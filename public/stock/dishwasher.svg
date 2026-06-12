@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="450" viewBox="0 0 600 450">
+<rect width="600" height="450" fill="#f3f1ea"/>
+<g transform="translate(300,200)" stroke="#b9b6ab" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<g transform="translate(-12,-12) scale(5)"><path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM4 8h16M8 12a4 4 0 0 0 8 0"/></g></g>
+<text x="300" y="360" font-family="Arial,Helvetica,sans-serif" font-size="30" font-weight="bold" fill="#0c447c" text-anchor="middle">BARGAIN BAY</text>
+<text x="300" y="395" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#6b6b6b" text-anchor="middle">Dishwasher · photo coming soon</text>
+</svg>

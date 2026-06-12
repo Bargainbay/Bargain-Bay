@@ -1,0 +1,181 @@
+import { NextResponse } from 'next/server';
+import { getMany } from '../../../lib/inventory';
+import { hasDb, query, withTransaction } from '../../../lib/db';
+import { unavailableSkus, reserveWithClient, expireReservations } from '../../../lib/reservations';
+import { cloverConfigured, createHostedCheckout } from '../../../lib/clover';
+import {
+  getSession, hashPassword, createSessionToken,
+  sessionCookieOptions, SESSION_COOKIE, normalizeEmail, validEmail
+} from '../../../lib/auth';
+import { round2, HST_RATE, DELIVERY_FEE } from '../../../lib/constants';
+import { writebackEnabled, writeSold } from '../../../lib/sheets';
+
+export const dynamic = 'force-dynamic';
+
+function siteUrl() {
+  return (process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000').replace(/\/$/, '');
+}
+
+export async function POST(req) {
+  let body;
+  try { body = await req.json(); } catch { body = {}; }
+
+  const skus = [...new Set((Array.isArray(body.skus) ? body.skus : []).filter((s) => typeof s === 'string'))];
+  const email = normalizeEmail(body.email);
+  const name = String(body.name || '').trim();
+  const phone = String(body.phone || '').trim();
+  const deliveryMethod = body.deliveryMethod === 'delivery' ? 'delivery' : 'pickup';
+  const address = String(body.address || '').trim();
+  const city = String(body.city || '').trim();
+  const postal = String(body.postal || '').trim();
+  const password = String(body.password || '');
+
+  // ---- validation ----
+  if (!skus.length) return NextResponse.json({ error: 'Your cart is empty.' }, { status: 400 });
+  if (!validEmail(email)) return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
+  if (!name) return NextResponse.json({ error: 'Please enter your name.' }, { status: 400 });
+  if (deliveryMethod === 'delivery' && (!address || !city || !postal)) {
+    return NextResponse.json({ error: 'Delivery requires a street address, city, and postal code.' }, { status: 400 });
+  }
+  if (!hasDb()) {
+    return NextResponse.json({ error: 'Online ordering is briefly offline — email sales@bargainbay.ca and we will hold the unit for you.' }, { status: 503 });
+  }
+
+  // Opportunistic housekeeping: clear expired holds / stale unpaid orders so
+  // a unit abandoned mid-checkout is purchasable again without waiting for cron.
+  expireReservations().catch((e) => console.error('opportunistic expiry failed', e.message));
+
+  const items = getMany(skus);
+  if (items.length !== skus.length) {
+    const found = new Set(items.map((u) => u.id));
+    return NextResponse.json(
+      { error: 'Some items are no longer in the catalogue.', unavailable: skus.filter((s) => !found.has(s)) },
+      { status: 409 }
+    );
+  }
+
+  // Fast pre-check (the transaction below is the authoritative race-safe gate).
+  const blocked = await unavailableSkus(skus);
+  if (blocked.size) {
+    return NextResponse.json(
+      { error: 'One or more items just sold or are held by another checkout.', unavailable: [...blocked] },
+      { status: 409 }
+    );
+  }
+
+  // ---- totals (HST applies to goods + delivery) ----
+  const subtotal = round2(items.reduce((a, u) => a + Number(u.price), 0));
+  const deliveryFee = deliveryMethod === 'delivery' ? DELIVERY_FEE : 0;
+  const hst = round2((subtotal + deliveryFee) * HST_RATE);
+  const total = round2(subtotal + deliveryFee + hst);
+
+  // ---- session / optional account creation ----
+  const session = await getSession();
+  let userId = session?.userId || null;
+  let newSessionToken = null;
+  if (!session && password) {
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Account password must be at least 8 characters (or leave it blank for guest checkout).' }, { status: 400 });
+    }
+    try {
+      const hash = await hashPassword(password);
+      const { rows } = await query(
+        `INSERT INTO users (email, name, phone, password_hash)
+         VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING
+         RETURNING id, email, name`,
+        [email, name, phone || null, hash]
+      );
+      if (rows.length) {
+        userId = rows[0].id;
+        newSessionToken = await createSessionToken(rows[0]);
+      }
+      // If the email already has an account, continue as guest — we can't
+      // attach the order to an account that wasn't authenticated.
+    } catch (e) {
+      console.error('account creation during checkout failed (continuing as guest)', e);
+    }
+  }
+
+  // ---- create order + items + reservations atomically ----
+  let order;
+  try {
+    order = await withTransaction(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO orders (user_id, email, name, phone, delivery_method, address, city, postal,
+                             status, subtotal, hst, total)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',$9,$10,$11)
+         RETURNING id`,
+        [userId, email, name, phone || null, deliveryMethod,
+         address || null, city || null, postal || null, subtotal, hst, total]
+      );
+      const orderId = rows[0].id;
+      const { rows: numbered } = await client.query(
+        `UPDATE orders SET order_number = 'BB-' || (1000 + id) WHERE id = $1 RETURNING order_number`,
+        [orderId]
+      );
+      await reserveWithClient(client, skus, orderId);
+      for (const u of items) {
+        await client.query(
+          'INSERT INTO order_items (order_id, sku, title, price) VALUES ($1,$2,$3,$4)',
+          [orderId, u.id, u.title || `${u.make} ${u.model}`, u.price]
+        );
+      }
+      return { id: orderId, orderNumber: numbered[0].order_number };
+    });
+  } catch (e) {
+    if (e.code === 'SKU_HELD') {
+      return NextResponse.json(
+        { error: 'Someone else just started checking out with one of your items. It may free up in ~30 minutes.', unavailable: [e.sku] },
+        { status: 409 }
+      );
+    }
+    console.error('checkout transaction failed', e);
+    return NextResponse.json({ error: 'Could not create your order. Please try again.' }, { status: 500 });
+  }
+
+  const trackUrl = `/order/${order.orderNumber}` + (userId ? '' : `?email=${encodeURIComponent(email)}`);
+
+  let payload;
+  if (cloverConfigured()) {
+    // ---- hosted payment ----
+    try {
+      const lineItems = [
+        ...items.map((u) => ({
+          name: `${u.make} ${u.model}`,
+          priceCents: Math.round(Number(u.price) * 100),
+          note: u.id
+        })),
+        ...(deliveryFee ? [{ name: 'Local delivery (Hamilton & area)', priceCents: Math.round(deliveryFee * 100), note: 'DELIVERY' }] : []),
+        { name: 'HST 13% (Ontario)', priceCents: Math.round(hst * 100), note: 'HST' }
+      ];
+      const { url, sessionId } = await createHostedCheckout({
+        lineItems,
+        customer: { email, firstName: name.split(' ')[0], lastName: name.split(' ').slice(1).join(' ') || '-', phoneNumber: phone || undefined },
+        successUrl: `${siteUrl()}${trackUrl}${trackUrl.includes('?') ? '&' : '?'}status=success`,
+        failureUrl: `${siteUrl()}/checkout?status=failed`
+      });
+      if (sessionId) {
+        await query('UPDATE orders SET clover_session_id = $2 WHERE id = $1', [order.id, sessionId]).catch(() => {});
+      }
+      payload = { url, orderNumber: order.orderNumber };
+    } catch (e) {
+      console.error('Clover session failed — cancelling order', e);
+      await query("UPDATE orders SET status = 'cancelled' WHERE id = $1", [order.id]).catch(() => {});
+      await query('DELETE FROM reservations WHERE order_id = $1', [order.id]).catch(() => {});
+      return NextResponse.json({ error: 'Payment provider is unavailable right now. Please try again in a few minutes.' }, { status: 502 });
+    }
+  } else {
+    // ---- no Clover token yet: confirm immediately, pay on pickup/delivery ----
+    await query("UPDATE orders SET status = 'confirmed' WHERE id = $1", [order.id]);
+    if (writebackEnabled()) {
+      for (const u of items) {
+        try { await writeSold(u.id, u.price); } catch (e) { console.error('writeSold failed', u.id, e.message); }
+      }
+    }
+    payload = { orderUrl: trackUrl, orderNumber: order.orderNumber };
+  }
+
+  const res = NextResponse.json(payload);
+  if (newSessionToken) res.cookies.set(SESSION_COOKIE, newSessionToken, sessionCookieOptions());
+  return res;
+}

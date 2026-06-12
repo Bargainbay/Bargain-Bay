@@ -1,0 +1,29 @@
+import { money, pctOff } from '../lib/constants';
+import ConditionPill from './ConditionPill';
+import AddToCartButton from './AddToCartButton';
+
+// Server-safe card; the add-to-cart button inside is a client component.
+export default function ProductCard({ unit }) {
+  const off = pctOff(unit.price, unit.compareAt);
+  const href = `/product/${encodeURIComponent(unit.id)}`;
+  return (
+    <div className="card">
+      {off > 0 && <span className="off-badge">{off}% off</span>}
+      <a href={href} className="thumb">
+        <img src={unit.image} alt={unit.title || `${unit.make} ${unit.model}`} loading="lazy" />
+      </a>
+      <div className="card-body">
+        <ConditionPill condition={unit.condition} />
+        <a href={href} className="card-title">{unit.title || `${unit.make} ${unit.model}`}</a>
+        <div className="card-model">{unit.make} · {unit.model}</div>
+        <div className="price-row">
+          <span className="price">{money(unit.price)}</span>
+          {unit.compareAt > unit.price && <span className="compare">{money(unit.compareAt)}</span>}
+        </div>
+        <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+          <AddToCartButton sku={unit.id} small />
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,1395 @@
+{
+ "generatedAt": "2026-06-12",
+ "units": [
+  {
+   "id": "SS-116088-004",
+   "make": "Midea",
+   "model": "MLC31N5AWW",
+   "category": "Washer/Dryer Combo",
+   "title": "Midea All-in-One Washer Dryer Combo",
+   "condition": "New Open Box",
+   "price": 734.3,
+   "compareAt": 1049.0
+  },
+  {
+   "id": "SS-116088-005",
+   "make": "Midea",
+   "model": "MRU21F6AWW",
+   "category": "Freezer",
+   "title": "Midea 21 Cu. Ft. 30\" Convertible 2-in-1 Upright Freezer/Fridge",
+   "condition": "Scratch & Dent",
+   "price": 503.3,
+   "compareAt": 719.0
+  },
+  {
+   "id": "SS-116088-006",
+   "make": "Midea",
+   "model": "MRB19B7AWW",
+   "category": "Refrigerator",
+   "title": "Midea 18.7 cu. ft. Garage Ready Bottom-Freezer Refrigerator, White - MRB19B7AWW",
+   "condition": "Scratch & Dent",
+   "price": 625.8,
+   "compareAt": 894.0
+  },
+  {
+   "id": "SS-116088-007",
+   "make": "Midea",
+   "model": "MLH27N5AWWC",
+   "category": "Washer",
+   "title": "Midea 24 Inch Front Load Washing Machine with 3.1 cu. ft. Capacity, White - MLH27N5AWWC",
+   "condition": "New Open Box",
+   "price": 434.75,
+   "compareAt": 539.0
+  },
+  {
+   "id": "SS-11236-003",
+   "make": "Forno",
+   "model": "FCMDW0024",
+   "category": "Dishwasher",
+   "title": "Forno 24 in. Commercial Under-Counter Dishwasher, Stainless Steel",
+   "condition": "New in Box",
+   "price": 2159.99,
+   "compareAt": 2699.99
+  },
+  {
+   "id": "SS-11236-004",
+   "make": "Frigidaire",
+   "model": "FRMS2733AV",
+   "category": "Refrigerator",
+   "title": "Frigidaire 36 Inch 4-Door French Door Refrigerator with 26.3 Cu. Ft. Capacity, Stainless Steel",
+   "condition": "New Open Box",
+   "price": 1679.3,
+   "compareAt": 2399.0
+  },
+  {
+   "id": "SS-11236-008",
+   "make": "Midea",
+   "model": "MLH52N5AWW",
+   "category": "Washer",
+   "title": "Midea 5.2 cu ft. White Front Load Washer",
+   "condition": "New Open Box",
+   "price": 639.2,
+   "compareAt": 799.0
+  },
+  {
+   "id": "SS-11236-009",
+   "make": "LG",
+   "model": "LF24Z6530S",
+   "category": "Refrigerator",
+   "title": "LG 24 cu. ft. Counter-Depth 3-Door French Door Refrigerator, PrintProof Stainless Steel",
+   "condition": "Scratch & Dent",
+   "price": 1556.99,
+   "compareAt": 2594.99
+  },
+  {
+   "id": "SS-11236-011",
+   "make": "Frigidaire",
+   "model": "FRSS2323AS",
+   "category": "Refrigerator",
+   "title": "Frigidaire 33 Inch Side-by-Side Refrigerator with 22.3 cu. ft. Capacity, Stainless Steel",
+   "condition": "New in Box",
+   "price": 1274.39,
+   "compareAt": 1592.99
+  },
+  {
+   "id": "SS-11236-012",
+   "make": "GE",
+   "model": "GWE22JYMFS",
+   "category": "Refrigerator",
+   "title": "GE 36 Inch Counter-Depth French Door Refrigerator with 21.9 cu. ft. Capacity, Stainless Steel",
+   "condition": "New Open Box",
+   "price": 1395.8,
+   "compareAt": 1994.0
+  },
+  {
+   "id": "SS-11236-013",
+   "make": "Samsung",
+   "model": "RF25C5551SR/AA",
+   "category": "Refrigerator",
+   "title": "Samsung 33 Inch 3-Door French Door Refrigerator with Beverage Center",
+   "condition": "Scratch & Dent",
+   "price": 1196.99,
+   "compareAt": 1994.99
+  },
+  {
+   "id": "SS-11236-016",
+   "make": "Frigidaire",
+   "model": "PRSC2222AF",
+   "category": "Refrigerator",
+   "title": "Frigidaire 36 Inch Counter Depth Side by Side Refrigerator with 22.3 cu. ft. Capacity",
+   "condition": "Refurbished",
+   "price": 1196.49,
+   "compareAt": 2392.99
+  },
+  {
+   "id": "SS-114223-012",
+   "make": "Electrolux",
+   "model": "ELFW7337AW",
+   "category": "Washer",
+   "title": "ELECTROLUX 3 SERIES 27 IN 5.1 CU FT. I.E.C WHITE FRONT LOAD WASHER WITH LUXCARE WASH SYSTEM - ELFW73",
+   "condition": "Scratch & Dent",
+   "price": 629.3,
+   "compareAt": 899.0
+  },
+  {
+   "id": "SS-114223-014",
+   "make": "1.6",
+   "model": "YWMCS7022RZ",
+   "category": "Microwave",
+   "title": "1.6 cu. ft. Sensor Cooking Microwave YWMCS7022RZ",
+   "condition": "Scratch & Dent",
+   "price": 292.5,
+   "compareAt": 325.0
+  },
+  {
+   "id": "SS-114223-015",
+   "make": "Electrolux",
+   "model": "EPWD257UTT",
+   "category": "Appliance",
+   "title": "ELECTROLUX EPWD257UTT",
+   "condition": "Scratch & Dent",
+   "price": 263.69,
+   "compareAt": 292.99
+  },
+  {
+   "id": "SS-114223-016",
+   "make": "LG",
+   "model": "WDP6B",
+   "category": "Laundry Pedestal",
+   "title": "LG 27 Inch Laundry Storage Pedestal - WDP6B",
+   "condition": "Scratch & Dent",
+   "price": 265.48,
+   "compareAt": 294.98
+  },
+  {
+   "id": "SS-113652-006",
+   "make": "Whirlpool",
+   "model": "WFC682CLW",
+   "category": "Laundry Center",
+   "title": "Whirlpool 4.5 Cu. Ft. Ventless All In One Washer Dryer WFC682CLW",
+   "condition": "Refurbished",
+   "price": 997.5,
+   "compareAt": 1995.0
+  },
+  {
+   "id": "SS-113652-017",
+   "make": "Frigidaire",
+   "model": "GCFI306CBF",
+   "category": "Range",
+   "title": "FRIGIDAIRE GALLERY 30 INCH SLIDE-IN INDUCTION RANGE WITH TOTAL CONVECTION - GCFI306CBF",
+   "condition": "Scratch & Dent",
+   "price": 1178.4,
+   "compareAt": 1964.0
+  },
+  {
+   "id": "SS-113652-023",
+   "make": "Samsung",
+   "model": "DVE50BG8300V",
+   "category": "Appliance",
+   "title": "SAMSUNG 7.5 CUFT BSS ELEC",
+   "condition": "Scratch & Dent",
+   "price": 656.99,
+   "compareAt": 1094.99
+  },
+  {
+   "id": "SS-113652-024",
+   "make": "GE",
+   "model": "GYE21JYMFS",
+   "category": "Appliance",
+   "title": "GE 36IN 20.96 CUFT",
+   "condition": "Used",
+   "price": 877.6,
+   "compareAt": 2194.0
+  },
+  {
+   "id": "SS-113652-029",
+   "make": "Bosch",
+   "model": "HBL5351UC",
+   "category": "Wall Oven",
+   "title": "Bosch 500 Series HBL5351UC Wall Oven , 30 inch Exterior Width",
+   "condition": "Scratch & Dent",
+   "price": 1857.0,
+   "compareAt": 3095.0
+  },
+  {
+   "id": "SS-113652-041",
+   "make": "GE",
+   "model": "GFW650SPNSN",
+   "category": "Washer",
+   "title": "GE GFW650SPNSN 5.5 WASHER",
+   "condition": "Refurbished",
+   "price": 675.0,
+   "compareAt": 1349.99
+  },
+  {
+   "id": "SS-113652-045",
+   "make": "Maytag",
+   "model": "MRFF5033PZ",
+   "category": "Refrigerator",
+   "title": "Maytag 33-Inch Wide French Door Refrigerator with Water Dispenser",
+   "condition": "New Open Box",
+   "price": 1746.49,
+   "compareAt": 2494.99
+  },
+  {
+   "id": "SS-113652-046",
+   "make": "Maytag",
+   "model": "MSS25N4MKZ",
+   "category": "Refrigerator",
+   "title": "Maytag 36-Inch Wide Side-by-Side Refrigerator",
+   "condition": "Scratch & Dent",
+   "price": 1016.99,
+   "compareAt": 1694.99
+  },
+  {
+   "id": "SS-113652-048",
+   "make": "GE Profile",
+   "model": "PCGS960YPFS",
+   "category": "Range",
+   "title": "GE PROFILE 30 IN. STAINLESS STEEL GAS SLIDE-IN DOUBLE RANGE WITH STEAM CLEAN - PCGS960YPFS",
+   "condition": "Scratch & Dent",
+   "price": 1796.99,
+   "compareAt": 2994.99
+  },
+  {
+   "id": "SS-113652-059",
+   "make": "Whirlpool",
+   "model": "WRFC2036RZ",
+   "category": "Refrigerator",
+   "title": "Whirlpool 36-Inch Counter-Depth French Door Refrigerator, 20 cu. ft., Fingerprint Resistant",
+   "condition": "Refurbished",
+   "price": 1297.5,
+   "compareAt": 2595.0
+  },
+  {
+   "id": "SS-113652-062",
+   "make": "Bosch",
+   "model": "SHEM63W55N",
+   "category": "Dishwasher",
+   "title": "Bosch 300 Series Stainless Steel colour Miele Dishwasher",
+   "condition": "Scratch & Dent",
+   "price": 659.4,
+   "compareAt": 1099.0
+  },
+  {
+   "id": "SS-113652-065",
+   "make": "Whirlpool",
+   "model": "YWHD560CHW",
+   "category": "Appliance",
+   "title": "Whirlpool Electric YWHD560CHW",
+   "condition": "Refurbished",
+   "price": 897.5,
+   "compareAt": 1795.0
+  },
+  {
+   "id": "SS-113652-066",
+   "make": "Whirlpool",
+   "model": "WRFF3536SZ",
+   "category": "Appliance",
+   "title": "WHIRLPOOL WRFF3536SZ 36IN",
+   "condition": "Scratch & Dent",
+   "price": 1197.0,
+   "compareAt": 1995.0
+  },
+  {
+   "id": "SS-113652-069",
+   "make": "Whirlpool",
+   "model": "WRS321SDHZ",
+   "category": "Refrigerator",
+   "title": "Whirlpool 33-inch W 21 cu. ft. Side by Side Refrigerator in Fingerprint Resistant - WRS321SDHZ",
+   "condition": "Scratch & Dent",
+   "price": 1017.0,
+   "compareAt": 1695.0
+  },
+  {
+   "id": "SS-113652-070",
+   "make": "Whirlpool",
+   "model": "WRS321SDHZ",
+   "category": "Refrigerator",
+   "title": "Whirlpool 33-inch W 21 cu. ft. Side by Side Refrigerator in Fingerprint Resistant - WRS321SDHZ",
+   "condition": "Scratch & Dent",
+   "price": 1017.0,
+   "compareAt": 1695.0
+  },
+  {
+   "id": "SS-113652-074",
+   "make": "Whirlpool",
+   "model": "YWML75011HV",
+   "category": "Microwave",
+   "title": "Whirlpool YWML75011HV Over the Range Microwave, 30 inch Exterior Width",
+   "condition": "Tested & Working",
+   "price": 266.99,
+   "compareAt": null
+  },
+  {
+   "id": "SS-114239-001",
+   "make": "Cafe",
+   "model": "CDT875P2NS1",
+   "category": "Dishwasher",
+   "title": "Cafe 24 Inch Fully Integrated Smart Built-In Dishwasher with 16 Place Settings, Stainless Steel - CD",
+   "condition": "Scratch & Dent",
+   "price": 1499.99,
+   "compareAt": 2499.99
+  },
+  {
+   "id": "SS-114239-002",
+   "make": "Fisher & Paykel",
+   "model": "DD24ST4NX9",
+   "category": "Dishwasher",
+   "title": "Fisher & Paykel 24 Inch Built-Under Single Smart DishDrawer Dishwasher - DD24ST4NX9",
+   "condition": "Scratch & Dent",
+   "price": 1019.4,
+   "compareAt": 1699.0
+  },
+  {
+   "id": "SS-114239-003",
+   "make": "Bosch",
+   "model": "SHP78CM5N",
+   "category": "Dishwasher",
+   "title": "Bosch 800 Series 24 Inch Top Control Dishwasher, Stainless Steel - SHP78CM5N",
+   "condition": "Scratch & Dent",
+   "price": 1496.99,
+   "compareAt": 2494.99
+  },
+  {
+   "id": "SS-114239-011",
+   "make": "Frigidaire",
+   "model": "GRSC2352AD",
+   "category": "Refrigerator",
+   "title": "Frigidaire 36 Inch Counter-Depth Side-by-Side Refrigerator with 22.2 cu. ft. Capacity, Black Stainle",
+   "condition": "Scratch & Dent",
+   "price": 1195.79,
+   "compareAt": 1992.98
+  },
+  {
+   "id": "SS-114239-013",
+   "make": "Frigidaire",
+   "model": "GRSS2652AF",
+   "category": "Refrigerator",
+   "title": "Frigidaire 36 Inch Side-by-Side Refrigerator with 25.6 cu. ft. Capacity, Smudge-Proof Stainless Stee",
+   "condition": "Used",
+   "price": 797.2,
+   "compareAt": 1993.0
+  },
+  {
+   "id": "SS-114239-015",
+   "make": "GE",
+   "model": "GWE22JYMFS",
+   "category": "Refrigerator",
+   "title": "GE 36 Inch Counter-Depth French Door Refrigerator with 21.9 cu. ft. Capacity, Stainless Steel - GWE2",
+   "condition": "Used",
+   "price": 797.6,
+   "compareAt": 1994.0
+  },
+  {
+   "id": "SS-114239-023",
+   "make": "JennAir",
+   "model": "JMC2430LM",
+   "category": "Microwave",
+   "title": "JennAir 30 Inch Built-In Convection Microwave, 1.4 Cu. Ft. - JMC2430LM",
+   "condition": "Scratch & Dent",
+   "price": 2078.99,
+   "compareAt": 3464.98
+  },
+  {
+   "id": "SS-114239-026",
+   "make": "LG",
+   "model": "DLG3601W",
+   "category": "Dryer",
+   "title": "LG 7.4 cu ft Stackable Vented Gas Dryer, White - DLG3601W",
+   "condition": "Refurbished",
+   "price": 572.5,
+   "compareAt": 1144.99
+  },
+  {
+   "id": "SS-114239-027",
+   "make": "Samsung",
+   "model": "DVE53BB8900TAC",
+   "category": "Dryer",
+   "title": "Samsung 7.6 Cu. Ft. Electric Steam Dryer, Silver Steel - DVE53BB8900TAC",
+   "condition": "Refurbished",
+   "price": 599.5,
+   "compareAt": 1199.0
+  },
+  {
+   "id": "SS-114239-028",
+   "make": "Electrolux",
+   "model": "ELFE753CAT",
+   "category": "Dryer",
+   "title": "Electrolux 8 Cu. Ft. Electric Dryer with Steam, Titanium - ELFE753CAT",
+   "condition": "Refurbished",
+   "price": 521.5,
+   "compareAt": 1042.99
+  },
+  {
+   "id": "SS-114239-030",
+   "make": "JennAir",
+   "model": "JWD2030WS",
+   "category": "Warming Drawer",
+   "title": "JennAir Warming Drawer with Stainless Steel Finish - JWD2030WS",
+   "condition": "Scratch & Dent",
+   "price": 839.4,
+   "compareAt": 1399.0
+  },
+  {
+   "id": "SS-114238-002",
+   "make": "Fisher & Paykel",
+   "model": "DD24ST4NX9",
+   "category": "Dishwasher",
+   "title": "Fisher & Paykel 24 Inch Built-Under Single Smart DishDrawer Dishwasher - DD24ST4NX9",
+   "condition": "Scratch & Dent",
+   "price": 1019.4,
+   "compareAt": 1699.0
+  },
+  {
+   "id": "SS-114238-003",
+   "make": "Fulgor Milano",
+   "model": "F4DWS24FI1",
+   "category": "Dishwasher",
+   "title": "Fulgor Milano 24 Inch Fully Integrated Panel Ready Dishwasher - F4DWS24FI1",
+   "condition": "Scratch & Dent",
+   "price": 663.6,
+   "compareAt": 1106.0
+  },
+  {
+   "id": "SS-114238-006",
+   "make": "Danby",
+   "model": "DFF101B1BDB",
+   "category": "Refrigerator",
+   "title": "Danby 23.4 Inch Top-Freezer Refrigerator 10.1 Cu. Ft., Black - DFF101B1BDB",
+   "condition": "Scratch & Dent",
+   "price": 489.98,
+   "compareAt": 699.97
+  },
+  {
+   "id": "SS-114238-009",
+   "make": "Fulgor Milano",
+   "model": "FM1BM22FBI",
+   "category": "Refrigerator",
+   "title": "Fulgor Milano Built-In Refrigerator - FM1BM22FBI",
+   "condition": "Scratch & Dent",
+   "price": 845.4,
+   "compareAt": 1409.0
+  },
+  {
+   "id": "SS-114238-011",
+   "make": "Frigidaire",
+   "model": "FRFN2813AF",
+   "category": "Refrigerator",
+   "title": "Frigidaire 36 Inch French Door Refrigerator with 28.8 cu. ft. Capacity, Stainless Steel - FRFN2813AF",
+   "condition": "Scratch & Dent",
+   "price": 1195.8,
+   "compareAt": 1993.0
+  },
+  {
+   "id": "SS-114238-012",
+   "make": "Frigidaire",
+   "model": "FRFS2823AS",
+   "category": "Refrigerator",
+   "title": "Frigidaire 36 Inch French Door Refrigerator with 27.8 cu. ft. Capacity, Stainless Steel - FRFS2823AS",
+   "condition": "Refurbished",
+   "price": 1146.5,
+   "compareAt": 2293.0
+  },
+  {
+   "id": "SS-114238-013",
+   "make": "Frigidaire",
+   "model": "FRSS2623AS",
+   "category": "Refrigerator",
+   "title": "Frigidaire 36 Inch Side-by-Side Refrigerator, Stainless Steel - FRSS2623AS",
+   "condition": "Scratch & Dent",
+   "price": 1075.79,
+   "compareAt": 1792.99
+  },
+  {
+   "id": "SS-114238-016",
+   "make": "Frigidaire",
+   "model": "GRFG2353AF",
+   "category": "Refrigerator",
+   "title": "Frigidaire 36 Inch French Door Refrigerator with 23.3 cu. ft. Capacity, Stainless Steel - GRFG2353AF",
+   "condition": "Scratch & Dent",
+   "price": 1435.8,
+   "compareAt": 2393.0
+  },
+  {
+   "id": "SS-114238-019",
+   "make": "Whirlpool",
+   "model": "WRSF5536RW",
+   "category": "Refrigerator",
+   "title": "Whirlpool 36 Inch Side-by-Side Refrigerator, White - WRSF5536RW",
+   "condition": "Used",
+   "price": 898.0,
+   "compareAt": 2245.0
+  },
+  {
+   "id": "SS-114238-021",
+   "make": "KitchenAid",
+   "model": "KVUB400GSS",
+   "category": "Range Hood",
+   "title": "KitchenAid 30 Inch Under-Cabinet Range Hood, Stainless Steel - KVUB400GSS",
+   "condition": "Scratch & Dent",
+   "price": 627.0,
+   "compareAt": 1045.0
+  },
+  {
+   "id": "SS-114238-022",
+   "make": "Electrolux",
+   "model": "RH30WX55GS",
+   "category": "Range Hood",
+   "title": "Electrolux 30 Inch Chimney Range Hood with Heat Sensor, 600 CFM, Stainless Steel - RH30WC55GS",
+   "condition": "Scratch & Dent",
+   "price": 688.8,
+   "compareAt": 1148.0
+  },
+  {
+   "id": "SS-114238-027",
+   "make": "Samsung",
+   "model": "DVE53BB8900GAC",
+   "category": "Dryer",
+   "title": "Samsung Electric Dryer 7.6 cu. ft., Bespoke Forest Green - DVE53BB8900GAC",
+   "condition": "Scratch & Dent",
+   "price": 1109.97,
+   "compareAt": 1849.95
+  },
+  {
+   "id": "SS-114238-028",
+   "make": "Samsung",
+   "model": "DVE55A7300E/AC",
+   "category": "Dryer",
+   "title": "Samsung 7.4 cu.ft. Smart Top Load Dryer with Steam Sanitize - DVE55A7300E/AC",
+   "condition": "Scratch & Dent",
+   "price": 696.5,
+   "compareAt": 995.0
+  },
+  {
+   "id": "SS-114238-029",
+   "make": "Fulgor Milano",
+   "model": "F7SP24S1",
+   "category": "Wall Oven",
+   "title": "Fulgor Milano 24 Inch Single Wall Oven - F7SP24S1",
+   "condition": "Scratch & Dent",
+   "price": 1200.64,
+   "compareAt": 2001.06
+  },
+  {
+   "id": "SS-114238-030",
+   "make": "LG",
+   "model": "WM6998HBA",
+   "category": "Laundry Center",
+   "title": "LG 5.7 cu. ft. Ventless All-in-One Heat Pump WashCombo, Black Steel - WM6998HBA",
+   "condition": "Refurbished",
+   "price": 1152.5,
+   "compareAt": 2305.0
+  },
+  {
+   "id": "SS-116094-001",
+   "make": "Midea",
+   "model": "MLTE52M2BGG",
+   "category": "Dryer",
+   "title": "Midea 7.0 Cu. Ft. Electric Dryer (MLTE52M2BGG) - Metallic Grey",
+   "condition": "New Open Box",
+   "price": 599.99,
+   "compareAt": 749.99
+  },
+  {
+   "id": "SS-114240-002",
+   "make": "Cafe",
+   "model": "CDT875P2NS1",
+   "category": "Dishwasher",
+   "title": "Cafe 24 Inch Fully Integrated Smart Built-In Dishwasher with 16 Place Settings, Stainless Steel - CDT875P2NS1",
+   "condition": "Scratch & Dent",
+   "price": 1499.99,
+   "compareAt": 2499.99
+  },
+  {
+   "id": "SS-114240-003",
+   "make": "Beko",
+   "model": "DIT38532",
+   "category": "Dishwasher",
+   "title": "Beko Tall Tub Built-In Dishwasher, 16 Place Settings, Panel-Ready - DIT38532",
+   "condition": "Scratch & Dent",
+   "price": 1019.99,
+   "compareAt": 1699.99
+  },
+  {
+   "id": "SS-114240-006",
+   "make": "KitchenAid",
+   "model": "KRFF305EBS",
+   "category": "Refrigerator",
+   "title": "KitchenAid 36 Inch French Door Refrigerator, 25.2 cu. ft., Black Stainless - KRFF305EBS",
+   "condition": "New Open Box",
+   "price": 1839.6,
+   "compareAt": 2628.0
+  },
+  {
+   "id": "SS-114240-009",
+   "make": "KitchenAid",
+   "model": "KRSF705HPS",
+   "category": "Refrigerator",
+   "title": "KitchenAid 36 Inch Side-by-Side Refrigerator with 24.8 cu. ft. Capacity, Stainless Steel - KRSF705HPS",
+   "condition": "Scratch & Dent",
+   "price": 1979.98,
+   "compareAt": 3299.96
+  },
+  {
+   "id": "SS-114240-012",
+   "make": "LG",
+   "model": "LSBNC1021P",
+   "category": "Refrigerator",
+   "title": "LG STUDIO 22-inch W 9 cu. ft. Panel-Ready 2 Door Bottom Freezer Refrigerator in White Counter Depth",
+   "condition": "Used",
+   "price": 680.0,
+   "compareAt": 1699.99
+  },
+  {
+   "id": "SS-114240-013",
+   "make": "Frigidaire",
+   "model": "PRSC2222AF",
+   "category": "Refrigerator",
+   "title": "Frigidaire 36 Inch Counter Depth Side by Side Refrigerator with 22.3 cu. ft. Capacity - PRSC2222AF",
+   "condition": "New Open Box",
+   "price": 1675.09,
+   "compareAt": 2392.99
+  },
+  {
+   "id": "SS-114240-015",
+   "make": "Frigidaire",
+   "model": "PRSC2222AF",
+   "category": "Refrigerator",
+   "title": "Frigidaire 36 Inch Counter Depth Side by Side Refrigerator with 22.3 cu. ft. Capacity - PRSC2222AF",
+   "condition": "Refurbished",
+   "price": 1196.49,
+   "compareAt": 2392.99
+  },
+  {
+   "id": "SS-114240-020",
+   "make": "Cafe",
+   "model": "CVW73012MSS",
+   "category": "Range Hood",
+   "title": "Cafe 30 in. Wall Mount Range Hood with Light, Stainless Steel - CVW73012MSS",
+   "condition": "New Open Box",
+   "price": 604.0,
+   "compareAt": 755.0
+  },
+  {
+   "id": "SS-114240-021",
+   "make": "Wolf",
+   "model": "PL461912",
+   "category": "Range Hood",
+   "title": "Wolf Wall Mount Hood Liner - PL461912",
+   "condition": "New Open Box",
+   "price": 1514.8,
+   "compareAt": 2164.0
+  },
+  {
+   "id": "SS-114240-028",
+   "make": "Samsung",
+   "model": "DF18CG3100TRAC",
+   "category": "Air Dresser",
+   "title": "Samsung 3100 Series Air Dresser with Jet Steam, Right Swing - DF18CG3100TRAC",
+   "condition": "Refurbished",
+   "price": 847.5,
+   "compareAt": 1694.99
+  },
+  {
+   "id": "SS-114430-005",
+   "make": "Huebsch",
+   "model": "DR7103WE",
+   "category": "Dryer",
+   "title": "DR7 Sanitizing Electric Dryer, Pet Plus, Steam, Over-dry Protection",
+   "condition": "Scratch & Dent",
+   "price": 1445.4,
+   "compareAt": 2409.0
+  },
+  {
+   "id": "SS-114430-011",
+   "make": "Bertazzoni",
+   "model": "REF18FCBIPLV",
+   "category": "Freezer",
+   "title": "Built-In Freezer 18in, ENERGY STAR, Ice Maker, 8.6 cu ft",
+   "condition": "Refurbished",
+   "price": 4269.5,
+   "compareAt": 8539.0
+  },
+  {
+   "id": "SS-114430-012",
+   "make": "Bertazzoni",
+   "model": "REF24FCIPIXL",
+   "category": "Freezer",
+   "title": "24in Built-In Column Freezer, Stainless Steel",
+   "condition": "Refurbished",
+   "price": 7344.5,
+   "compareAt": 14689.0
+  },
+  {
+   "id": "SS-114430-013",
+   "make": "Frigidaire",
+   "model": "FRFG1723AV",
+   "category": "Refrigerator",
+   "title": "31.5in 17.6 cu ft SS Counter-Depth French Door Fridge, Auto-Close",
+   "condition": "Scratch & Dent",
+   "price": 955.79,
+   "compareAt": 1592.98
+  },
+  {
+   "id": "SS-114430-018",
+   "make": "Bertazzoni",
+   "model": "REF30RCBPNV",
+   "category": "Refrigerator",
+   "title": "30in Panel Ready Built-In Refrigerator Column, 16.7 cu ft",
+   "condition": "Refurbished",
+   "price": 3379.5,
+   "compareAt": 6759.0
+  },
+  {
+   "id": "SS-114430-020",
+   "make": "Bertazzoni",
+   "model": "REF36FDFZXNT",
+   "category": "Refrigerator",
+   "title": "36in Freestanding 4-Door French Door Refrigerator, 21.6 cu ft",
+   "condition": "Refurbished",
+   "price": 2414.5,
+   "compareAt": 4829.0
+  },
+  {
+   "id": "SS-114430-021",
+   "make": "Samsung",
+   "model": "RF29BB8600QLAA",
+   "category": "Refrigerator",
+   "title": "Bespoke 36in 28.8 cu ft 4-Door French Door Refrigerator",
+   "condition": "Scratch & Dent",
+   "price": 1676.99,
+   "compareAt": 2794.99
+  },
+  {
+   "id": "SS-114430-022",
+   "make": "Electrolux",
+   "model": "ELFW7437AW",
+   "category": "Washer",
+   "title": "27in Front Load Washer, 4.5 cu ft",
+   "condition": "Scratch & Dent",
+   "price": 625.79,
+   "compareAt": 1042.99
+  },
+  {
+   "id": "June8Refurb-001",
+   "make": "Whirlpool",
+   "model": "WFC682CLW",
+   "category": "Washer/Dryer Combo",
+   "title": "Whirlpool 5.2 Cu. Ft. Ventless All-In-One Washer Dryer, White - WFC682CLW",
+   "condition": "Scratch & Dent",
+   "price": 1169.99,
+   "compareAt": 1949.99
+  },
+  {
+   "id": "June8Refurb-002",
+   "make": "Whirlpool",
+   "model": "WRB329DFBW",
+   "category": "Refrigerator",
+   "title": "Whirlpool 30 Inch Bottom-Freezer Refrigerator with 18.7 Cu. Ft. Capacity, White - WRB329DFBW",
+   "condition": "Scratch & Dent",
+   "price": 1077.0,
+   "compareAt": 1795.0
+  },
+  {
+   "id": "June8Refurb-003",
+   "make": "KitchenAid",
+   "model": "KFDS936SSS",
+   "category": "Range",
+   "title": "KitchenAid 36 Inch 6-Burner Commercial-Style Dual Fuel Range, Stainless Steel - KFDS936SSS",
+   "condition": "Scratch & Dent",
+   "price": 4799.4,
+   "compareAt": 7999.0
+  },
+  {
+   "id": "June8Refurb-004",
+   "make": "Amana",
+   "model": "YNED4655EW",
+   "category": "Dryer",
+   "title": "Amana 6.5 cu. ft. Front Load Electric Dryer with Automatic Dryness Control, White - YNED4655EW",
+   "condition": "Scratch & Dent",
+   "price": 445.5,
+   "compareAt": 495.0
+  },
+  {
+   "id": "June8Refurb-031",
+   "make": "Maytag",
+   "model": "YMED4205SW",
+   "category": "Dryer",
+   "title": "Maytag 7.0 Cu. Ft. Electric Dryer, White - YMED4205SW",
+   "condition": "Scratch & Dent",
+   "price": 539.99,
+   "compareAt": 599.99
+  },
+  {
+   "id": "June8Refurb-036",
+   "make": "Whirlpool",
+   "model": "YWED4105SW",
+   "category": "Dryer",
+   "title": "Whirlpool 7.0 cu. ft. Front Load Electric Dryer with AutoSensing, White - YWED4105SW",
+   "condition": "Scratch & Dent",
+   "price": 580.5,
+   "compareAt": 645.0
+  },
+  {
+   "id": "June8Refurb-040",
+   "make": "Maytag",
+   "model": "YMED6500MBK",
+   "category": "Dryer",
+   "title": "Maytag Pet Pro Front Load Electric Dryer, 7.0 cu. ft. - YMED6500MBK",
+   "condition": "Scratch & Dent",
+   "price": 614.98,
+   "compareAt": 699.96
+  },
+  {
+   "id": "June8Refurb-041",
+   "make": "Whirlpool",
+   "model": "YWED5050LW",
+   "category": "Dryer",
+   "title": "Whirlpool 7.0 Cu. Ft. Front Load Electric Moisture Sensing Dryer with Steam - YWED5050LW",
+   "condition": "Scratch & Dent",
+   "price": 635.25,
+   "compareAt": 745.0
+  },
+  {
+   "id": "June8Refurb-044",
+   "make": "Maytag",
+   "model": "YMED5030MW",
+   "category": "Dryer",
+   "title": "Maytag 7.0 cu ft Front Load Electric Dryer with Extra Power - YMED5030MW",
+   "condition": "Scratch & Dent",
+   "price": 657.75,
+   "compareAt": 795.0
+  },
+  {
+   "id": "June8Refurb-046",
+   "make": "Maytag",
+   "model": "YMED5630HW",
+   "category": "Dryer",
+   "title": "Maytag 7.3 cu. ft. Front Load Electric Dryer, White - YMED5630HW",
+   "condition": "Scratch & Dent",
+   "price": 725.25,
+   "compareAt": 944.99
+  },
+  {
+   "id": "June8Refurb-049",
+   "make": "Maytag",
+   "model": "YMED6205RR",
+   "category": "Dryer",
+   "title": "Maytag 7.4 Cu. Ft. Top Load Electric Dryer with Advanced Moisture Sensing, Radiant Silver - YMED6205RR",
+   "condition": "Scratch & Dent",
+   "price": 725.25,
+   "compareAt": 945.0
+  },
+  {
+   "id": "June8Refurb-050",
+   "make": "Whirlpool",
+   "model": "YWED5620HW",
+   "category": "Dryer",
+   "title": "Whirlpool 7.4 Cu. Ft. Front Load Electric Dryer, White - YWED5620HW",
+   "condition": "Scratch & Dent",
+   "price": 725.25,
+   "compareAt": 945.0
+  },
+  {
+   "id": "June8Refurb-051",
+   "make": "Maytag",
+   "model": "YMED7205RW",
+   "category": "Dryer",
+   "title": "Maytag 7.4 cu. ft. Vented Electric Dryer, White - YMED7205RW",
+   "condition": "Scratch & Dent",
+   "price": 657.0,
+   "compareAt": 1095.0
+  },
+  {
+   "id": "June8Refurb-052",
+   "make": "Maytag",
+   "model": "YMED7205RR",
+   "category": "Dryer",
+   "title": "Maytag 7.4 Cu. Ft. Pet Pro Electric Dryer, Radiant Silver - YMED7205RR",
+   "condition": "Scratch & Dent",
+   "price": 687.0,
+   "compareAt": 1145.0
+  },
+  {
+   "id": "June8Refurb-053",
+   "make": "Maytag",
+   "model": "YMED7020RF",
+   "category": "Dryer",
+   "title": "Maytag 7.4 Cu. Ft. Electric Steam Dryer, Midnight Steel - YMED7020RF",
+   "condition": "Scratch & Dent",
+   "price": 716.99,
+   "compareAt": 1194.99
+  },
+  {
+   "id": "June8Refurb-054",
+   "make": "Maytag",
+   "model": "YMEDP586GW",
+   "category": "Dryer",
+   "title": "Maytag 7.4 Cu. Ft. Electric Commercial-Grade Residential Dryer, White - YMEDP586GW",
+   "condition": "Scratch & Dent",
+   "price": 777.0,
+   "compareAt": 1295.0
+  },
+  {
+   "id": "June8Refurb-056",
+   "make": "Maytag",
+   "model": "YMED8630HC",
+   "category": "Dryer",
+   "title": "Maytag 27 Inch Smart Electric Dryer with 7.3 cu. ft. Capacity - YMED8630HC",
+   "condition": "Scratch & Dent",
+   "price": 866.99,
+   "compareAt": 1444.99
+  },
+  {
+   "id": "June8Refurb-057",
+   "make": "Amana",
+   "model": "YACR4303MFW",
+   "category": "Range",
+   "title": "Amana 30 Inch Electric Freestanding Range with 4.8 cu. ft. Oven, White - YACR4303MFW",
+   "condition": "Scratch & Dent",
+   "price": 635.25,
+   "compareAt": 745.0
+  },
+  {
+   "id": "June8Refurb-058",
+   "make": "Whirlpool",
+   "model": "YWFES3330RZ",
+   "category": "Range",
+   "title": "Whirlpool 30 Inch 5.3 Cu. Ft. Electric Range with 5 Elements - YWFES3330RZ",
+   "condition": "Scratch & Dent",
+   "price": 718.95,
+   "compareAt": 931.0
+  },
+  {
+   "id": "June8Refurb-061",
+   "make": "Whirlpool",
+   "model": "YWFES4530SW",
+   "category": "Range",
+   "title": "Whirlpool 30 Inch Freestanding Electric Range with 5.3 cu. ft. Capacity, White - YWFES4530SW",
+   "condition": "Scratch & Dent",
+   "price": 647.4,
+   "compareAt": 1079.0
+  },
+  {
+   "id": "June8Refurb-062",
+   "make": "Whirlpool",
+   "model": "YWFES4530SZ",
+   "category": "Range",
+   "title": "Whirlpool 30 Inch Freestanding Electric Range with Air Fry, 5.3 cu. ft. - YWFES4530SZ",
+   "condition": "Scratch & Dent",
+   "price": 647.4,
+   "compareAt": 1079.0
+  },
+  {
+   "id": "June8Refurb-063",
+   "make": "Whirlpool",
+   "model": "YWFES4530SB",
+   "category": "Range",
+   "title": "Whirlpool 30 Inch Freestanding Electric Range with 5.3 cu. ft. Capacity, Black - YWFES4530SB",
+   "condition": "Scratch & Dent",
+   "price": 659.99,
+   "compareAt": 1099.99
+  },
+  {
+   "id": "June8Refurb-064",
+   "make": "Maytag",
+   "model": "YMFES6030RZ",
+   "category": "Range",
+   "title": "Maytag 30 Inch Electric Range with 5.3 cu. ft. Capacity, Stainless Steel - YMFES6030RZ",
+   "condition": "Scratch & Dent",
+   "price": 701.99,
+   "compareAt": 1169.98
+  },
+  {
+   "id": "June8Refurb-065",
+   "make": "Maytag",
+   "model": "YMFES7030SZ",
+   "category": "Range",
+   "title": "Maytag 30 Inch Freestanding Electric Range with 5.3 Cu. Ft. Capacity, Stainless Steel - YMFES7030SZ",
+   "condition": "Scratch & Dent",
+   "price": 836.99,
+   "compareAt": 1394.99
+  },
+  {
+   "id": "June8Refurb-066",
+   "make": "Whirlpool",
+   "model": "YWSES5030SZ",
+   "category": "Range",
+   "title": "Whirlpool 30 Inch 5.3 Cu. Ft. Electric Range with Air Cooking, Stainless Steel - YWSES5030SZ",
+   "condition": "Scratch & Dent",
+   "price": 837.0,
+   "compareAt": 1395.0
+  },
+  {
+   "id": "June8Refurb-067",
+   "make": "Whirlpool",
+   "model": "YWGE745C0FS",
+   "category": "Range",
+   "title": "Whirlpool 30 Inch Electric Double Oven Range, Stainless Steel - YWGE745C0FS",
+   "condition": "Scratch & Dent",
+   "price": 1109.99,
+   "compareAt": 1849.99
+  },
+  {
+   "id": "June8Refurb-068",
+   "make": "KitchenAid",
+   "model": "YKFEG500EBS",
+   "category": "Range",
+   "title": "KitchenAid 30 Inch Freestanding Electric Convection Range with 6.4 cu. ft. Capacity, Black Stainless Steel - YKFEG500EBS",
+   "condition": "Scratch & Dent",
+   "price": 1259.98,
+   "compareAt": 2099.96
+  },
+  {
+   "id": "June8Refurb-069",
+   "make": "KitchenAid",
+   "model": "YKFED500EBS",
+   "category": "Range",
+   "title": "KitchenAid 30 Inch Double Oven Electric Range, 6.7 Cu. Ft. - YKFED500EBS",
+   "condition": "Scratch & Dent",
+   "price": 2159.99,
+   "compareAt": 3599.99
+  },
+  {
+   "id": "June8Refurb-070",
+   "make": "Whirlpool",
+   "model": "WRF560SFHZ",
+   "category": "Refrigerator",
+   "title": "Whirlpool 30 Inch French Door Refrigerator with 20 cu. ft. Capacity - WRF560SFHZ",
+   "condition": "Scratch & Dent",
+   "price": 1016.99,
+   "compareAt": 1694.99
+  },
+  {
+   "id": "June8Refurb-072",
+   "make": "Whirlpool",
+   "model": "WRFF3136SZ",
+   "category": "Refrigerator",
+   "title": "Whirlpool 36 Inch French Door Refrigerator with 31 cu. ft. Capacity, Stainless Steel - WRFF3136SZ",
+   "condition": "Scratch & Dent",
+   "price": 1016.99,
+   "compareAt": 1694.99
+  },
+  {
+   "id": "June8Refurb-075",
+   "make": "Whirlpool",
+   "model": "WRQA59CNKZ",
+   "category": "Refrigerator",
+   "title": "Whirlpool 36 Inch Counter Depth 4 Door Refrigerator with 19.4 cu. ft. Capacity, Fingerprint Resistant Stainless Steel - WRQA59CNKZ",
+   "condition": "Scratch & Dent",
+   "price": 1137.0,
+   "compareAt": 1895.0
+  },
+  {
+   "id": "June8Refurb-076",
+   "make": "Whirlpool",
+   "model": "WRFF3536SW",
+   "category": "Refrigerator",
+   "title": "Whirlpool 36 Inch French Door Refrigerator, White - WRFF3536SW",
+   "condition": "Scratch & Dent",
+   "price": 1197.0,
+   "compareAt": 1995.0
+  },
+  {
+   "id": "June8Refurb-077",
+   "make": "Whirlpool",
+   "model": "WFW5720RW",
+   "category": "Washer",
+   "title": "Whirlpool 27 Inch Smart Front Load Washer with 4.5 cu. ft. Capacity, White - WFW5720RW",
+   "condition": "Scratch & Dent",
+   "price": 627.0,
+   "compareAt": 1045.0
+  },
+  {
+   "id": "June8Refurb-078",
+   "make": "Whirlpool",
+   "model": "WFW6720RR",
+   "category": "Washer",
+   "title": "Whirlpool 5.0 cu. ft. Front Load Washer with FreshFlow Vent System, Radiant Silver - WFW6720RR",
+   "condition": "Scratch & Dent",
+   "price": 747.0,
+   "compareAt": 1245.0
+  },
+  {
+   "id": "June8Refurb-079",
+   "make": "Maytag",
+   "model": "MHW8630HW",
+   "category": "Washer",
+   "title": "Maytag 27 Inch Front Load Washer, White - MHW8630HW",
+   "condition": "Scratch & Dent",
+   "price": 896.99,
+   "compareAt": 1494.99
+  },
+  {
+   "id": "June8Refurb-080",
+   "make": "Whirlpool",
+   "model": "WSIS5030RV",
+   "category": "Range",
+   "title": "Whirlpool 30-inch Induction Range with No Preheat Air Fry - WSIS5030RV",
+   "condition": "Scratch & Dent",
+   "price": 1557.0,
+   "compareAt": 2595.0
+  },
+  {
+   "id": "June8Refurb-081",
+   "make": "Whirlpool",
+   "model": "YWET4024HW",
+   "category": "Laundry Center",
+   "title": "Whirlpool Electric Stacked Laundry Centre, White - YWET4024HW",
+   "condition": "Scratch & Dent",
+   "price": 896.99,
+   "compareAt": 1494.99
+  },
+  {
+   "id": "June8Refurb-082",
+   "make": "Whirlpool",
+   "model": "WRS321SDHZ",
+   "category": "Refrigerator",
+   "title": "Whirlpool 21.4 cu. ft. Side-by-Side Refrigerator, Fingerprint Resistant Stainless - WRS321SDHZ",
+   "condition": "Scratch & Dent",
+   "price": 1017.0,
+   "compareAt": 1695.0
+  },
+  {
+   "id": "June8Refurb-083",
+   "make": "KitchenAid",
+   "model": "KRSF536RPS",
+   "category": "Refrigerator",
+   "title": "KitchenAid 36 Inch Side-by-Side Refrigerator with 28.7 cu. ft. Capacity, Stainless Steel - KRSF536RPS",
+   "condition": "Scratch & Dent",
+   "price": 1797.0,
+   "compareAt": 2995.0
+  },
+  {
+   "id": "June8Refurb-084",
+   "make": "KitchenAid",
+   "model": "KRSF705HPS",
+   "category": "Refrigerator",
+   "title": "KitchenAid 36 Inch Side-by-Side Refrigerator with 24.8 cu. ft. Capacity, Stainless Steel - KRSF705HPS",
+   "condition": "Scratch & Dent",
+   "price": 1979.98,
+   "compareAt": 3299.96
+  },
+  {
+   "id": "June8Refurb-085",
+   "make": "Whirlpool",
+   "model": "WDP540HAMZ",
+   "category": "Dishwasher",
+   "title": "Whirlpool 24 in. Top Control Built-In Tall Tub Dishwasher, Fingerprint Resistant Stainless Steel - WDP540HAMZ",
+   "condition": "Scratch & Dent",
+   "price": 412.2,
+   "compareAt": 458.0
+  },
+  {
+   "id": "June8Refurb-086",
+   "make": "Whirlpool",
+   "model": "WDF341PAPM",
+   "category": "Dishwasher",
+   "title": "Whirlpool 24 Inch Front Control Dishwasher with Boost Cycle, Stainless Steel - WDF341PAPM",
+   "condition": "Scratch & Dent",
+   "price": 517.49,
+   "compareAt": 574.99
+  },
+  {
+   "id": "June8Refurb-087",
+   "make": "KitchenAid",
+   "model": "KDFS224SPS",
+   "category": "Dishwasher",
+   "title": "KitchenAid 24 Inch Built-In Dishwasher with 3rd Rack, 47 dB - KDFS224SPS",
+   "condition": "Scratch & Dent",
+   "price": 650.55,
+   "compareAt": 779.0
+  },
+  {
+   "id": "June8Refurb-088",
+   "make": "Whirlpool",
+   "model": "WDT740SALW",
+   "category": "Dishwasher",
+   "title": "Whirlpool 24 Inch Built-In Dishwasher, White - WDT740SALW",
+   "condition": "Scratch & Dent",
+   "price": 657.75,
+   "compareAt": 795.0
+  },
+  {
+   "id": "June8Refurb-089",
+   "make": "KitchenAid",
+   "model": "KDTS324SPS",
+   "category": "Dishwasher",
+   "title": "KitchenAid 24 Inch Built-In Dishwasher with 15 Place Settings - KDTS324SPS",
+   "condition": "Scratch & Dent",
+   "price": 747.75,
+   "compareAt": 994.99
+  },
+  {
+   "id": "June8Refurb-090",
+   "make": "KitchenAid",
+   "model": "KDTS224SPS",
+   "category": "Dishwasher",
+   "title": "KitchenAid 24 Inch Built-In Dishwasher with 13 Place Settings, PrintShield Stainless - KDTS224SPS",
+   "condition": "Scratch & Dent",
+   "price": 750.0,
+   "compareAt": 999.99
+  },
+  {
+   "id": "June8Refurb-091",
+   "make": "KitchenAid",
+   "model": "KDFS424SPS",
+   "category": "Dishwasher",
+   "title": "KitchenAid 24 Inch Top Control Dishwasher with 3rd Rack, PrintShield Stainless Steel - KDFS424SPS",
+   "condition": "Scratch & Dent",
+   "price": 716.99,
+   "compareAt": 1194.99
+  },
+  {
+   "id": "June8Refurb-092",
+   "make": "Whirlpool",
+   "model": "WRTX5419SW",
+   "category": "Refrigerator",
+   "title": "Whirlpool 30 Inch Top-Freezer Refrigerator with 19.3 cu. ft. Capacity, White - WRTX5419SW",
+   "condition": "Scratch & Dent",
+   "price": 687.0,
+   "compareAt": 1145.0
+  },
+  {
+   "id": "June8Refurb-093",
+   "make": "Whirlpool",
+   "model": "WRT134TFDW",
+   "category": "Refrigerator",
+   "title": "Whirlpool 14.3 cu. ft. Top Freezer Refrigerator in White - WRT134TFDW",
+   "condition": "Scratch & Dent",
+   "price": 717.0,
+   "compareAt": 1195.0
+  },
+  {
+   "id": "June8Refurb-096",
+   "make": "Whirlpool",
+   "model": "WRTX5419SZ",
+   "category": "Refrigerator",
+   "title": "Whirlpool 30 Inch Top Freezer Refrigerator with 19.3 Cu. Ft. Capacity, Stainless Steel - WRTX5419SZ",
+   "condition": "Scratch & Dent",
+   "price": 717.0,
+   "compareAt": 1195.0
+  },
+  {
+   "id": "June8Refurb-097",
+   "make": "Whirlpool",
+   "model": "WRT148FZDW",
+   "category": "Refrigerator",
+   "title": "Whirlpool 30 Inch Top Freezer Refrigerator with 18.25 cu. ft. Capacity, White - WRT148FZDW",
+   "condition": "Scratch & Dent",
+   "price": 807.0,
+   "compareAt": 1345.0
+  },
+  {
+   "id": "June8Refurb-101",
+   "make": "Whirlpool",
+   "model": "WRT148FZDM",
+   "category": "Refrigerator",
+   "title": "Whirlpool 30 Inch Top Freezer Refrigerator, 18.3 Cu. Ft., Monochromatic Stainless Steel - WRT148FZDM",
+   "condition": "Scratch & Dent",
+   "price": 837.0,
+   "compareAt": 1395.0
+  },
+  {
+   "id": "June8Refurb-103",
+   "make": "Whirlpool",
+   "model": "WRT541SZDZ",
+   "category": "Refrigerator",
+   "title": "Whirlpool 33 Inch Top Freezer Refrigerator with 21.3 Cu. Ft. Capacity, Fingerprint Resistant Stainless Steel - WRT541SZDZ",
+   "condition": "Scratch & Dent",
+   "price": 987.0,
+   "compareAt": 1645.0
+  },
+  {
+   "id": "June8Refurb-104",
+   "make": "Amana",
+   "model": "NTW4519JW",
+   "category": "Washer",
+   "title": "Amana 4.4 cu. ft. Top Load Washer with High-Efficiency Agitator, White - NTW4519JW",
+   "condition": "Scratch & Dent",
+   "price": 490.5,
+   "compareAt": 545.0
+  },
+  {
+   "id": "June8Refurb-110",
+   "make": "Whirlpool",
+   "model": "WTW4000SW",
+   "category": "Washer",
+   "title": "Whirlpool 4.5 Cu. Ft. Top Load Impeller Washer - WTW4000SW",
+   "condition": "Scratch & Dent",
+   "price": 539.99,
+   "compareAt": 599.99
+  },
+  {
+   "id": "June8Refurb-116",
+   "make": "Maytag",
+   "model": "MTW4205SW",
+   "category": "Washer",
+   "title": "Maytag 4.8 Cu. Ft. Top Load Washer, White - MTW4205SW",
+   "condition": "Scratch & Dent",
+   "price": 612.75,
+   "compareAt": 695.0
+  },
+  {
+   "id": "June8Refurb-119",
+   "make": "Whirlpool",
+   "model": "WTW5057LW",
+   "category": "Washer",
+   "title": "Whirlpool 4.7-4.8 cu. ft. Top Load Washer with 2-in-1 Removable Agitator, White - WTW5057LW",
+   "condition": "Scratch & Dent",
+   "price": 657.75,
+   "compareAt": 794.99
+  },
+  {
+   "id": "June8Refurb-123",
+   "make": "Maytag",
+   "model": "MVW4505MW",
+   "category": "Washer",
+   "title": "Maytag 4.5 cu. ft. Top Load Washer, White - MVW4505MW",
+   "condition": "Scratch & Dent",
+   "price": 680.25,
+   "compareAt": 845.0
+  },
+  {
+   "id": "June8Refurb-124",
+   "make": "Maytag",
+   "model": "MTW5600RW",
+   "category": "Washer",
+   "title": "Maytag 27 Inch Top Load Washer with 5.5 cu. ft. Capacity, White - MTW5600RW",
+   "condition": "Scratch & Dent",
+   "price": 682.5,
+   "compareAt": 849.99
+  },
+  {
+   "id": "June8Refurb-126",
+   "make": "Maytag",
+   "model": "MTW7205RW",
+   "category": "Washer",
+   "title": "Maytag 6.0 Cu. Ft. High Efficiency Top Load Washer, White - MTW7205RW",
+   "condition": "Scratch & Dent",
+   "price": 659.99,
+   "compareAt": 1099.99
+  },
+  {
+   "id": "June8Refurb-127",
+   "make": "Whirlpool",
+   "model": "WTW8127LC",
+   "category": "Washer",
+   "title": "Whirlpool 5.2 cu. ft. Smart Top Load Washer, Chrome Shadow - WTW8127LC",
+   "condition": "Scratch & Dent",
+   "price": 686.99,
+   "compareAt": 1144.99
+  },
+  {
+   "id": "June8Refurb-129",
+   "make": "Maytag",
+   "model": "MTW7205RF",
+   "category": "Washer",
+   "title": "Maytag 6.0 Cu. Ft. Top Load Agitator Washer with Extra Power, Midnight Steel - MTW7205RF",
+   "condition": "Scratch & Dent",
+   "price": 689.99,
+   "compareAt": 1149.99
+  }
+ ]
+}
