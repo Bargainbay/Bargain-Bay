@@ -21,16 +21,13 @@ export default function Header() {
   return (
     <header className="site-header">
       <div className="announce">
-        New lot just landed — tested &amp; working, <b>up to 60% off retail</b>. Local pickup &amp; delivery in Hamilton.
+        New lot just landed — tested &amp; working, <b>up to ~70% off retail</b>. <a href="/shop">Shop now →</a>
       </div>
       <div className="wrap">
         <div className="header-row">
           <a href="/" className="logo" aria-label="Bargain Bay home">
-            <img src="/logo.png" alt="Bargain Bay" />
-            <span>
-              <span className="logo-text">Bargain Bay</span>
-              <span className="logo-sub" style={{ display: 'block' }}>Liquidation appliances · Hamilton, ON</span>
-            </span>
+            <img src="/bargain-bay-logo-transparent.png" alt="Bargain Bay" />
+            <span className="logo-sub">Liquidation appliances · Hamilton / GTA</span>
           </a>
           <nav className={'main-nav' + (open ? ' open' : '')} onClick={() => setOpen(false)}>
             <a href="/shop">Shop</a>

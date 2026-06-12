@@ -15,7 +15,7 @@ export default function TrackForm() {
   return (
     <div className="narrow">
       <div className="panel">
-        <h1 style={{ marginTop: 0, color: 'var(--navy)' }}>Track your order</h1>
+        <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Track your order</h1>
         <p className="hint" style={{ marginBottom: 16 }}>
           Enter your order number (it looks like <b>BB-1042</b>, from your confirmation page or email)
           and the email you used at checkout.
@@ -32,7 +32,7 @@ export default function TrackForm() {
           <button className="btn primary block">View order status</button>
         </form>
         <p className="hint" style={{ marginTop: 14 }}>
-          Have an account? <a href="/login?next=/account" style={{ fontWeight: 700, color: 'var(--navy)' }}>Log in</a> to see all your orders.
+          Have an account? <a href="/login?next=/account" style={{ fontWeight: 700, color: 'var(--charcoal)' }}>Log in</a> to see all your orders.
           Can&apos;t find your order number? Email <a href="mailto:sales@bargainbay.ca" style={{ textDecoration: 'underline' }}>sales@bargainbay.ca</a>.
         </p>
       </div>

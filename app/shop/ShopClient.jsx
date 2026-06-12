@@ -49,7 +49,7 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
 
   return (
     <div>
-      <h1 style={{ color: 'var(--navy)' }}>{colLabel || 'Shop all inventory'}</h1>
+      <h1>{colLabel || 'Shop all inventory'}</h1>
 
       <div className="filters">
         <input

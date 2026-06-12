@@ -16,7 +16,7 @@ export default async function AdminPage() {
     return (
       <div className="narrow">
         <div className="panel">
-          <h1 style={{ marginTop: 0, color: 'var(--navy)' }}>Not authorized</h1>
+          <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
           <p style={{ fontSize: 14 }}>
             Your account ({session.email}) is not on the admin list. Add it to the
             <code> ADMIN_EMAILS</code> environment variable and redeploy.

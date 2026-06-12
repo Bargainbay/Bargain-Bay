@@ -29,7 +29,7 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
 
   return (
     <div>
-      <h1 style={{ color: 'var(--navy)' }}>Orders ({orders.length})</h1>
+      <h1 style={{ color: 'var(--charcoal)' }}>Orders ({orders.length})</h1>
       <p className="hint" style={{ marginBottom: 14 }}>
         Sheet sync: {sheetsOn
           ? 'ON — paid orders auto-write "Sold" to the master tracker.'
@@ -47,7 +47,7 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
             {orders.map((o) => (
               <tr key={o.id}>
                 <td>
-                  <a href={`/order/${o.order_number}?email=${encodeURIComponent(o.email)}`} style={{ fontWeight: 700, color: 'var(--navy)' }}>{o.order_number}</a>
+                  <a href={`/order/${o.order_number}?email=${encodeURIComponent(o.email)}`} style={{ fontWeight: 700, color: 'var(--charcoal)' }}>{o.order_number}</a>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>{new Date(o.created_at).toLocaleString('en-CA')}</div>
                 </td>
                 <td>

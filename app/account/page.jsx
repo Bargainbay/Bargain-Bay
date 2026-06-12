@@ -29,7 +29,7 @@ export default async function AccountPage() {
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-        <h1 style={{ color: 'var(--navy)', margin: '10px 0' }}>My account</h1>
+        <h1 style={{ color: 'var(--charcoal)', margin: '10px 0' }}>My account</h1>
         <LogoutButton />
       </div>
 
@@ -45,7 +45,7 @@ export default async function AccountPage() {
         </p>
       </div>
 
-      <h2 style={{ color: 'var(--navy)' }}>Your orders</h2>
+      <h2 style={{ color: 'var(--charcoal)' }}>Your orders</h2>
       {!dbOk && <div className="error-box">Order history is unavailable right now.</div>}
       {dbOk && orders.length === 0 && (
         <div className="panel" style={{ textAlign: 'center' }}>
@@ -56,7 +56,7 @@ export default async function AccountPage() {
       {orders.map((o) => (
         <a key={o.id} href={`/order/${o.order_number}`} className="order-card" style={{ display: 'block' }}>
           <div className="row1">
-            <b style={{ color: 'var(--navy)' }}>{o.order_number}</b>
+            <b style={{ color: 'var(--charcoal)' }}>{o.order_number}</b>
             <span className={`status-chip status-${o.status}`}>{STATUS_LABELS[o.status]}</span>
           </div>
           <div style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 6 }}>

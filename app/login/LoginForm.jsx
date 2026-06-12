@@ -32,7 +32,7 @@ export default function LoginForm() {
   return (
     <div className="narrow">
       <div className="panel">
-        <h1 style={{ marginTop: 0, color: 'var(--navy)' }}>Login</h1>
+        <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Login</h1>
         <p className="hint" style={{ marginBottom: 16 }}>Track your orders and check out faster.</p>
         {error && <div className="error-box">{error}</div>}
         <form onSubmit={submit}>
@@ -47,7 +47,7 @@ export default function LoginForm() {
           <button className="btn primary block" disabled={busy}>{busy ? 'Signing in…' : 'Login'}</button>
         </form>
         <p className="hint" style={{ marginTop: 14 }}>
-          No account? <a href={`/signup?next=${encodeURIComponent(next)}`} style={{ fontWeight: 700, color: 'var(--navy)' }}>Create one</a>.
+          No account? <a href={`/signup?next=${encodeURIComponent(next)}`} style={{ fontWeight: 700, color: 'var(--charcoal)' }}>Create one</a>.
         </p>
         <p className="hint">
           Forgot your password? Email <a href="mailto:sales@bargainbay.ca" style={{ textDecoration: 'underline' }}>sales@bargainbay.ca</a> to reset.

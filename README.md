@@ -159,3 +159,28 @@ lib/
 db/schema.sql              users / orders / order_items / reservations
 vercel.json                daily cron for reservation cleanup
 ```
+
+## Google Merchant Center (free product listings + Shopping ads)
+
+The site exposes a Google Shopping feed at **`/api/merchant-feed`** (RSS 2.0 with the
+`xmlns:g` Google namespace). One `<item>` per available unit; units that only have
+placeholder SVG art are skipped automatically (Google rejects placeholder images).
+Prices are `x.xx CAD`, condition maps New in Box→`new`, Refurbished→`refurbished`,
+everything else→`used`.
+
+To connect:
+
+1. Create a Merchant Center account at https://merchants.google.com (use the business
+   Google account).
+2. **Add & claim the website** — Settings → Business information → Website. Verify via
+   the HTML-tag option (paste the tag into `app/layout.jsx` metadata) or via Google
+   Search Console if already verified there.
+3. Go to **Products → Add products → Add products from a file** (classic: Feeds → `+`).
+4. Choose **Scheduled fetch**, name it `bargain-bay-feed`, and set the file URL to
+   `https://<SITE_URL>/api/merchant-feed` (e.g. `https://bargain-bay-two.vercel.app/api/merchant-feed`).
+5. Set the fetch frequency to **daily** (inventory is one-of-a-kind, so daily keeps
+   sold units from showing), country Canada / language English / currency CAD.
+6. After the first fetch, fix any item warnings under Products → Diagnostics.
+
+The feed is `force-dynamic`, so every fetch reflects live availability (sold/reserved
+units drop out automatically).

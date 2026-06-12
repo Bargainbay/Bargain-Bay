@@ -35,7 +35,7 @@ export default async function OrderPage({ params, searchParams }) {
     return (
       <div className="narrow">
         <div className="panel">
-          <h1 style={{ marginTop: 0, color: 'var(--navy)' }}>Find your order</h1>
+          <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Find your order</h1>
           <p style={{ fontSize: 14, color: 'var(--muted)' }}>
             To view order <b>{params.orderNumber}</b>, <a href={`/login?next=/order/${params.orderNumber}`} style={{ textDecoration: 'underline' }}>log in</a>,
             or open the tracking link from your confirmation (it includes your email), e.g.:
@@ -60,7 +60,7 @@ export default async function OrderPage({ params, searchParams }) {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
-      <h1 style={{ color: 'var(--navy)' }}>Order {order.order_number}</h1>
+      <h1 style={{ color: 'var(--charcoal)' }}>Order {order.order_number}</h1>
       <div style={{ marginBottom: 8 }}>
         <span className={`status-chip status-${order.status}`}>{STATUS_LABELS[order.status]}</span>
         <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 10 }}>

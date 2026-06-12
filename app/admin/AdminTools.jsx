@@ -42,7 +42,7 @@ export default function AdminTools({ initialReservations }) {
 
   return (
     <div>
-      <h2 style={{ color: 'var(--navy)', marginTop: 28 }}>Active reservations ({reservations.length})</h2>
+      <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Active reservations ({reservations.length})</h2>
       <p className="hint" style={{ marginBottom: 12 }}>
         A reservation holds a unit while a checkout is in progress (30 minutes). Releasing one puts the
         unit straight back on sale — only do it if the customer abandoned payment.
@@ -64,7 +64,7 @@ export default function AdminTools({ initialReservations }) {
                     <td style={{ fontFamily: 'monospace', fontSize: 13 }}>{r.sku}</td>
                     <td>
                       {r.order_number
-                        ? <a href={`/order/${r.order_number}${r.email ? `?email=${encodeURIComponent(r.email)}` : ''}`} style={{ fontWeight: 700, color: 'var(--navy)' }}>{r.order_number}</a>
+                        ? <a href={`/order/${r.order_number}${r.email ? `?email=${encodeURIComponent(r.email)}` : ''}`} style={{ fontWeight: 700, color: 'var(--charcoal)' }}>{r.order_number}</a>
                         : '—'}
                       {r.order_status && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.order_status}</div>}
                     </td>
@@ -85,7 +85,7 @@ export default function AdminTools({ initialReservations }) {
         </div>
       )}
 
-      <h2 style={{ color: 'var(--navy)', marginTop: 28 }}>Database</h2>
+      <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Database</h2>
       <div className="panel" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <button className="btn primary" disabled={migrating} onClick={migrate}>
           {migrating ? 'Running…' : 'Run schema migration'}

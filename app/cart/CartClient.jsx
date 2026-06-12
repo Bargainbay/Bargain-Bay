@@ -30,7 +30,7 @@ export default function CartClient({ catalog }) {
   if (items.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 0' }}>
-        <h1 style={{ color: 'var(--navy)' }}>Your cart is empty</h1>
+        <h1 style={{ color: 'var(--charcoal)' }}>Your cart is empty</h1>
         <p style={{ color: 'var(--muted)' }}>Every unit is one-of-a-kind — grab it before someone else does.</p>
         <a href="/shop" className="btn accent">Browse inventory</a>
       </div>
@@ -39,7 +39,7 @@ export default function CartClient({ catalog }) {
 
   return (
     <div>
-      <h1 style={{ color: 'var(--navy)' }}>Your cart</h1>
+      <h1 style={{ color: 'var(--charcoal)' }}>Your cart</h1>
       {gone.some((g) => skus.includes(g)) && (
         <div className="error-box">
           Heads up — {gone.filter((g) => skus.includes(g)).length === 1 ? 'an item in your cart is' : 'some items in your cart are'} no

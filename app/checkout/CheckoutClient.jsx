@@ -27,7 +27,7 @@ export default function CheckoutClient({ catalog, session }) {
   if (items.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 0' }}>
-        <h1 style={{ color: 'var(--navy)' }}>Nothing to check out</h1>
+        <h1 style={{ color: 'var(--charcoal)' }}>Nothing to check out</h1>
         <a href="/shop" className="btn accent">Browse inventory</a>
       </div>
     );
@@ -69,7 +69,7 @@ export default function CheckoutClient({ catalog, session }) {
 
   return (
     <div>
-      <h1 style={{ color: 'var(--navy)' }}>Checkout</h1>
+      <h1 style={{ color: 'var(--charcoal)' }}>Checkout</h1>
       <form onSubmit={submit}>
         <div className="checkout-layout">
           <div>
@@ -137,7 +137,7 @@ export default function CheckoutClient({ catalog, session }) {
           </div>
 
           <div className="summary-card">
-            <h2 style={{ marginTop: 0, fontSize: 17, color: 'var(--navy)' }}>Order summary</h2>
+            <h2 style={{ marginTop: 0, fontSize: 17, color: 'var(--charcoal)' }}>Order summary</h2>
             {items.map((u) => (
               <div className="summary-row" key={u.id}>
                 <span style={{ paddingRight: 10 }}>{u.make} {u.model}</span>

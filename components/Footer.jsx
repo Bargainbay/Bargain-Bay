@@ -6,14 +6,15 @@ export default function Footer() {
       <div className="wrap">
         <div className="cols">
           <div>
-            <h4>Bargain Bay</h4>
+            <img src="/bargain-bay-logo-on-charcoal.png" alt="Bargain Bay" className="footer-logo" />
+            <p className="tagline">Tested. Working. Warrantied. Hamilton &amp; the GTA.</p>
             <p style={{ fontSize: 14, margin: '0 0 8px' }}>
-              Name-brand liquidation appliances — tested, certified working, and up to 60% off retail.
-              Operated by RS Solutions.
+              Name-brand appliances at liquidation prices — every unit tested &amp; working and backed
+              by a one-year warranty. Pickup, delivery &amp; freight serving Hamilton, Scarborough and the GTA.
             </p>
             <p style={{ fontSize: 13.5, margin: 0 }}>
               {PICKUP_ADDRESS}<br />
-              <a href={`mailto:${SALES_EMAIL}`} style={{ display: 'inline', padding: 0, color: 'var(--yellow)' }}>{SALES_EMAIL}</a>
+              <a href={`mailto:${SALES_EMAIL}`} style={{ display: 'inline', padding: 0, color: 'var(--line)' }}>{SALES_EMAIL}</a>
             </p>
           </div>
           <div>
@@ -33,7 +34,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="legal">
-          © {new Date().getFullYear()} Bargain Bay / RS Solutions · Hamilton (Lynden), Ontario, Canada · All prices in CAD, HST added at checkout. · HST # 00000 0000 RT0001 (placeholder — update before launch)
+          © {new Date().getFullYear()} Bargain Bay / RS Solutions · Hamilton (Lynden), Ontario — serving Hamilton, Scarborough &amp; the GTA · All prices in CAD, HST added at checkout. · HST # 00000 0000 RT0001 (placeholder — update before launch)
         </div>
       </div>
     </footer>

@@ -33,7 +33,7 @@ export default function SignupForm() {
   return (
     <div className="narrow">
       <div className="panel">
-        <h1 style={{ marginTop: 0, color: 'var(--navy)' }}>Create account</h1>
+        <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Create account</h1>
         <p className="hint" style={{ marginBottom: 16 }}>Track orders, get pickup updates, and check out faster.</p>
         {error && <div className="error-box">{error}</div>}
         <form onSubmit={submit}>
@@ -57,7 +57,7 @@ export default function SignupForm() {
           <button className="btn primary block" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
         </form>
         <p className="hint" style={{ marginTop: 14 }}>
-          Already have an account? <a href={`/login?next=${encodeURIComponent(next)}`} style={{ fontWeight: 700, color: 'var(--navy)' }}>Login</a>.
+          Already have an account? <a href={`/login?next=${encodeURIComponent(next)}`} style={{ fontWeight: 700, color: 'var(--charcoal)' }}>Login</a>.
         </p>
       </div>
     </div>
