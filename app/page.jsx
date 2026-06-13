@@ -10,7 +10,8 @@ export const metadata = {
     'Name-brand appliances. Liquidation prices. Every unit tested & working with a one-year warranty — pickup, delivery & freight serving Hamilton, Scarborough and the GTA.'
 };
 
-const TILE_IMG = {
+// Fallback per-category line-art if no real product photo is available.
+const TILE_FALLBACK = {
   'refrigerators': '/stock/refrigerator.svg',
   'washers-dryers': '/stock/washer.svg',
   'dishwashers': '/stock/dishwasher.svg',
@@ -19,9 +20,21 @@ const TILE_IMG = {
   'under-500': '/stock/appliance.svg'
 };
 
+// Pick a real representative product photo for each category tile: the
+// priciest available unit in the collection that has actual photography
+// (image not a placeholder .svg). Falls back to the category line-art.
+function tileImage(slug, units) {
+  const match = units
+    .filter(collectionFilter(slug))
+    .filter((u) => u.image && !u.image.endsWith('.svg'))
+    .sort((a, b) => (b.price || 0) - (a.price || 0))[0];
+  return match ? match.image : TILE_FALLBACK[slug];
+}
+
 export default async function Home() {
   const units = await getAvailable();
   const newest = newestArrivals(units, 12);
+  const tileImages = Object.fromEntries(COLLECTIONS.map((c) => [c.slug, tileImage(c.slug, units)]));
 
   return (
     <div>
@@ -60,8 +73,8 @@ export default async function Home() {
           const count = units.filter(collectionFilter(c.slug)).length;
           return (
             <a key={c.slug} href={`/shop?collection=${c.slug}`} className="cat-tile">
-              <img src={TILE_IMG[c.slug]} alt="" aria-hidden="true" />
-              {c.label}
+              <span className="cat-thumb"><img src={tileImages[c.slug]} alt="" aria-hidden="true" loading="lazy" /></span>
+              <span className="cat-label">{c.label}</span>
               <span className="count">{count} available</span>
             </a>
           );
