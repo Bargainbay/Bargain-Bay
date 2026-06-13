@@ -1,6 +1,7 @@
 import './globals.css';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import ChatWidget from '../components/ChatWidget';
 import { SALES_EMAIL, PICKUP_ADDRESS } from '../lib/constants';
 import { SITE_URL } from '../lib/site';
 
@@ -59,6 +60,7 @@ export default function RootLayout({ children }) {
         <Header />
         <main className="wrap">{children}</main>
         <Footer />
+        <ChatWidget />
       </body>
     </html>
   );
