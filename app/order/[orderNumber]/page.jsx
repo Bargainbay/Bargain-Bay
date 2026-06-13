@@ -130,4 +130,10 @@ export default async function OrderPage({ params, searchParams }) {
             {PICKUP_ADDRESS}<br />
             <span style={{ color: 'var(--muted)', fontSize: 13.5 }}>By appointment — we&apos;ll email {order.email} to schedule. Bring photo ID and a vehicle suited to the appliance.</span>
           </p>
-   
+        )}
+      </div>
+
+      <p className="hint">Questions about this order? Email <a href={`mailto:${SALES_EMAIL}`} style={{ textDecoration: 'underline' }}>{SALES_EMAIL}</a> with your order number.</p>
+    </div>
+  );
+}
