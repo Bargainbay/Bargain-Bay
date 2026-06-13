@@ -113,6 +113,9 @@ export default async function OrderPage({ params, searchParams }) {
         </div>
         <div className="summary-row"><span>HST (13%)</span><span>{money(order.hst)}</span></div>
         <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
+        <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--muted)' }}>
+          RS Solutions Inc. — GST/HST # 708490016 RT0001. This page is your receipt; keep your order number for reference.
+        </p>
       </div>
 
       <div className="panel">
@@ -127,10 +130,4 @@ export default async function OrderPage({ params, searchParams }) {
             {PICKUP_ADDRESS}<br />
             <span style={{ color: 'var(--muted)', fontSize: 13.5 }}>By appointment — we&apos;ll email {order.email} to schedule. Bring photo ID and a vehicle suited to the appliance.</span>
           </p>
-        )}
-      </div>
-
-      <p className="hint">Questions about this order? Email <a href={`mailto:${SALES_EMAIL}`} style={{ textDecoration: 'underline' }}>{SALES_EMAIL}</a> with your order number.</p>
-    </div>
-  );
-}
+   
