@@ -325,7 +325,7 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
    AI sales associate — floating chat widget ("Bay")
    ============================================================ */
 .bb-chat-fab {
-  position: fixed; right: 20px; bottom: 20px; z-index: 1000;
+  position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 2147483000;
   width: 56px; height: 56px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--charcoal); color: #fff; border: none; cursor: pointer;
@@ -334,7 +334,7 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .bb-chat-fab:hover { background: var(--charcoal-soft); transform: translateY(-1px); }
 
 .bb-chat-panel {
-  position: fixed; right: 20px; bottom: 88px; z-index: 1000;
+  position: fixed; right: 20px; bottom: calc(88px + env(safe-area-inset-bottom, 0px)); z-index: 2147483000;
   width: 370px; max-width: calc(100vw - 32px);
   height: 540px; max-height: calc(100vh - 120px);
   display: flex; flex-direction: column;
@@ -408,5 +408,5 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 
 @media (max-width: 480px) {
   .bb-chat-panel { right: 8px; left: 8px; width: auto; bottom: 80px; height: calc(100vh - 110px); }
-  .bb-chat-fab { right: 14px; bottom: 14px; }
+  .bb-chat-fab { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
 }
