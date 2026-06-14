@@ -11,6 +11,9 @@ const PRICE_BANDS = [
   { id: '2000+', label: '$2,000+', min: 2000, max: Infinity }
 ];
 
+const normalizeSearch = (s) =>
+  s.toLowerCase().replace(/["\u201d\u2033]/g, ' inch ').replace(/\b(inches|inch|in)\b/g, ' inch ').replace(/\s+/g, ' ').trim();
+
 const CONDITION_OPTIONS = [
   'New in Box', 'New Open Box', 'Scratch & Dent', 'Refurbished', 'Used', 'Tested & Working'
 ];
@@ -34,10 +37,11 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
       if (b) l = l.filter((u) => u.price >= b.min && u.price < b.max);
     }
     if (q.trim()) {
-      const needle = q.trim().toLowerCase();
-      l = l.filter((u) =>
-        `${u.make} ${u.model} ${u.title} ${u.category} ${u.id}`.toLowerCase().includes(needle)
-      );
+      const tokens = normalizeSearch(q).split(' ').filter(Boolean);
+      l = l.filter((u) => {
+        const hay = u.kw || '';
+        return tokens.every((t) => hay.includes(t));
+      });
     }
     if (sort === 'lo') l = [...l].sort((a, b) => a.price - b.price);
     else if (sort === 'hi') l = [...l].sort((a, b) => b.price - a.price);
@@ -54,7 +58,7 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
       <div className="filters">
         <input
           type="search"
-          placeholder="Search make, model, keyword…"
+          placeholder="Search make, model, size, feature…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           aria-label="Search inventory"

@@ -1,6 +1,8 @@
 import { getAvailable, categories, brands } from '../../lib/inventory';
 import { COLLECTIONS } from '../../lib/constants';
 import ShopClient from './ShopClient';
+import specs from '../../data/specs.json';
+import { unitKeywords } from '../../lib/keywords';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,9 +17,10 @@ export async function generateMetadata({ searchParams }) {
 
 export default async function ShopPage({ searchParams }) {
   const units = await getAvailable();
+  const enriched = units.map((u) => ({ ...u, kw: unitKeywords(u, specs[u.id]) }));
   return (
     <ShopClient
-      units={units}
+      units={enriched}
       cats={categories(units)}
       makes={brands(units)}
       initialCollection={searchParams?.collection || ''}
