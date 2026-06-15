@@ -84,8 +84,8 @@ export default function AdminClearance({ initialItems }) {
     <div>
       <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Clearance ({items.filter((i) => i.active).length} active)</h2>
       <p className="hint" style={{ marginBottom: 12 }}>
-        Mark a unit down and it shows a <b>Clearance</b> badge, the slashed price, and a 3-month warranty
-        across the store (homepage banner, /clearance, product page). Toggle off to hide without losing the markdown.
+        Mark a unit down and it shows a <b>Clearance</b> badge and the slashed price
+        across the store (homepage banner, /clearance, product page) — warranty stays the standard one year. Toggle off to hide without losing the markdown.
       </p>
       {error && <div className="error-box">{error}</div>}
 
