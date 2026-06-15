@@ -19,9 +19,10 @@ export default function ProductCard({ unit }) {
         <a href={href} className="card-title">{unit.title || `${unit.make} ${unit.model}`}</a>
         <div className="card-model">{unit.make} · {unit.model}</div>
         <div className="price-row">
-          <span className={'price' + (unit.onClearance ? ' price-clearance' : '')}>{money(unit.price)}</span>
+          <span className={'price' + (unit.onClearance ? ' price-clearance' : '') + (unit.isMemberPrice ? ' price-member' : '')}>{money(unit.price)}</span>
           {unit.compareAt > unit.price && <span className="compare">{money(unit.compareAt)}</span>}
         </div>
+        {unit.isMemberPrice && <div className="member-tag">Member price</div>}
         <div style={{ marginTop: 'auto', paddingTop: 8 }}>
           <AddToCartButton sku={unit.id} small />
         </div>
