@@ -469,3 +469,12 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
     .bb-chat-panel { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
   }
 }
+
+/* ============================================================
+   Bay FAB — Android compositing fix (C, attempt 2)
+   The near-int-max z-index (2147483000) + box-shadow fails to
+   paint on some Android GPUs while rendering fine on desktop/iOS.
+   Use a sane high z-index and force a clean compositing layer.
+   ============================================================ */
+.bb-chat-fab, .bb-chat-panel { z-index: 9999 !important; }
+.bb-chat-fab { transform: translateZ(0); -webkit-transform: translateZ(0); will-change: transform; }
