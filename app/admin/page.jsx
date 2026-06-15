@@ -2,9 +2,11 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../lib/auth';
 import { hasDb, query } from '../../lib/db';
 import { getAllOrders } from '../../lib/orders';
+import { listClearanceAdmin } from '../../lib/clearance';
 import { writebackEnabled } from '../../lib/sheets';
 import AdminOrders from './AdminOrders';
 import AdminTools from './AdminTools';
+import AdminClearance from './AdminClearance';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Admin — Bargain Bay' };
@@ -30,6 +32,7 @@ export default async function AdminPage() {
   }
   let orders = [];
   let reservations = [];
+  let clearance = [];
   let needsMigration = false;
   try {
     orders = await getAllOrders(200);
@@ -44,14 +47,22 @@ export default async function AdminPage() {
     console.error('admin load failed (run migration?)', e.message);
     needsMigration = true;
   }
+  try {
+    clearance = await listClearanceAdmin();
+  } catch (e) {
+    // clearance table may not exist until the next migration runs
+    console.error('clearance load failed (run migration?)', e.message);
+    needsMigration = true;
+  }
   return (
     <div>
       {needsMigration && (
         <div className="error-box">
-          Could not read orders/reservations — if this is a fresh database, run the schema migration below.
+          Could not read all tables — if you just deployed the clearance feature, run the schema migration below to create the clearance table.
         </div>
       )}
       <AdminOrders initialOrders={orders} sheetsOn={writebackEnabled()} />
+      <AdminClearance initialItems={clearance} />
       <AdminTools initialReservations={reservations} />
     </div>
   );
