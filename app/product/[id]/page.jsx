@@ -37,8 +37,7 @@ export default async function Product({ params }) {
   const off = pctOff(u.price, u.compareAt);
   const explainer = conditionCopy(u.condition);
   const rows = specRows(u);
-  const warrantyMonths = u.onClearance ? (u.warrantyMonths || 3) : 12;
-  const warrantyLabel = u.onClearance ? `${warrantyMonths}-month warranty` : 'one-year warranty';
+  const warrantyLabel = 'one-year warranty';
 
   const productSchema = {
     '@context': 'https://schema.org',
@@ -103,7 +102,7 @@ export default async function Product({ params }) {
           <div className="meta-list" style={{ marginTop: 18 }}>
             <div>🚚 Free pickup at {PICKUP_ADDRESS} (by appointment), flat-fee local delivery, or freight — Hamilton, Scarborough &amp; the GTA.</div>
             <div>✔️ Bench-tested &amp; certified working before listing.</div>
-            <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; {warrantyLabel}</a>{u.onClearance ? ' (clearance units carry a 3-month warranty)' : ''}</div>
+            <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; {warrantyLabel}</a></div>
           </div>
 
           <a className="btn" href="/shop" style={{ marginTop: 18 }}>← Back to catalogue</a>
