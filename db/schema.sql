@@ -67,3 +67,11 @@ CREATE TABLE IF NOT EXISTS clearance (
   updated_at      timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_clearance_active ON clearance(active);
+
+-- Member / reseller portal: tier + approval state on users.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role               text NOT NULL DEFAULT 'client'; -- client | member
+ALTER TABLE users ADD COLUMN IF NOT EXISTS member_status      text DEFAULT 'none';             -- none | pending | approved | rejected
+ALTER TABLE users ADD COLUMN IF NOT EXISTS business_name      text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS member_note        text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS member_requested_at timestamptz;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS member_approved_at  timestamptz;
