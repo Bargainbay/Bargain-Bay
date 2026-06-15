@@ -8,6 +8,7 @@ import {
   sessionCookieOptions, SESSION_COOKIE, normalizeEmail, validEmail
 } from '../../../lib/auth';
 import { round2, HST_RATE, DELIVERY_FEE } from '../../../lib/constants';
+import { resolvePrices } from '../../../lib/pricing';
 import { writebackEnabled, writeSold } from '../../../lib/sheets';
 
 export const dynamic = 'force-dynamic';
@@ -63,14 +64,18 @@ export async function POST(req) {
     );
   }
 
+  // ---- authoritative pricing (clearance + member tier; never trust the client) ----
+  const session = await getSession();
+  const priced = await resolvePrices(items, session);
+  const priceOf = (u) => Number(priced.get(u.id)?.price ?? u.price);
+
   // ---- totals (HST applies to goods + delivery) ----
-  const subtotal = round2(items.reduce((a, u) => a + Number(u.price), 0));
+  const subtotal = round2(items.reduce((a, u) => a + priceOf(u), 0));
   const deliveryFee = deliveryMethod === 'delivery' ? DELIVERY_FEE : 0;
   const hst = round2((subtotal + deliveryFee) * HST_RATE);
   const total = round2(subtotal + deliveryFee + hst);
 
-  // ---- session / optional account creation ----
-  const session = await getSession();
+  // ---- optional account creation ----
   let userId = session?.userId || null;
   let newSessionToken = null;
   if (!session && password) {
@@ -117,7 +122,7 @@ export async function POST(req) {
       for (const u of items) {
         await client.query(
           'INSERT INTO order_items (order_id, sku, title, price) VALUES ($1,$2,$3,$4)',
-          [orderId, u.id, u.title || `${u.make} ${u.model}`, u.price]
+          [orderId, u.id, u.title || `${u.make} ${u.model}`, priceOf(u)]
         );
       }
       return { id: orderId, orderNumber: numbered[0].order_number };
@@ -142,7 +147,7 @@ export async function POST(req) {
       const lineItems = [
         ...items.map((u) => ({
           name: `${u.make} ${u.model}`,
-          priceCents: Math.round(Number(u.price) * 100),
+          priceCents: Math.round(priceOf(u) * 100),
           note: u.id
         })),
         ...(deliveryFee ? [{ name: 'Local delivery (Hamilton & area)', priceCents: Math.round(deliveryFee * 100), note: 'DELIVERY' }] : []),
@@ -169,7 +174,7 @@ export async function POST(req) {
     await query("UPDATE orders SET status = 'confirmed' WHERE id = $1", [order.id]);
     if (writebackEnabled()) {
       for (const u of items) {
-        try { await writeSold(u.id, u.price); } catch (e) { console.error('writeSold failed', u.id, e.message); }
+        try { await writeSold(u.id, priceOf(u)); } catch (e) { console.error('writeSold failed', u.id, e.message); }
       }
     }
     payload = { orderUrl: trackUrl, orderNumber: order.orderNumber };
