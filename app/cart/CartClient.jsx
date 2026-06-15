@@ -4,7 +4,7 @@ import { getCart, removeFromCart, onCartChange } from '../../lib/cart';
 import { money, round2, HST_RATE, DELIVERY_FEE } from '../../lib/constants';
 import ConditionPill from '../../components/ConditionPill';
 
-export default function CartClient({ catalog }) {
+export default function CartClient({ catalog, member }) {
   const [skus, setSkus] = useState(null); // null = not hydrated yet
   const [gone, setGone] = useState([]); // SKUs that sold / got reserved since being added
 
@@ -77,6 +77,7 @@ export default function CartClient({ catalog }) {
           <div className="summary-row"><span>HST (13%)</span><span>{money(hst)}</span></div>
           <div className="summary-row"><span>Pickup / delivery</span><span>chosen at checkout</span></div>
           <div className="summary-row total"><span>Total</span><span>{money(total)}</span></div>
+          {member && <div className="hint" style={{ marginTop: 8, color: '#0B6B3A', fontWeight: 600 }}>✓ Member pricing applied</div>}
           <a href="/checkout" className="btn primary block" style={{ marginTop: 14 }}>Checkout</a>
           <div className="hint" style={{ marginTop: 10 }}>
             Free warehouse pickup, or flat {money(DELIVERY_FEE)} local delivery (added at checkout, plus HST).
