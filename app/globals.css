@@ -410,3 +410,62 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
   .bb-chat-panel { right: 8px; left: 8px; width: auto; bottom: 80px; height: calc(100vh - 110px); }
   .bb-chat-fab { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ============================================================
+   Clearance (E)
+   ============================================================ */
+.clearance-badge {
+  position: absolute; top: 10px; left: 10px; z-index: 2;
+  background: #b3261e; color: #fff; font-size: 11px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(179,38,30,.35);
+}
+.card-clearance { outline: 1.5px solid rgba(179,38,30,.5); outline-offset: -1.5px; }
+.price-clearance { color: #b3261e; }
+.clearance-warr { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.clearance-pill { background: #b3261e; color: #fff; }
+.clearance-was { font-size: 13px; color: #b3261e; font-weight: 600; margin-top: 2px; }
+.product-clearance-badge { position: absolute; }
+.product-img { position: relative; }
+.nav-clearance, .cats-clearance { color: #b3261e !important; font-weight: 700; }
+
+.clearance-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  margin: 16px 0; padding: 16px 20px; border-radius: 12px; text-decoration: none;
+  background: linear-gradient(100deg, #b3261e 0%, #8f1d17 100%); color: #fff;
+  box-shadow: 0 8px 26px rgba(179,38,30,.28); flex-wrap: wrap;
+}
+.clearance-banner:hover { filter: brightness(1.05); }
+.clearance-banner-txt { display: flex; flex-direction: column; gap: 2px; }
+.clearance-banner-txt strong { font-size: 18px; }
+.clearance-kicker { font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .9; }
+.clearance-banner-sub { font-size: 13px; opacity: .92; }
+.clearance-banner-cta { font-weight: 700; white-space: nowrap; background: rgba(255,255,255,.16); padding: 9px 14px; border-radius: 8px; }
+
+.clearance-hero {
+  margin: 8px 0 4px; padding: 26px 24px; border-radius: 14px;
+  background: linear-gradient(100deg, #b3261e 0%, #8f1d17 100%); color: #fff;
+}
+.clearance-hero h1 { margin: 6px 0 8px; }
+.clearance-hero p { font-size: 14.5px; max-width: 640px; opacity: .95; }
+
+/* ============================================================
+   Chat FAB (Bay) — Android positioning hardening (C)
+   Guarantee a valid fixed position on every browser; layer the
+   iOS safe-area inset back only where env() is supported, so a
+   parsing difference can never leave the button unpositioned.
+   ============================================================ */
+.bb-chat-fab { bottom: 20px; }
+.bb-chat-panel { bottom: 88px; }
+@media (max-width: 480px) {
+  .bb-chat-fab { bottom: 14px; }
+  .bb-chat-panel { bottom: 80px; }
+}
+@supports (padding: env(safe-area-inset-bottom)) {
+  .bb-chat-fab { bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+  .bb-chat-panel { bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+  @media (max-width: 480px) {
+    .bb-chat-fab { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+    .bb-chat-panel { bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+  }
+}

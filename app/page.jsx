@@ -1,5 +1,6 @@
 import { getAvailable, newestArrivals } from '../lib/inventory';
-import { COLLECTIONS, collectionFilter } from '../lib/constants';
+import { clearanceUnits } from '../lib/clearance';
+import { COLLECTIONS, collectionFilter, money } from '../lib/constants';
 import ProductCard from '../components/ProductCard';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,11 @@ function tileImage(slug, units) {
 export default async function Home() {
   const units = await getAvailable();
   const newest = newestArrivals(units, 12);
+  const clearance = await clearanceUnits(units);
   const tileImages = Object.fromEntries(COLLECTIONS.map((c) => [c.slug, tileImage(c.slug, units)]));
+  const topClearanceOff = clearance.reduce(
+    (m, u) => Math.max(m, u.compareAt > u.price ? Math.round((1 - u.price / u.compareAt) * 100) : 0), 0
+  );
 
   return (
     <div>
@@ -57,6 +62,20 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {clearance.length > 0 && (
+        <a href="/clearance" className="clearance-banner" aria-label="Shop clearance">
+          <div className="clearance-banner-txt">
+            <span className="clearance-kicker">Clearance · while they last</span>
+            <strong>
+              {clearance.length} unit{clearance.length === 1 ? '' : 's'} marked down
+              {topClearanceOff > 0 ? ` — up to ${topClearanceOff}% off retail` : ''}
+            </strong>
+            <span className="clearance-banner-sub">Heavy markdowns on tested units · 3-month warranty</span>
+          </div>
+          <span className="clearance-banner-cta">Shop clearance →</span>
+        </a>
+      )}
 
       <div className="trust-strip">
         <div className="item"><span className="ico">✓</span><div><b>Tested &amp; working</b><span>Every unit is bench-tested before it&apos;s listed.</span></div></div>
@@ -105,8 +124,8 @@ export default async function Home() {
           delivery, or a freight quote for oversized and out-of-area orders.
         </p>
         <p style={{ fontSize: 14.5, margin: '8px 0 0' }}>
-          Every appliance comes with a <b>one-year warranty</b>. If a covered unit stops working within
-          a year of purchase, we&apos;ll repair or replace it. Liquidation pricing, full peace of mind.
+          Every appliance comes with a <b>one-year warranty</b> (3 months on clearance units). If a covered unit stops working within
+          the warranty period, we&apos;ll repair or replace it. Liquidation pricing, full peace of mind.
         </p>
       </div>
     </div>
