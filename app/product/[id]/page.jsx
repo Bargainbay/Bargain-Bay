@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getById } from '../../../lib/inventory';
+import { decorateOne } from '../../../lib/clearance';
 import { isUnavailable } from '../../../lib/reservations';
 import { money, pctOff, PICKUP_ADDRESS } from '../../../lib/constants';
 import { conditionCopy, leadSentence, specRows, seoDescription } from '../../../lib/specs';
@@ -29,12 +30,15 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function Product({ params }) {
-  const u = getById(decodeURIComponent(params.id));
-  if (!u) return notFound();
+  const base = getById(decodeURIComponent(params.id));
+  if (!base) return notFound();
+  const u = await decorateOne(base);
   const sold = await isUnavailable(u.id);
   const off = pctOff(u.price, u.compareAt);
   const explainer = conditionCopy(u.condition);
   const rows = specRows(u);
+  const warrantyMonths = u.onClearance ? (u.warrantyMonths || 3) : 12;
+  const warrantyLabel = u.onClearance ? `${warrantyMonths}-month warranty` : 'one-year warranty';
 
   const productSchema = {
     '@context': 'https://schema.org',
@@ -60,20 +64,25 @@ export default async function Product({ params }) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
       <div className="product-layout">
         <div className="product-img">
+          {u.onClearance && <span className="clearance-badge product-clearance-badge">Clearance</span>}
           <img src={u.image} alt={u.title || `${u.make} ${u.model}`} />
         </div>
         <div>
           <ConditionPill condition={u.condition} />
+          {u.onClearance && <span className="pill clearance-pill" style={{ marginLeft: 8 }}>Clearance</span>}
           {sold && <span className="pill sold" style={{ marginLeft: 8 }}>Sold / on hold</span>}
           <h1 style={{ margin: '10px 0 4px' }}>{u.title || `${u.make} ${u.model}`}</h1>
           <div style={{ color: 'var(--muted)', fontSize: 14 }}>{u.category} · {u.make}</div>
 
           <div className="price-row" style={{ margin: '14px 0 4px' }}>
-            <span className="product-price">{money(u.price)}</span>
+            <span className={'product-price' + (u.onClearance ? ' price-clearance' : '')}>{money(u.price)}</span>
             {u.compareAt > u.price && <span className="compare" style={{ fontSize: 16 }}>{money(u.compareAt)}</span>}
           </div>
           {off > 0 && (
             <div className="savings">You save {money(u.compareAt - u.price)} ({off}% off retail)</div>
+          )}
+          {u.onClearance && u.preClearancePrice > u.price && (
+            <div className="clearance-was">Clearance markdown — was {money(u.preClearancePrice)}</div>
           )}
           <div className="hint">+ 13% HST at checkout · prices in CAD</div>
 
@@ -94,7 +103,7 @@ export default async function Product({ params }) {
           <div className="meta-list" style={{ marginTop: 18 }}>
             <div>🚚 Free pickup at {PICKUP_ADDRESS} (by appointment), flat-fee local delivery, or freight — Hamilton, Scarborough &amp; the GTA.</div>
             <div>✔️ Bench-tested &amp; certified working before listing.</div>
-            <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; one-year functional warranty</a></div>
+            <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; {warrantyLabel}</a>{u.onClearance ? ' (clearance units carry a 3-month warranty)' : ''}</div>
           </div>
 
           <a className="btn" href="/shop" style={{ marginTop: 18 }}>← Back to catalogue</a>
@@ -106,7 +115,7 @@ export default async function Product({ params }) {
         <p>{leadSentence(u)}</p>
         <p>
           Like every appliance at Bargain Bay, it was put through a functional bench test by our
-          technicians before listing and is backed by a one-year warranty. Free warehouse pickup,
+          technicians before listing and is backed by a {warrantyLabel}. Free warehouse pickup,
           flat-fee local delivery, and freight options serve Hamilton, Scarborough and the GTA.
         </p>
 
