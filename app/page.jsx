@@ -71,7 +71,7 @@ export default async function Home() {
               {clearance.length} unit{clearance.length === 1 ? '' : 's'} marked down
               {topClearanceOff > 0 ? ` — up to ${topClearanceOff}% off retail` : ''}
             </strong>
-            <span className="clearance-banner-sub">Heavy markdowns on tested units · 3-month warranty</span>
+            <span className="clearance-banner-sub">Heavy markdowns on tested units · full one-year warranty</span>
           </div>
           <span className="clearance-banner-cta">Shop clearance →</span>
         </a>
@@ -124,8 +124,8 @@ export default async function Home() {
           delivery, or a freight quote for oversized and out-of-area orders.
         </p>
         <p style={{ fontSize: 14.5, margin: '8px 0 0' }}>
-          Every appliance comes with a <b>one-year warranty</b> (3 months on clearance units). If a covered unit stops working within
-          the warranty period, we&apos;ll repair or replace it. Liquidation pricing, full peace of mind.
+          Every appliance comes with a <b>one-year warranty</b>. If a covered unit stops working within
+          a year of purchase, we&apos;ll repair or replace it. Liquidation pricing, full peace of mind.
         </p>
       </div>
     </div>
