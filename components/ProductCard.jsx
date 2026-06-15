@@ -7,8 +7,10 @@ export default function ProductCard({ unit }) {
   const off = pctOff(unit.price, unit.compareAt);
   const href = `/product/${encodeURIComponent(unit.id)}`;
   return (
-    <div className="card">
-      {off > 0 && <span className="off-badge">{off}% off</span>}
+    <div className={'card' + (unit.onClearance ? ' card-clearance' : '')}>
+      {unit.onClearance
+        ? <span className="clearance-badge">Clearance</span>
+        : off > 0 && <span className="off-badge">{off}% off</span>}
       <a href={href} className="thumb">
         <img src={unit.image} alt={unit.title || `${unit.make} ${unit.model}`} loading="lazy" />
       </a>
@@ -17,9 +19,10 @@ export default function ProductCard({ unit }) {
         <a href={href} className="card-title">{unit.title || `${unit.make} ${unit.model}`}</a>
         <div className="card-model">{unit.make} · {unit.model}</div>
         <div className="price-row">
-          <span className="price">{money(unit.price)}</span>
+          <span className={'price' + (unit.onClearance ? ' price-clearance' : '')}>{money(unit.price)}</span>
           {unit.compareAt > unit.price && <span className="compare">{money(unit.compareAt)}</span>}
         </div>
+        {unit.onClearance && <div className="clearance-warr">{unit.warrantyMonths}-month warranty</div>}
         <div style={{ marginTop: 'auto', paddingTop: 8 }}>
           <AddToCartButton sku={unit.id} small />
         </div>

@@ -31,6 +31,7 @@ export default function Header() {
           </a>
           <nav className={'main-nav' + (open ? ' open' : '')} onClick={() => setOpen(false)}>
             <a href="/shop">Shop</a>
+            <a href="/clearance" className="nav-clearance">Clearance</a>
             <a href="/track">Track Order</a>
             <a href="/contact">Contact</a>
             {user ? <a href="/account">My Account</a> : <a href="/login">Login</a>}
@@ -49,6 +50,7 @@ export default function Header() {
           {COLLECTIONS.map((c) => (
             <a key={c.slug} href={`/shop?collection=${c.slug}`}>{c.label}</a>
           ))}
+          <a href="/clearance" className="cats-clearance">Clearance</a>
         </div>
       </div>
     </header>
