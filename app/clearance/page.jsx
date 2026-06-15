@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = {
   title: 'Clearance — Heavy Markdowns on Tested Appliances | Bargain Bay',
   description:
-    'Clearance appliances at Bargain Bay — heavily marked-down tested units. Every clearance appliance is bench-tested and backed by a 3-month warranty. While they last.'
+    'Clearance appliances at Bargain Bay — heavily marked-down tested units. Every clearance appliance is bench-tested and backed by our full one-year warranty. While they last.'
 };
 
 export default async function ClearancePage() {
@@ -26,7 +26,7 @@ export default async function ClearancePage() {
           <h1>Final markdowns. While they last.</h1>
           <p>
             Heavily discounted tested appliances we&apos;re clearing out. Every unit is bench-tested and
-            working, sold with a <b>3-month warranty</b>. One of each — when it&apos;s gone, it&apos;s gone.
+            working, backed by our full <b>one-year warranty</b>. One of each — when it&apos;s gone, it&apos;s gone.
           </p>
         </div>
       </section>
