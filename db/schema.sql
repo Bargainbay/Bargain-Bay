@@ -54,3 +54,16 @@ CREATE INDEX IF NOT EXISTS idx_items_sku      ON order_items(sku);
 
 -- Idempotent upgrades for databases created before these columns existed.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes text;
+
+-- Clearance overrides. One row per SKU put on clearance. Layered onto the
+-- catalog at render time (like reservations). active=false hides it without
+-- losing the markdown. warranty_months defaults to 3 for clearance units.
+CREATE TABLE IF NOT EXISTS clearance (
+  sku             text PRIMARY KEY,
+  price           numeric(10,2) NOT NULL,
+  warranty_months int  NOT NULL DEFAULT 3,
+  note            text,
+  active          boolean NOT NULL DEFAULT true,
+  updated_at      timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_clearance_active ON clearance(active);
