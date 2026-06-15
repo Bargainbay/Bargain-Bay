@@ -1,5 +1,6 @@
 import { getAvailable } from '../../lib/inventory';
-import { clearanceUnits } from '../../lib/clearance';
+import { getSession } from '../../lib/auth';
+import { decorate } from '../../lib/pricing';
 import { money } from '../../lib/constants';
 import ProductCard from '../../components/ProductCard';
 
@@ -12,8 +13,8 @@ export const metadata = {
 };
 
 export default async function ClearancePage() {
-  const available = await getAvailable();
-  const units = await clearanceUnits(available);
+  const session = await getSession();
+  const units = (await decorate(await getAvailable(), session)).filter((u) => u.onClearance);
   const totalSaved = units.reduce(
     (s, u) => s + Math.max(0, (u.compareAt || u.price) - u.price), 0
   );
