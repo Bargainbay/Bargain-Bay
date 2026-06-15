@@ -1,4 +1,6 @@
 import { getAvailable, categories, brands } from '../../lib/inventory';
+import { getSession } from '../../lib/auth';
+import { decorate } from '../../lib/pricing';
 import { COLLECTIONS } from '../../lib/constants';
 import ShopClient from './ShopClient';
 import specs from '../../data/specs.json';
@@ -16,7 +18,7 @@ export async function generateMetadata({ searchParams }) {
 }
 
 export default async function ShopPage({ searchParams }) {
-  const units = await getAvailable();
+  const units = await decorate(await getAvailable(), await getSession());
   const enriched = units.map((u) => ({ ...u, kw: unitKeywords(u, specs[u.id]) }));
   return (
     <ShopClient
