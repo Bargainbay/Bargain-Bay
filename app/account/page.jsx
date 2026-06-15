@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import { getSession } from '../../lib/auth';
 import { hasDb, query } from '../../lib/db';
 import { getOrdersForUser } from '../../lib/orders';
+import { getMembership } from '../../lib/members';
+import MemberRequest from './MemberRequest';
 import { money, STATUS_LABELS } from '../../lib/constants';
 import LogoutButton from './LogoutButton';
 
@@ -15,11 +17,13 @@ export default async function AccountPage() {
   let profile = { email: session.email, name: session.name, phone: '' };
   let orders = [];
   let dbOk = hasDb();
+  let membership = null;
   if (dbOk) {
     try {
       const { rows } = await query('SELECT email, name, phone, created_at FROM users WHERE id = $1', [session.userId]);
       if (rows[0]) profile = rows[0];
       orders = await getOrdersForUser(session.userId);
+      membership = await getMembership(session.userId);
     } catch (e) {
       console.error('account load failed', e);
       dbOk = false;
@@ -43,6 +47,17 @@ export default async function AccountPage() {
         <p className="hint" style={{ marginTop: 10 }}>
           Need to change something or reset your password? Email <a href="mailto:sales@bargainbay.ca" style={{ textDecoration: 'underline' }}>sales@bargainbay.ca</a>.
         </p>
+      </div>
+
+      <div className="panel">
+        <h2>Wholesale / Member access</h2>
+        {membership?.role === 'member' && membership?.member_status === 'approved' ? (
+          <p style={{ fontSize: 14.5, margin: 0 }}><b style={{ color: '#0B6B3A' }}>✓ You're a member.</b> Wholesale pricing is active across the store and at checkout.</p>
+        ) : membership?.member_status === 'pending' ? (
+          <p style={{ fontSize: 14.5, margin: 0 }}>Your member application is <b>under review</b>. We'll email you once it's approved.</p>
+        ) : (
+          <MemberRequest />
+        )}
       </div>
 
       <h2 style={{ color: 'var(--charcoal)' }}>Your orders</h2>
