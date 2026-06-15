@@ -4,6 +4,7 @@ import {
   hashPassword, createSessionToken, sessionCookieOptions,
   SESSION_COOKIE, normalizeEmail, validEmail
 } from '../../../../lib/auth';
+import { notifyOwner, esc } from '../../../../lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,13 @@ export async function POST(req) {
     const user = rows[0];
     // Claim any guest orders previously placed with this email.
     await query('UPDATE orders SET user_id = $1 WHERE user_id IS NULL AND email = $2', [user.id, email]).catch(() => {});
+
+    // Notify the owner (fire-and-forget; never blocks signup).
+    notifyOwner(
+      `New account: ${name} (${email})`,
+      `<p>A new customer account was created on Bargain Bay.</p>
+       <ul><li><b>Name:</b> ${esc(name)}</li><li><b>Email:</b> ${esc(email)}</li><li><b>Phone:</b> ${esc(phone) || '—'}</li></ul>`
+    ).catch(() => {});
 
     const token = await createSessionToken(user);
     const res = NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } });
