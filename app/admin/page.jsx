@@ -3,10 +3,12 @@ import { getSession, isAdmin } from '../../lib/auth';
 import { hasDb, query } from '../../lib/db';
 import { getAllOrders } from '../../lib/orders';
 import { listClearanceAdmin } from '../../lib/clearance';
+import { listMembers } from '../../lib/members';
 import { writebackEnabled } from '../../lib/sheets';
 import AdminOrders from './AdminOrders';
 import AdminTools from './AdminTools';
 import AdminClearance from './AdminClearance';
+import AdminMembers from './AdminMembers';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Admin — Bargain Bay' };
@@ -33,6 +35,7 @@ export default async function AdminPage() {
   let orders = [];
   let reservations = [];
   let clearance = [];
+  let members = [];
   let needsMigration = false;
   try {
     orders = await getAllOrders(200);
@@ -50,8 +53,13 @@ export default async function AdminPage() {
   try {
     clearance = await listClearanceAdmin();
   } catch (e) {
-    // clearance table may not exist until the next migration runs
     console.error('clearance load failed (run migration?)', e.message);
+    needsMigration = true;
+  }
+  try {
+    members = await listMembers();
+  } catch (e) {
+    console.error('members load failed (run migration?)', e.message);
     needsMigration = true;
   }
   return (
@@ -62,6 +70,7 @@ export default async function AdminPage() {
         </div>
       )}
       <AdminOrders initialOrders={orders} sheetsOn={writebackEnabled()} />
+      <AdminMembers initialMembers={members} />
       <AdminClearance initialItems={clearance} />
       <AdminTools initialReservations={reservations} />
     </div>
