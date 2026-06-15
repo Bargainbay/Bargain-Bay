@@ -22,7 +22,6 @@ export default function ProductCard({ unit }) {
           <span className={'price' + (unit.onClearance ? ' price-clearance' : '')}>{money(unit.price)}</span>
           {unit.compareAt > unit.price && <span className="compare">{money(unit.compareAt)}</span>}
         </div>
-        {unit.onClearance && <div className="clearance-warr">{unit.warrantyMonths}-month warranty</div>}
         <div style={{ marginTop: 'auto', paddingTop: 8 }}>
           <AddToCartButton sku={unit.id} small />
         </div>
