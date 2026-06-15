@@ -1,5 +1,6 @@
 import { getAvailable, newestArrivals } from '../lib/inventory';
-import { clearanceUnits } from '../lib/clearance';
+import { getSession } from '../lib/auth';
+import { decorate } from '../lib/pricing';
 import { COLLECTIONS, collectionFilter, money } from '../lib/constants';
 import ProductCard from '../components/ProductCard';
 
@@ -33,9 +34,10 @@ function tileImage(slug, units) {
 }
 
 export default async function Home() {
-  const units = await getAvailable();
+  const session = await getSession();
+  const units = await decorate(await getAvailable(), session);
   const newest = newestArrivals(units, 12);
-  const clearance = await clearanceUnits(units);
+  const clearance = units.filter((u) => u.onClearance);
   const tileImages = Object.fromEntries(COLLECTIONS.map((c) => [c.slug, tileImage(c.slug, units)]));
   const topClearanceOff = clearance.reduce(
     (m, u) => Math.max(m, u.compareAt > u.price ? Math.round((1 - u.price / u.compareAt) * 100) : 0), 0

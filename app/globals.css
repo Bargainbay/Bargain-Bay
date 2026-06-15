@@ -480,3 +480,8 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .bb-chat-fab { transform: translateZ(0); -webkit-transform: translateZ(0); will-change: transform; }
 
 /* build trigger 20260615T153626Z */
+
+/* Member / wholesale pricing tags */
+.member-tag { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #0B6B3A; margin-top: 2px; }
+.price-member { color: #0B6B3A; }
+.member-was { font-size: 13px; color: #0B6B3A; font-weight: 600; margin-top: 2px; }
