@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getById } from '../../../lib/inventory';
-import { decorateOne } from '../../../lib/clearance';
+import { decorateOne } from '../../../lib/pricing';
+import { getSession } from '../../../lib/auth';
 import { isUnavailable } from '../../../lib/reservations';
 import { money, pctOff, PICKUP_ADDRESS } from '../../../lib/constants';
 import { conditionCopy, leadSentence, specRows, seoDescription } from '../../../lib/specs';
@@ -32,7 +33,7 @@ export async function generateMetadata({ params }) {
 export default async function Product({ params }) {
   const base = getById(decodeURIComponent(params.id));
   if (!base) return notFound();
-  const u = await decorateOne(base);
+  const u = await decorateOne(base, await getSession());
   const sold = await isUnavailable(u.id);
   const off = pctOff(u.price, u.compareAt);
   const explainer = conditionCopy(u.condition);
@@ -80,8 +81,8 @@ export default async function Product({ params }) {
           {off > 0 && (
             <div className="savings">You save {money(u.compareAt - u.price)} ({off}% off retail)</div>
           )}
-          {u.onClearance && u.preClearancePrice > u.price && (
-            <div className="clearance-was">Clearance markdown — was {money(u.preClearancePrice)}</div>
+          {u.isMemberPrice && (
+            <div className="member-was">Member price · client price {money(u.clientPrice)}</div>
           )}
           <div className="hint">+ 13% HST at checkout · prices in CAD</div>
 
