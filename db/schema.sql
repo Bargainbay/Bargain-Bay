@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS orders (
   subtotal          numeric(10,2),
   hst               numeric(10,2),
   total             numeric(10,2),
-  clover_session_id text,
+  stripe_session_id text,
   notes             text,
   created_at        timestamptz DEFAULT now()
 );
@@ -54,6 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_items_sku      ON order_items(sku);
 
 -- Idempotent upgrades for databases created before these columns existed.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id text;
 
 -- Clearance overrides. One row per SKU put on clearance. Layered onto the
 -- catalog at render time (like reservations). active=false hides it without

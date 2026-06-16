@@ -9,12 +9,13 @@
     "sync": "node scripts/sync-sheet.mjs"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "googleapis": "^140.0.1",
+    "jose": "^5.9.6",
     "next": "^14.2.5",
+    "pg": "^8.12.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "googleapis": "^140.0.1",
-    "pg": "^8.12.0",
-    "bcryptjs": "^2.4.3",
-    "jose": "^5.9.6"
+    "stripe": "^22.2.1"
   }
 }
