@@ -8,6 +8,27 @@ export default function AdminTools({ initialReservations }) {
   const [migrateMsg, setMigrateMsg] = useState('');
   const [migrating, setMigrating] = useState(false);
   const [error, setError] = useState('');
+  const [emailMsg, setEmailMsg] = useState('');
+  const [emailBusy, setEmailBusy] = useState(false);
+
+  async function testEmail() {
+    setEmailBusy(true); setEmailMsg('');
+    try {
+      const res = await fetch('/api/admin/test-email', { method: 'POST' });
+      const d = await res.json();
+      if (!d.configured) {
+        setEmailMsg('✗ RESEND_API_KEY is not set in Vercel — emails are disabled.');
+      } else if (d.result?.ok) {
+        setEmailMsg(`✓ Sent to ${d.to} from ${d.from} (id ${d.result.id || 'n/a'}). Check that inbox.`);
+      } else {
+        setEmailMsg(`✗ Resend rejected it (status ${d.result?.status || '?'}): ${d.result?.error || d.result?.reason || 'unknown'} — from=${d.from}`);
+      }
+    } catch {
+      setEmailMsg('✗ Network error');
+    } finally {
+      setEmailBusy(false);
+    }
+  }
 
   async function release(sku) {
     setBusySku(sku); setError('');
@@ -84,6 +105,18 @@ export default function AdminTools({ initialReservations }) {
           </table>
         </div>
       )}
+
+      <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Email</h2>
+      <div className="panel" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <button className="btn primary" disabled={emailBusy} onClick={testEmail}>
+          {emailBusy ? 'Sending…' : 'Send test email'}
+        </button>
+        <span style={{ fontSize: 13.5, color: 'var(--muted)' }}>
+          Sends a test to <code>NOTIFY_EMAIL</code> and reports exactly what the mail provider said —
+          use it to confirm order &amp; member notifications will deliver.
+        </span>
+        {emailMsg && <span style={{ fontSize: 13.5, fontWeight: 600, flexBasis: '100%' }}>{emailMsg}</span>}
+      </div>
 
       <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Database</h2>
       <div className="panel" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
