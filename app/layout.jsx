@@ -2,6 +2,7 @@ import './globals.css';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ChatWidget from '../components/ChatWidget';
+import FabProbe from '../components/FabProbe';
 import MetaPixel from '../components/MetaPixel';
 import { SALES_EMAIL, PICKUP_ADDRESS } from '../lib/constants';
 import { SITE_URL } from '../lib/site';
@@ -63,6 +64,7 @@ export default function RootLayout({ children }) {
         <main className="wrap">{children}</main>
         <Footer />
         <ChatWidget />
+        <FabProbe />
       </body>
     </html>
   );
