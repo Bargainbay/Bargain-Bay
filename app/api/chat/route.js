@@ -9,6 +9,31 @@ export const runtime = 'nodejs';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = process.env.CHAT_MODEL || 'claude-haiku-4-5';
 
+// Best-effort per-IP rate limit so a single client can't spin the Anthropic
+// bill up. In-memory only: each serverless instance keeps its own window, so
+// this throttles a burst hitting one instance — for hard global limits move
+// this to Vercel KV / Upstash. Tune via CHAT_RATE_MAX / CHAT_RATE_WINDOW_MS.
+const RATE_MAX = Number(process.env.CHAT_RATE_MAX || 20);
+const RATE_WINDOW_MS = Number(process.env.CHAT_RATE_WINDOW_MS || 60_000);
+const hits = new Map(); // ip -> { count, resetAt }
+
+function rateLimited(ip) {
+  const now = Date.now();
+  const rec = hits.get(ip);
+  if (!rec || now > rec.resetAt) {
+    hits.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    if (hits.size > 5000) for (const [k, v] of hits) if (now > v.resetAt) hits.delete(k);
+    return false;
+  }
+  rec.count += 1;
+  return rec.count > RATE_MAX;
+}
+
+function clientIp(req) {
+  const fwd = req.headers.get('x-forwarded-for');
+  return (fwd ? fwd.split(',')[0] : '').trim() || req.headers.get('x-real-ip') || 'unknown';
+}
+
 // Build a catalogue context with verified specs once per cold start so "Bay"
 // can answer fit/feature questions and only ever recommends real, in-stock units.
 const units = (catalog.units || []).filter((u) => u && u.id);
@@ -67,6 +92,13 @@ CATALOGUE — ${units.length} units currently in stock (one of each), with verif
 ${catalogLines}`;
 
 export async function POST(req) {
+  if (rateLimited(clientIp(req))) {
+    return NextResponse.json(
+      { reply: `You're sending messages a little fast for me! Give me a moment, or email ${SALES_EMAIL} and the team will jump in.`, mode: 'rate_limited' },
+      { status: 429 }
+    );
+  }
+
   let body;
   try {
     body = await req.json();

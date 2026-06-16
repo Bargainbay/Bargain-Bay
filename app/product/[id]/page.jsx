@@ -23,6 +23,7 @@ export async function generateMetadata({ params }) {
   return {
     title: `${u.make} ${u.model} ${u.category} (${u.condition})`,
     description: seoDescription(u),
+    alternates: { canonical: `${SITE_URL}/product/${encodeURIComponent(u.id)}` },
     openGraph: {
       title: `${u.make} ${u.model} ${u.category} (${u.condition}) | Bargain Bay`,
       description: seoDescription(u),

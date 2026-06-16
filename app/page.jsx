@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic';
 export const metadata = {
   title: 'Bargain Bay — Discount Appliances Hamilton & Scarborough | Tested & Working',
   description:
-    'Name-brand appliances. Liquidation prices. Every unit tested & working with a one-year warranty — pickup, delivery & freight serving Hamilton, Scarborough and the GTA.'
+    'Name-brand appliances. Liquidation prices. Every unit tested & working with a one-year warranty — pickup, delivery & freight serving Hamilton, Scarborough and the GTA.',
+  alternates: { canonical: '/' }
 };
 
 // Fallback per-category line-art if no real product photo is available.
