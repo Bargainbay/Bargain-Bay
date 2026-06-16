@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { hasDb } from '../../../../lib/db';
+import { hasDb, query } from '../../../../lib/db';
 import { listMembers, setMembership } from '../../../../lib/members';
+import { sendMemberApproved } from '../../../../lib/email';
 
 export const dynamic = 'force-dynamic';
 async function admin() { const s = await getSession(); return !!(s && isAdmin(s)); }
@@ -20,6 +21,17 @@ export async function POST(req) {
   const userId = Number(body.userId); const decision = String(body.decision || '');
   if (!userId || !['approve', 'reject', 'revoke'].includes(decision))
     return NextResponse.json({ error: 'userId and a valid decision are required' }, { status: 400 });
-  try { await setMembership(userId, decision); return NextResponse.json({ ok: true }); }
-  catch (e) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+  try {
+    await setMembership(userId, decision);
+    // On approval, email the reseller that wholesale pricing is now live
+    // (fire-and-forget — never block or fail the admin action on email).
+    if (decision === 'approve') {
+      try {
+        const { rows } = await query('SELECT email, name, business_name FROM users WHERE id = $1', [userId]);
+        const u = rows[0];
+        if (u?.email) sendMemberApproved({ to: u.email, name: u.name, businessName: u.business_name }).catch(() => {});
+      } catch (e) { console.error('member approval email failed', e.message); }
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e) { return NextResponse.json({ error: e.message }, { status: 500 }); }
 }
