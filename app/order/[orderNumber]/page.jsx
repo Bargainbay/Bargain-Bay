@@ -3,6 +3,7 @@ import { hasDb } from '../../../lib/db';
 import { getOrderByNumber } from '../../../lib/orders';
 import { getSession } from '../../../lib/auth';
 import { money, STATUS_LABELS, PICKUP_ADDRESS, SALES_EMAIL } from '../../../lib/constants';
+import PixelPurchase from '../../../components/PixelPurchase';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Order Status — Bargain Bay' };
@@ -68,6 +69,14 @@ export default async function OrderPage({ params, searchParams }) {
         </span>
       </div>
 
+      {justPaid && !cancelled && (
+        <PixelPurchase
+          orderNumber={order.order_number}
+          ids={order.items.map((i) => i.sku)}
+          value={Number(order.total)}
+          email={order.email}
+        />
+      )}
       {justPaid && !cancelled && (
         <div className="notice-box">Payment received — thank you! We&apos;ll email you to schedule {order.delivery_method === 'delivery' ? 'delivery' : 'pickup'}.</div>
       )}
