@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getMany } from '../../../lib/inventory';
 import { hasDb, query, withTransaction } from '../../../lib/db';
 import { unavailableSkus, reserveWithClient, expireReservations } from '../../../lib/reservations';
-import { cloverConfigured, createHostedCheckout } from '../../../lib/clover';
+import { stripeConfigured, createCheckoutSession } from '../../../lib/stripe';
 import {
   getSession, hashPassword, createSessionToken,
   sessionCookieOptions, SESSION_COOKIE, normalizeEmail, validEmail
@@ -142,36 +142,37 @@ export async function POST(req) {
   const trackUrl = `/order/${order.orderNumber}` + (userId ? '' : `?email=${encodeURIComponent(email)}`);
 
   let payload;
-  if (cloverConfigured()) {
-    // ---- hosted payment ----
+  if (stripeConfigured()) {
+    // ---- hosted payment via Stripe Checkout ----
     try {
       const lineItems = [
         ...items.map((u) => ({
           name: `${u.make} ${u.model}`,
-          priceCents: Math.round(priceOf(u) * 100),
-          note: u.id
+          priceCents: Math.round(priceOf(u) * 100)
         })),
-        ...(deliveryFee ? [{ name: 'Local delivery (Hamilton & area)', priceCents: Math.round(deliveryFee * 100), note: 'DELIVERY' }] : []),
-        { name: 'HST 13% (Ontario)', priceCents: Math.round(hst * 100), note: 'HST' }
+        ...(deliveryFee ? [{ name: 'Local delivery (Hamilton & area)', priceCents: Math.round(deliveryFee * 100) }] : []),
+        { name: 'HST 13% (Ontario)', priceCents: Math.round(hst * 100) }
       ];
-      const { url, sessionId } = await createHostedCheckout({
+      const { url, sessionId } = await createCheckoutSession({
         lineItems,
-        customer: { email, firstName: name.split(' ')[0], lastName: name.split(' ').slice(1).join(' ') || '-', phoneNumber: phone || undefined },
+        email,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
         successUrl: `${siteUrl()}${trackUrl}${trackUrl.includes('?') ? '&' : '?'}status=success`,
-        failureUrl: `${siteUrl()}/checkout?status=failed`
+        cancelUrl: `${siteUrl()}/checkout?status=failed`
       });
       if (sessionId) {
-        await query('UPDATE orders SET clover_session_id = $2 WHERE id = $1', [order.id, sessionId]).catch(() => {});
+        await query('UPDATE orders SET stripe_session_id = $2 WHERE id = $1', [order.id, sessionId]).catch(() => {});
       }
       payload = { url, orderNumber: order.orderNumber };
     } catch (e) {
-      console.error('Clover session failed — cancelling order', e);
+      console.error('Stripe session failed — cancelling order', e);
       await query("UPDATE orders SET status = 'cancelled' WHERE id = $1", [order.id]).catch(() => {});
       await query('DELETE FROM reservations WHERE order_id = $1', [order.id]).catch(() => {});
       return NextResponse.json({ error: 'Payment provider is unavailable right now. Please try again in a few minutes.' }, { status: 502 });
     }
   } else {
-    // ---- no Clover token yet: confirm immediately, pay on pickup/delivery ----
+    // ---- no Stripe key yet: confirm immediately, pay on pickup/delivery ----
     await query("UPDATE orders SET status = 'confirmed' WHERE id = $1", [order.id]);
     if (writebackEnabled()) {
       for (const u of items) {

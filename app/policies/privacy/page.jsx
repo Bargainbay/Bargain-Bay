@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <h2>Information we collect</h2>
       <ul>
         <li><b>Information you give us:</b> name, email, phone, billing/shipping/pickup address, order details, account credentials, and the content of your messages to us.</li>
-        <li><b>Payment information:</b> handled by our payment provider (Clover). We do <b>not</b> store full card numbers.</li>
+        <li><b>Payment information:</b> handled by our payment provider (Stripe). We do <b>not</b> store full card numbers.</li>
         <li><b>Information collected automatically:</b> device and browser type, IP address, pages viewed, referring site, and similar analytics, via cookies and our e-commerce platform.</li>
       </ul>
 
@@ -28,7 +28,7 @@ export default function PrivacyPage() {
       <h2>How we share information</h2>
       <p>We share personal information only as needed, with:</p>
       <ul>
-        <li><b>Payment processors</b> (Clover) to take payment;</li>
+        <li><b>Payment processors</b> (Stripe) to take payment;</li>
         <li><b>Our hosting and e-commerce infrastructure</b>, which processes data on our behalf;</li>
         <li><b>Delivery and freight carriers</b> to get your order to you;</li>
         <li><b>Service providers</b> (e.g., email and analytics tools) bound by confidentiality;</li>

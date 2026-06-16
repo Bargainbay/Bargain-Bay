@@ -1,8 +1,8 @@
 # Bargain Bay — e-commerce storefront
 
 Production storefront for RS Solutions' liquidation appliance business
-(Hamilton, ON). Next.js 14 App Router, plain JavaScript, Postgres, Clover
-Hosted Checkout, with the master inventory tracker (Google Sheet) as the
+(Hamilton, ON). Next.js 14 App Router, plain JavaScript, Postgres, Stripe
+Checkout, with the master inventory tracker (Google Sheet) as the
 source of truth for the catalogue.
 
 ## How the pieces fit
@@ -16,11 +16,11 @@ data/catalog.json  (139 one-of-a-kind units)
         ▼
 Next.js storefront ── customer checks out ──► order + 30-min SKU reservation (Postgres)
         │                                            │
-        │                       CLOVER_PRIVATE_TOKEN set?  ── no ──► order confirmed,
-        │                                            │               pay on pickup/delivery
+        │                       STRIPE_SECRET_KEY set?  ── no ──► order confirmed,
+        │                                            │            pay on pickup/delivery
         │                                           yes
         │                                            ▼
-        │                                  Clover Hosted Checkout
+        │                                  Stripe Checkout
         │                                            │ webhook on payment
         │                                            ▼
         │                          order → confirmed + writeSold() to the sheet
@@ -61,8 +61,9 @@ See `.env.example` for the full annotated list:
 | `POSTGRES_URL` | accounts, orders, reservations, admin | Neon / Vercel Postgres connection string. Site builds and browses without it. |
 | `AUTH_SECRET` | login sessions | long random string (`openssl rand -hex 32`) |
 | `ADMIN_EMAILS` | `/admin`, `/api/admin/*` | comma-separated emails; each needs a normal account |
-| `SITE_URL` | Clover redirects | e.g. `https://bargainbay.org` |
-| `CLOVER_ENV` / `CLOVER_MERCHANT_ID` / `CLOVER_PRIVATE_TOKEN` | card payments | leave token blank → pay-on-pickup/delivery mode |
+| `SITE_URL` | Stripe redirects | e.g. `https://bargainbay.ca` |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | card payments | leave the secret key blank → pay-on-pickup/delivery mode |
+| `RESEND_API_KEY` / `RESEND_FROM` / `NOTIFY_EMAIL` | order + member emails | `RESEND_FROM` must be on a verified domain |
 | `CRON_SECRET` | protecting the cleanup cron | optional |
 | `GOOGLE_CREDENTIALS` / `SHEET_ID` / `GOOGLE_SHEETS_TAB` | catalog sync + sold write-back | service-account JSON |
 | `SHEET_WRITEBACK` | sold write-back | set `1` to let paid orders mark units Sold in the master tracker |
@@ -91,21 +92,22 @@ See `.env.example` for the full annotated list:
 2. At the registrar, set the apex `A` record to `76.76.21.21` and the `www`
    `CNAME` to `cname.vercel-dns.com` (Vercel shows the exact values).
 3. Wait for DNS + automatic TLS, then set `SITE_URL=https://bargainbay.org`
-   and redeploy so Clover redirect URLs use the real domain.
+   and redeploy so Stripe success/cancel redirect URLs use the real domain.
 
-### Turning on Clover payments
+### Turning on Stripe payments
 
-1. In the Clover dashboard enable **Ecommerce** and create an API token of type
-   **Hosted Checkout** (private token).
-2. Set `CLOVER_MERCHANT_ID`, `CLOVER_PRIVATE_TOKEN`, and `CLOVER_ENV=sandbox`
-   to test (`production` to go live).
-3. Point the Clover webhook at `https://<your-domain>/api/clover-webhook` —
-   payment success flips the order to **confirmed** and (if `SHEET_WRITEBACK=1`
-   with Google credentials set) writes "Sold" back to the master tracker.
-4. Run a sandbox order end-to-end before switching `CLOVER_ENV=production`.
-5. TODO before go-live: add webhook signature verification in
-   `app/api/clover-webhook/route.js`, and confirm the request schema in
-   `lib/clover.js` against your Clover region/account.
+1. In the Stripe dashboard grab your secret key (`sk_test_…` to test, `sk_live_…`
+   to go live) and set `STRIPE_SECRET_KEY`.
+2. Add a webhook endpoint at `https://<your-domain>/api/stripe-webhook` listening
+   for `checkout.session.completed` (plus `async_payment_succeeded/failed` and
+   `checkout.session.expired`). Copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
+   Payment success flips the order to **confirmed**, emails the customer + owner,
+   and (if `SHEET_WRITEBACK=1` with Google credentials set) writes "Sold" back to
+   the master tracker.
+3. The webhook **requires** a valid Stripe signature — unsigned/forged POSTs are
+   rejected, so an order can never be marked paid without a real Stripe event.
+4. Run a test-mode order end-to-end (Stripe test card `4242 4242 4242 4242`)
+   before switching to live keys.
 
 ## Refreshing the catalogue (`data/catalog.json`)
 
@@ -142,8 +144,8 @@ app/
   account/  login/ signup/ customer accounts (JWT cookie 'bb_session')
   admin/                   order board + reservations + migrate (ADMIN_EMAILS gate)
   contact/  policies/      contact / returns / shipping / privacy / terms
-  api/checkout             order + reservation transaction → Clover or confirm
-  api/clover-webhook       payment confirmation + sheet write-back
+  api/checkout             order + reservation transaction → Stripe or confirm
+  api/stripe-webhook       payment confirmation (signed) + sheet write-back
   api/availability         live sold/reserved check for the cart
   api/auth/*               signup / login / logout / me
   api/admin/orders         PATCH order status
@@ -155,7 +157,7 @@ lib/
   auth.js                  bcryptjs + jose sessions
   reservations.js          race-safe 30-min SKU holds (Postgres)
   inventory.js  images.js  catalog + image resolution
-  clover.js  sheets.js     Clover Hosted Checkout + master-sheet sync
+  stripe.js  sheets.js     Stripe Checkout + master-sheet sync
 db/schema.sql              users / orders / order_items / reservations
 vercel.json                daily cron for reservation cleanup
 ```

@@ -38,7 +38,7 @@ export default function TermsPage() {
 
       <h2>5. Payment &amp; taxes</h2>
       <p>
-        Payment is processed securely by <b>Clover</b>. Applicable <b>HST (13% in Ontario)</b> is calculated and
+        Payment is processed securely by <b>Stripe</b>. Applicable <b>HST (13% in Ontario)</b> is calculated and
         added at checkout.
       </p>
 
