@@ -2,6 +2,7 @@ import './globals.css';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import ChatWidget from '../components/ChatWidget';
+import MetaPixel from '../components/MetaPixel';
 import { SALES_EMAIL, PICKUP_ADDRESS } from '../lib/constants';
 import { SITE_URL } from '../lib/site';
 
@@ -53,6 +54,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
+        <MetaPixel />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(storeSchema) }}
