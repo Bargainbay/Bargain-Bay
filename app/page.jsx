@@ -47,11 +47,6 @@ export default async function Home() {
   return (
     <div>
       <section className="hero">
-        <img
-          src="/bargain-bay-hero-wide.jpg"
-          alt="Rows of tested name-brand appliances at the Bargain Bay warehouse"
-          className="hero-bg"
-        />
         <div className="hero-inner">
           <h1>Name-brand appliances. <em>Liquidation prices.</em></h1>
           <p>
