@@ -472,15 +472,15 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 }
 
 /* ============================================================
-   Bay FAB — Android compositing fix (C, attempt 2)
-   The near-int-max z-index (2147483000) + box-shadow fails to
-   paint on some Android GPUs while rendering fine on desktop/iOS.
-   Use a sane high z-index and force a clean compositing layer.
+   Bay FAB — keep a sane high z-index, and NOTHING that promotes
+   the button to its own GPU layer. An earlier attempt added
+   `transform: translateZ(0); will-change: transform;` to "force a
+   clean compositing layer" — but forcing a tiny position:fixed
+   element onto its own layer makes it fail to paint on some Android
+   GPUs: it stayed invisible across every mobile browser while
+   rendering fine on desktop. Plain rendering is the reliable path.
    ============================================================ */
 .bb-chat-fab, .bb-chat-panel { z-index: 9999 !important; }
-.bb-chat-fab { transform: translateZ(0); -webkit-transform: translateZ(0); will-change: transform; }
-
-/* build trigger 20260615T153626Z */
 
 /* Member / wholesale pricing tags */
 .member-tag { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #0B6B3A; margin-top: 2px; }
