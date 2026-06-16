@@ -10,6 +10,7 @@ import {
 import { round2, HST_RATE, DELIVERY_FEE } from '../../../lib/constants';
 import { resolvePrices } from '../../../lib/pricing';
 import { writebackEnabled, writeSold } from '../../../lib/sheets';
+import { sendOrderEmails } from '../../../lib/email';
 
 export const dynamic = 'force-dynamic';
 
@@ -177,6 +178,11 @@ export async function POST(req) {
         try { await writeSold(u.id, priceOf(u)); } catch (e) { console.error('writeSold failed', u.id, e.message); }
       }
     }
+    // Customer receipt + owner alert (fire-and-forget; never blocks the order).
+    sendOrderEmails(
+      { orderNumber: order.orderNumber, name, email, deliveryMethod, address, city, postal, subtotal, hst, total },
+      items.map((u) => ({ title: u.title || `${u.make} ${u.model}`, price: priceOf(u) }))
+    ).catch((e) => console.error('order emails failed', e.message));
     payload = { orderUrl: trackUrl, orderNumber: order.orderNumber };
   }
 
