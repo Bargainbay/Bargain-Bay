@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { addToCart, inCart, onCartChange } from '../lib/cart';
+import { addToCart as addToCartPixel } from '../lib/fpixel';
 
-export default function AddToCartButton({ sku, available = true, small = false }) {
+export default function AddToCartButton({ sku, available = true, small = false, price, name }) {
   const [added, setAdded] = useState(false);
 
   useEffect(() => {
@@ -21,7 +22,11 @@ export default function AddToCartButton({ sku, available = true, small = false }
   return (
     <button
       className={'btn accent' + (small ? '' : ' block')}
-      onClick={() => { addToCart(sku); setAdded(true); }}
+      onClick={() => {
+        addToCart(sku);
+        addToCartPixel({ id: sku, name, value: price });
+        setAdded(true);
+      }}
     >
       Add to cart
     </button>
