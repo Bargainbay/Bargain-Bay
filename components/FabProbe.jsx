@@ -25,16 +25,27 @@ export default function FabProbe() {
         ? (hitEl === el || el.contains(hitEl) ? 'FAB(self)' : (hitEl.className || hitEl.tagName) + ' [COVERS]')
         : 'null/offscreen';
       const vv = window.visualViewport;
+      const visW = vv ? Math.round(vv.width) : innerWidth;
+      const visH = vv ? Math.round(vv.height) : innerHeight;
+      const docSW = document.documentElement.scrollWidth;
+      // find what (if anything) extends past the visible width
+      const offenders = [];
+      document.querySelectorAll('body *').forEach((el) => {
+        const er = el.getBoundingClientRect();
+        if (er.right > visW + 1) {
+          const cls = el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '';
+          offenders.push(el.tagName.toLowerCase() + cls + '=' + Math.round(er.right));
+        }
+      });
+      offenders.sort((a, b) => parseInt(b.split('=')[1]) - parseInt(a.split('=')[1]));
       const lines = [
-        `found=yes  display=${cs.display}  vis=${cs.visibility}  opacity=${cs.opacity}`,
-        `pos=${cs.position}  z=${cs.zIndex}  transform=${cs.transform}`,
-        `clip=${cs.clip} clipPath=${cs.clipPath} overflow(html/body)=${getComputedStyle(document.documentElement).overflow}/${getComputedStyle(document.body).overflow}`,
-        `rect: left=${Math.round(r.left)} top=${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`,
-        `layoutVP=${innerWidth}x${innerHeight}  dpr=${window.devicePixelRatio}`,
-        `visualVP=${vv ? Math.round(vv.width) + 'x' + Math.round(vv.height) + ' offTop=' + Math.round(vv.offsetTop) : 'n/a'}`,
-        `belowFold=${r.top > innerHeight ? 'YES' : 'no'}  offRight=${r.left > innerWidth ? 'YES' : 'no'}  hitTest=${hit}`,
-        `bg=${cs.backgroundColor}  border=${cs.borderTopWidth} ${cs.borderTopColor}`,
-        `UA=${navigator.userAgent.slice(0, 80)}`
+        `found=yes display=${cs.display} vis=${cs.visibility} op=${cs.opacity} hit=${hit}`,
+        `FAB rect: left=${Math.round(r.left)} top=${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`,
+        `layoutVP=${innerWidth}x${innerHeight}  visualVP=${visW}x${visH}  dpr=${window.devicePixelRatio}`,
+        `FAB offVisibleRight=${r.left > visW ? 'YES ⚠️' : 'no ✓'}  offVisibleBottom=${r.top > visH ? 'YES ⚠️' : 'no ✓'}`,
+        `docScrollW=${docSW}  overflowX=${docSW > visW + 1 ? 'YES ⚠️' : 'no ✓'}  offenders=${offenders.length}`,
+        `widest: ${offenders.slice(0, 4).join('  ') || '(none ✓)'}`,
+        `UA=${navigator.userAgent.slice(0, 70)}`
       ];
       setInfo(lines.join('\n'));
     };

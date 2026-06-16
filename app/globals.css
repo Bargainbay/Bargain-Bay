@@ -37,6 +37,11 @@
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
+/* Never let any element overflow horizontally past the screen. A stray wide
+   element widens the layout viewport, which on mobile pushes position:fixed
+   UI (the Bay chat bubble) off-screen. `clip` (not `hidden`) keeps the sticky
+   header working. */
+html, body { overflow-x: clip; max-width: 100%; }
 body {
   margin: 0;
   font-family: var(--font-body);
