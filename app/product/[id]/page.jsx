@@ -8,6 +8,7 @@ import { conditionCopy, leadSentence, specRows, seoDescription } from '../../../
 import { SITE_URL } from '../../../lib/site';
 import ConditionPill from '../../../components/ConditionPill';
 import AddToCartButton from '../../../components/AddToCartButton';
+import PixelView from '../../../components/PixelView';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +63,7 @@ export default async function Product({ params }) {
   return (
     <div>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
+      <PixelView id={u.id} name={u.title || `${u.make} ${u.model}`} value={u.price} />
       <div className="product-layout">
         <div className="product-img">
           {u.onClearance && <span className="clearance-badge product-clearance-badge">Clearance</span>}
@@ -97,7 +99,7 @@ export default async function Product({ params }) {
           </div>
 
           <div style={{ maxWidth: 360, marginTop: 12 }}>
-            <AddToCartButton sku={u.id} available={!sold} />
+            <AddToCartButton sku={u.id} available={!sold} price={u.price} name={u.title || `${u.make} ${u.model}`} />
           </div>
 
           <div className="meta-list" style={{ marginTop: 18 }}>
