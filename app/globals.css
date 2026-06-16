@@ -133,14 +133,10 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
   position: relative; overflow: hidden; border-radius: 14px; margin-top: 8px;
   color: #fff; padding: 56px 40px; min-height: 320px;
   display: flex; flex-direction: column; justify-content: center;
-}
-.hero .hero-bg {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; object-position: center;
-}
-.hero::after {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(95deg, rgba(46,45,43,.86) 0%, rgba(46,45,43,.62) 55%, rgba(46,45,43,.30) 100%);
+  /* Brand gradient background. No text-baked image: the heading, paragraph and
+     buttons below are the real, responsive, indexable content — a banner image
+     with text would duplicate them and clash on mobile (object-fit cropping). */
+  background: linear-gradient(115deg, #2e2d2b 0%, #3a3937 50%, #6f6358 118%);
 }
 .hero > .hero-inner { position: relative; z-index: 1; max-width: 600px; }
 .hero h1 { color: #fff; font-size: 34px; margin: 0 0 12px; letter-spacing: .05em; }
