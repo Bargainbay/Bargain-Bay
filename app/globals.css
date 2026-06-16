@@ -328,8 +328,13 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
   position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 2147483000;
   width: 56px; height: 56px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--charcoal); color: #fff; border: none; cursor: pointer;
-  box-shadow: 0 6px 22px rgba(46,45,43,.32); transition: background .15s, transform .15s;
+  background: var(--charcoal); color: #fff; cursor: pointer;
+  /* Light ring so the dark circle stays visible even when it floats over the
+     near-identical dark footer (charcoal FAB on charcoal footer = invisible on
+     phones). The inner hairline keeps the white ring crisp on the light page. */
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.12), 0 6px 22px rgba(46,45,43,.45);
+  transition: background .15s, transform .15s;
 }
 .bb-chat-fab:hover { background: var(--charcoal-soft); transform: translateY(-1px); }
 
