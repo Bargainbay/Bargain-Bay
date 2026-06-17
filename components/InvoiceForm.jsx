@@ -3,10 +3,11 @@ import { useState } from 'react';
 
 const blankItem = () => ({ description: '', amount: '' });
 
-export default function InvoiceForm() {
+export default function InvoiceForm({ inventory = [] }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [items, setItems] = useState([blankItem()]);
+  const [q, setQ] = useState('');
   const [addHst, setAddHst] = useState(true);
   const [daysUntilDue, setDaysUntilDue] = useState(14);
   const [memo, setMemo] = useState('');
@@ -17,6 +18,18 @@ export default function InvoiceForm() {
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const addRow = () => setItems((xs) => [...xs, blankItem()]);
   const removeRow = (i) => setItems((xs) => (xs.length > 1 ? xs.filter((_, j) => j !== i) : xs));
+
+  const matches = q.trim().length >= 2
+    ? inventory.filter((u) => u.search.includes(q.trim().toLowerCase())).slice(0, 8)
+    : [];
+  function pickInventory(u) {
+    const filled = { description: u.description, amount: String(u.price) };
+    setItems((xs) => {
+      const empty = xs.findIndex((it) => !it.description && !it.amount);
+      return empty >= 0 ? xs.map((it, j) => (j === empty ? filled : it)) : [...xs, filled];
+    });
+    setQ('');
+  }
 
   const subtotal = items.reduce((a, it) => a + (Number(it.amount) || 0), 0);
   const hst = addHst ? subtotal * 0.13 : 0;
@@ -68,6 +81,25 @@ export default function InvoiceForm() {
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@example.com" />
         </div>
       </div>
+
+      {inventory.length > 0 && (
+        <div className="field">
+          <label>Add from inventory</label>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your stock by model, name, or SKU…" />
+          {matches.length > 0 && (
+            <div style={{ border: '1px solid var(--line)', borderRadius: 8, marginTop: 4, maxHeight: 230, overflowY: 'auto' }}>
+              {matches.map((u) => (
+                <button type="button" key={u.id} onClick={() => pickInventory(u)}
+                  style={{ display: 'flex', justifyContent: 'space-between', gap: 12, width: '100%', textAlign: 'left', padding: '8px 11px', background: 'none', border: 'none', borderBottom: '1px solid var(--line-soft)', cursor: 'pointer', fontSize: 13.5, color: 'var(--ink)' }}>
+                  <span>{u.description}</span>
+                  <span style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontWeight: 600 }}>${u.price.toFixed(2)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="hint">Picking a unit fills a line below with its name, SKU, and price — you can still edit the amount.</div>
+        </div>
+      )}
 
       <label style={{ fontSize: 13, fontWeight: 500, display: 'block', margin: '4px 0 6px' }}>Line items</label>
       {items.map((it, i) => (
