@@ -3,11 +3,12 @@ import { useState } from 'react';
 
 const blankItem = () => ({ description: '', amount: '' });
 
-export default function InvoiceForm({ inventory = [] }) {
+export default function InvoiceForm({ inventory = [], customers = [] }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [items, setItems] = useState([blankItem()]);
   const [q, setQ] = useState('');
+  const [custOpen, setCustOpen] = useState(false);
   const [addHst, setAddHst] = useState(true);
   const [daysUntilDue, setDaysUntilDue] = useState(14);
   const [memo, setMemo] = useState('');
@@ -22,6 +23,16 @@ export default function InvoiceForm({ inventory = [] }) {
   const matches = q.trim().length >= 2
     ? inventory.filter((u) => u.search.includes(q.trim().toLowerCase())).slice(0, 8)
     : [];
+
+  const custQuery = (email || name).trim().toLowerCase();
+  const custMatches = custOpen && custQuery.length >= 2
+    ? customers.filter((c) => c.search.includes(custQuery) && c.email.toLowerCase() !== email.trim().toLowerCase()).slice(0, 6)
+    : [];
+  function pickCustomer(c) {
+    setName(c.name || '');
+    setEmail(c.email || '');
+    setCustOpen(false);
+  }
   function pickInventory(u) {
     const filled = { description: u.description, amount: String(u.price) };
     setItems((xs) => {
@@ -74,13 +85,25 @@ export default function InvoiceForm({ inventory = [] }) {
       <div className="form-2col">
         <div className="field">
           <label>Customer name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Smith" />
+          <input value={name} onChange={(e) => { setName(e.target.value); setCustOpen(true); }} placeholder="Jane Smith" />
         </div>
         <div className="field">
           <label>Customer email *</label>
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@example.com" />
+          <input type="email" required value={email} onChange={(e) => { setEmail(e.target.value); setCustOpen(true); }} placeholder="jane@example.com" autoComplete="off" />
         </div>
       </div>
+      {custMatches.length > 0 && (
+        <div style={{ border: '1px solid var(--line)', borderRadius: 8, margin: '-6px 0 12px', maxHeight: 200, overflowY: 'auto' }}>
+          <div style={{ fontSize: 12, color: 'var(--muted)', padding: '6px 11px', borderBottom: '1px solid var(--line-soft)' }}>Existing customers</div>
+          {custMatches.map((c) => (
+            <button type="button" key={c.email} onClick={() => pickCustomer(c)}
+              style={{ display: 'flex', justifyContent: 'space-between', gap: 12, width: '100%', textAlign: 'left', padding: '8px 11px', background: 'none', border: 'none', borderBottom: '1px solid var(--line-soft)', cursor: 'pointer', fontSize: 13.5, color: 'var(--ink)' }}>
+              <span>{c.name || '(no name)'}<span style={{ color: 'var(--muted)' }}> · {c.email}</span></span>
+              <span style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{c.phone || ''}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {inventory.length > 0 && (
         <div className="field">
