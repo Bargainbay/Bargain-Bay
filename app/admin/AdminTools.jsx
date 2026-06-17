@@ -12,6 +12,29 @@ export default function AdminTools({ initialReservations }) {
   const [emailBusy, setEmailBusy] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [importMsg, setImportMsg] = useState('');
+  const [importing, setImporting] = useState(false);
+
+  async function importCsv(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setImporting(true); setImportMsg('');
+    try {
+      const text = await file.text();
+      const res = await fetch('/api/admin/import-inventory', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ csv: text })
+      });
+      const d = await res.json();
+      setImportMsg(res.ok
+        ? `✓ Imported ${d.synced} units${d.deactivated ? `, removed ${d.deactivated} no longer in stock` : ''}.`
+        : `✗ ${d.error || 'Import failed'}`);
+    } catch {
+      setImportMsg('✗ Could not read that file.');
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  }
 
   async function syncInventory() {
     setSyncing(true); setSyncMsg('');
@@ -133,6 +156,16 @@ export default function AdminTools({ initialReservations }) {
           and removes anything no longer in stock. Needs <code>GOOGLE_CREDENTIALS</code> + <code>SHEET_ID</code>.
         </span>
         {syncMsg && <span style={{ fontSize: 13.5, fontWeight: 600, flexBasis: '100%' }}>{syncMsg}</span>}
+        <div style={{ flexBasis: '100%', borderTop: '1px solid var(--line-soft)', paddingTop: 12, marginTop: 2 }}>
+          <label className="btn" style={{ cursor: 'pointer', opacity: importing ? 0.6 : 1 }}>
+            {importing ? 'Importing…' : 'Import inventory CSV'}
+            <input type="file" accept=".csv,text/csv" style={{ display: 'none' }} disabled={importing} onChange={importCsv} />
+          </label>
+          <span style={{ fontSize: 13.5, color: 'var(--muted)', marginLeft: 12 }}>
+            No Google needed — export your tracker's Main tab to CSV and upload it here.
+          </span>
+          {importMsg && <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 8 }}>{importMsg}</div>}
+        </div>
       </div>
 
       <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Email</h2>
