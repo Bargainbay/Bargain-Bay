@@ -3,6 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
 import { stripeConfigured } from '../../../lib/stripe';
 import { listInvoices } from '../../../lib/invoices';
+import { customerContacts } from '../../../lib/analytics';
 import catalog from '../../../data/catalog.json';
 import AdminNav from '../../../components/AdminNav';
 import InvoiceForm from '../../../components/InvoiceForm';
@@ -41,6 +42,14 @@ export default async function InvoicesPage() {
     catch (e) { loadError = e?.message || 'Could not load invoices from Stripe.'; }
   }
 
+  let customers = [];
+  try {
+    customers = (await customerContacts()).map((c) => ({
+      name: c.name, email: c.email, phone: c.phone,
+      search: `${c.name} ${c.email} ${c.phone}`.toLowerCase()
+    }));
+  } catch { customers = []; }
+
   return (
     <div>
       <AdminNav active="invoices" />
@@ -55,7 +64,7 @@ export default async function InvoicesPage() {
         <p className="hint" style={{ marginTop: 0 }}>
           Creates a hosted Stripe invoice and emails the customer a pay link. Good for offline/custom sales.
         </p>
-        <InvoiceForm inventory={inventory} />
+        <InvoiceForm inventory={inventory} customers={customers} />
       </div>
 
       <div className="panel">
