@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
-import { dashboardData, customerList } from '../../../lib/analytics';
+import { dashboardData, customerList, inventoryFinancials } from '../../../lib/analytics';
 import AdminNav from '../../../components/AdminNav';
 
 export const dynamic = 'force-dynamic';
@@ -90,6 +90,7 @@ export default async function DashboardPage() {
   }
 
   const k = data.kpis;
+  const fin = inventoryFinancials();
   const members = customers.filter((c) => c.memberStatus && c.memberStatus !== 'none');
 
   return (
@@ -109,6 +110,39 @@ export default async function DashboardPage() {
       <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Revenue by month</h2>
         <RevenueChart data={data.revenueByMonth} />
+      </div>
+
+      <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Inventory &amp; margins</h2>
+        {fin.unitsWithCost === 0 && (
+          <p className="hint" style={{ marginTop: 0 }}>
+            Per-unit cost isn&apos;t in the catalog yet — re-run the tracker sync (<code>npm run sync</code>) to pull "Total Cost" and light up margins. Counts shown below regardless.
+          </p>
+        )}
+        <div className="dash-kpis">
+          <Kpi label="In-stock units" value={fin.units} />
+          <Kpi label="Inventory cost" value={money(fin.inventoryCost)} sub="COGS in stock" />
+          <Kpi label="Sale value" value={money(fin.suggestedValue)} sub="at listed prices" />
+          <Kpi label="Potential profit" value={money(fin.potentialProfit)} sub={fin.unitsWithCost ? `${fin.marginPct.toFixed(1)}% margin` : null} />
+          <Kpi label="Retail value" value={money(fin.retailValue)} />
+        </div>
+        {fin.unitsWithCost > 0 && (
+          <div className="table-wrap" style={{ marginTop: 14 }}><table className="admin">
+            <thead><tr><th>Category</th><th>Units</th><th style={{ textAlign: 'right' }}>Cost</th><th style={{ textAlign: 'right' }}>Sale value</th><th style={{ textAlign: 'right' }}>Potential profit</th><th style={{ textAlign: 'right' }}>Margin</th></tr></thead>
+            <tbody>
+              {fin.byCategory.map((b) => (
+                <tr key={b.category}>
+                  <td>{b.category}</td>
+                  <td>{b.units}</td>
+                  <td style={{ textAlign: 'right' }}>{money(b.cost)}</td>
+                  <td style={{ textAlign: 'right' }}>{money(b.suggested)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(b.profit)}</td>
+                  <td style={{ textAlign: 'right' }}>{b.margin.toFixed(1)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        )}
       </div>
 
       <div className="dash-2col">
