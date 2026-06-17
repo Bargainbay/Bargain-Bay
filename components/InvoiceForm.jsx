@@ -1,0 +1,105 @@
+'use client';
+import { useState } from 'react';
+
+const blankItem = () => ({ description: '', amount: '' });
+
+export default function InvoiceForm() {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [items, setItems] = useState([blankItem()]);
+  const [addHst, setAddHst] = useState(true);
+  const [daysUntilDue, setDaysUntilDue] = useState(14);
+  const [memo, setMemo] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [done, setDone] = useState(null);
+
+  const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
+  const addRow = () => setItems((xs) => [...xs, blankItem()]);
+  const removeRow = (i) => setItems((xs) => (xs.length > 1 ? xs.filter((_, j) => j !== i) : xs));
+
+  const subtotal = items.reduce((a, it) => a + (Number(it.amount) || 0), 0);
+  const hst = addHst ? subtotal * 0.13 : 0;
+  const total = subtotal + hst;
+  const fmt = (n) => '$' + n.toFixed(2);
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true); setErr(''); setDone(null);
+    try {
+      const res = await fetch('/api/admin/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, items, addHst, daysUntilDue, memo })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not create the invoice.'); return; }
+      setDone(d.invoice);
+      setName(''); setEmail(''); setItems([blankItem()]); setMemo('');
+    } catch {
+      setErr('Network error — please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="notice-box" style={{ lineHeight: 1.6 }}>
+        ✓ Invoice <b>{done.number}</b> for <b>{fmt(done.total)}</b> created and emailed to <b>{done.email}</b>.
+        {done.hostedUrl && <> <a href={done.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View / pay link →</a></>}
+        <div style={{ marginTop: 10 }}>
+          <button className="btn" onClick={() => setDone(null)}>Create another</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit}>
+      {err && <div className="error-box">{err}</div>}
+      <div className="form-2col">
+        <div className="field">
+          <label>Customer name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Smith" />
+        </div>
+        <div className="field">
+          <label>Customer email *</label>
+          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@example.com" />
+        </div>
+      </div>
+
+      <label style={{ fontSize: 13, fontWeight: 500, display: 'block', margin: '4px 0 6px' }}>Line items</label>
+      {items.map((it, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <input style={{ flex: 1 }} value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} placeholder="e.g. Whirlpool WRS321SDHZ refrigerator" />
+          <input style={{ width: 120 }} type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="0.00" />
+          <button type="button" className="btn" style={{ padding: '0 12px' }} onClick={() => removeRow(i)} aria-label="Remove line">×</button>
+        </div>
+      ))}
+      <button type="button" className="btn" onClick={addRow} style={{ marginBottom: 12 }}>+ Add line</button>
+
+      <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+          <input type="checkbox" style={{ width: 'auto' }} checked={addHst} onChange={(e) => setAddHst(e.target.checked)} /> Add 13% HST
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+          Due in
+          <input style={{ width: 70 }} type="number" min="1" max="90" value={daysUntilDue} onChange={(e) => setDaysUntilDue(e.target.value)} /> days
+        </label>
+      </div>
+
+      <div className="field">
+        <label>Memo / notes (optional)</label>
+        <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="Shown on the invoice" />
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
+        <div style={{ fontSize: 14, color: 'var(--muted)' }}>
+          Subtotal {fmt(subtotal)}{addHst ? ` · HST ${fmt(hst)}` : ''} · <b style={{ color: 'var(--charcoal)' }}>Total {fmt(total)}</b>
+        </div>
+        <button className="btn accent" disabled={busy}>{busy ? 'Creating…' : 'Create & send invoice'}</button>
+      </div>
+    </form>
+  );
+}
