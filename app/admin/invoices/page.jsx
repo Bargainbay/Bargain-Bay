@@ -3,9 +3,20 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
 import { stripeConfigured } from '../../../lib/stripe';
 import { listInvoices } from '../../../lib/invoices';
+import catalog from '../../../data/catalog.json';
 import AdminNav from '../../../components/AdminNav';
 import InvoiceForm from '../../../components/InvoiceForm';
 import MarkPaidControl from '../../../components/MarkPaidControl';
+
+// Slim, searchable list of in-stock units for the invoice item picker.
+const inventory = (catalog.units || [])
+  .filter((u) => u && u.id)
+  .map((u) => ({
+    id: u.id,
+    description: `${u.title || `${u.make} ${u.model}`} (${u.id})`,
+    price: Number(u.price) || 0,
+    search: `${u.make || ''} ${u.model || ''} ${u.title || ''} ${u.id || ''}`.toLowerCase()
+  }));
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoices — Bargain Bay' };
@@ -44,7 +55,7 @@ export default async function InvoicesPage() {
         <p className="hint" style={{ marginTop: 0 }}>
           Creates a hosted Stripe invoice and emails the customer a pay link. Good for offline/custom sales.
         </p>
-        <InvoiceForm />
+        <InvoiceForm inventory={inventory} />
       </div>
 
       <div className="panel">
