@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { stripeConfigured } from '../../../../lib/stripe';
-import { createAndSendInvoice, listInvoices } from '../../../../lib/invoices';
+import { createAndSendInvoice, listInvoices, markInvoicePaid, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -55,6 +55,25 @@ export async function POST(req) {
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
     console.error('create invoice failed', e?.message || e);
+    return NextResponse.json({ error: explain(e) }, { status: 502 });
+  }
+}
+
+// Mark an open invoice paid out-of-band (cash / e-transfer / etc.) + record how.
+export async function PATCH(req) {
+  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!stripeConfigured()) return NextResponse.json({ error: 'Stripe is not configured.' }, { status: 503 });
+  let body;
+  try { body = await req.json(); } catch { body = {}; }
+  const invoiceId = String(body.invoiceId || '').trim();
+  const method = String(body.method || '').trim();
+  if (!invoiceId) return NextResponse.json({ error: 'invoiceId is required.' }, { status: 400 });
+  if (!PAYMENT_METHODS[method]) return NextResponse.json({ error: 'Pick a valid payment method.' }, { status: 400 });
+  try {
+    const invoice = await markInvoicePaid(invoiceId, method);
+    return NextResponse.json({ ok: true, invoice });
+  } catch (e) {
+    console.error('mark invoice paid failed', e?.message || e);
     return NextResponse.json({ error: explain(e) }, { status: 502 });
   }
 }

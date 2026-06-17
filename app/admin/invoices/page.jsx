@@ -5,6 +5,7 @@ import { stripeConfigured } from '../../../lib/stripe';
 import { listInvoices } from '../../../lib/invoices';
 import AdminNav from '../../../components/AdminNav';
 import InvoiceForm from '../../../components/InvoiceForm';
+import MarkPaidControl from '../../../components/MarkPaidControl';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoices — Bargain Bay' };
@@ -57,9 +58,9 @@ export default async function InvoicesPage() {
           </div>
         )}
         <div className="table-wrap"><table className="admin">
-          <thead><tr><th>Invoice</th><th>Customer</th><th>Status</th><th>Date</th><th style={{ textAlign: 'right' }}>Total</th><th></th></tr></thead>
+          <thead><tr><th>Invoice</th><th>Customer</th><th>Status</th><th>Date</th><th style={{ textAlign: 'right' }}>Total</th><th>Paid via / action</th><th></th></tr></thead>
           <tbody>
-            {invoices.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--muted)' }}>No invoices yet.</td></tr>}
+            {invoices.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--muted)' }}>No invoices yet.</td></tr>}
             {invoices.map((inv) => (
               <tr key={inv.id}>
                 <td style={{ fontWeight: 700 }}>{inv.number}</td>
@@ -67,6 +68,11 @@ export default async function InvoicesPage() {
                 <td><span className={'pill ' + statusClass(inv.status)}>{inv.status}</span></td>
                 <td>{fmtDate(inv.created)}</td>
                 <td style={{ textAlign: 'right' }}>{money(inv.total)}</td>
+                <td>
+                  {inv.status === 'open'
+                    ? <MarkPaidControl invoiceId={inv.id} />
+                    : (inv.method || (inv.status === 'paid' ? 'Card (online)' : '—'))}
+                </td>
                 <td>{inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View</a> : ''}</td>
               </tr>
             ))}
