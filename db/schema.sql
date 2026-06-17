@@ -69,6 +69,28 @@ CREATE TABLE IF NOT EXISTS clearance (
 );
 CREATE INDEX IF NOT EXISTS idx_clearance_active ON clearance(active);
 
+-- Live inventory mirror of the master tracker's available ("Tested Working")
+-- units (Phase A). Populated by /api/admin/sync-inventory, which reads the
+-- tracker server-side. active=false = the unit left the available set
+-- (sold / status changed / removed), so it drops off the storefront.
+CREATE TABLE IF NOT EXISTS products (
+  sku        text PRIMARY KEY,
+  make       text,
+  model      text,
+  category   text,
+  title      text,
+  condition  text,
+  price      numeric(10,2),
+  compare_at numeric(10,2),
+  cost       numeric(10,2),
+  uid        text,
+  position   int DEFAULT 0,
+  active     boolean NOT NULL DEFAULT true,
+  synced_at  timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_products_active   ON products(active);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+
 -- Member / reseller portal: tier + approval state on users.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role               text NOT NULL DEFAULT 'client'; -- client | member
 ALTER TABLE users ADD COLUMN IF NOT EXISTS member_status      text DEFAULT 'none';             -- none | pending | approved | rejected

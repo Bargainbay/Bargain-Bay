@@ -4,20 +4,10 @@ import { money } from '../../../lib/constants';
 import { stripeConfigured } from '../../../lib/stripe';
 import { listInvoices } from '../../../lib/invoices';
 import { customerContacts } from '../../../lib/analytics';
-import catalog from '../../../data/catalog.json';
+import { getAll } from '../../../lib/inventory';
 import AdminNav from '../../../components/AdminNav';
 import InvoiceForm from '../../../components/InvoiceForm';
 import MarkPaidControl from '../../../components/MarkPaidControl';
-
-// Slim, searchable list of in-stock units for the invoice item picker.
-const inventory = (catalog.units || [])
-  .filter((u) => u && u.id)
-  .map((u) => ({
-    id: u.id,
-    description: `${u.title || `${u.make} ${u.model}`} (${u.id})`,
-    price: Number(u.price) || 0,
-    search: `${u.make || ''} ${u.model || ''} ${u.title || ''} ${u.id || ''}`.toLowerCase()
-  }));
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoices — Bargain Bay' };
@@ -49,6 +39,16 @@ export default async function InvoicesPage() {
       search: `${c.name} ${c.email} ${c.phone}`.toLowerCase()
     }));
   } catch { customers = []; }
+
+  let inventory = [];
+  try {
+    inventory = (await getAll()).map((u) => ({
+      id: u.id,
+      description: `${u.title || `${u.make} ${u.model}`} (${u.id})`,
+      price: Number(u.price) || 0,
+      search: `${u.make || ''} ${u.model || ''} ${u.title || ''} ${u.id || ''}`.toLowerCase()
+    }));
+  } catch { inventory = []; }
 
   return (
     <div>

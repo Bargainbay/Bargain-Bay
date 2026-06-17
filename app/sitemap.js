@@ -1,7 +1,7 @@
 import { getAll } from '../lib/inventory';
 import { SITE_URL } from '../lib/site';
 
-export default function sitemap() {
+export default async function sitemap() {
   const now = new Date();
   const staticPages = ['', '/shop', '/contact', '/track', '/policies/returns', '/policies/shipping', '/policies/privacy', '/policies/terms', '/policies/contact'].map((p) => ({
     url: `${SITE_URL}${p}`,
@@ -15,7 +15,7 @@ export default function sitemap() {
     changeFrequency: 'daily',
     priority: 0.7
   }));
-  const products = getAll().map((u) => ({
+  const products = (await getAll()).map((u) => ({
     url: `${SITE_URL}/product/${encodeURIComponent(u.id)}`,
     lastModified: now,
     changeFrequency: 'weekly',

@@ -47,7 +47,7 @@ export async function POST(req) {
   // a unit abandoned mid-checkout is purchasable again without waiting for cron.
   expireReservations().catch((e) => console.error('opportunistic expiry failed', e.message));
 
-  const items = getMany(skus);
+  const items = await getMany(skus);
   if (items.length !== skus.length) {
     const found = new Set(items.map((u) => u.id));
     return NextResponse.json(

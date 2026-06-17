@@ -39,7 +39,7 @@ const esc = (v) => {
 const fmt = (n) => `${Number(n).toFixed(2)} CAD`;
 
 export async function GET() {
-  const units = await decorateClearance(getAll()); // clearance markdowns applied
+  const units = await decorateClearance(await getAll()); // clearance markdowns applied
   const blocked = await unavailableSkus();          // sold / reserved units
 
   const rows = units

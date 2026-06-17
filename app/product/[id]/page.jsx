@@ -18,7 +18,7 @@ const CONDITION_SCHEMA = {
 };
 
 export async function generateMetadata({ params }) {
-  const u = getById(decodeURIComponent(params.id));
+  const u = await getById(decodeURIComponent(params.id));
   if (!u) return { title: 'Not found' };
   return {
     title: `${u.make} ${u.model} ${u.category} (${u.condition})`,
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function Product({ params }) {
-  const base = getById(decodeURIComponent(params.id));
+  const base = await getById(decodeURIComponent(params.id));
   if (!base) return notFound();
   const u = await decorateOne(base, await getSession());
   const sold = await isUnavailable(u.id);

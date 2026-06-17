@@ -90,7 +90,7 @@ export default async function DashboardPage() {
   }
 
   const k = data.kpis;
-  const fin = inventoryFinancials();
+  const fin = await inventoryFinancials();
   const members = customers.filter((c) => c.memberStatus && c.memberStatus !== 'none');
 
   return (

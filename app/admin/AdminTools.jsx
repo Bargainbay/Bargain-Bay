@@ -10,6 +10,23 @@ export default function AdminTools({ initialReservations }) {
   const [error, setError] = useState('');
   const [emailMsg, setEmailMsg] = useState('');
   const [emailBusy, setEmailBusy] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+  const [syncing, setSyncing] = useState(false);
+
+  async function syncInventory() {
+    setSyncing(true); setSyncMsg('');
+    try {
+      const res = await fetch('/api/admin/sync-inventory', { method: 'POST' });
+      const d = await res.json();
+      setSyncMsg(res.ok
+        ? `✓ Synced ${d.synced} available units${d.deactivated ? `, removed ${d.deactivated} no longer in stock` : ''}.`
+        : `✗ ${d.error || 'Sync failed'}`);
+    } catch {
+      setSyncMsg('✗ Network error');
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function testEmail() {
     setEmailBusy(true); setEmailMsg('');
@@ -105,6 +122,18 @@ export default function AdminTools({ initialReservations }) {
           </table>
         </div>
       )}
+
+      <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Inventory</h2>
+      <div className="panel" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <button className="btn primary" disabled={syncing} onClick={syncInventory}>
+          {syncing ? 'Syncing…' : 'Sync inventory from tracker'}
+        </button>
+        <span style={{ fontSize: 13.5, color: 'var(--muted)' }}>
+          Pulls every "Tested Working" unit from the master tracker into the live storefront (price, cost, serial),
+          and removes anything no longer in stock. Needs <code>GOOGLE_CREDENTIALS</code> + <code>SHEET_ID</code>.
+        </span>
+        {syncMsg && <span style={{ fontSize: 13.5, fontWeight: 600, flexBasis: '100%' }}>{syncMsg}</span>}
+      </div>
 
       <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Email</h2>
       <div className="panel" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>

@@ -7,5 +7,5 @@ export const metadata = { title: 'Checkout — Bargain Bay' };
 
 export default async function CheckoutPage() {
   const session = await getSession();
-  return <CheckoutClient catalog={getAll()} session={session} />;
+  return <CheckoutClient catalog={await getAll()} session={session} />;
 }
