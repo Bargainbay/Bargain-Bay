@@ -303,6 +303,29 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 /* ---------- auth / narrow pages ---------- */
 .narrow { max-width: 440px; margin: 30px auto; }
 .narrow .panel { padding: 26px; }
+
+/* ---------- Owner portal / CRM dashboard ---------- */
+.pill.ok { background: var(--okbg); color: var(--ok); }
+.pill.warn { background: var(--warnbg); color: var(--warn); }
+
+.admin-nav {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 10px 0 14px; margin-bottom: 10px; border-bottom: 1px solid var(--line-soft);
+}
+.admin-nav-title { font-family: var(--font-head); text-transform: uppercase; letter-spacing: .08em; font-size: 12.5px; color: var(--muted); }
+.admin-nav-links { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.admin-nav-link { font-family: var(--font-head); text-transform: uppercase; letter-spacing: .05em; font-size: 13px; font-weight: 500; color: var(--muted); padding: 4px 0; border-bottom: 2px solid transparent; }
+.admin-nav-link:hover { color: var(--charcoal); }
+.admin-nav-link.active { color: var(--charcoal); border-bottom-color: var(--taupe); }
+
+.dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.kpi-card { background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 16px; }
+.kpi-value { font-family: var(--font-head); font-size: 24px; color: var(--charcoal); line-height: 1.1; }
+.kpi-label { font-size: 12.5px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.kpi-sub { font-size: 12px; color: var(--taupe-dark); margin-top: 4px; }
+
+.dash-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+@media (max-width: 760px) { .dash-2col { grid-template-columns: 1fr; } }
 .prose { max-width: 760px; }
 .prose h2 { margin-top: 28px; font-size: 17px; }
 .prose table { border-collapse: collapse; margin: 12px 0; }
