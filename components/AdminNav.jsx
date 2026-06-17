@@ -3,6 +3,7 @@ export default function AdminNav({ active }) {
   const items = [
     { key: 'dashboard', label: 'Dashboard', href: '/admin/dashboard' },
     { key: 'invoices', label: 'Invoices', href: '/admin/invoices' },
+    { key: 'campaigns', label: 'Campaigns', href: '/admin/campaigns' },
     { key: 'operations', label: 'Operations', href: '/admin/operations' }
   ];
   return (
