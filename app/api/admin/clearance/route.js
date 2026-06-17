@@ -15,7 +15,7 @@ async function requireAdmin() {
 export async function GET(req) {
   if (!(await requireAdmin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   const q = new URL(req.url).searchParams.get('q');
-  if (q) return NextResponse.json({ results: searchCatalog(q) });
+  if (q) return NextResponse.json({ results: await searchCatalog(q) });
   if (!hasDb()) return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
   try {
     return NextResponse.json({ items: await listClearanceAdmin() });
