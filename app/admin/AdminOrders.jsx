@@ -31,9 +31,9 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
     <div>
       <h1 style={{ color: 'var(--charcoal)' }}>Orders ({orders.length})</h1>
       <p className="hint" style={{ marginBottom: 14 }}>
-        Sheet sync: {sheetsOn
-          ? 'ON — paid orders auto-write "Sold" to the master tracker.'
-          : 'OFF (set GOOGLE_CREDENTIALS + SHEET_WRITEBACK=1) — mark units Sold in the master sheet manually.'}
+        Card payments are paused — orders come in as <b>Pending payment</b> (paid by e-transfer or in person).
+        When the money lands, set the order to <b>Confirmed</b>: that holds the sale, removes the unit from the
+        site, and adds it to the tracker-reconciliation list below.
       </p>
       {error && <div className="error-box">{error}</div>}
       <div className="table-wrap">
@@ -66,6 +66,11 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
                   {o.delivery_method === 'delivery'
                     ? <>Delivery<br /><span style={{ color: 'var(--muted)', fontSize: 12 }}>{o.address}, {o.city} {o.postal}</span></>
                     : 'Pickup'}
+                  {o.payment_method && (
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                      Pay: {o.payment_method === 'in_person' ? 'In person' : 'E-transfer'}
+                    </div>
+                  )}
                 </td>
                 <td><b>{money(o.total)}</b><div style={{ color: 'var(--muted)', fontSize: 12 }}>incl. HST {money(o.hst)}</div></td>
                 <td>
@@ -81,10 +86,10 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
                 </td>
                 <td style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 140 }}>
                   {o.status === 'cancelled'
-                    ? 'If it was marked Sold, set it back to available in the master sheet.'
+                    ? 'Cancelled — unit released back to the site.'
                     : o.status === 'pending_payment'
-                      ? '—'
-                      : sheetsOn ? 'Auto-synced on payment.' : 'Mark sold in master sheet.'}
+                      ? 'Awaiting payment — set Confirmed once it lands.'
+                      : 'Sold — see Tracker reconciliation below.'}
                 </td>
               </tr>
             ))}

@@ -104,6 +104,10 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_ref       text;    -- order n
 ALTER TABLE products ADD COLUMN IF NOT EXISTS tracker_synced boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_products_sold ON products(sold_at) WHERE sold_at IS NOT NULL;
 
+-- Interim offline payments: how the customer intends to pay an order placed
+-- while card checkout is off — 'etransfer' or 'in_person' (pay on pickup/delivery).
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method text;
+
 -- Member / reseller portal: tier + approval state on users.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role               text NOT NULL DEFAULT 'client'; -- client | member
 ALTER TABLE users ADD COLUMN IF NOT EXISTS member_status      text DEFAULT 'none';             -- none | pending | approved | rejected

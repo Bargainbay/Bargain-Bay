@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
 import { ORDER_STATUSES, updateOrderStatus } from '../../../../lib/orders';
+import { markUnitsSold } from '../../../../lib/catalog-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,19 @@ export async function PATCH(req) {
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     if (status === 'cancelled') {
       await query('DELETE FROM reservations WHERE order_id = $1', [id]).catch(() => {});
+    }
+    // Confirming an order = payment received. Record its units in the sold ledger
+    // (drops them off the storefront durably + onto the reconciliation list) and
+    // release the long hold. Online card orders are marked sold by the webhook
+    // instead, so this mainly covers offline e-transfer / pay-on-pickup orders.
+    if (status === 'confirmed') {
+      try {
+        const { rows: its } = await query('SELECT sku FROM order_items WHERE order_id = $1', [id]);
+        await markUnitsSold(its.map((r) => r.sku), { channel: 'order', ref: order.order_number, price: null });
+        await query('DELETE FROM reservations WHERE order_id = $1', [id]).catch(() => {});
+      } catch (e) {
+        console.error('mark order confirmed -> sold failed', e.message);
+      }
     }
     return NextResponse.json({ order });
   } catch (e) {
