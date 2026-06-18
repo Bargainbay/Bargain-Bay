@@ -3,6 +3,7 @@ import { hasDb, query } from '../../../lib/db';
 import { getStripe } from '../../../lib/stripe';
 import { getOrderByStripeSession } from '../../../lib/orders';
 import { writebackEnabled, writeSold } from '../../../lib/sheets';
+import { markUnitsSold } from '../../../lib/catalog-sync';
 import { sendOrderEmails } from '../../../lib/email';
 
 export const dynamic = 'force-dynamic';
@@ -53,6 +54,13 @@ export async function POST(req) {
       if (order && paid && order.status === 'pending_payment') {
         await query("UPDATE orders SET status = 'confirmed' WHERE id = $1", [order.id]);
         const { rows: orderItems } = await query('SELECT sku, title, price FROM order_items WHERE order_id = $1', [order.id]);
+        // Record the sale in the local sold ledger so the units drop off the site
+        // durably (survive tracker re-import) and show on the reconciliation list.
+        try {
+          await markUnitsSold(orderItems.map((it) => it.sku), { channel: 'order', ref: order.order_number, price: null });
+        } catch (e) {
+          console.error('markUnitsSold (order) failed', e.message);
+        }
         if (writebackEnabled()) {
           for (const it of orderItems) {
             try { await writeSold(it.sku, Number(it.price)); }

@@ -4,12 +4,14 @@ import { hasDb, query } from '../../../lib/db';
 import { getAllOrders } from '../../../lib/orders';
 import { listClearanceAdmin } from '../../../lib/clearance';
 import { listMembers } from '../../../lib/members';
+import { listSold } from '../../../lib/catalog-sync';
 import { writebackEnabled } from '../../../lib/sheets';
 import AdminNav from '../../../components/AdminNav';
 import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
 import AdminClearance from '../AdminClearance';
 import AdminMembers from '../AdminMembers';
+import AdminReconcile from '../AdminReconcile';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Operations — Bargain Bay' };
@@ -37,6 +39,7 @@ export default async function OperationsPage() {
   let reservations = [];
   let clearance = [];
   let members = [];
+  let sold = [];
   let needsMigration = false;
   try {
     orders = await getAllOrders(200);
@@ -62,6 +65,12 @@ export default async function OperationsPage() {
     console.error('members load failed (run migration?)', e.message);
     needsMigration = true;
   }
+  try {
+    sold = await listSold({ pendingOnly: true });
+  } catch (e) {
+    console.error('sold reconcile load failed (run migration?)', e.message);
+    needsMigration = true;
+  }
   return (
     <div>
       <AdminNav active="operations" />
@@ -71,6 +80,7 @@ export default async function OperationsPage() {
         </div>
       )}
       <AdminOrders initialOrders={orders} sheetsOn={writebackEnabled()} />
+      <AdminReconcile initialItems={sold} />
       <AdminMembers initialMembers={members} />
       <AdminClearance initialItems={clearance} />
       <AdminTools initialReservations={reservations} />

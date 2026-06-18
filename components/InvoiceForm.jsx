@@ -34,7 +34,8 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
     setCustOpen(false);
   }
   function pickInventory(u) {
-    const filled = { description: u.description, amount: String(u.price) };
+    // Keep the SKU on the line so the server can delist the unit when paid.
+    const filled = { description: u.description, amount: String(u.price), sku: u.id };
     setItems((xs) => {
       const empty = xs.findIndex((it) => !it.description && !it.amount);
       return empty >= 0 ? xs.map((it, j) => (j === empty ? filled : it)) : [...xs, filled];
