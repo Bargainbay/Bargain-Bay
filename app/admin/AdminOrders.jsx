@@ -31,9 +31,9 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
     <div>
       <h1 style={{ color: 'var(--charcoal)' }}>Orders ({orders.length})</h1>
       <p className="hint" style={{ marginBottom: 14 }}>
-        Card payments are paused — orders come in as <b>Pending payment</b> (paid by e-transfer or in person).
-        When the money lands, set the order to <b>Confirmed</b>: that holds the sale, removes the unit from the
-        site, and adds it to the tracker-reconciliation list below.
+        Card payments are paused — orders come in <b>Confirmed · Pending payment</b> (paid by e-transfer or in person).
+        When the money lands, click <b>Mark paid</b>: the order moves to <b>Ready for pickup</b>, the unit drops off the
+        site for good, and it lands on the tracker-reconciliation list below.
       </p>
       {error && <div className="error-box">{error}</div>}
       <div className="table-wrap">
@@ -74,7 +74,24 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
                 </td>
                 <td><b>{money(o.total)}</b><div style={{ color: 'var(--muted)', fontSize: 12 }}>incl. HST {money(o.hst)}</div></td>
                 <td>
-                  <span className={`status-chip status-${o.status}`} style={{ marginBottom: 6, display: 'inline-block' }}>{STATUS_LABELS[o.status]}</span>
+                  {o.status === 'pending_payment' ? (
+                    <>
+                      <span className="status-chip status-confirmed" style={{ display: 'inline-block' }}>Confirmed</span>
+                      <span className="pill warn" style={{ marginLeft: 6 }}>Pending payment</span>
+                      <div style={{ marginTop: 6 }}>
+                        <button
+                          className="btn primary"
+                          style={{ padding: '5px 10px', fontSize: 12.5 }}
+                          disabled={savingId === o.id}
+                          onClick={() => setStatus(o.id, 'ready')}
+                        >
+                          {savingId === o.id ? 'Saving…' : `Mark paid → ${o.delivery_method === 'delivery' ? 'Ready' : 'Ready for pickup'}`}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <span className={`status-chip status-${o.status}`} style={{ marginBottom: 6, display: 'inline-block' }}>{STATUS_LABELS[o.status]}</span>
+                  )}
                   <br />
                   <select
                     value={o.status}
@@ -88,7 +105,7 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
                   {o.status === 'cancelled'
                     ? 'Cancelled — unit released back to the site.'
                     : o.status === 'pending_payment'
-                      ? 'Awaiting payment — set Confirmed once it lands.'
+                      ? 'Confirmed, awaiting payment — click Mark paid once it lands.'
                       : 'Sold — see Tracker reconciliation below.'}
                 </td>
               </tr>
