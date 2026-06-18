@@ -137,6 +137,11 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
 
+-- Cleanup: a sold unit should never stay on clearance. markUnitsSold handles
+-- this going forward; this sweeps any rows sold before that fix. Idempotent.
+UPDATE clearance SET active = false, updated_at = now()
+ WHERE active = true AND sku IN (SELECT sku FROM products WHERE sold_at IS NOT NULL);
+
 -- Member / reseller portal: tier + approval state on users.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role               text NOT NULL DEFAULT 'client'; -- client | member
 ALTER TABLE users ADD COLUMN IF NOT EXISTS member_status      text DEFAULT 'none';             -- none | pending | approved | rejected
