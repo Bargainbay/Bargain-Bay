@@ -64,7 +64,6 @@ export default async function OrderPage({ params, searchParams }) {
   const pickup = order.delivery_method !== 'delivery';
   const cancelled = order.status === 'cancelled';
   const pendingPayment = order.status === 'pending_payment';
-  const paidStage = ['confirmed', 'ready', 'out_for_delivery', 'delivered'].includes(order.status);
   const justPaid = searchParams?.status === 'success';
 
   // Pickup self-scheduling opens once a pickup order is Ready.
@@ -99,9 +98,15 @@ export default async function OrderPage({ params, searchParams }) {
       {justPaid && !cancelled && (
         <div className="notice-box">Payment received — thank you! We&apos;ll email you to schedule {order.delivery_method === 'delivery' ? 'delivery' : 'pickup'}.</div>
       )}
-      {paidStage && !justPaid && order.status !== 'delivered' && (
+      {order.status === 'confirmed' && !justPaid && (
         <div className="notice-box">
-          Payment received — your order is {pickup ? 'ready for pickup' : 'confirmed for delivery'}. We&apos;ll
+          Payment received — thank you! We&apos;re preparing your order and will email {order.email} as soon as it&apos;s
+          ready for {pickup ? 'pickup' : 'delivery'}.
+        </div>
+      )}
+      {['ready', 'out_for_delivery'].includes(order.status) && !justPaid && (
+        <div className="notice-box">
+          Payment received — your order is {pickup ? 'ready for pickup' : 'ready for delivery'}. We&apos;ll
           email {order.email} to arrange {pickup ? 'a pickup time' : 'delivery'}.
         </div>
       )}
@@ -118,10 +123,9 @@ export default async function OrderPage({ params, searchParams }) {
             <>
               <b>Payment due — Interac e-Transfer.</b><br />
               Send <b>{money(order.total)}</b> to <b>{ETRANSFER_EMAIL}</b> (auto-deposit — no security question).
-              Put your order number <b>{order.order_number}</b> in the message. Your order is confirmed and your
-              {order.items.length === 1 ? ' unit is' : ' units are'} held; once your payment arrives this page updates to
-              <b> {pickup ? 'Ready for pickup' : 'Ready'}</b>. Prefer to pay in person? You can pay by cash, debit, or card
-              {order.delivery_method === 'delivery' ? ' on delivery' : ' on pickup'} instead.
+              Put your order number <b>{order.order_number}</b> in the message. We&apos;ll hold your
+              {order.items.length === 1 ? ' unit' : ' units'} for 24 hours and confirm as soon as payment is applied.
+              Orders with non payment will automatically be cancelled after 24 hours.
             </>
           )}
         </div>
