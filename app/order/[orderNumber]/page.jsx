@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { hasDb } from '../../../lib/db';
 import { getOrderByNumber } from '../../../lib/orders';
 import { getSession } from '../../../lib/auth';
-import { money, STATUS_LABELS, PICKUP_ADDRESS, SALES_EMAIL } from '../../../lib/constants';
+import { money, STATUS_LABELS, PICKUP_ADDRESS, SALES_EMAIL, ETRANSFER_EMAIL } from '../../../lib/constants';
 import PixelPurchase from '../../../components/PixelPurchase';
 
 export const dynamic = 'force-dynamic';
@@ -81,7 +81,24 @@ export default async function OrderPage({ params, searchParams }) {
         <div className="notice-box">Payment received — thank you! We&apos;ll email you to schedule {order.delivery_method === 'delivery' ? 'delivery' : 'pickup'}.</div>
       )}
       {pendingPayment && !justPaid && (
-        <div className="error-box">We&apos;re waiting for payment confirmation. If you completed payment, this page will update shortly.</div>
+        <div className="notice-box" style={{ lineHeight: 1.6 }}>
+          {order.payment_method === 'in_person' ? (
+            <>
+              <b>Payment due {order.delivery_method === 'delivery' ? 'on delivery' : 'on pickup'}.</b><br />
+              Pay <b>{money(order.total)}</b> by cash, debit, or credit card in person
+              {order.delivery_method === 'delivery' ? ' when we deliver' : ' when you pick up'}.
+              Your {order.items.length === 1 ? 'unit is' : 'units are'} held for you — we&apos;ll email {order.email} to arrange a time.
+            </>
+          ) : (
+            <>
+              <b>Payment due — Interac e-Transfer.</b><br />
+              Send <b>{money(order.total)}</b> to <b>{ETRANSFER_EMAIL}</b> (auto-deposit — no security question).
+              Put your order number <b>{order.order_number}</b> in the message. We&apos;ll confirm your order as soon as it arrives;
+              this page updates to <b>Confirmed</b> once we do. Prefer to pay in person? You can pay by cash, debit, or card
+              {order.delivery_method === 'delivery' ? ' on delivery' : ' on pickup'} instead.
+            </>
+          )}
+        </div>
       )}
       {cancelled && <div className="error-box">This order was cancelled. Questions? Email {SALES_EMAIL}.</div>}
 

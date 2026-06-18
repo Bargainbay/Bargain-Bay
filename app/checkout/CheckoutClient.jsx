@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { getCart, removeFromCart, clearCart, onCartChange } from '../../lib/cart';
-import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS } from '../../lib/constants';
+import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS, CARD_PAYMENTS_ENABLED, ETRANSFER_EMAIL } from '../../lib/constants';
 
 export default function CheckoutClient({ catalog, session }) {
   const [skus, setSkus] = useState(null);
@@ -11,6 +11,7 @@ export default function CheckoutClient({ catalog, session }) {
     phone: '',
     deliveryMethod: 'pickup',
     address: '', city: '', postal: '',
+    paymentMethod: 'etransfer',
     password: ''
   });
   const [error, setError] = useState('');
@@ -134,6 +135,34 @@ export default function CheckoutClient({ catalog, session }) {
                 </div>
               )}
             </div>
+
+            {!CARD_PAYMENTS_ENABLED && (
+              <div className="panel">
+                <h2>How you&apos;ll pay</h2>
+                <p className="hint" style={{ marginTop: 0 }}>
+                  We&apos;re not taking card payments online right now. Place your order and pay by
+                  e-transfer or in person — your unit is held for you either way.
+                </p>
+                <label className={'radio-card' + (form.paymentMethod === 'etransfer' ? ' active' : '')}>
+                  <input type="radio" name="paymentMethod" value="etransfer" checked={form.paymentMethod === 'etransfer'} onChange={set('paymentMethod')} />
+                  <span>
+                    <b>Interac e-Transfer</b>
+                    <span className="sub" style={{ display: 'block' }}>
+                      Send to <b>{ETRANSFER_EMAIL}</b> (auto-deposit — no security question). Put your order number in the message.
+                    </span>
+                  </span>
+                </label>
+                <label className={'radio-card' + (form.paymentMethod === 'in_person' ? ' active' : '')}>
+                  <input type="radio" name="paymentMethod" value="in_person" checked={form.paymentMethod === 'in_person'} onChange={set('paymentMethod')} />
+                  <span>
+                    <b>Pay {form.deliveryMethod === 'delivery' ? 'on delivery' : 'on pickup'}</b>
+                    <span className="sub" style={{ display: 'block' }}>
+                      Cash, debit, or credit card in person {form.deliveryMethod === 'delivery' ? 'when we deliver' : 'when you pick up'}.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
           </div>
 
           <div className="summary-card">
@@ -155,7 +184,11 @@ export default function CheckoutClient({ catalog, session }) {
               {busy ? 'Placing order…' : 'Place order'}
             </button>
             <div className="hint" style={{ marginTop: 10 }}>
-              Each unit is held for you for 30 minutes while you complete payment.
+              {CARD_PAYMENTS_ENABLED
+                ? 'Each unit is held for you for 30 minutes while you complete payment.'
+                : form.paymentMethod === 'etransfer'
+                  ? <>After you place the order, send your e-transfer to <b>{ETRANSFER_EMAIL}</b> with your order number. We hold your unit until it arrives.</>
+                  : <>We&apos;ll hold your unit and email you to arrange {form.deliveryMethod === 'delivery' ? 'delivery' : 'pickup'} — pay in person then.</>}
             </div>
           </div>
         </div>
