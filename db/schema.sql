@@ -112,6 +112,22 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method text;
 -- store-local "YYYY-MM-DDTHH:MM" label (America/Toronto). Null until booked.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_slot text;
 
+-- Phase 3 delivery ops + driver portal.
+ALTER TABLE users  ADD COLUMN IF NOT EXISTS is_driver boolean NOT NULL DEFAULT false;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_date  date;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS driver_id      int REFERENCES users(id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at   timestamptz;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS pod_signature  text;  -- private-blob pathname of the signature (Phase 3b)
+CREATE TABLE IF NOT EXISTS pod_photos (
+  id         serial PRIMARY KEY,
+  order_id   int REFERENCES orders(id) ON DELETE CASCADE,
+  url        text,   -- private blob url
+  pathname   text,   -- blob pathname (for the admin download proxy)
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_orders_driver ON orders(driver_id);
+CREATE INDEX IF NOT EXISTS idx_pod_photos_order ON pod_photos(order_id);
+
 -- Manual invoicing without Stripe: owner builds an invoice, customer pays by
 -- Interac e-transfer (or in person), owner marks it paid. Replaces the old
 -- Stripe-Invoicing flow after Stripe paused the account.

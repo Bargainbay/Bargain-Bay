@@ -15,10 +15,11 @@ function fmtPickup(value) {
   return `${wd} · ${h12}:${String(mm).padStart(2, '0')} ${hh < 12 ? 'AM' : 'PM'}`;
 }
 
-export default function AdminOrders({ initialOrders, sheetsOn }) {
+export default function AdminOrders({ initialOrders, drivers = [] }) {
   const [orders, setOrders] = useState(initialOrders);
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState('');
+  const driverName = (id) => { const d = drivers.find((x) => x.id === id); return d ? (d.name || d.email) : null; };
 
   async function setStatus(id, status) {
     setSavingId(id); setError('');
@@ -31,6 +32,24 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Update failed'); return; }
       setOrders((os) => os.map((o) => (o.id === id ? { ...o, status } : o)));
+    } catch {
+      setError('Network error');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function schedule(id, deliveryDate, driverId) {
+    setSavingId(id); setError('');
+    try {
+      const res = await fetch('/api/admin/schedule-delivery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: id, deliveryDate, driverId })
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Update failed'); return; }
+      setOrders((os) => os.map((o) => (o.id === id ? { ...o, delivery_date: deliveryDate || null, driver_id: driverId || null } : o)));
     } catch {
       setError('Network error');
     } finally {
@@ -77,6 +96,32 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
                   {o.delivery_method === 'delivery'
                     ? <>Delivery<br /><span style={{ color: 'var(--muted)', fontSize: 12 }}>{o.address}, {o.city} {o.postal}</span></>
                     : 'Pickup'}
+                  {o.delivery_method === 'delivery' && (
+                    <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <input
+                        type="date"
+                        defaultValue={o.delivery_date ? String(o.delivery_date).slice(0, 10) : ''}
+                        id={`dd-${o.id}`}
+                        style={{ width: 'auto', padding: '3px 6px', fontSize: 12 }}
+                      />
+                      <select id={`dv-${o.id}`} defaultValue={o.driver_id || ''} style={{ width: 'auto', padding: '3px 6px', fontSize: 12 }}>
+                        <option value="">— driver —</option>
+                        {drivers.map((d) => <option key={d.id} value={d.id}>{d.name || d.email}</option>)}
+                      </select>
+                      <button
+                        className="btn" style={{ padding: '3px 9px', fontSize: 12 }}
+                        disabled={savingId === o.id}
+                        onClick={() => schedule(o.id, document.getElementById(`dd-${o.id}`).value, document.getElementById(`dv-${o.id}`).value)}
+                      >
+                        {savingId === o.id ? '…' : 'Assign'}
+                      </button>
+                    </div>
+                  )}
+                  {o.delivery_method === 'delivery' && o.driver_id && (
+                    <div style={{ fontSize: 12, color: 'var(--charcoal)', marginTop: 2 }}>
+                      🚚 {driverName(o.driver_id) || 'Driver'}{o.delivery_date ? ` · ${String(o.delivery_date).slice(0, 10)}` : ''}
+                    </div>
+                  )}
                   {o.payment_method && (
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
                       Pay: {o.payment_method === 'in_person' ? 'In person' : 'E-transfer'}
