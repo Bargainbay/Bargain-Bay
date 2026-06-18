@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { listSold, markTrackerSynced } from '../../../../lib/catalog-sync';
+import { listSold, markTrackerSynced, reactivateUnit } from '../../../../lib/catalog-sync';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,6 +28,19 @@ export async function PATCH(req) {
   if (!hasDb()) return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
   let body;
   try { body = await req.json(); } catch { body = {}; }
+
+  // Reactivate (un-sell) a single unit and put it back on the storefront.
+  if (body.action === 'reactivate') {
+    const sku = String(body.sku || '').trim();
+    if (!sku) return NextResponse.json({ error: 'No SKU supplied.' }, { status: 400 });
+    try {
+      const r = await reactivateUnit(sku);
+      return NextResponse.json({ ok: true, ...r });
+    } catch (e) {
+      return NextResponse.json({ error: e?.message || 'Reactivate failed' }, { status: 500 });
+    }
+  }
+
   const skus = Array.isArray(body.skus) ? body.skus : (body.sku ? [body.sku] : []);
   if (!skus.length) return NextResponse.json({ error: 'No SKUs supplied.' }, { status: 400 });
   try {

@@ -32,6 +32,26 @@ export default function AdminReconcile({ initialItems = [] }) {
     }
   }
 
+  // Un-sell a unit: put it back on the storefront (cancels the related order).
+  async function reactivate(sku) {
+    if (!window.confirm(`Reactivate ${sku}? It goes back on the store and any order holding it is cancelled.`)) return;
+    setBusy(sku); setError('');
+    try {
+      const res = await fetch('/api/admin/reconcile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reactivate', sku })
+      });
+      const d = await res.json();
+      if (!res.ok) { setError(d.error || 'Reactivate failed'); return; }
+      setItems((xs) => xs.filter((x) => x.sku !== sku));
+    } catch {
+      setError('Network error');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div>
       <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Tracker reconciliation ({items.length})</h2>
@@ -65,9 +85,14 @@ export default function AdminReconcile({ initialItems = [] }) {
                   </td>
                   <td style={{ textAlign: 'right' }}>{it.sold_price == null ? '—' : money(it.sold_price)}</td>
                   <td>
-                    <button className="btn primary" style={{ padding: '5px 10px', fontSize: 12.5 }} disabled={busy === it.sku} onClick={() => markDone([it.sku])}>
-                      {busy === it.sku ? 'Saving…' : 'Mark done'}
-                    </button>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button className="btn primary" style={{ padding: '5px 10px', fontSize: 12.5 }} disabled={busy === it.sku} onClick={() => markDone([it.sku])}>
+                        {busy === it.sku ? 'Saving…' : 'Mark done'}
+                      </button>
+                      <button className="btn" style={{ padding: '5px 10px', fontSize: 12.5 }} disabled={busy === it.sku} onClick={() => reactivate(it.sku)} title="Un-sell and put back on the store">
+                        Reactivate
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
