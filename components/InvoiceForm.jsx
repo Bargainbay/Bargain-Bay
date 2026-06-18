@@ -71,8 +71,8 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   if (done) {
     return (
       <div className="notice-box" style={{ lineHeight: 1.6 }}>
-        ✓ Invoice <b>{done.number}</b> for <b>{fmt(done.total)}</b> created and emailed to <b>{done.email}</b>.
-        {done.hostedUrl && <> <a href={done.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View / pay link →</a></>}
+        ✓ Invoice <b>{done.number}</b> for <b>{fmt(done.total)}</b> emailed to <b>{done.email}</b> with e-transfer instructions.
+        {done.hostedUrl && <> <a href={done.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View invoice →</a></>}
         <div style={{ marginTop: 10 }}>
           <button className="btn" onClick={() => setDone(null)}>Create another</button>
         </div>

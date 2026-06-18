@@ -108,6 +108,35 @@ CREATE INDEX IF NOT EXISTS idx_products_sold ON products(sold_at) WHERE sold_at 
 -- while card checkout is off — 'etransfer' or 'in_person' (pay on pickup/delivery).
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method text;
 
+-- Manual invoicing without Stripe: owner builds an invoice, customer pays by
+-- Interac e-transfer (or in person), owner marks it paid. Replaces the old
+-- Stripe-Invoicing flow after Stripe paused the account.
+CREATE TABLE IF NOT EXISTS invoices (
+  id             serial PRIMARY KEY,
+  number         text UNIQUE,                 -- 'INV-' || (1000 + id)
+  email          text NOT NULL,
+  name           text,
+  status         text NOT NULL DEFAULT 'open' -- open | paid | void
+                 CHECK (status IN ('open','paid','void')),
+  subtotal       numeric(10,2),
+  hst            numeric(10,2),
+  total          numeric(10,2),
+  memo           text,
+  due_date       date,
+  payment_method text,                        -- how it was paid (cash/etransfer/...)
+  paid_at        timestamptz,
+  created_at     timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id          serial PRIMARY KEY,
+  invoice_id  int REFERENCES invoices(id) ON DELETE CASCADE,
+  description text,
+  sku         text,
+  amount      numeric(10,2)
+);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
+
 -- Member / reseller portal: tier + approval state on users.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role               text NOT NULL DEFAULT 'client'; -- client | member
 ALTER TABLE users ADD COLUMN IF NOT EXISTS member_status      text DEFAULT 'none';             -- none | pending | approved | rejected
