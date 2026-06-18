@@ -108,6 +108,10 @@ CREATE INDEX IF NOT EXISTS idx_products_sold ON products(sold_at) WHERE sold_at 
 -- while card checkout is off — 'etransfer' or 'in_person' (pay on pickup/delivery).
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method text;
 
+-- Phase 2 pickup scheduling: the customer-booked appointment slot, stored as a
+-- store-local "YYYY-MM-DDTHH:MM" label (America/Toronto). Null until booked.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_slot text;
+
 -- Manual invoicing without Stripe: owner builds an invoice, customer pays by
 -- Interac e-transfer (or in person), owner marks it paid. Replaces the old
 -- Stripe-Invoicing flow after Stripe paused the account.
