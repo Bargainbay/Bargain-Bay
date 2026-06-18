@@ -61,9 +61,10 @@ export default function AdminOrders({ initialOrders, drivers = [] }) {
     <div>
       <h1 style={{ color: 'var(--charcoal)' }}>Orders ({orders.length})</h1>
       <p className="hint" style={{ marginBottom: 14 }}>
-        Card payments are paused — orders come in <b>Confirmed · Pending payment</b> (paid by e-transfer or in person).
-        When the money lands, click <b>Mark paid</b>: the order moves to <b>Ready for pickup</b>, the unit drops off the
-        site for good, and it lands on the tracker-reconciliation list below.
+        Card payments are paused — orders come in <b>Confirmed · Pending payment</b> (paid by e-transfer; pickup orders
+        can also pay in person). When the money lands, click <b>Mark paid</b> — the customer gets a payment-received
+        email and the unit drops off the site. Then click <b>Mark ready</b> when it's ready (the customer is notified;
+        pickup customers can book a time). Unpaid orders auto-cancel after 24 hours.
       </p>
       {error && <div className="error-box">{error}</div>}
       <div className="table-wrap">
@@ -144,14 +145,28 @@ export default function AdminOrders({ initialOrders, drivers = [] }) {
                           className="btn primary"
                           style={{ padding: '5px 10px', fontSize: 12.5 }}
                           disabled={savingId === o.id}
-                          onClick={() => setStatus(o.id, 'ready')}
+                          onClick={() => setStatus(o.id, 'confirmed')}
                         >
-                          {savingId === o.id ? 'Saving…' : `Mark paid → ${o.delivery_method === 'delivery' ? 'Ready' : 'Ready for pickup'}`}
+                          {savingId === o.id ? 'Saving…' : 'Mark paid'}
                         </button>
                       </div>
                     </>
                   ) : (
-                    <span className={`status-chip status-${o.status}`} style={{ marginBottom: 6, display: 'inline-block' }}>{STATUS_LABELS[o.status]}</span>
+                    <>
+                      <span className={`status-chip status-${o.status}`} style={{ marginBottom: 6, display: 'inline-block' }}>{STATUS_LABELS[o.status]}</span>
+                      {o.status === 'confirmed' && (
+                        <div style={{ marginTop: 6 }}>
+                          <button
+                            className="btn primary"
+                            style={{ padding: '5px 10px', fontSize: 12.5 }}
+                            disabled={savingId === o.id}
+                            onClick={() => setStatus(o.id, 'ready')}
+                          >
+                            {savingId === o.id ? 'Saving…' : `Mark ready${o.delivery_method === 'delivery' ? ' for delivery' : ' for pickup'}`}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                   <br />
                   <select

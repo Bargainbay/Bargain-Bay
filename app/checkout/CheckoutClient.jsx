@@ -103,14 +103,14 @@ export default function CheckoutClient({ catalog, session }) {
             <div className="panel">
               <h2>Pickup or delivery</h2>
               <label className={'radio-card' + (form.deliveryMethod === 'pickup' ? ' active' : '')}>
-                <input type="radio" name="deliveryMethod" value="pickup" checked={form.deliveryMethod === 'pickup'} onChange={set('deliveryMethod')} />
+                <input type="radio" name="deliveryMethod" value="pickup" checked={form.deliveryMethod === 'pickup'} onChange={() => setForm((f) => ({ ...f, deliveryMethod: 'pickup' }))} />
                 <span>
                   <b>Warehouse pickup — Free</b>
                   <span className="sub" style={{ display: 'block' }}>{PICKUP_ADDRESS}. By appointment — we&apos;ll email you to schedule.</span>
                 </span>
               </label>
               <label className={'radio-card' + (form.deliveryMethod === 'delivery' ? ' active' : '')}>
-                <input type="radio" name="deliveryMethod" value="delivery" checked={form.deliveryMethod === 'delivery'} onChange={set('deliveryMethod')} />
+                <input type="radio" name="deliveryMethod" value="delivery" checked={form.deliveryMethod === 'delivery'} onChange={() => setForm((f) => ({ ...f, deliveryMethod: 'delivery', paymentMethod: 'etransfer' }))} />
                 <span>
                   <b>Local delivery — {money(DELIVERY_FEE)} flat</b>
                   <span className="sub" style={{ display: 'block' }}>Hamilton &amp; area (within ~50 km of Lynden). To your door / ground floor. Farther out? Email us for a freight quote.</span>
@@ -140,8 +140,9 @@ export default function CheckoutClient({ catalog, session }) {
               <div className="panel">
                 <h2>How you&apos;ll pay</h2>
                 <p className="hint" style={{ marginTop: 0 }}>
-                  We&apos;re not taking card payments online right now. Place your order and pay by
-                  e-transfer or in person — your unit is held for you either way.
+                  We&apos;re not taking card payments online right now. Place your order and pay by Interac e-transfer
+                  {form.deliveryMethod === 'pickup' ? ' (or in person at pickup)' : ''} — we hold your unit for 24 hours
+                  while we confirm payment.
                 </p>
                 <label className={'radio-card' + (form.paymentMethod === 'etransfer' ? ' active' : '')}>
                   <input type="radio" name="paymentMethod" value="etransfer" checked={form.paymentMethod === 'etransfer'} onChange={set('paymentMethod')} />
@@ -152,15 +153,17 @@ export default function CheckoutClient({ catalog, session }) {
                     </span>
                   </span>
                 </label>
-                <label className={'radio-card' + (form.paymentMethod === 'in_person' ? ' active' : '')}>
-                  <input type="radio" name="paymentMethod" value="in_person" checked={form.paymentMethod === 'in_person'} onChange={set('paymentMethod')} />
-                  <span>
-                    <b>Pay {form.deliveryMethod === 'delivery' ? 'on delivery' : 'on pickup'}</b>
-                    <span className="sub" style={{ display: 'block' }}>
-                      Cash, debit, or credit card in person {form.deliveryMethod === 'delivery' ? 'when we deliver' : 'when you pick up'}.
+                {form.deliveryMethod === 'pickup' && (
+                  <label className={'radio-card' + (form.paymentMethod === 'in_person' ? ' active' : '')}>
+                    <input type="radio" name="paymentMethod" value="in_person" checked={form.paymentMethod === 'in_person'} onChange={set('paymentMethod')} />
+                    <span>
+                      <b>Pay on pickup</b>
+                      <span className="sub" style={{ display: 'block' }}>
+                        Cash, debit, or credit card in person when you pick up.
+                      </span>
                     </span>
-                  </span>
-                </label>
+                  </label>
+                )}
               </div>
             )}
           </div>
