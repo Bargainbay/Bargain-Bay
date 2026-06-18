@@ -54,16 +54,29 @@ export default async function OrderPage({ params, searchParams }) {
   }
 
   const steps = timelineSteps(order);
-  const reached = steps.findIndex((s) => s.key === order.status);
+  // An offline order is "Confirmed" the moment it's placed; payment is a separate
+  // pending→paid state shown as a badge. So pending_payment lights the Confirmed
+  // step, and marking it paid advances the order to Ready (for pickup/delivery).
+  const STAGE_INDEX = { pending_payment: 0, confirmed: 0, ready: 1, out_for_delivery: 2, delivered: 3 };
+  const reached = STAGE_INDEX[order.status] ?? -1;
+  const pickup = order.delivery_method !== 'delivery';
   const cancelled = order.status === 'cancelled';
   const pendingPayment = order.status === 'pending_payment';
+  const paidStage = ['confirmed', 'ready', 'out_for_delivery', 'delivered'].includes(order.status);
   const justPaid = searchParams?.status === 'success';
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <h1 style={{ color: 'var(--charcoal)' }}>Order {order.order_number}</h1>
       <div style={{ marginBottom: 8 }}>
-        <span className={`status-chip status-${order.status}`}>{STATUS_LABELS[order.status]}</span>
+        {pendingPayment ? (
+          <>
+            <span className="status-chip status-confirmed">Confirmed</span>
+            <span className="pill warn" style={{ marginLeft: 8 }}>Pending payment</span>
+          </>
+        ) : (
+          <span className={`status-chip status-${order.status}`}>{STATUS_LABELS[order.status]}</span>
+        )}
         <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 10 }}>
           Placed {new Date(order.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
         </span>
@@ -80,6 +93,12 @@ export default async function OrderPage({ params, searchParams }) {
       {justPaid && !cancelled && (
         <div className="notice-box">Payment received — thank you! We&apos;ll email you to schedule {order.delivery_method === 'delivery' ? 'delivery' : 'pickup'}.</div>
       )}
+      {paidStage && !justPaid && order.status !== 'delivered' && (
+        <div className="notice-box">
+          Payment received — your order is {pickup ? 'ready for pickup' : 'confirmed for delivery'}. We&apos;ll
+          email {order.email} to arrange {pickup ? 'a pickup time' : 'delivery'}.
+        </div>
+      )}
       {pendingPayment && !justPaid && (
         <div className="notice-box" style={{ lineHeight: 1.6 }}>
           {order.payment_method === 'in_person' ? (
@@ -93,8 +112,9 @@ export default async function OrderPage({ params, searchParams }) {
             <>
               <b>Payment due — Interac e-Transfer.</b><br />
               Send <b>{money(order.total)}</b> to <b>{ETRANSFER_EMAIL}</b> (auto-deposit — no security question).
-              Put your order number <b>{order.order_number}</b> in the message. We&apos;ll confirm your order as soon as it arrives;
-              this page updates to <b>Confirmed</b> once we do. Prefer to pay in person? You can pay by cash, debit, or card
+              Put your order number <b>{order.order_number}</b> in the message. Your order is confirmed and your
+              {order.items.length === 1 ? ' unit is' : ' units are'} held; once your payment arrives this page updates to
+              <b> {pickup ? 'Ready for pickup' : 'Ready'}</b>. Prefer to pay in person? You can pay by cash, debit, or card
               {order.delivery_method === 'delivery' ? ' on delivery' : ' on pickup'} instead.
             </>
           )}
