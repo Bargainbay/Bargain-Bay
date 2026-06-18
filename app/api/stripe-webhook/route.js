@@ -12,7 +12,9 @@ export const runtime = 'nodejs';
 // Stripe calls this after a Checkout Session resolves. Configure the endpoint in
 // the Stripe dashboard (Developers → Webhooks): https://bargainbay.ca/api/stripe-webhook
 // listening for checkout.session.completed (+ async_payment_succeeded/failed,
-// session.expired). The signing secret goes in STRIPE_WEBHOOK_SECRET.
+// session.expired) AND invoice.paid (so a CRM invoice paid by card via its pay
+// link delists its units — the out-of-band "Mark paid" path is handled in the
+// admin API). The signing secret goes in STRIPE_WEBHOOK_SECRET.
 //
 // We REQUIRE a verified signature — an unsigned/forged POST can never mark an
 // order paid (that was the big risk with the old unverified Clover webhook).
@@ -82,6 +84,19 @@ export async function POST(req) {
       if (order && order.status === 'pending_payment') {
         await query("UPDATE orders SET status = 'cancelled' WHERE id = $1", [order.id]);
         await query('DELETE FROM reservations WHERE order_id = $1', [order.id]);
+      }
+    } else if (event.type === 'invoice.paid') {
+      // A CRM invoice was paid. Covers the card-via-pay-link path (the cash/
+      // e-transfer "Mark paid" path already delists in the admin API). The SKUs
+      // were stashed on the invoice metadata at creation. Idempotent: re-firing
+      // for an already-handled out-of-band payment is a harmless no-op.
+      const skus = String(obj.metadata?.skus || '').split(',').map((s) => s.trim()).filter(Boolean);
+      if (skus.length) {
+        try {
+          await markUnitsSold(skus, { channel: 'invoice', ref: obj.number || obj.id, price: (obj.total || 0) / 100 });
+        } catch (e) {
+          console.error('markUnitsSold (invoice webhook) failed', e.message);
+        }
       }
     }
   } catch (e) {
