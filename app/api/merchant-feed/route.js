@@ -4,6 +4,7 @@
 import { getAvailable } from '../../../lib/inventory';
 import { seoDescription, leadSentence } from '../../../lib/specs';
 import { SITE_URL } from '../../../lib/site';
+import { feedShippingWeightKg } from '../../../lib/shipping';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,6 +41,7 @@ export async function GET() {
       <link>${esc(`${SITE_URL}/product/${encodeURIComponent(u.id)}`)}</link>
       <g:image_link>${esc(img)}</g:image_link>
       <g:price>${Number(u.price).toFixed(2)} CAD</g:price>
+      <g:shipping_weight>${feedShippingWeightKg(u)} kg</g:shipping_weight>
       <g:availability>in_stock</g:availability>
       <g:condition>${gCondition(u.condition)}</g:condition>
       <g:brand>${esc(u.make)}</g:brand>
