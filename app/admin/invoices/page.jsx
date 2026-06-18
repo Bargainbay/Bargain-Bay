@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
-import { stripeConfigured } from '../../../lib/stripe';
+import { hasDb } from '../../../lib/db';
 import { listInvoices } from '../../../lib/invoices';
 import { customerContacts } from '../../../lib/analytics';
 import { getAll } from '../../../lib/inventory';
@@ -27,9 +27,9 @@ export default async function InvoicesPage() {
 
   let invoices = [];
   let loadError = '';
-  if (stripeConfigured()) {
+  if (hasDb()) {
     try { invoices = await listInvoices(25); }
-    catch (e) { loadError = e?.message || 'Could not load invoices from Stripe.'; }
+    catch (e) { loadError = e?.message || 'Could not load invoices.'; }
   }
 
   let customers = [];
@@ -55,14 +55,15 @@ export default async function InvoicesPage() {
       <AdminNav active="invoices" />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Invoices</h1>
 
-      {!stripeConfigured() && (
-        <div className="error-box">Stripe isn&apos;t configured yet (set <code>STRIPE_SECRET_KEY</code>). Invoicing needs it.</div>
+      {!hasDb() && (
+        <div className="error-box">Database isn&apos;t configured (set <code>POSTGRES_URL</code>). Invoicing needs it.</div>
       )}
 
       <div className="panel">
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>New invoice</h2>
         <p className="hint" style={{ marginTop: 0 }}>
-          Creates a hosted Stripe invoice and emails the customer a pay link. Good for offline/custom sales.
+          Emails the customer an itemized invoice to pay by Interac e-transfer (auto-deposit) or in person.
+          Good for offline / custom / wholesale sales. Mark it paid here when the money lands.
         </p>
         <InvoiceForm inventory={inventory} customers={customers} />
       </div>
@@ -70,12 +71,7 @@ export default async function InvoicesPage() {
       <div className="panel">
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Recent invoices</h2>
         {loadError && (
-          <div className="error-box" style={{ marginBottom: 10 }}>
-            {loadError}
-            <div className="hint" style={{ marginTop: 6 }}>
-              If this mentions permissions, your Stripe key needs <b>Invoices / Customers / Invoice Items</b> access.
-            </div>
-          </div>
+          <div className="error-box" style={{ marginBottom: 10 }}>{loadError}</div>
         )}
         <div className="table-wrap"><table className="admin">
           <thead><tr><th>Invoice</th><th>Customer</th><th>Status</th><th>Date</th><th style={{ textAlign: 'right' }}>Total</th><th>Paid via / action</th><th></th></tr></thead>
@@ -91,7 +87,7 @@ export default async function InvoicesPage() {
                 <td>
                   {inv.status === 'open'
                     ? <MarkPaidControl invoiceId={inv.id} />
-                    : (inv.method || (inv.status === 'paid' ? 'Card (online)' : '—'))}
+                    : (inv.method || (inv.status === 'paid' ? 'Paid' : '—'))}
                 </td>
                 <td>{inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View</a> : ''}</td>
               </tr>
