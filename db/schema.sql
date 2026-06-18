@@ -91,6 +91,19 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE INDEX IF NOT EXISTS idx_products_active   ON products(active);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 
+-- Phase B: local "sold" ledger. When a unit is sold through the site (paid order)
+-- or the CRM (invoice paid out-of-band), we mark it sold HERE so it drops off the
+-- storefront immediately AND survives the next tracker/CSV re-import (which would
+-- otherwise re-list it, since the import reconciles `active` straight from the
+-- tracker). tracker_synced flips true once the owner has marked it Sold in the
+-- master tracker — the reconciliation checklist until Google write-back is enabled.
+ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_at        timestamptz;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_price     numeric(10,2);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_channel   text;    -- 'order' | 'invoice' | 'manual'
+ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_ref       text;    -- order number / invoice number
+ALTER TABLE products ADD COLUMN IF NOT EXISTS tracker_synced boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_products_sold ON products(sold_at) WHERE sold_at IS NOT NULL;
+
 -- Member / reseller portal: tier + approval state on users.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role               text NOT NULL DEFAULT 'client'; -- client | member
 ALTER TABLE users ADD COLUMN IF NOT EXISTS member_status      text DEFAULT 'none';             -- none | pending | approved | rejected
