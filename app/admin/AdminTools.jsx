@@ -25,9 +25,19 @@ export default function AdminTools({ initialReservations }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ csv: text })
       });
       const d = await res.json();
+      const rep = d.report;
+      // Spell out why the imported count differs from the row total.
+      const why = rep
+        ? ` of ${rep.dataRows} rows` +
+          [
+            rep.skippedNotTested ? `${rep.skippedNotTested} not "Tested Working"` : '',
+            rep.skippedNoPrice ? `${rep.skippedNoPrice} no price` : '',
+            rep.skippedNoId ? `${rep.skippedNoId} no item ID` : ''
+          ].filter(Boolean).reduce((s, p, i) => s + (i === 0 ? ` — skipped ${p}` : `, ${p}`), '')
+        : '';
       setImportMsg(res.ok
-        ? `✓ Imported ${d.synced} units${d.deactivated ? `, removed ${d.deactivated} no longer in stock` : ''}.`
-        : `✗ ${d.error || 'Import failed'}`);
+        ? `✓ Imported ${d.synced} units${why}${d.deactivated ? `. Removed ${d.deactivated} no longer in stock` : ''}.`
+        : `✗ ${d.error || 'Import failed'}${why}`);
     } catch {
       setImportMsg('✗ Could not read that file.');
     } finally {

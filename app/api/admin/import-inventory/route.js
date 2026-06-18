@@ -20,18 +20,22 @@ export async function POST(req) {
   const csv = String(body.csv || '');
   if (!csv.trim()) return NextResponse.json({ error: 'No CSV content received.' }, { status: 400 });
 
-  let units;
+  let units, report;
   try {
-    units = parseTrackerCsv(csv);
+    ({ units, report } = parseTrackerCsv(csv));
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 400 });
   }
   if (!units.length) {
-    return NextResponse.json({ error: 'No "Tested Working" units found in that CSV — check the Status column.' }, { status: 400 });
+    return NextResponse.json({
+      error: 'No "Tested Working" units found in that CSV — check the Status column.',
+      report
+    }, { status: 400 });
   }
   try {
     const result = await upsertProducts(units);
-    return NextResponse.json({ ok: true, ...result });
+    // report explains why the imported count can differ from total tracker rows.
+    return NextResponse.json({ ok: true, ...result, report });
   } catch (e) {
     console.error('csv import failed', e?.message || e);
     return NextResponse.json({ error: e?.message || 'Import failed.' }, { status: 500 });
