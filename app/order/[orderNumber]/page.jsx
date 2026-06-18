@@ -6,6 +6,7 @@ import { money, STATUS_LABELS, PICKUP_ADDRESS, SALES_EMAIL, ETRANSFER_EMAIL } fr
 import { availableSlots, pickupLabel } from '../../../lib/pickup';
 import PixelPurchase from '../../../components/PixelPurchase';
 import PickupBooker from '../../../components/PickupBooker';
+import OrderLiveRefresh from '../../../components/OrderLiveRefresh';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Order Status — Bargain Bay' };
@@ -86,6 +87,7 @@ export default async function OrderPage({ params, searchParams }) {
           Placed {new Date(order.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
         </span>
       </div>
+      <OrderLiveRefresh orderNumber={order.order_number} email={guestEmail} status={order.status} />
 
       {justPaid && !cancelled && (
         <PixelPurchase
@@ -149,6 +151,13 @@ export default async function OrderPage({ params, searchParams }) {
               );
             })}
           </div>
+          {!pickup && order.delivery_date && order.status !== 'delivered' && (
+            <p style={{ margin: '12px 0 0', fontSize: 14 }}>
+              <b>{order.status === 'out_for_delivery' ? 'Out for delivery today' : 'Scheduled delivery'}:</b>{' '}
+              {new Date(order.delivery_date).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}
+              <span style={{ color: 'var(--muted)' }}> — we&apos;ll call {order.phone || 'you'} with a window.</span>
+            </p>
+          )}
         </div>
       )}
 
