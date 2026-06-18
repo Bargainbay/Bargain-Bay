@@ -9,6 +9,7 @@
     "sync": "node scripts/sync-sheet.mjs"
   },
   "dependencies": {
+    "@vercel/blob": "^2.4.1",
     "bcryptjs": "^2.4.3",
     "googleapis": "^140.0.1",
     "jose": "^5.9.6",

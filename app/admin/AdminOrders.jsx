@@ -162,12 +162,23 @@ export default function AdminOrders({ initialOrders, drivers = [] }) {
                     {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
                   </select>
                 </td>
-                <td style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 140 }}>
+                <td style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 150 }}>
                   {o.status === 'cancelled'
                     ? 'Cancelled — unit released back to the site.'
                     : o.status === 'pending_payment'
                       ? 'Confirmed, awaiting payment — click Mark paid once it lands.'
                       : 'Sold — see Tracker reconciliation below.'}
+                  {(o.pod_signature || (o.pod_photo_ids && o.pod_photo_ids.length > 0)) && (
+                    <div style={{ marginTop: 6, color: 'var(--charcoal)' }}>
+                      <b>POD:</b>{' '}
+                      {o.pod_signature && (
+                        <a href={`/api/admin/pod?sig=${o.id}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>signature</a>
+                      )}
+                      {(o.pod_photo_ids || []).map((pid, i) => (
+                        <span key={pid}>{(o.pod_signature || i > 0) ? ' · ' : ''}<a href={`/api/admin/pod?photo=${pid}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>photo {i + 1}</a></span>
+                      ))}
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

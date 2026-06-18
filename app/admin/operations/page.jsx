@@ -6,6 +6,7 @@ import { listClearanceAdmin } from '../../../lib/clearance';
 import { listMembers } from '../../../lib/members';
 import { listSold } from '../../../lib/catalog-sync';
 import { listDrivers } from '../../../lib/drivers';
+import { podPhotosForOrders } from '../../../lib/pod';
 import AdminNav from '../../../components/AdminNav';
 import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
@@ -80,6 +81,13 @@ export default async function OperationsPage() {
     drivers = await listDrivers();
   } catch (e) {
     console.error('drivers load failed (run migration?)', e.message);
+    needsMigration = true;
+  }
+  try {
+    const podMap = await podPhotosForOrders(orders.map((o) => o.id));
+    orders = orders.map((o) => ({ ...o, pod_photo_ids: podMap.get(o.id) || [] }));
+  } catch (e) {
+    console.error('pod photos load failed (run migration?)', e.message);
     needsMigration = true;
   }
   return (
