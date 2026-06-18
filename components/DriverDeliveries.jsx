@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { STATUS_LABELS } from '../lib/constants';
+import PodCapture from './PodCapture';
 
 const mapsUrl = (o) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([o.address, o.city, o.postal].filter(Boolean).join(', '))}`;
@@ -25,6 +26,8 @@ export default function DriverDeliveries({ initialDeliveries = [] }) {
       setBusy(null);
     }
   }
+
+  const markDelivered = (id) => setList((xs) => xs.map((o) => (o.id === id ? { ...o, status: 'delivered' } : o)));
 
   if (!list.length) {
     return <div className="panel" style={{ fontSize: 14, color: 'var(--muted)' }}>No deliveries assigned right now. Check back later.</div>;
@@ -60,20 +63,19 @@ export default function DriverDeliveries({ initialDeliveries = [] }) {
             </div>
 
             <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {out ? (
-                <>
-                  <span className="pill ok" style={{ alignSelf: 'center' }}>On the way</span>
-                  <button className="btn" disabled title="Photo + signature capture arrives in the next update">
-                    Complete with POD (coming soon)
-                  </button>
-                </>
-              ) : (
+              {o.status === 'delivered' ? (
+                <span className="pill ok" style={{ alignSelf: 'center' }}>✓ Delivered</span>
+              ) : !out ? (
                 <button className="btn accent" disabled={busy === o.id} onClick={() => start(o.id)}>
                   {busy === o.id ? 'Starting…' : 'Start delivery'}
                 </button>
+              ) : (
+                <span className="pill ok" style={{ alignSelf: 'center' }}>On the way</span>
               )}
               <a className="btn" href={mapsUrl(o)} target="_blank" rel="noopener noreferrer">Navigate</a>
             </div>
+
+            {out && <PodCapture order={o} onDelivered={() => markDelivered(o.id)} />}
           </div>
         );
       })}
