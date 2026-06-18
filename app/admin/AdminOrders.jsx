@@ -4,6 +4,17 @@ import { money, STATUS_LABELS } from '../../lib/constants';
 
 const STATUSES = ['pending_payment', 'confirmed', 'ready', 'out_for_delivery', 'delivered', 'cancelled'];
 
+// Format a stored pickup slot ("YYYY-MM-DDTHH:MM", store-local) for display.
+function fmtPickup(value) {
+  if (!value) return '';
+  const [date, time] = String(value).split('T');
+  const [y, m, d] = date.split('-').map(Number);
+  const [hh, mm] = (time || '00:00').split(':').map(Number);
+  const wd = new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const h12 = ((hh + 11) % 12) + 1;
+  return `${wd} · ${h12}:${String(mm).padStart(2, '0')} ${hh < 12 ? 'AM' : 'PM'}`;
+}
+
 export default function AdminOrders({ initialOrders, sheetsOn }) {
   const [orders, setOrders] = useState(initialOrders);
   const [savingId, setSavingId] = useState(null);
@@ -69,6 +80,11 @@ export default function AdminOrders({ initialOrders, sheetsOn }) {
                   {o.payment_method && (
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
                       Pay: {o.payment_method === 'in_person' ? 'In person' : 'E-transfer'}
+                    </div>
+                  )}
+                  {o.pickup_slot && (
+                    <div style={{ fontSize: 12, color: 'var(--charcoal)', marginTop: 2, fontWeight: 600 }}>
+                      🕑 Pickup: {fmtPickup(o.pickup_slot)}
                     </div>
                   )}
                 </td>

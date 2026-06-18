@@ -3,7 +3,9 @@ import { hasDb } from '../../../lib/db';
 import { getOrderByNumber } from '../../../lib/orders';
 import { getSession } from '../../../lib/auth';
 import { money, STATUS_LABELS, PICKUP_ADDRESS, SALES_EMAIL, ETRANSFER_EMAIL } from '../../../lib/constants';
+import { availableSlots, pickupLabel } from '../../../lib/pickup';
 import PixelPurchase from '../../../components/PixelPurchase';
+import PickupBooker from '../../../components/PickupBooker';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Order Status — Bargain Bay' };
@@ -64,6 +66,10 @@ export default async function OrderPage({ params, searchParams }) {
   const pendingPayment = order.status === 'pending_payment';
   const paidStage = ['confirmed', 'ready', 'out_for_delivery', 'delivered'].includes(order.status);
   const justPaid = searchParams?.status === 'success';
+
+  // Pickup self-scheduling opens once a pickup order is Ready.
+  const showPickupBooker = pickup && order.status === 'ready';
+  const slots = showPickupBooker ? await availableSlots() : [];
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -140,6 +146,16 @@ export default async function OrderPage({ params, searchParams }) {
             })}
           </div>
         </div>
+      )}
+
+      {showPickupBooker && (
+        <PickupBooker
+          orderNumber={order.order_number}
+          email={order.email}
+          slots={slots}
+          currentValue={order.pickup_slot || ''}
+          currentLabel={pickupLabel(order.pickup_slot)}
+        />
       )}
 
       <div className="panel">
