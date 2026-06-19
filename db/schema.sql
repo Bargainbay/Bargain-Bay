@@ -84,10 +84,12 @@ CREATE TABLE IF NOT EXISTS products (
   compare_at numeric(10,2),
   cost       numeric(10,2),
   uid        text,
+  image_url  text,
   position   int DEFAULT 0,
   active     boolean NOT NULL DEFAULT true,
   synced_at  timestamptz DEFAULT now()
 );
+ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url text;
 CREATE INDEX IF NOT EXISTS idx_products_active   ON products(active);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 
