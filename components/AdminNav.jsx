@@ -2,6 +2,7 @@
 export default function AdminNav({ active }) {
   const items = [
     { key: 'dashboard', label: 'Dashboard', href: '/admin/dashboard' },
+    { key: 'reports', label: 'Reports', href: '/admin/reports' },
     { key: 'invoices', label: 'Invoices', href: '/admin/invoices' },
     { key: 'campaigns', label: 'Campaigns', href: '/admin/campaigns' },
     { key: 'operations', label: 'Operations', href: '/admin/operations' }
