@@ -526,3 +526,28 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .member-tag { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #0B6B3A; margin-top: 2px; }
 .price-member { color: #0B6B3A; }
 .member-was { font-size: 13px; color: #0B6B3A; font-weight: 600; margin-top: 2px; }
+
+/* ---------- model grouping ---------- */
+/* "N available" badge on a grouped shop card — bottom-left of the thumb so it
+   never collides with the top-corner clearance / % off badges. */
+.count-badge {
+  position: absolute; bottom: 10px; left: 10px; z-index: 1;
+  background: var(--charcoal); color: #fff; font-size: 11.5px; font-weight: 600;
+  letter-spacing: .02em; border-radius: 6px; padding: 2px 8px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.18);
+}
+.from-label { font-size: 12px; color: var(--muted); }
+
+/* "More units of this model" on a product page */
+.model-siblings { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line-soft); }
+.model-siblings h2 { margin: 0 0 4px; }
+.sibling-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
+.sibling-card {
+  display: flex; flex-direction: column; border: 1px solid var(--line-soft);
+  border-radius: var(--radius); overflow: hidden; background: var(--card); text-decoration: none;
+}
+.sibling-card:hover { border-color: var(--taupe); }
+.sibling-thumb { aspect-ratio: 1 / 1; background: #fff; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--line-soft); }
+.sibling-thumb img { width: 100%; height: 100%; object-fit: contain; padding: 12px; }
+.sibling-info { padding: 10px; display: flex; flex-direction: column; gap: 2px; }
+.sibling-info .price { font-size: 16px; }

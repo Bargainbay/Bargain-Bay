@@ -27,7 +27,11 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
   const [make, setMake] = useState('');
   const [sort, setSort] = useState('newest');
 
-  const list = useMemo(() => {
+  // Filter individual units, then collapse identical make+model into one card
+  // (SecondShop-style). Each group keeps its cheapest unit as the representative;
+  // a group of one renders exactly like a plain unit. Filters apply per-unit
+  // before grouping, so a condition/price filter can shrink or split a model.
+  const groups = useMemo(() => {
     let l = units.filter(collectionFilter(collection));
     if (cat) l = l.filter((u) => u.category === cat);
     if (cond) l = l.filter((u) => u.condition === cond);
@@ -43,11 +47,24 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
         return tokens.every((t) => hay.includes(t));
       });
     }
-    if (sort === 'lo') l = [...l].sort((a, b) => a.price - b.price);
-    else if (sort === 'hi') l = [...l].sort((a, b) => b.price - a.price);
-    else l = [...l].reverse(); // newest = last added in catalog first
-    return l;
+    // Group by make+model in filtered (catalog) order.
+    const map = new Map();
+    for (const u of l) {
+      const key = `${u.make}|${u.model}`.toLowerCase();
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(u);
+    }
+    let g = [...map.values()].map((arr) => {
+      const sorted = [...arr].sort((a, b) => a.price - b.price);
+      return { rep: sorted[0], count: sorted.length, minPrice: sorted[0].price, maxPrice: sorted[sorted.length - 1].price };
+    });
+    if (sort === 'lo') g.sort((a, b) => a.minPrice - b.minPrice);
+    else if (sort === 'hi') g.sort((a, b) => b.maxPrice - a.maxPrice);
+    else g.reverse(); // newest = most recently added models first
+    return g;
   }, [units, q, collection, cat, cond, band, make, sort]);
+
+  const totalUnits = groups.reduce((n, g) => n + g.count, 0);
 
   const colLabel = COLLECTIONS.find((c) => c.slug === collection)?.label;
 
@@ -89,15 +106,18 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
         </select>
       </div>
 
-      <div className="result-count">{list.length} unit{list.length === 1 ? '' : 's'} available — each one-of-a-kind</div>
+      <div className="result-count">
+        {totalUnits} unit{totalUnits === 1 ? '' : 's'} available — each one-of-a-kind
+        {groups.length !== totalUnits && ` · ${groups.length} model${groups.length === 1 ? '' : 's'}`}
+      </div>
 
-      {list.length === 0 ? (
+      {groups.length === 0 ? (
         <div className="panel" style={{ textAlign: 'center', padding: 40 }}>
           No units match those filters. <button className="btn" style={{ marginLeft: 8 }} onClick={() => { setQ(''); setCollection(''); setCat(''); setCond(''); setBand(''); setMake(''); }}>Clear filters</button>
         </div>
       ) : (
         <div className="grid">
-          {list.map((u) => <ProductCard key={u.id} unit={u} />)}
+          {groups.map((g) => <ProductCard key={g.rep.id} unit={g.rep} count={g.count} />)}
         </div>
       )}
     </div>
