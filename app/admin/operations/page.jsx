@@ -7,6 +7,7 @@ import { listMembers } from '../../../lib/members';
 import { listSold } from '../../../lib/catalog-sync';
 import { listDrivers } from '../../../lib/drivers';
 import { podPhotosForOrders } from '../../../lib/pod';
+import { listSalvage } from '../../../lib/salvage';
 import AdminNav from '../../../components/AdminNav';
 import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
@@ -14,6 +15,7 @@ import AdminClearance from '../AdminClearance';
 import AdminMembers from '../AdminMembers';
 import AdminReconcile from '../AdminReconcile';
 import AdminDrivers from '../AdminDrivers';
+import AdminSalvage from '../AdminSalvage';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Operations — Bargain Bay' };
@@ -43,6 +45,7 @@ export default async function OperationsPage() {
   let members = [];
   let sold = [];
   let drivers = [];
+  let salvage = null;
   let needsMigration = false;
   try {
     orders = (await getAllOrders(200)).map((o) => ({
@@ -90,6 +93,12 @@ export default async function OperationsPage() {
     console.error('pod photos load failed (run migration?)', e.message);
     needsMigration = true;
   }
+  try {
+    salvage = await listSalvage();
+  } catch (e) {
+    console.error('salvage load failed (run migration?)', e.message);
+    needsMigration = true;
+  }
   return (
     <div>
       <AdminNav active="operations" />
@@ -100,6 +109,7 @@ export default async function OperationsPage() {
       )}
       <AdminOrders initialOrders={orders} drivers={drivers} />
       <AdminReconcile initialItems={sold} />
+      <AdminSalvage initial={salvage} />
       <AdminDrivers initialDrivers={drivers} />
       <AdminMembers initialMembers={members} />
       <AdminClearance initialItems={clearance} />

@@ -112,6 +112,22 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method text;
 -- store-local "YYYY-MM-DDTHH:MM" label (America/Toronto). Null until booked.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_slot text;
 
+-- Phase C: salvage / parts-only units (Status "Salvage For Parts Only" in the
+-- tracker — never on the storefront). Synced separately; disposed when invoiced.
+CREATE TABLE IF NOT EXISTS salvage_units (
+  sku            text PRIMARY KEY,
+  make           text,
+  model          text,
+  title          text,
+  cost           numeric(10,2),
+  status         text NOT NULL DEFAULT 'available',  -- available | disposed
+  sale_price     numeric(10,2),
+  invoice_number text,
+  disposed_at    timestamptz,
+  synced_at      timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_salvage_status ON salvage_units(status);
+
 -- Phase 3 delivery ops + driver portal.
 ALTER TABLE users  ADD COLUMN IF NOT EXISTS is_driver boolean NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_date  date;
