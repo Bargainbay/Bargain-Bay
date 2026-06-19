@@ -21,6 +21,7 @@ export default function AdminMembers({ initialMembers }) {
 
   const pending = members.filter((m) => m.member_status === 'pending');
   const approved = members.filter((m) => m.member_status === 'approved');
+  const declined = members.filter((m) => m.member_status === 'rejected');
   const dt = (s) => (s ? new Date(s).toLocaleDateString('en-CA') : '—');
 
   return (
@@ -48,6 +49,25 @@ export default function AdminMembers({ initialMembers }) {
             </tr>))}
           </tbody>
         </table></div>
+      )}
+
+      {declined.length > 0 && (
+        <>
+          <h3 style={{ color: 'var(--charcoal)', marginTop: 22, fontSize: 15 }}>Declined applications ({declined.length})</h3>
+          <p className="hint" style={{ marginBottom: 10 }}>Declined or accidentally-rejected applicants — click Approve to make them a member.</p>
+          <div className="table-wrap"><table className="admin">
+            <thead><tr><th>Business</th><th>Contact</th><th>Note</th><th>Requested</th><th></th></tr></thead>
+            <tbody>{declined.map((m) => (
+              <tr key={m.id}>
+                <td><b>{m.business_name || '—'}</b></td>
+                <td>{m.name || '—'}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.email}{m.phone ? ' · ' + m.phone : ''}</div></td>
+                <td style={{ fontSize: 13, maxWidth: 240 }}>{m.member_note || '—'}</td>
+                <td style={{ fontSize: 12.5 }}>{dt(m.member_requested_at)}</td>
+                <td><button className="btn primary" style={{ padding: '5px 10px', fontSize: 12.5 }} disabled={busy === m.id} onClick={() => act(m.id, 'approve')}>Approve</button></td>
+              </tr>))}
+            </tbody>
+          </table></div>
+        </>
       )}
 
       <h3 style={{ color: 'var(--charcoal)', marginTop: 22, fontSize: 15 }}>Active members ({approved.length})</h3>
