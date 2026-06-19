@@ -1,4 +1,6 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "[ \"$VERCEL_ENV\" != \"production\" ]",
   "crons": [
     { "path": "/api/cron/expire-reservations", "schedule": "0 6 * * *" },
     { "path": "/api/cron/sync-inventory", "schedule": "0 7 * * *" }
