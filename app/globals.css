@@ -131,6 +131,18 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
   .main-nav.open { display: flex; }
   .header-row { position: relative; }
   .menu-btn { display: inline-block; }
+
+  /* Keep the whole header inside the viewport so the Login button and cart
+     never get clipped off the right edge (overflow-x is `clip`). The logo
+     wordmark shrinks and may truncate; the long subtitle is dropped. */
+  .wrap { padding: 0 14px; }
+  .header-row { gap: 10px; height: 60px; }
+  .logo { min-width: 0; flex-shrink: 1; }
+  .logo img { height: 38px; }
+  .logo-sub { display: none; }
+  .header-actions { gap: 8px; flex-shrink: 0; }
+  .header-actions .btn { padding: 6px 10px !important; font-size: 13px; white-space: nowrap; }
+  .cart-link { font-size: 20px; }
 }
 
 /* ---------- hero / home ---------- */
