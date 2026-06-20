@@ -3,11 +3,9 @@ import { getById, getSiblings } from '../../../lib/inventory';
 import { decorateOne, decorate } from '../../../lib/pricing';
 import { getSession } from '../../../lib/auth';
 import { isUnavailable } from '../../../lib/reservations';
-import { money, pctOff, PICKUP_ADDRESS } from '../../../lib/constants';
 import { conditionCopy, leadSentence, specRows, seoDescription } from '../../../lib/specs';
 import { SITE_URL } from '../../../lib/site';
-import ConditionPill from '../../../components/ConditionPill';
-import AddToCartButton from '../../../components/AddToCartButton';
+import ProductBuyPanel from '../../../components/ProductBuyPanel';
 import PixelView from '../../../components/PixelView';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +30,27 @@ export async function generateMetadata({ params }) {
   };
 }
 
+// Slim, serializable shape handed to the client buy panel — only the fields the
+// picker needs, so we don't ship the whole spec blob to the browser.
+function forPanel(x, sold) {
+  return {
+    id: x.id,
+    make: x.make,
+    model: x.model,
+    category: x.category,
+    title: x.title || `${x.make} ${x.model}`,
+    condition: x.condition,
+    explainer: conditionCopy(x.condition),
+    price: x.price,
+    compareAt: x.compareAt || 0,
+    clientPrice: x.clientPrice,
+    onClearance: !!x.onClearance,
+    isMemberPrice: !!x.isMemberPrice,
+    image: x.image,
+    sold: !!sold
+  };
+}
+
 export default async function Product({ params }) {
   const base = await getById(decodeURIComponent(params.id));
   if (!base) return notFound();
@@ -39,7 +58,13 @@ export default async function Product({ params }) {
   const u = await decorateOne(base, session);
   const sold = await isUnavailable(u.id);
   const siblings = await decorate(await getSiblings(u.make, u.model, u.id), session);
-  const off = pctOff(u.price, u.compareAt);
+
+  // Every available unit of this model, cheapest first; the URL's unit is the
+  // one preselected in the picker. Siblings come from getAvailable(), so they're
+  // already in stock — only the URL unit can be sold/on-hold.
+  const units = [forPanel(u, sold), ...siblings.map((s) => forPanel(s, false))]
+    .sort((a, b) => a.price - b.price);
+
   const explainer = conditionCopy(u.condition);
   const rows = specRows(u);
   const warrantyLabel = 'one-year warranty';
@@ -67,78 +92,8 @@ export default async function Product({ params }) {
     <div>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
       <PixelView id={u.id} name={u.title || `${u.make} ${u.model}`} value={u.price} />
-      <div className="product-layout">
-        <div className="product-img">
-          {u.onClearance && <span className="clearance-badge product-clearance-badge">Clearance</span>}
-          <img src={u.image} alt={u.title || `${u.make} ${u.model}`} />
-        </div>
-        <div>
-          <ConditionPill condition={u.condition} />
-          {u.onClearance && <span className="pill clearance-pill" style={{ marginLeft: 8 }}>Clearance</span>}
-          {sold && <span className="pill sold" style={{ marginLeft: 8 }}>Sold / on hold</span>}
-          <h1 style={{ margin: '10px 0 4px' }}>{u.title || `${u.make} ${u.model}`}</h1>
-          <div style={{ color: 'var(--muted)', fontSize: 14 }}>{u.category} · {u.make}</div>
 
-          <div className="price-row" style={{ margin: '14px 0 4px' }}>
-            <span className={'product-price' + (u.onClearance ? ' price-clearance' : '')}>{money(u.price)}</span>
-            {u.compareAt > u.price && <span className="compare" style={{ fontSize: 16 }}>{money(u.compareAt)}</span>}
-          </div>
-          {off > 0 && (
-            <div className="savings">You save {money(u.compareAt - u.price)} ({off}% off retail)</div>
-          )}
-          {u.isMemberPrice && (
-            <div className="member-was">Member price · client price {money(u.clientPrice)}</div>
-          )}
-          <div className="hint">+ 13% HST at checkout · prices in CAD</div>
-
-          <div className="cond-box">
-            <b>{u.condition}:</b> {explainer}
-          </div>
-
-          <div className="meta-list">
-            <div>Model #: <b style={{ color: 'var(--ink)' }}>{u.model}</b></div>
-            <div>SKU: {u.id}</div>
-            {siblings.length > 0
-              ? <div>⚡ <b style={{ color: 'var(--ink)' }}>{siblings.length + 1} of this model available</b> — each a separate, individually-tested unit. <a href="#more-units" style={{ textDecoration: 'underline' }}>See the others ↓</a></div>
-              : <div>⚡ <b style={{ color: 'var(--ink)' }}>One available</b> — every Bargain Bay unit is one-of-a-kind. When it&apos;s gone, it&apos;s gone.</div>}
-          </div>
-
-          <div style={{ maxWidth: 360, marginTop: 12 }}>
-            <AddToCartButton sku={u.id} available={!sold} price={u.price} name={u.title || `${u.make} ${u.model}`} />
-          </div>
-
-          <div className="meta-list" style={{ marginTop: 18 }}>
-            <div>🚚 Free pickup at {PICKUP_ADDRESS} (by appointment), flat-fee local delivery, or freight — Hamilton, Scarborough &amp; the GTA.</div>
-            <div>✔️ Bench-tested &amp; certified working before listing.</div>
-            <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; {warrantyLabel}</a></div>
-          </div>
-
-          <a className="btn" href="/shop" style={{ marginTop: 18 }}>← Back to catalogue</a>
-        </div>
-      </div>
-
-      {siblings.length > 0 && (
-        <div className="model-siblings" id="more-units">
-          <h2>More units of this model</h2>
-          <p className="hint" style={{ marginTop: 0 }}>Same model, separate units — each tested individually and priced for its own condition.</p>
-          <div className="sibling-grid">
-            {siblings.map((s) => (
-              <a key={s.id} href={`/product/${encodeURIComponent(s.id)}`} className="sibling-card">
-                <div className="sibling-thumb"><img src={s.image} alt={s.title || `${s.make} ${s.model}`} loading="lazy" /></div>
-                <div className="sibling-info">
-                  <ConditionPill condition={s.condition} />
-                  <div className="price-row" style={{ marginTop: 4 }}>
-                    <span className={'price' + (s.onClearance ? ' price-clearance' : '')}>{money(s.price)}</span>
-                    {s.compareAt > s.price && <span className="compare">{money(s.compareAt)}</span>}
-                  </div>
-                  {s.isMemberPrice && <div className="member-tag">Member price</div>}
-                  <div className="card-model">{s.id}</div>
-                </div>
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
+      <ProductBuyPanel units={units} initialId={u.id} />
 
       <div className="product-desc">
         <h2>About this unit</h2>
