@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { getById } from '../../../lib/inventory';
-import { decorateOne } from '../../../lib/pricing';
+import { getById, getSiblings } from '../../../lib/inventory';
+import { decorateOne, decorate } from '../../../lib/pricing';
 import { getSession } from '../../../lib/auth';
 import { isUnavailable } from '../../../lib/reservations';
 import { money, pctOff, PICKUP_ADDRESS } from '../../../lib/constants';
@@ -35,8 +35,10 @@ export async function generateMetadata({ params }) {
 export default async function Product({ params }) {
   const base = await getById(decodeURIComponent(params.id));
   if (!base) return notFound();
-  const u = await decorateOne(base, await getSession());
+  const session = await getSession();
+  const u = await decorateOne(base, session);
   const sold = await isUnavailable(u.id);
+  const siblings = await decorate(await getSiblings(u.make, u.model, u.id), session);
   const off = pctOff(u.price, u.compareAt);
   const explainer = conditionCopy(u.condition);
   const rows = specRows(u);
@@ -96,7 +98,9 @@ export default async function Product({ params }) {
           <div className="meta-list">
             <div>Model #: <b style={{ color: 'var(--ink)' }}>{u.model}</b></div>
             <div>SKU: {u.id}</div>
-            <div>⚡ <b style={{ color: 'var(--ink)' }}>One available</b> — every Bargain Bay unit is one-of-a-kind. When it&apos;s gone, it&apos;s gone.</div>
+            {siblings.length > 0
+              ? <div>⚡ <b style={{ color: 'var(--ink)' }}>{siblings.length + 1} of this model available</b> — each a separate, individually-tested unit. <a href="#more-units" style={{ textDecoration: 'underline' }}>See the others ↓</a></div>
+              : <div>⚡ <b style={{ color: 'var(--ink)' }}>One available</b> — every Bargain Bay unit is one-of-a-kind. When it&apos;s gone, it&apos;s gone.</div>}
           </div>
 
           <div style={{ maxWidth: 360, marginTop: 12 }}>
@@ -112,6 +116,29 @@ export default async function Product({ params }) {
           <a className="btn" href="/shop" style={{ marginTop: 18 }}>← Back to catalogue</a>
         </div>
       </div>
+
+      {siblings.length > 0 && (
+        <div className="model-siblings" id="more-units">
+          <h2>More units of this model</h2>
+          <p className="hint" style={{ marginTop: 0 }}>Same model, separate units — each tested individually and priced for its own condition.</p>
+          <div className="sibling-grid">
+            {siblings.map((s) => (
+              <a key={s.id} href={`/product/${encodeURIComponent(s.id)}`} className="sibling-card">
+                <div className="sibling-thumb"><img src={s.image} alt={s.title || `${s.make} ${s.model}`} loading="lazy" /></div>
+                <div className="sibling-info">
+                  <ConditionPill condition={s.condition} />
+                  <div className="price-row" style={{ marginTop: 4 }}>
+                    <span className={'price' + (s.onClearance ? ' price-clearance' : '')}>{money(s.price)}</span>
+                    {s.compareAt > s.price && <span className="compare">{money(s.compareAt)}</span>}
+                  </div>
+                  {s.isMemberPrice && <div className="member-tag">Member price</div>}
+                  <div className="card-model">{s.id}</div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="product-desc">
         <h2>About this unit</h2>
