@@ -175,6 +175,43 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
 
+-- ── Quotes ──────────────────────────────────────────────────────────────────
+-- Non-binding package quotes the owner builds in /admin/quotes and shares with a
+-- client (hosted page + email). A quote reserves NOTHING — the units stay live
+-- and sellable for everyone — until it's converted into an invoice, which is
+-- where stock actually gets held/sold. Bundle pricing = a % off the our-price
+-- subtotal, plus an optional all-in cash deal and a free-delivery perk.
+CREATE TABLE IF NOT EXISTS quotes (
+  id                   serial PRIMARY KEY,
+  number               text UNIQUE,                 -- 'Q-' || (1000 + id)
+  email                text NOT NULL,
+  name                 text,
+  status               text NOT NULL DEFAULT 'open' -- open | accepted | converted | expired | void
+                       CHECK (status IN ('open','accepted','converted','expired','void')),
+  retail_subtotal      numeric(10,2),
+  subtotal             numeric(10,2),               -- our-price subtotal (pre-bundle)
+  bundle_pct           numeric(5,2) DEFAULT 0,      -- bundle discount %
+  bundle_price         numeric(10,2),               -- subtotal after the bundle %
+  hst                  numeric(10,2),
+  total                numeric(10,2),               -- what the client pays (cash_deal if set, else bundle_price + hst)
+  cash_deal            numeric(10,2),               -- optional all-in cash offer (overrides total)
+  free_delivery        boolean DEFAULT false,
+  memo                 text,
+  expires_at           date,
+  converted_invoice_id int REFERENCES invoices(id) ON DELETE SET NULL,
+  created_at           timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS quote_items (
+  id          serial PRIMARY KEY,
+  quote_id    int REFERENCES quotes(id) ON DELETE CASCADE,
+  description text,
+  sku         text,
+  retail      numeric(10,2),
+  amount      numeric(10,2)                          -- our price for this line
+);
+CREATE INDEX IF NOT EXISTS idx_quotes_status ON quotes(status);
+CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON quote_items(quote_id);
+
 -- Cleanup: a sold unit should never stay on clearance. markUnitsSold handles
 -- this going forward; this sweeps any rows sold before that fix. Idempotent.
 UPDATE clearance SET active = false, updated_at = now()
