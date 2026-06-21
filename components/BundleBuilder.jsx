@@ -17,8 +17,11 @@ export default function BundleBuilder({ units = [], user = null }) {
   const byId = (id) => units.find((u) => u.id === id);
   const pickedUnits = picked.map(byId).filter(Boolean);
 
+  // Every query word must appear somewhere in the unit's text (so "kitchenaid
+  // dishwasher" matches even though brand and type sit far apart in the string).
+  const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const matches = q.trim().length >= 2
-    ? units.filter((u) => !picked.includes(u.id) && u.search.includes(q.trim().toLowerCase())).slice(0, 10)
+    ? units.filter((u) => !picked.includes(u.id) && tokens.every((t) => u.search.includes(t))).slice(0, 10)
     : [];
 
   const add = (id) => { setPicked((xs) => (xs.includes(id) ? xs : [...xs, id])); setQ(''); };

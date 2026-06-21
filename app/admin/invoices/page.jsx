@@ -46,7 +46,7 @@ export default async function InvoicesPage() {
       id: u.id,
       description: `${u.title || `${u.make} ${u.model}`} (${u.id})`,
       price: Number(u.price) || 0,
-      search: `${u.make || ''} ${u.model || ''} ${u.title || ''} ${u.id || ''}`.toLowerCase()
+      search: `${u.make || ''} ${u.model || ''} ${u.title || ''} ${u.category || ''} ${u.id || ''}`.toLowerCase()
     }));
   } catch { inventory = []; }
 

@@ -20,8 +20,12 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   const addRow = () => setItems((xs) => [...xs, blankItem()]);
   const removeRow = (i) => setItems((xs) => (xs.length > 1 ? xs.filter((_, j) => j !== i) : xs));
 
+  // Every query word must appear somewhere in the unit's text, so multi-word
+  // searches like "kitchenaid dishwasher" match (brand and type sit far apart
+  // in the string; a plain substring match needs the whole phrase contiguous).
+  const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const matches = q.trim().length >= 2
-    ? inventory.filter((u) => u.search.includes(q.trim().toLowerCase())).slice(0, 8)
+    ? inventory.filter((u) => tokens.every((t) => u.search.includes(t))).slice(0, 8)
     : [];
 
   const custQuery = (email || name).trim().toLowerCase();
