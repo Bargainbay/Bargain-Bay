@@ -52,7 +52,7 @@ export default async function QuotesPage({ searchParams }) {
       description: `${u.title || `${u.make} ${u.model}`} (${u.id})`,
       price: Number(u.price) || 0,
       retail: Number(u.compareAt) || 0,
-      search: `${u.make || ''} ${u.model || ''} ${u.title || ''} ${u.id || ''}`.toLowerCase()
+      search: `${u.make || ''} ${u.model || ''} ${u.title || ''} ${u.category || ''} ${u.id || ''}`.toLowerCase()
     }));
   } catch { inventory = []; }
 

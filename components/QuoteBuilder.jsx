@@ -29,8 +29,13 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
   const addRow = () => setItems((xs) => [...xs, blankItem()]);
   const removeRow = (i) => setItems((xs) => (xs.length > 1 ? xs.filter((_, j) => j !== i) : xs));
 
+  // Tokenize: every word in the query must appear somewhere in the unit's
+  // searchable text, so "kitchenaid dishwasher" matches even though brand and
+  // type sit far apart in the string. (A plain substring match needs the whole
+  // phrase contiguous and silently finds nothing.)
+  const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const matches = q.trim().length >= 2
-    ? inventory.filter((u) => u.search.includes(q.trim().toLowerCase())).slice(0, 8)
+    ? inventory.filter((u) => tokens.every((t) => u.search.includes(t))).slice(0, 8)
     : [];
 
   const custQuery = (email || name).trim().toLowerCase();
