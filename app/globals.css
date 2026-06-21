@@ -538,6 +538,14 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 }
 .from-label { font-size: 12px; color: var(--muted); }
 
+/* ---------- build-a-bundle (customer quote request) ---------- */
+.bundle-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 24px; align-items: start; margin-top: 12px; }
+.bundle-form { position: sticky; top: 96px; }
+@media (max-width: 820px) {
+  .bundle-layout { grid-template-columns: 1fr; }
+  .bundle-form { position: static; }
+}
+
 /* Product-page unit picker — choose between identical in-stock units of a
    model. A visible radio list (not a hidden dropdown): every unit's condition,
    price and % off are scannable at a glance; the selected one swaps the photo,

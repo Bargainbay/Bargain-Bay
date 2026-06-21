@@ -4,10 +4,15 @@ import { useState } from 'react';
 const blankItem = () => ({ description: '', retail: '', amount: '', sku: '' });
 const fmt = (n) => '$' + (Number(n) || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function QuoteBuilder({ inventory = [], customers = [] }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [items, setItems] = useState([blankItem()]);
+export default function QuoteBuilder({ inventory = [], customers = [], initial = null }) {
+  const [name, setName] = useState(initial?.name || '');
+  const [email, setEmail] = useState(initial?.email || '');
+  const [items, setItems] = useState(
+    initial?.items?.length
+      ? initial.items.map((it) => ({ description: it.description || '', retail: it.retail || '', amount: it.amount || '', sku: it.sku || '' }))
+      : [blankItem()]
+  );
+  const sourceQuoteId = initial?.sourceQuoteId || null;
   const [q, setQ] = useState('');
   const [custOpen, setCustOpen] = useState(false);
   const [bundlePct, setBundlePct] = useState(10);
@@ -63,7 +68,7 @@ export default function QuoteBuilder({ inventory = [], customers = [] }) {
       const res = await fetch('/api/admin/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, items, bundlePct: pct, cashDeal, freeDelivery, addHst, daysValid, memo })
+        body: JSON.stringify({ name, email, items, bundlePct: pct, cashDeal, freeDelivery, addHst, daysValid, memo, sourceQuoteId })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not create the quote.'); return; }
@@ -92,6 +97,11 @@ export default function QuoteBuilder({ inventory = [], customers = [] }) {
   return (
     <form onSubmit={submit}>
       {err && <div className="error-box">{err}</div>}
+      {sourceQuoteId && (
+        <div className="notice-box" style={{ marginBottom: 12 }}>
+          Pricing a customer request — set your bundle discount and send. The original request is filed away once you send this quote.
+        </div>
+      )}
       <div className="form-2col">
         <div className="field">
           <label>Customer name</label>

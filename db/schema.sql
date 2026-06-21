@@ -209,6 +209,8 @@ CREATE TABLE IF NOT EXISTS quote_items (
   retail      numeric(10,2),
   amount      numeric(10,2)                          -- our price for this line
 );
+-- 'admin' = owner-built; 'customer' = assembled on /bundle (a quote request).
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS source text;
 CREATE INDEX IF NOT EXISTS idx_quotes_status ON quotes(status);
 CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON quote_items(quote_id);
 

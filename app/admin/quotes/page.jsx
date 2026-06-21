@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
-import { listQuotes } from '../../../lib/quotes';
+import { listQuotes, getQuoteForBuilder } from '../../../lib/quotes';
 import { customerContacts } from '../../../lib/analytics';
 import { getAll } from '../../../lib/inventory';
 import AdminNav from '../../../components/AdminNav';
@@ -15,7 +15,7 @@ export const metadata = { title: 'Quotes — Bargain Bay' };
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 const statusClass = (s) => (s === 'converted' || s === 'accepted' ? 'ok' : s === 'open' ? 'warn' : 'sold');
 
-export default async function QuotesPage() {
+export default async function QuotesPage({ searchParams }) {
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/quotes');
   if (!isAdmin(session)) {
@@ -40,6 +40,11 @@ export default async function QuotesPage() {
     }));
   } catch { customers = []; }
 
+  let initial = null;
+  if (searchParams?.from) {
+    try { initial = await getQuoteForBuilder(searchParams.from); } catch { initial = null; }
+  }
+
   let inventory = [];
   try {
     inventory = (await getAll()).map((u) => ({
@@ -61,12 +66,12 @@ export default async function QuotesPage() {
       )}
 
       <div className="panel">
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>New package quote</h2>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>{initial ? 'Price & send this request' : 'New package quote'}</h2>
         <p className="hint" style={{ marginTop: 0 }}>
           Build a bundle, apply a discount, and email the customer a shareable quote. Nothing is reserved —
           the units stay live until you convert the quote to an invoice.
         </p>
-        <QuoteBuilder inventory={inventory} customers={customers} />
+        <QuoteBuilder inventory={inventory} customers={customers} initial={initial} />
       </div>
 
       <div className="panel">
@@ -78,12 +83,19 @@ export default async function QuotesPage() {
             {quotes.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--muted)' }}>No quotes yet.</td></tr>}
             {quotes.map((qt) => (
               <tr key={qt.id}>
-                <td style={{ fontWeight: 700 }}>{qt.number}{qt.freeDelivery ? <span title="Free delivery"> 🚚</span> : ''}</td>
+                <td style={{ fontWeight: 700 }}>
+                  {qt.number}{qt.freeDelivery ? <span title="Free delivery"> 🚚</span> : ''}
+                  {qt.source === 'customer' && <span className="pill warn" style={{ marginLeft: 6, fontSize: 11 }}>request</span>}
+                </td>
                 <td>{qt.name ? `${qt.name} · ` : ''}{qt.email || '—'}</td>
                 <td><span className={'pill ' + statusClass(qt.status)}>{qt.status}</span></td>
                 <td>{qt.status === 'open' ? fmtDate(qt.expires) : '—'}</td>
                 <td style={{ textAlign: 'right' }}>{money(qt.total)}</td>
-                <td><QuoteActions quoteId={qt.id} status={qt.status} invoiceUrl={qt.convertedInvoiceId ? `/admin/invoices` : null} /></td>
+                <td>
+                  {qt.source === 'customer' && qt.status === 'open'
+                    ? <a className="btn accent" style={{ padding: '5px 10px' }} href={`/admin/quotes?from=${qt.id}`}>Price &amp; send →</a>
+                    : <QuoteActions quoteId={qt.id} status={qt.status} invoiceUrl={qt.convertedInvoiceId ? `/admin/invoices` : null} />}
+                </td>
                 <td>{qt.hostedUrl ? <a href={qt.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View</a> : ''}</td>
               </tr>
             ))}

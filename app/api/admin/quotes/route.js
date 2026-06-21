@@ -48,7 +48,8 @@ export async function POST(req) {
       freeDelivery: !!body.freeDelivery,
       addHst: body.addHst !== false,
       daysValid: body.daysValid,
-      memo: body.memo
+      memo: body.memo,
+      sourceQuoteId: body.sourceQuoteId ? Number(body.sourceQuoteId) : null
     });
     return NextResponse.json({ ok: true, quote });
   } catch (e) {
