@@ -63,6 +63,11 @@ ${items}
 `;
 
   return new Response(xml, {
-    headers: { 'Content-Type': 'application/xml; charset=utf-8' }
+    headers: {
+      'Content-Type': 'application/xml; charset=utf-8',
+      // Serve repeats from Vercel's edge cache (Google fetches this ~daily), so a
+      // public URL can't be looped to force full-catalog DB scans on every hit.
+      'Cache-Control': 's-maxage=3600, stale-while-revalidate=86400'
+    }
   });
 }

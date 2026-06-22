@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { normalizeEmail, validEmail } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { createQuoteRequest } from '../../../lib/quotes';
-import { notifyOwner } from '../../../lib/email';
+import { notifyOwner, esc } from '../../../lib/email';
 import { money } from '../../../lib/constants';
 import { SITE_URL } from '../../../lib/site';
 
@@ -25,14 +25,14 @@ export async function POST(req) {
   try {
     const r = await createQuoteRequest({ name: body.name, email, phone: body.phone, skus, note: body.note });
     const rows = r.items
-      .map((it) => `<tr><td style="padding:4px 0;border-bottom:1px solid #eee">${it.description}</td><td style="padding:4px 0;border-bottom:1px solid #eee;text-align:right">${money(it.amount)}</td></tr>`)
+      .map((it) => `<tr><td style="padding:4px 0;border-bottom:1px solid #eee">${esc(it.description)}</td><td style="padding:4px 0;border-bottom:1px solid #eee;text-align:right">${money(it.amount)}</td></tr>`)
       .join('');
     notifyOwner(
       `📝 New quote request ${r.number} — ${r.name || email}`,
       `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#2e2d2b">
-        <h2 style="text-transform:uppercase;letter-spacing:.05em">New quote request ${r.number}</h2>
-        <p><b>${r.name || '(no name)'}</b> (${email}${body.phone ? ', ' + String(body.phone).slice(0, 40) : ''}) assembled a bundle on the site.</p>
-        ${body.note ? `<p style="color:#555">"${String(body.note).slice(0, 500)}"</p>` : ''}
+        <h2 style="text-transform:uppercase;letter-spacing:.05em">New quote request ${esc(r.number)}</h2>
+        <p><b>${esc(r.name || '(no name)')}</b> (${esc(email)}${body.phone ? ', ' + esc(String(body.phone).slice(0, 40)) : ''}) assembled a bundle on the site.</p>
+        ${body.note ? `<p style="color:#555">"${esc(String(body.note).slice(0, 500))}"</p>` : ''}
         <table style="width:100%;border-collapse:collapse;margin:12px 0">${rows}
           <tr><td style="padding:6px 0;text-align:right;font-weight:bold">List subtotal</td><td style="padding:6px 0;text-align:right;font-weight:bold">${money(r.total)}</td></tr>
         </table>

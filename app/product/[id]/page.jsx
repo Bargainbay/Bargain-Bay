@@ -4,7 +4,7 @@ import { decorateOne, decorate } from '../../../lib/pricing';
 import { getSession } from '../../../lib/auth';
 import { isUnavailable } from '../../../lib/reservations';
 import { conditionCopy, leadSentence, specRows, seoDescription } from '../../../lib/specs';
-import { SITE_URL } from '../../../lib/site';
+import { SITE_URL, jsonLd } from '../../../lib/site';
 import ProductBuyPanel from '../../../components/ProductBuyPanel';
 import PixelView from '../../../components/PixelView';
 
@@ -90,7 +90,7 @@ export default async function Product({ params }) {
 
   return (
     <div>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(productSchema) }} />
       <PixelView id={u.id} name={u.title || `${u.make} ${u.model}`} value={u.price} />
 
       <ProductBuyPanel units={units} initialId={u.id} />
