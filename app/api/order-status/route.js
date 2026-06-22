@@ -16,13 +16,17 @@ export async function GET(req) {
   if (!number) return NextResponse.json({ error: 'number required' }, { status: 400 });
 
   const order = await getOrderByNumber(number).catch(() => null);
-  if (!order) return NextResponse.json({ error: 'not found' }, { status: 404 });
-
   const session = await getSession();
+  // Uniform response whether the order is missing OR the email doesn't match, so
+  // an unauthenticated caller can't use 404-vs-403 as an oracle to enumerate
+  // which order numbers exist (they're sequential).
   const ok =
-    (session && order.user_id && session.userId === order.user_id) ||
-    (session && session.email?.toLowerCase() === order.email?.toLowerCase()) ||
-    (email && email === order.email?.toLowerCase());
+    order &&
+    (
+      (session && order.user_id && session.userId === order.user_id) ||
+      (session && session.email?.toLowerCase() === order.email?.toLowerCase()) ||
+      (email && email === order.email?.toLowerCase())
+    );
   if (!ok) return NextResponse.json({ error: 'denied' }, { status: 403 });
 
   return NextResponse.json({ status: order.status });

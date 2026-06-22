@@ -4,7 +4,7 @@ import Footer from '../components/Footer';
 import ChatWidget from '../components/ChatWidget';
 import MetaPixel from '../components/MetaPixel';
 import { SALES_EMAIL, PICKUP_ADDRESS } from '../lib/constants';
-import { SITE_URL } from '../lib/site';
+import { SITE_URL, jsonLd } from '../lib/site';
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
@@ -57,7 +57,7 @@ export default function RootLayout({ children }) {
         <MetaPixel />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(storeSchema) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(storeSchema) }}
         />
         <Header />
         <main className="wrap">{children}</main>
