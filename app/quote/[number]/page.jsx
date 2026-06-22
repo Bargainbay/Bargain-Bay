@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { hasDb } from '../../../lib/db';
 import { getQuoteByNumber } from '../../../lib/quotes';
 import { getSession, isAdmin } from '../../../lib/auth';
+import { verifyLinkToken } from '../../../lib/links';
 import { money, SALES_EMAIL } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,7 @@ export default async function QuotePage({ params, searchParams }) {
   const owns =
     (session && isAdmin(session)) ||
     (session && session.email?.toLowerCase() === quote.email?.toLowerCase()) ||
+    verifyLinkToken('quote', quote.number, searchParams?.t) ||
     (guestEmail && guestEmail === quote.email?.toLowerCase());
   if (!owns) {
     return (

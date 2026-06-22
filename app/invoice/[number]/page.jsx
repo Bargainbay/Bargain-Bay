@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { hasDb } from '../../../lib/db';
 import { getInvoiceByNumber } from '../../../lib/invoices';
 import { getSession, isAdmin } from '../../../lib/auth';
+import { verifyLinkToken } from '../../../lib/links';
 import { money, SALES_EMAIL, ETRANSFER_EMAIL } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ export default async function InvoicePage({ params, searchParams }) {
   const owns =
     (session && isAdmin(session)) ||
     (session && session.email?.toLowerCase() === invoice.email?.toLowerCase()) ||
+    verifyLinkToken('invoice', invoice.number, searchParams?.t) ||
     (guestEmail && guestEmail === invoice.email?.toLowerCase());
   if (!owns) {
     return (
