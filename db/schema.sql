@@ -226,3 +226,6 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS business_name      text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS member_note        text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS member_requested_at timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS member_approved_at  timestamptz;
+-- Session revocation: bumped on logout / password change to invalidate any JWT
+-- issued before it (lib/auth embeds it in the token as `tv`).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version       int NOT NULL DEFAULT 0;
