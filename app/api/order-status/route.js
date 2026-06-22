@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { hasDb } from '../../../lib/db';
 import { getOrderByNumber } from '../../../lib/orders';
 import { getSession } from '../../../lib/auth';
+import { verifyLinkToken } from '../../../lib/links';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,7 @@ export async function GET(req) {
   const u = new URL(req.url);
   const number = u.searchParams.get('number');
   const email = (u.searchParams.get('email') || '').trim().toLowerCase();
+  const token = u.searchParams.get('t') || '';
   if (!number) return NextResponse.json({ error: 'number required' }, { status: 400 });
 
   const order = await getOrderByNumber(number).catch(() => null);
@@ -25,6 +27,7 @@ export async function GET(req) {
     (
       (session && order.user_id && session.userId === order.user_id) ||
       (session && session.email?.toLowerCase() === order.email?.toLowerCase()) ||
+      verifyLinkToken('order', order.order_number, token) ||
       (email && email === order.email?.toLowerCase())
     );
   if (!ok) return NextResponse.json({ error: 'denied' }, { status: 403 });

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { hasDb } from '../../../lib/db';
 import { getOrderByNumber } from '../../../lib/orders';
 import { getSession } from '../../../lib/auth';
+import { linkToken, verifyLinkToken } from '../../../lib/links';
 import { money, STATUS_LABELS, PICKUP_ADDRESS, SALES_EMAIL, ETRANSFER_EMAIL } from '../../../lib/constants';
 import { availableSlots, pickupLabel } from '../../../lib/pickup';
 import PixelPurchase from '../../../components/PixelPurchase';
@@ -34,6 +35,7 @@ export default async function OrderPage({ params, searchParams }) {
   const owns =
     (session && order.user_id && session.userId === order.user_id) ||
     (session && session.email?.toLowerCase() === order.email?.toLowerCase()) ||
+    verifyLinkToken('order', order.order_number, searchParams?.t) ||
     (guestEmail && guestEmail === order.email?.toLowerCase());
   if (!owns) {
     return (
@@ -87,7 +89,7 @@ export default async function OrderPage({ params, searchParams }) {
           Placed {new Date(order.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
         </span>
       </div>
-      <OrderLiveRefresh orderNumber={order.order_number} email={guestEmail} status={order.status} />
+      <OrderLiveRefresh orderNumber={order.order_number} token={linkToken('order', order.order_number)} status={order.status} />
 
       {justPaid && !cancelled && (
         <PixelPurchase

@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 // Live order tracking: while an order is in flight, poll its status every 30s
 // and refresh the page when it advances (e.g. driver marks Out for Delivery or
 // Delivered) — so a customer watching the tracker sees it move without reloading.
-export default function OrderLiveRefresh({ orderNumber, email, status }) {
+export default function OrderLiveRefresh({ orderNumber, token, status }) {
   const initial = useRef(status);
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (status === 'delivered' || status === 'cancelled') return undefined;
-    const url = `/api/order-status?number=${encodeURIComponent(orderNumber)}${email ? `&email=${encodeURIComponent(email)}` : ''}`;
+    const url = `/api/order-status?number=${encodeURIComponent(orderNumber)}${token ? `&t=${encodeURIComponent(token)}` : ''}`;
     const id = setInterval(async () => {
       try {
         const r = await fetch(url, { cache: 'no-store' });
@@ -24,7 +24,7 @@ export default function OrderLiveRefresh({ orderNumber, email, status }) {
       } catch { /* transient — keep polling */ }
     }, 30000);
     return () => clearInterval(id);
-  }, [orderNumber, email, status]);
+  }, [orderNumber, token, status]);
 
   if (!updating) return null;
   return <div className="hint" style={{ marginTop: 8 }}>Updating your order status…</div>;
