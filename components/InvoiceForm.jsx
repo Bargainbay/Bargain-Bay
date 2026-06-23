@@ -12,6 +12,11 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   const [addHst, setAddHst] = useState(true);
   const [daysUntilDue, setDaysUntilDue] = useState(14);
   const [memo, setMemo] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState('pickup');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [postal, setPostal] = useState('');
+  const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(null);
@@ -59,12 +64,13 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
       const res = await fetch('/api/admin/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, items, addHst, daysUntilDue, memo })
+        body: JSON.stringify({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not create the invoice.'); return; }
       setDone(d.invoice);
       setName(''); setEmail(''); setItems([blankItem()]); setMemo('');
+      setDeliveryMethod('pickup'); setAddress(''); setCity(''); setPostal(''); setPhone('');
     } catch {
       setErr('Network error — please try again.');
     } finally {
@@ -147,6 +153,29 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
           Due in
           <input style={{ width: 70 }} type="number" min="1" max="90" value={daysUntilDue} onChange={(e) => setDaysUntilDue(e.target.value)} /> days
         </label>
+      </div>
+
+      <div className="field">
+        <label>Fulfilment</label>
+        <div style={{ display: 'flex', gap: 18, margin: '2px 0 6px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 400 }}>
+            <input type="radio" name="dm" style={{ width: 'auto' }} checked={deliveryMethod === 'pickup'} onChange={() => setDeliveryMethod('pickup')} /> Pickup
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 400 }}>
+            <input type="radio" name="dm" style={{ width: 'auto' }} checked={deliveryMethod === 'delivery'} onChange={() => setDeliveryMethod('delivery')} /> Delivery
+          </label>
+        </div>
+        <div className="hint" style={{ marginTop: 0 }}>When you mark this invoice paid, a matching <b>{deliveryMethod}</b> order is created in Operations to fulfil.</div>
+        {deliveryMethod === 'delivery' && (
+          <div style={{ marginTop: 8 }}>
+            <input style={{ marginBottom: 8 }} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street address" />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
+              <input style={{ width: 150 }} value={postal} onChange={(e) => setPostal(e.target.value)} placeholder="Postal code" />
+            </div>
+          </div>
+        )}
+        <input style={{ marginTop: 8 }} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Customer phone (optional)" />
       </div>
 
       <div className="field">

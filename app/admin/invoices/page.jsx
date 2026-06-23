@@ -89,7 +89,10 @@ export default async function InvoicesPage() {
                     ? <MarkPaidControl invoiceId={inv.id} />
                     : (inv.method || (inv.status === 'paid' ? 'Paid' : '—'))}
                 </td>
-                <td>{inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View</a> : ''}</td>
+                <td>
+                  {inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View</a> : ''}
+                  {inv.orderNumber ? <> · <a href="/admin/operations" style={{ textDecoration: 'underline' }} title={`Fulfilment order ${inv.orderNumber}`}>{inv.orderNumber}</a></> : ''}
+                </td>
               </tr>
             ))}
           </tbody>
