@@ -6,9 +6,9 @@
 // SARAH_ALLOWED_NUMBERS) — see the PR for the setup checklist.
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { put } from '@vercel/blob';
 import { runSarah } from '../../../../lib/sarah';
 import { isAllowedSender, alreadyProcessed, loadThread, appendMessage, normalizePhone } from '../../../../lib/sarah-threads';
+import { storeAudio } from '../../../../lib/sarah-audio';
 import { voiceConfigured, transcribeAudio, synthesizeSpeech } from '../../../../lib/voice';
 
 export const dynamic = 'force-dynamic';
@@ -114,18 +114,18 @@ export async function POST(req) {
     const { reply } = await runSarah({ messages: thread });
     await appendMessage(sender, 'assistant', reply);
 
-    // Voice-back: synthesize the reply and host it on the public Blob store so
-    // Twilio can fetch it as a WhatsApp voice note. Text always goes too.
+    // Voice-back: synthesize the reply and host it from our own public route so
+    // Twilio can fetch it as a WhatsApp voice note (the Blob store is private).
+    // Text always goes too.
     let mediaUrl = null;
     if (voiceConfigured()) {
       try {
         const mp3 = await synthesizeSpeech(reply);
         if (mp3) {
-          const name = `sarah-voice/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.mp3`;
-          const { url } = await put(name, mp3, { access: 'public', contentType: 'audio/mpeg', token: process.env.BLOB_READ_WRITE_TOKEN });
-          mediaUrl = url;
+          const id = await storeAudio(mp3);
+          if (id) mediaUrl = `${new URL(webhookUrl(req)).origin}/api/sarah/voice/${id}.mp3`;
         }
-      } catch (e) { console.error('sarah tts/blob', e?.message || e); }
+      } catch (e) { console.error('sarah tts', e?.message || e); }
     }
 
     await sendWhatsApp({ to: from, from: to, body: reply, mediaUrl });
