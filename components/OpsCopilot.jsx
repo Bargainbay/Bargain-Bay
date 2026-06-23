@@ -1,0 +1,135 @@
+'use client';
+import { useState, useRef, useEffect } from 'react';
+
+// Friendly labels for the action chips shown under an assistant reply.
+const ACTION_LABEL = {
+  search_inventory: 'Searched inventory',
+  inventory_summary: 'Read stock summary',
+  list_invoices: 'Listed invoices',
+  create_invoice: 'Created invoice',
+  mark_invoice_paid: 'Marked invoice paid',
+  void_invoice: 'Voided invoice',
+  reprice_unit: 'Repriced unit',
+  mark_unit_sold: 'Marked unit sold',
+  relist_unit: 'Relisted unit',
+  sync_inventory: 'Synced inventory'
+};
+
+const SUGGESTIONS = [
+  'How much stock do we have right now?',
+  'Show me the last few invoices',
+  'Find our Whirlpool fridges',
+  'Invoice jane@example.com for the KitchenAid dishwasher'
+];
+
+export default function OpsCopilot() {
+  const [messages, setMessages] = useState([]); // { role, content, actions? }
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const scroller = useRef(null);
+
+  useEffect(() => {
+    if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
+  }, [messages, busy]);
+
+  async function send(text) {
+    const content = (text ?? input).trim();
+    if (!content || busy) return;
+    setErr('');
+    const next = [...messages, { role: 'user', content }];
+    setMessages(next);
+    setInput('');
+    setBusy(true);
+    try {
+      const res = await fetch('/api/admin/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: next.map((m) => ({ role: m.role, content: m.content })) })
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setErr(d.error || 'The copilot couldn’t respond. Try again.');
+      } else {
+        setMessages((cur) => [...cur, { role: 'assistant', content: d.reply, actions: d.actions || [] }]);
+      }
+    } catch {
+      setErr('Network error — please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function onKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'min(70vh, 640px)' }}>
+      <div ref={scroller} style={{ flex: 1, overflowY: 'auto', padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {messages.length === 0 && (
+          <div style={{ color: 'var(--muted)', fontSize: 14, lineHeight: 1.6, padding: '8px 2px' }}>
+            <p style={{ margin: '0 0 10px' }}>
+              Hi — I’m <b>Sarah</b>, your Operations Copilot. I can create &amp; send invoices and manage your inventory from
+              plain English. I’ll always confirm before I email a customer or change live data.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {SUGGESTIONS.map((s) => (
+                <button key={s} type="button" className="btn" style={{ fontSize: 12.5, padding: '6px 11px' }} onClick={() => send(s)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((m, i) => (
+          <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
+            <div style={{
+              background: m.role === 'user' ? 'var(--charcoal)' : 'var(--surface, #f6f5f1)',
+              color: m.role === 'user' ? '#fff' : 'var(--ink)',
+              border: m.role === 'user' ? 'none' : '1px solid var(--line)',
+              borderRadius: 12, padding: '9px 13px', fontSize: 14, lineHeight: 1.55, whiteSpace: 'pre-wrap'
+            }}>
+              {m.content}
+            </div>
+            {m.role === 'assistant' && m.actions && m.actions.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                {m.actions.map((a, j) => (
+                  <span key={j} className={'pill ' + (a.ok ? 'ok' : 'sold')} style={{ fontSize: 11.5 }}>
+                    {a.ok ? '✓' : '⚠'} {ACTION_LABEL[a.name] || a.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {busy && (
+          <div style={{ alignSelf: 'flex-start', color: 'var(--muted)', fontSize: 13.5, padding: '4px 2px' }}>
+            Working…
+          </div>
+        )}
+      </div>
+
+      {err && <div className="error-box" style={{ margin: '8px 0 0' }}>{err}</div>}
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'flex-end' }}>
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKey}
+          placeholder="e.g. Invoice john@example.com for SKU June8Refurb-092, pickup"
+          rows={2}
+          style={{ flex: 1, resize: 'none', fontSize: 14 }}
+        />
+        <button className="btn accent" disabled={busy || !input.trim()} onClick={() => send()} style={{ height: 42 }}>
+          {busy ? '…' : 'Send'}
+        </button>
+      </div>
+      <div className="hint" style={{ marginTop: 6 }}>
+        The copilot confirms before emailing a customer or changing inventory. Press Enter to send, Shift+Enter for a new line.
+      </div>
+    </div>
+  );
+}
