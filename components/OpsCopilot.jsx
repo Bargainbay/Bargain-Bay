@@ -70,8 +70,8 @@ export default function OpsCopilot() {
         {messages.length === 0 && (
           <div style={{ color: 'var(--muted)', fontSize: 14, lineHeight: 1.6, padding: '8px 2px' }}>
             <p style={{ margin: '0 0 10px' }}>
-              Hi — I’m your Operations Copilot. I can create &amp; send invoices and manage your inventory from plain English.
-              I’ll always confirm before I email a customer or change live data.
+              Hi — I’m <b>Sarah</b>, your Operations Copilot. I can create &amp; send invoices and manage your inventory from
+              plain English. I’ll always confirm before I email a customer or change live data.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {SUGGESTIONS.map((s) => (

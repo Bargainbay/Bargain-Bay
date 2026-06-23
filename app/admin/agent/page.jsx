@@ -4,7 +4,7 @@ import AdminNav from '../../../components/AdminNav';
 import OpsCopilot from '../../../components/OpsCopilot';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Copilot — Bargain Bay' };
+export const metadata = { title: 'Sarah — Bargain Bay' };
 
 export default async function AgentPage() {
   const session = await getSession();
@@ -21,11 +21,12 @@ export default async function AgentPage() {
   return (
     <div>
       <AdminNav active="copilot" />
-      <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 6px' }}>Operations Copilot</h1>
+      <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 6px' }}>Sarah — Operations Copilot</h1>
       <p className="hint" style={{ marginTop: 0, maxWidth: 680 }}>
-        Your AI assistant for the daily grind. Right now it handles <b>invoicing</b> and <b>inventory</b> — create &amp; send
-        invoices, mark them paid, search stock, reprice or relist units, and sync from the tracker. More (deliveries, run
-        sheets, daily brief) is on the way.
+        Your AI assistant for the daily grind. Right now she handles <b>invoicing</b> and <b>inventory</b> — create &amp;
+        send invoices, mark them paid, search stock, reprice or relist units, and sync from the tracker. Once WhatsApp is
+        connected you’ll be able to text or send her voice notes while you’re on the road. More (deliveries, run sheets,
+        daily brief) is on the way.
       </p>
 
       {!ready && (
