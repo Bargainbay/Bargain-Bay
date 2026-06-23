@@ -174,6 +174,15 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 );
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
+-- Fulfilment intent captured on the invoice; when it's marked paid, a matching
+-- order is created (delivery_method/address flow into the order). order_id links
+-- the created fulfilment order back (and guards against double-creation).
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS delivery_method text;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address  text;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS city     text;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS postal   text;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS phone    text;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS order_id int REFERENCES orders(id) ON DELETE SET NULL;
 
 -- ── Quotes ──────────────────────────────────────────────────────────────────
 -- Non-binding package quotes the owner builds in /admin/quotes and shares with a

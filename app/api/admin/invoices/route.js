@@ -37,14 +37,22 @@ export async function POST(req) {
   const addHst = !!body.addHst;
   const daysUntilDue = Math.min(Math.max(parseInt(body.daysUntilDue, 10) || 14, 1), 90);
   const memo = String(body.memo || '').trim();
+  const deliveryMethod = body.deliveryMethod === 'delivery' ? 'delivery' : 'pickup';
+  const address = String(body.address || '').trim();
+  const city = String(body.city || '').trim();
+  const postal = String(body.postal || '').trim();
+  const phone = String(body.phone || '').trim();
 
   if (!validEmail(email)) return NextResponse.json({ error: 'Enter a valid customer email.' }, { status: 400 });
   if (!items.some((it) => String(it?.description || '').trim() && Number(it?.amount) > 0)) {
     return NextResponse.json({ error: 'Add at least one line item with a description and a positive amount.' }, { status: 400 });
   }
+  if (deliveryMethod === 'delivery' && (!address || !city || !postal)) {
+    return NextResponse.json({ error: 'Delivery requires a street address, city, and postal code.' }, { status: 400 });
+  }
 
   try {
-    const invoice = await createAndSendInvoice({ name, email, items, addHst, daysUntilDue, memo });
+    const invoice = await createAndSendInvoice({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone });
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
     console.error('create invoice failed', e?.message || e);
