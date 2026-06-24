@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import AdminNav from '../../../components/AdminNav';
 import OpsCopilot from '../../../components/OpsCopilot';
+import PlaybookEditor from '../../../components/PlaybookEditor';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Sarah — Bargain Bay' };
@@ -37,6 +38,11 @@ export default async function AgentPage() {
 
       <div className="panel">
         <OpsCopilot />
+      </div>
+
+      <div className="panel">
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Train Sarah — the company playbook</h2>
+        <PlaybookEditor />
       </div>
     </div>
   );
