@@ -12,7 +12,12 @@ const ACTION_LABEL = {
   reprice_unit: 'Repriced unit',
   mark_unit_sold: 'Marked unit sold',
   relist_unit: 'Relisted unit',
-  sync_inventory: 'Synced inventory'
+  sync_inventory: 'Synced inventory',
+  remember: 'Saved to playbook',
+  check_email: 'Checked email',
+  read_email: 'Read email',
+  send_email: 'Sent email',
+  delegate: 'Asked the team'
 };
 
 const SUGGESTIONS = [
@@ -23,6 +28,8 @@ const SUGGESTIONS = [
 ];
 
 export default function OpsCopilot() {
+  const [agents, setAgents] = useState([]);     // [{ key, name, title, blurb }]
+  const [agentKey, setAgentKey] = useState('sarah');
   const [messages, setMessages] = useState([]); // { role, content, actions? }
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -30,8 +37,25 @@ export default function OpsCopilot() {
   const scroller = useRef(null);
 
   useEffect(() => {
+    fetch('/api/admin/agents').then((r) => r.json()).then((d) => {
+      if (Array.isArray(d.agents)) setAgents(d.agents);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (scroller.current) scroller.current.scrollTop = scroller.current.scrollHeight;
   }, [messages, busy]);
+
+  const active = agents.find((a) => a.key === agentKey);
+
+  // Switching who you're talking to starts a fresh conversation (each agent keeps
+  // its own lane — mixing transcripts would confuse the context).
+  function switchAgent(key) {
+    if (key === agentKey) return;
+    setAgentKey(key);
+    setMessages([]);
+    setErr('');
+  }
 
   async function send(text) {
     const content = (text ?? input).trim();
@@ -45,7 +69,7 @@ export default function OpsCopilot() {
       const res = await fetch('/api/admin/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next.map((m) => ({ role: m.role, content: m.content })) })
+        body: JSON.stringify({ agentKey, messages: next.map((m) => ({ role: m.role, content: m.content })) })
       });
       const d = await res.json();
       if (!res.ok) {
@@ -66,12 +90,34 @@ export default function OpsCopilot() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'min(70vh, 640px)' }}>
+      {agents.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>Talk to:</span>
+          {agents.map((a) => (
+            <button
+              key={a.key}
+              type="button"
+              className={'btn' + (a.key === agentKey ? ' accent' : '')}
+              style={{ fontSize: 12.5, padding: '5px 10px' }}
+              title={a.blurb || a.title}
+              onClick={() => switchAgent(a.key)}
+            >
+              {a.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div ref={scroller} style={{ flex: 1, overflowY: 'auto', padding: '4px 2px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {messages.length === 0 && (
           <div style={{ color: 'var(--muted)', fontSize: 14, lineHeight: 1.6, padding: '8px 2px' }}>
             <p style={{ margin: '0 0 10px' }}>
-              Hi — I’m <b>Sarah</b>, your Operations Copilot. I can create &amp; send invoices and manage your inventory from
-              plain English. I’ll always confirm before I email a customer or change live data.
+              {active && active.key !== 'sarah' ? (
+                <>You’re talking to <b>{active.name}</b> — {active.blurb || active.title}. {active.title === active.name ? '' : ''}They’ll confirm before any action that changes live data or emails a customer.</>
+              ) : (
+                <>Hi — I’m <b>Sarah</b>, your Chief of Staff. Ask me anything across operations and I’ll handle it or hand it to
+                the right specialist on the team. I’ll always confirm before I email a customer or change live data.</>
+              )}
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {SUGGESTIONS.map((s) => (
@@ -98,6 +144,7 @@ export default function OpsCopilot() {
                 {m.actions.map((a, j) => (
                   <span key={j} className={'pill ' + (a.ok ? 'ok' : 'sold')} style={{ fontSize: 11.5 }}>
                     {a.ok ? '✓' : '⚠'} {ACTION_LABEL[a.name] || a.name}
+                    {a.name === 'delegate' && a.dept ? ` → ${a.dept.replace(/_/g, ' ')}` : ''}
                   </span>
                 ))}
               </div>

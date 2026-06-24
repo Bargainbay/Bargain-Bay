@@ -3,7 +3,8 @@
 // WhatsApp channel).
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { runSarah } from '../../../../lib/sarah';
+import { runAgent } from '../../../../lib/sarah';
+import { getAgent } from '../../../../lib/agents/registry';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,9 +30,12 @@ export async function POST(req) {
     return NextResponse.json({ error: 'No user message.' }, { status: 400 });
   }
 
+  // Which agent the owner is chatting with (default Sarah, the orchestrator).
+  const agentKey = getAgent(body?.agentKey).key;
+
   try {
-    const { reply, actions, stopReason } = await runSarah({ messages });
-    return NextResponse.json({ reply, actions, stopReason });
+    const { reply, actions, stopReason } = await runAgent({ agentKey, messages });
+    return NextResponse.json({ reply, actions, stopReason, agentKey });
   } catch (e) {
     console.error('sarah web error', e?.message || e);
     return NextResponse.json({ error: 'Sarah hit a snag talking to the model. Try again in a moment.' }, { status: 502 });
