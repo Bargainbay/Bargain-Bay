@@ -3,6 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import AdminNav from '../../../components/AdminNav';
 import OpsCopilot from '../../../components/OpsCopilot';
 import PlaybookEditor from '../../../components/PlaybookEditor';
+import AgentRoster from '../../../components/AgentRoster';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Sarah — Bargain Bay' };
@@ -22,17 +23,17 @@ export default async function AgentPage() {
   return (
     <div>
       <AdminNav active="copilot" />
-      <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 6px' }}>Sarah — Operations Copilot</h1>
-      <p className="hint" style={{ marginTop: 0, maxWidth: 680 }}>
-        Your AI assistant for the daily grind. Right now she handles <b>invoicing</b> and <b>inventory</b> — create &amp;
-        send invoices, mark them paid, search stock, reprice or relist units, and sync from the tracker. Once WhatsApp is
-        connected you’ll be able to text or send her voice notes while you’re on the road. More (deliveries, run sheets,
-        daily brief) is on the way.
+      <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 6px' }}>Sarah &amp; the team</h1>
+      <p className="hint" style={{ marginTop: 0, maxWidth: 720 }}>
+        Sarah is your chief of staff — she answers you and hands work to a team of specialists (Sales, Customer Service,
+        Delivery, Technical, Accounting, Marketing, HR). Chat with any of them below, train each one in its playbook
+        section, and dial up its autonomy as you trust it. They handle <b>invoicing</b> and <b>inventory</b> today, advise
+        across everything, and learn every decision you confirm — more actions are wired in over time.
       </p>
 
       {!ready && (
         <div className="error-box" style={{ marginBottom: 14 }}>
-          The copilot needs <code>ANTHROPIC_API_KEY</code> set in the environment before it can chat.
+          The team needs <code>ANTHROPIC_API_KEY</code> set in the environment before it can chat.
         </div>
       )}
 
@@ -41,7 +42,12 @@ export default async function AgentPage() {
       </div>
 
       <div className="panel">
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Train Sarah — the company playbook</h2>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Your AI team &amp; autonomy</h2>
+        <AgentRoster />
+      </div>
+
+      <div className="panel">
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Train the team — playbooks</h2>
         <PlaybookEditor />
       </div>
     </div>
