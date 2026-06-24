@@ -1,13 +1,19 @@
 // Sarah on Telegram — the team channel. Handles DMs (admins only, full access)
-// and a designated team group (everyone gets inventory lookups; admins get the
-// full tool set). Same Sarah brain as WhatsApp/web, role-gated per sender.
-// Voice notes are transcribed in; in DMs she also replies with a spoken note.
+// and department team groups (mapped via SARAH_TELEGRAM_DEPT_GROUPS / the main
+// SARAH_TELEGRAM_GROUP_ID). Same Sarah brain as WhatsApp/web, role-gated.
+//
+// In a group she behaves like a natural participant: she reads the conversation
+// and only replies when someone's actually talking to her or asking something
+// she handles — no @-tag required — and stays out when teammates talk to each
+// other. Voice notes are transcribed and treated exactly like text; in a 1:1 DM
+// she also replies with a spoken note (groups stay text-only to avoid noise).
 //
 // Dormant until env is set: TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET,
-// SARAH_TELEGRAM_ADMINS (Telegram user ids), SARAH_TELEGRAM_GROUP_ID.
+// SARAH_TELEGRAM_ADMINS, and SARAH_TELEGRAM_GROUP_ID / SARAH_TELEGRAM_DEPT_GROUPS.
 import { NextResponse } from 'next/server';
 import { runAgent } from '../../../../lib/sarah';
 import { getAgent } from '../../../../lib/agents/registry';
+import { couldBeForBot, isAddressedToBot } from '../../../../lib/agents/addressing';
 import { loadThread, appendMessage } from '../../../../lib/sarah-threads';
 import { verifyTelegramSecret, getBotUsername, sendMessage, sendChatAction, downloadFile, sendVoice } from '../../../../lib/telegram';
 import { voiceConfigured, transcribeAudio, synthesizeSpeech } from '../../../../lib/voice';
@@ -15,6 +21,9 @@ import { voiceConfigured, transcribeAudio, synthesizeSpeech } from '../../../../
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+// The name people call the bot in chat, regardless of which agent fronts a group.
+const BOT_NAME = 'Sarah';
 
 const ok = () => NextResponse.json({ ok: true });
 const adminIds = () => (process.env.SARAH_TELEGRAM_ADMINS || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -34,6 +43,15 @@ function agentForGroup(chatId) {
   return null;
 }
 
+// Transcribe a voice/audio note to text (or '' if it can't be made out).
+async function transcribe(voice) {
+  try {
+    const file = await downloadFile(voice.file_id);
+    if (file) return (await transcribeAudio(file.buf, voice.mime_type || file.mime)) || '';
+  } catch (e) { console.error('telegram voice note', e?.message || e); }
+  return '';
+}
+
 export async function POST(req) {
   if (!verifyTelegramSecret(req)) return new NextResponse('forbidden', { status: 403 });
 
@@ -48,79 +66,91 @@ export async function POST(req) {
   const userId = String(from.id || '');
   const fromName = from.first_name || from.username || 'Someone';
   const text = String(msg.text || '').trim();
-  // A voice note or an audio file carries a downloadable file_id; transcribe it.
-  const voice = msg.voice || msg.audio || null;
+  const voice = msg.voice || msg.audio || null; // a downloadable voice/audio note
+  const isAdmin = adminIds().includes(userId);
+  const inGroup = chatType === 'group' || chatType === 'supergroup';
 
-  // Bootstrapping aid: log who's messaging + the chat id, so the owner can fill
-  // SARAH_TELEGRAM_ADMINS / SARAH_TELEGRAM_GROUP_ID from the Vercel logs.
-  console.log('telegram msg', { chatId, chatType, userId, username: from.username || '', isVoice: !!voice, isAdmin: adminIds().includes(userId) });
+  console.log('telegram msg', { chatId, chatType, userId, username: from.username || '', isVoice: !!voice, isAdmin });
 
   if (!text && !voice) return ok(); // nothing we can act on (photo, sticker, etc.)
 
-  const isAdmin = adminIds().includes(userId);
+  // Who answers, and may this chat use Sarah at all?
   let readOnly;
   let agentKey = 'sarah';
-
-  // Decide whether Sarah should engage with this message BEFORE transcribing
-  // (so we never spend an STT call on a group voice note that isn't for her).
   if (chatType === 'private') {
     if (!isAdmin) return ok();          // only owner/partner may DM Sarah
     readOnly = false;
-  } else if (chatType === 'group' || chatType === 'supergroup') {
+  } else if (inGroup) {
     agentKey = agentForGroup(chatId);
     if (!agentKey) return ok();         // only the team group / mapped dept groups
-    const botU = (await getBotUsername()).toLowerCase();
-    const repliedToBot = (msg.reply_to_message?.from?.username || '').toLowerCase() === botU && !!botU;
-    // Text can address her by @mention, reply, or /command; a voice note can't
-    // carry a mention, so in a group she only takes voice when it replies to her.
-    const mentioned = !!text && botU && text.toLowerCase().includes('@' + botU);
-    const isCommand = text.startsWith('/');
-    const addressed = repliedToBot || (!!text && (mentioned || isCommand));
-    if (!addressed) return ok();
-    readOnly = !isAdmin;                // admins keep full power even in the group
+    readOnly = !isAdmin;               // admins keep full power even in the group
   } else {
     return ok();
   }
 
-  sendChatAction(chatId, 'typing');
-
-  // Resolve the user's words: transcript for a voice note, otherwise the text.
+  // Resolve the words: a voice note becomes a transcript so text and voice are
+  // handled identically from here on.
   let prompt = text;
   const wasVoice = !!voice;
   if (voice) {
-    try {
-      const file = await downloadFile(voice.file_id);
-      if (file) {
-        const t = await transcribeAudio(file.buf, voice.mime_type || file.mime);
-        if (t) prompt = text ? `${text}\n${t}` : t;
-      }
-    } catch (e) { console.error('telegram voice note', e?.message || e); }
+    const t = await transcribe(voice);
+    if (t) prompt = text ? `${text}\n${t}` : t;
     if (!prompt) {
-      await sendMessage(chatId, 'I couldn’t make out that voice note — mind sending it again or typing it?');
+      // Never nag a group over an unclear note; in a DM, ask for a resend.
+      if (!inGroup) await sendMessage(chatId, 'I couldn’t make out that voice note — mind sending it again or typing it?');
       return ok();
     }
   }
 
-  // In a group, strip the @mention / leading command so the prompt is clean.
-  if (chatType !== 'private') {
+  const threadKey = `tg:${chatId}`;
+
+  if (inGroup) {
     const botU = (await getBotUsername()).toLowerCase();
+    const repliedToBot = (msg.reply_to_message?.from?.username || '').toLowerCase() === botU && !!botU;
+    const mentioned = !!text && botU && text.toLowerCase().includes('@' + botU);
+    const isCommand = text.startsWith('/');
+    // Clean the @mention / leading command so the stored + sent prompt is tidy.
     if (botU) prompt = prompt.replace(new RegExp('@' + botU, 'ig'), '').trim();
     prompt = prompt.replace(/^\/\w+@?\w*\s*/, '').trim() || prompt;
-  }
-  if (!prompt) return ok();
+    if (!prompt) return ok();
 
+    // Log every group message (with speaker) so she follows the conversation —
+    // context for both the addressing decision and her own reply — even when she
+    // stays quiet.
+    await appendMessage(threadKey, 'user', `${fromName}: ${prompt}`);
+
+    // Decide whether she's actually being addressed. Explicit signals win for
+    // free; otherwise a fast judge reads the recent chat, but only for messages
+    // that look like a question/request (pure chatter never triggers a call).
+    const nameMentioned = new RegExp(`\\b${BOT_NAME}\\b`, 'i').test(prompt);
+    let engage = repliedToBot || mentioned || isCommand || nameMentioned;
+    if (!engage && couldBeForBot(prompt)) {
+      const recent = await loadThread(threadKey, 12);
+      engage = await isAddressedToBot({ recent: recent.slice(0, -1), latest: `${fromName}: ${prompt}`, botName: BOT_NAME });
+    }
+    if (!engage) return ok(); // she's listening, but this one isn't for her
+
+    sendChatAction(chatId, 'typing');
+    try {
+      const thread = await loadThread(threadKey, 20);
+      const { reply } = await runAgent({ agentKey, messages: thread, readOnly });
+      await appendMessage(threadKey, 'assistant', reply);
+      await sendMessage(chatId, reply); // groups stay text-only
+    } catch (e) {
+      console.error('sarah telegram run', e?.message || e);
+      await sendMessage(chatId, 'Sorry — I hit a snag. Try me again in a moment.');
+    }
+    return ok();
+  }
+
+  // Private DM (owner / partner): always engage; if they spoke, speak back too.
+  sendChatAction(chatId, 'typing');
   try {
-    const threadKey = `tg:${chatId}`;
-    // In a group, prefix the speaker so the agent can follow a multi-person thread.
-    const stored = chatType === 'private' ? prompt : `${fromName}: ${prompt}`;
-    await appendMessage(threadKey, 'user', stored);
+    await appendMessage(threadKey, 'user', prompt);
     const thread = await loadThread(threadKey, 20);
     const { reply } = await runAgent({ agentKey, messages: thread, readOnly });
     await appendMessage(threadKey, 'assistant', reply);
-
-    // Always send the text. In a 1:1 DM, if they spoke to her, speak back too —
-    // voice notes in a busy team group are noisy, so groups stay text-only.
-    if (wasVoice && chatType === 'private' && voiceConfigured()) {
+    if (wasVoice && voiceConfigured()) {
       try {
         const ogg = await synthesizeSpeech(reply, { format: 'ogg' });
         if (ogg) await sendVoice(chatId, ogg);
