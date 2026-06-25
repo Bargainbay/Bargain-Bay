@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef } from 'react';
-import { loadGoogleMaps, mapsKey } from '../lib/maps';
+import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
 
 // Product lines default to a 1-year warranty (downgrade per item as needed).
 const blankItem = () => ({ description: '', amount: '', kind: 'unit', warrantyMonths: 12 });
@@ -25,21 +25,22 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(null);
-  const addrRef = useRef(null);
   const acDone = useRef(false);
   const hasMaps = !!mapsKey();
 
   // Attach Google Places autocomplete the first time the address field is focused.
-  // Focusing guarantees the input is mounted, and loadGoogleMaps awaits the Places
-  // library, so this can't race the way a mount-time effect did. No-op without
-  // NEXT_PUBLIC_GOOGLE_MAPS_API_KEY — the plain fields still work.
-  async function attachAutocomplete() {
-    if (acDone.current || !addrRef.current) return;
-    const maps = await loadGoogleMaps();
-    if (!maps?.places || acDone.current || !addrRef.current) return;
+  // Uses the focused input directly (e.currentTarget) and polls until the async
+  // Places library is actually ready — robust against the load timing that broke
+  // a mount-time effect. No-op without NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.
+  async function attachAutocomplete(e) {
+    if (acDone.current) return;
+    const input = e.currentTarget;
+    await loadGoogleMaps();
+    const places = await placesReady();
+    if (acDone.current || !places || !input) return;
     acDone.current = true;
     try {
-      const ac = new maps.places.Autocomplete(addrRef.current, {
+      const ac = new places.Autocomplete(input, {
         componentRestrictions: { country: 'ca' },
         fields: ['address_components'],
         types: ['address']
@@ -232,7 +233,7 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
         <div className="hint" style={{ marginTop: 0 }}>When you mark this invoice paid, a matching <b>{deliveryMethod}</b> order is created in Operations to fulfil.</div>
         {deliveryMethod === 'delivery' && (
           <div style={{ marginTop: 8 }}>
-            <input ref={addrRef} onFocus={attachAutocomplete} autoComplete="off" style={{ marginBottom: 8 }} value={address} onChange={(e) => setAddress(e.target.value)} placeholder={hasMaps ? 'Start typing the street address…' : 'Street address'} />
+            <input onFocus={attachAutocomplete} autoComplete="off" style={{ marginBottom: 8 }} value={address} onChange={(e) => setAddress(e.target.value)} placeholder={hasMaps ? 'Start typing the street address…' : 'Street address'} />
             <div style={{ display: 'flex', gap: 8 }}>
               <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
               <input style={{ width: 150 }} value={postal} onChange={(e) => setPostal(e.target.value)} placeholder="Postal code" />
