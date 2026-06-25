@@ -3,7 +3,7 @@ import { hasDb } from '../../../lib/db';
 import { getInvoiceByNumber } from '../../../lib/invoices';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { verifyLinkToken } from '../../../lib/links';
-import { money, SALES_EMAIL, ETRANSFER_EMAIL } from '../../../lib/constants';
+import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoice — Bargain Bay' };
@@ -74,12 +74,18 @@ export default async function InvoicePage({ params, searchParams }) {
 
       <div className="panel">
         <h2>Items</h2>
-        {invoice.items.map((it) => (
-          <div className="summary-row" key={it.id}>
-            <span>{it.description}{it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({it.sku})</span> : null}</span>
-            <span>{money(it.amount)}</span>
-          </div>
-        ))}
+        {invoice.items.map((it) => {
+          const w = warrantyLabel(it.warranty_months);
+          return (
+            <div className="summary-row" key={it.id} style={{ alignItems: 'flex-start' }}>
+              <span>
+                {it.description}{it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({it.sku})</span> : null}
+                {w && <span style={{ display: 'block', fontSize: 12.5, color: 'var(--green, #0f6e56)' }}>✓ {w}</span>}
+              </span>
+              <span>{money(it.amount)}</span>
+            </div>
+          );
+        })}
         <div className="summary-row" style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 10 }}>
           <span>Subtotal</span><span>{money(invoice.subtotal)}</span>
         </div>

@@ -8,9 +8,12 @@ import AdminNav from '../../../components/AdminNav';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Dashboard — Bargain Bay' };
 
+// e.g. "2026-06" → "Jun '26" — the apostrophe makes the year unambiguous so the
+// month label can't be misread as a day-of-month ("Jun 26").
 const fmtMonth = (m) => {
   const [y, mo] = m.split('-');
-  return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString('en-CA', { month: 'short', year: '2-digit' });
+  const mon = new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString('en-CA', { month: 'short' });
+  return `${mon} '${String(y).slice(-2)}`;
 };
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 

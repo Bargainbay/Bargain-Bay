@@ -1,7 +1,10 @@
 'use client';
 import { useState } from 'react';
 
-const blankItem = () => ({ description: '', amount: '' });
+// Product lines default to a 1-year warranty (downgrade per item as needed).
+const blankItem = () => ({ description: '', amount: '', kind: 'unit', warrantyMonths: 12 });
+const serviceItem = (description) => ({ description, amount: '', kind: 'service', warrantyMonths: null });
+const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 
 export default function InvoiceForm({ inventory = [], customers = [] }) {
   const [name, setName] = useState('');
@@ -10,6 +13,7 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   const [q, setQ] = useState('');
   const [custOpen, setCustOpen] = useState(false);
   const [addHst, setAddHst] = useState(true);
+  const [sendEmail, setSendEmail] = useState(true);
   const [daysUntilDue, setDaysUntilDue] = useState(14);
   const [memo, setMemo] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('pickup');
@@ -24,6 +28,13 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const addRow = () => setItems((xs) => [...xs, blankItem()]);
   const removeRow = (i) => setItems((xs) => (xs.length > 1 ? xs.filter((_, j) => j !== i) : xs));
+  // Add a service line (Installation/Delivery/Door Removal) — no SKU, no warranty,
+  // never touches inventory. Reuses the first empty row if there is one.
+  const addService = (label) => setItems((xs) => {
+    const empty = xs.findIndex((it) => !it.description && !it.amount);
+    const li = serviceItem(label);
+    return empty >= 0 ? xs.map((it, j) => (j === empty ? li : it)) : [...xs, li];
+  });
 
   // Every query word must appear somewhere in the unit's text, so multi-word
   // searches like "kitchenaid dishwasher" match (brand and type sit far apart
@@ -44,7 +55,7 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   }
   function pickInventory(u) {
     // Keep the SKU on the line so the server can delist the unit when paid.
-    const filled = { description: u.description, amount: String(u.price), sku: u.id };
+    const filled = { description: u.description, amount: String(u.price), sku: u.id, kind: 'unit', warrantyMonths: 12 };
     setItems((xs) => {
       const empty = xs.findIndex((it) => !it.description && !it.amount);
       return empty >= 0 ? xs.map((it, j) => (j === empty ? filled : it)) : [...xs, filled];
@@ -64,7 +75,7 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
       const res = await fetch('/api/admin/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone })
+        body: JSON.stringify({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not create the invoice.'); return; }
@@ -81,7 +92,8 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   if (done) {
     return (
       <div className="notice-box" style={{ lineHeight: 1.6 }}>
-        ✓ Invoice <b>{done.number}</b> for <b>{fmt(done.total)}</b> emailed to <b>{done.email}</b> with e-transfer instructions.
+        ✓ Invoice <b>{done.number}</b> for <b>{fmt(done.total)}</b>{' '}
+        {done.emailed ? <>emailed to <b>{done.email}</b> with e-transfer instructions.</> : <>created (<b>not emailed</b>) — for <b>{done.email}</b>.</>}
         {done.hostedUrl && <> <a href={done.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View invoice →</a></>}
         <div style={{ marginTop: 10 }}>
           <button className="btn" onClick={() => setDone(null)}>Create another</button>
@@ -137,13 +149,30 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
 
       <label style={{ fontSize: 13, fontWeight: 500, display: 'block', margin: '4px 0 6px' }}>Line items</label>
       {items.map((it, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          <input style={{ flex: 1 }} value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} placeholder="e.g. Whirlpool WRS321SDHZ refrigerator" />
-          <input style={{ width: 120 }} type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="0.00" />
+        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+          <input style={{ flex: 1 }} value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} placeholder={it.kind === 'service' ? 'Service description' : 'e.g. Whirlpool WRS321SDHZ refrigerator'} />
+          {it.kind === 'service' ? (
+            <span className="pill" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>Service</span>
+          ) : (
+            <select value={it.warrantyMonths == null ? '' : it.warrantyMonths} onChange={(e) => setItem(i, 'warrantyMonths', e.target.value === '' ? null : Number(e.target.value))}
+              title="Warranty term shown on the invoice" style={{ width: 120, fontSize: 12.5, padding: '4px 6px' }}>
+              <option value={12}>1-yr warranty</option>
+              <option value={6}>6-mo warranty</option>
+              <option value={3}>3-mo warranty</option>
+              <option value="">No warranty</option>
+            </select>
+          )}
+          <input style={{ width: 110 }} type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="0.00" />
           <button type="button" className="btn" style={{ padding: '0 12px' }} onClick={() => removeRow(i)} aria-label="Remove line">×</button>
         </div>
       ))}
-      <button type="button" className="btn" onClick={addRow} style={{ marginBottom: 12 }}>+ Add line</button>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <button type="button" className="btn" onClick={addRow}>+ Add line</button>
+        <span className="hint" style={{ margin: '0 0 0 4px' }}>Add a service:</span>
+        {SERVICES.map((s) => (
+          <button key={s} type="button" className="btn" style={{ fontSize: 12.5 }} onClick={() => addService(s)}>+ {s}</button>
+        ))}
+      </div>
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
@@ -152,6 +181,9 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
           Due in
           <input style={{ width: 70 }} type="number" min="1" max="90" value={daysUntilDue} onChange={(e) => setDaysUntilDue(e.target.value)} /> days
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+          <input type="checkbox" style={{ width: 'auto' }} checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} /> Email this invoice to the customer
         </label>
       </div>
 
@@ -187,7 +219,7 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
         <div style={{ fontSize: 14, color: 'var(--muted)' }}>
           Subtotal {fmt(subtotal)}{addHst ? ` · HST ${fmt(hst)}` : ''} · <b style={{ color: 'var(--charcoal)' }}>Total {fmt(total)}</b>
         </div>
-        <button className="btn accent" disabled={busy}>{busy ? 'Creating…' : 'Create & send invoice'}</button>
+        <button className="btn accent" disabled={busy}>{busy ? 'Creating…' : (sendEmail ? 'Create & send invoice' : 'Create invoice')}</button>
       </div>
     </form>
   );
