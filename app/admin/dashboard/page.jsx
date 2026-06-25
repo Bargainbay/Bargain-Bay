@@ -270,6 +270,7 @@ export default async function DashboardPage({ searchParams }) {
           <Kpi label="Sale value" value={money(fin.suggestedValue)} sub="at listed prices" />
           <Kpi label="Potential profit" value={money(fin.potentialProfit)} sub={fin.unitsWithCost ? `${fin.marginPct.toFixed(1)}% margin` : null} />
           <Kpi label="Retail value" value={money(fin.retailValue)} />
+          <Kpi label="Salvage revenue" value={money(data.salvage.revenue)} sub={`${data.salvage.disposed} parts unit${data.salvage.disposed === 1 ? '' : 's'} · all-time`} />
         </div>
       </div>
 
