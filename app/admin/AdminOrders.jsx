@@ -19,6 +19,9 @@ export default function AdminOrders({ initialOrders, drivers = [] }) {
   const [orders, setOrders] = useState(initialOrders);
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState('');
+  // Per-order "don't email the customer on this status change" — for quiet
+  // in-person payments where the owner doesn't want the thank-you/status email.
+  const [silent, setSilent] = useState({});
   const driverName = (id) => { const d = drivers.find((x) => x.id === id); return d ? (d.name || d.email) : null; };
 
   async function setStatus(id, status) {
@@ -27,7 +30,7 @@ export default function AdminOrders({ initialOrders, drivers = [] }) {
       const res = await fetch('/api/admin/orders', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status })
+        body: JSON.stringify({ id, status, notify: !silent[id] })
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Update failed'); return; }
@@ -64,7 +67,8 @@ export default function AdminOrders({ initialOrders, drivers = [] }) {
         Card payments are paused — orders come in <b>Confirmed · Pending payment</b> (paid by e-transfer; pickup orders
         can also pay in person). When the money lands, click <b>Mark paid</b> — the customer gets a payment-received
         email and the unit drops off the site. Then click <b>Mark ready</b> when it's ready (the customer is notified;
-        pickup customers can book a time). Unpaid orders auto-cancel after 24 hours.
+        pickup customers can book a time). Uncheck <b>Email customer</b> on a row first to change its status silently
+        (no thank-you/status email). Unpaid orders auto-cancel after 24 hours.
       </p>
       {error && <div className="error-box">{error}</div>}
       <div className="table-wrap">
@@ -176,6 +180,10 @@ export default function AdminOrders({ initialOrders, drivers = [] }) {
                   >
                     {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
                   </select>
+                  <label style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: 'var(--muted)' }} title="Uncheck to change status without emailing the customer (e.g. a quiet in-person payment).">
+                    <input type="checkbox" style={{ width: 'auto', marginRight: 4 }} checked={!silent[o.id]} onChange={(e) => setSilent((s) => ({ ...s, [o.id]: !e.target.checked }))} />
+                    Email customer
+                  </label>
                 </td>
                 <td style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 150 }}>
                   {o.status === 'cancelled'
