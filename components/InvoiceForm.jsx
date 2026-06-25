@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { loadGoogleMaps, mapsKey } from '../lib/maps';
 
 // Product lines default to a 1-year warranty (downgrade per item as needed).
 const blankItem = () => ({ description: '', amount: '', kind: 'unit', warrantyMonths: 12 });
@@ -24,6 +25,34 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(null);
+  const addrRef = useRef(null);
+  const hasMaps = !!mapsKey();
+
+  // Google Places autocomplete on the street-address field (delivery only).
+  // No-op without NEXT_PUBLIC_GOOGLE_MAPS_API_KEY — the plain fields still work.
+  useEffect(() => {
+    if (deliveryMethod !== 'delivery') return undefined;
+    let cancelled = false;
+    loadGoogleMaps().then((maps) => {
+      if (cancelled || !maps || !addrRef.current) return;
+      const ac = new maps.places.Autocomplete(addrRef.current, {
+        componentRestrictions: { country: 'ca' },
+        fields: ['address_components'],
+        types: ['address']
+      });
+      ac.addListener('place_changed', () => {
+        const comps = ac.getPlace()?.address_components || [];
+        const get = (type, short) => comps.find((c) => c.types.includes(type))?.[short ? 'short_name' : 'long_name'] || '';
+        const street = [get('street_number'), get('route')].filter(Boolean).join(' ');
+        const town = get('locality') || get('postal_town') || get('sublocality_level_1') || '';
+        const code = get('postal_code', true);
+        if (street) setAddress(street);
+        if (town) setCity(town);
+        if (code) setPostal(code);
+      });
+    });
+    return () => { cancelled = true; };
+  }, [deliveryMethod]);
 
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const addRow = () => setItems((xs) => [...xs, blankItem()]);
@@ -200,11 +229,12 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
         <div className="hint" style={{ marginTop: 0 }}>When you mark this invoice paid, a matching <b>{deliveryMethod}</b> order is created in Operations to fulfil.</div>
         {deliveryMethod === 'delivery' && (
           <div style={{ marginTop: 8 }}>
-            <input style={{ marginBottom: 8 }} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street address" />
+            <input ref={addrRef} autoComplete="off" style={{ marginBottom: 8 }} value={address} onChange={(e) => setAddress(e.target.value)} placeholder={hasMaps ? 'Start typing the street address…' : 'Street address'} />
             <div style={{ display: 'flex', gap: 8 }}>
               <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
               <input style={{ width: 150 }} value={postal} onChange={(e) => setPostal(e.target.value)} placeholder="Postal code" />
             </div>
+            {hasMaps && <div className="hint" style={{ marginTop: 4 }}>Pick the address from the dropdown and the city + postal fill in automatically.</div>}
           </div>
         )}
         <input style={{ marginTop: 8 }} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Customer phone (optional)" />
