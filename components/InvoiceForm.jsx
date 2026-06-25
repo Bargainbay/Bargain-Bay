@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { loadGoogleMaps, mapsKey } from '../lib/maps';
 
 // Product lines default to a 1-year warranty (downgrade per item as needed).
@@ -26,15 +26,19 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   const [err, setErr] = useState('');
   const [done, setDone] = useState(null);
   const addrRef = useRef(null);
+  const acDone = useRef(false);
   const hasMaps = !!mapsKey();
 
-  // Google Places autocomplete on the street-address field (delivery only).
-  // No-op without NEXT_PUBLIC_GOOGLE_MAPS_API_KEY — the plain fields still work.
-  useEffect(() => {
-    if (deliveryMethod !== 'delivery') return undefined;
-    let cancelled = false;
-    loadGoogleMaps().then((maps) => {
-      if (cancelled || !maps || !addrRef.current) return;
+  // Attach Google Places autocomplete the first time the address field is focused.
+  // Focusing guarantees the input is mounted, and loadGoogleMaps awaits the Places
+  // library, so this can't race the way a mount-time effect did. No-op without
+  // NEXT_PUBLIC_GOOGLE_MAPS_API_KEY — the plain fields still work.
+  async function attachAutocomplete() {
+    if (acDone.current || !addrRef.current) return;
+    const maps = await loadGoogleMaps();
+    if (!maps?.places || acDone.current || !addrRef.current) return;
+    acDone.current = true;
+    try {
       const ac = new maps.places.Autocomplete(addrRef.current, {
         componentRestrictions: { country: 'ca' },
         fields: ['address_components'],
@@ -50,9 +54,8 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
         if (town) setCity(town);
         if (code) setPostal(code);
       });
-    });
-    return () => { cancelled = true; };
-  }, [deliveryMethod]);
+    } catch { acDone.current = false; }
+  }
 
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const addRow = () => setItems((xs) => [...xs, blankItem()]);
@@ -229,7 +232,7 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
         <div className="hint" style={{ marginTop: 0 }}>When you mark this invoice paid, a matching <b>{deliveryMethod}</b> order is created in Operations to fulfil.</div>
         {deliveryMethod === 'delivery' && (
           <div style={{ marginTop: 8 }}>
-            <input ref={addrRef} autoComplete="off" style={{ marginBottom: 8 }} value={address} onChange={(e) => setAddress(e.target.value)} placeholder={hasMaps ? 'Start typing the street address…' : 'Street address'} />
+            <input ref={addrRef} onFocus={attachAutocomplete} autoComplete="off" style={{ marginBottom: 8 }} value={address} onChange={(e) => setAddress(e.target.value)} placeholder={hasMaps ? 'Start typing the street address…' : 'Street address'} />
             <div style={{ display: 'flex', gap: 8 }}>
               <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
               <input style={{ width: 150 }} value={postal} onChange={(e) => setPostal(e.target.value)} placeholder="Postal code" />
