@@ -335,6 +335,17 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .kpi-value { font-family: var(--font-head); font-size: 24px; color: var(--charcoal); line-height: 1.1; }
 .kpi-label { font-size: 12.5px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .04em; }
 .kpi-sub { font-size: 12px; color: var(--taupe-dark); margin-top: 4px; }
+.kpi-delta { font-family: var(--font-body, inherit); font-size: 12.5px; font-weight: 600; margin-left: 8px; vertical-align: middle; white-space: nowrap; }
+.kpi-delta.up { color: var(--ok); }
+.kpi-delta.down { color: var(--danger); }
+.kpi-delta.flat { color: var(--muted); }
+
+/* Revenue dashboard period selector */
+.dash-filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 16px; }
+.dash-filter { font-family: var(--font-head); text-transform: uppercase; letter-spacing: .04em; font-size: 12px; padding: 7px 13px; border: 1px solid var(--line-soft); border-radius: 999px; background: var(--card); color: var(--muted); cursor: pointer; transition: background .12s, color .12s, border-color .12s; }
+.dash-filter:hover { color: var(--charcoal); border-color: var(--line); }
+.dash-filter.active { background: var(--charcoal); color: #fff; border-color: var(--charcoal); }
+.dash-filter:disabled { opacity: .55; cursor: default; }
 
 .dash-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
 @media (max-width: 760px) { .dash-2col { grid-template-columns: 1fr; } }

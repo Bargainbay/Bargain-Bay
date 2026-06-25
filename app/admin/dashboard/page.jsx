@@ -2,46 +2,76 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
-import { dashboardData, customerList, inventoryFinancials } from '../../../lib/analytics';
+import { revenueDashboard, customerList, inventoryFinancials, DASH_PERIODS } from '../../../lib/analytics';
 import AdminNav from '../../../components/AdminNav';
+import DashboardFilters from '../../../components/DashboardFilters';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Dashboard — Bargain Bay' };
 
-// e.g. "2026-06" → "Jun '26" — the apostrophe makes the year unambiguous so the
-// month label can't be misread as a day-of-month ("Jun 26").
-const fmtMonth = (m) => {
-  const [y, mo] = m.split('-');
-  const mon = new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString('en-CA', { month: 'short' });
-  return `${mon} '${String(y).slice(-2)}`;
-};
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
+const periodLabel = (key) => (DASH_PERIODS.find((p) => p.key === key) || {}).label || '';
 
-// Lightweight server-rendered SVG bar chart (no chart library / no client JS).
-function RevenueChart({ data }) {
-  if (!data.length) return <p className="hint">No sales yet — your revenue chart will appear here.</p>;
-  const W = 720, H = 220, pad = { l: 48, r: 12, t: 12, b: 28 };
-  const max = Math.max(...data.map((d) => d.revenue), 1);
-  const bw = (W - pad.l - pad.r) / data.length;
-  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - v / max);
+// ── Trend chart ──────────────────────────────────────────────────────────────
+// Server-rendered SVG. Continuous buckets (zeros filled upstream), value labels
+// on sparse series, current bucket highlighted, average line, hover tooltips.
+function TrendChart({ series, unit }) {
+  if (!series.length) return <p className="hint">No sales in this period yet.</p>;
+  const n = series.length;
+  const total = series.reduce((s, d) => s + d.revenue, 0);
+  const nonZero = series.filter((d) => d.revenue > 0).length;
+  const max = Math.max(...series.map((d) => d.revenue), 1);
+  const avg = total / n;
+
+  const W = 880, H = 280, pad = { l: 58, r: 16, t: 18, b: 36 };
+  const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
+  const bw = plotW / n;
+  const barW = Math.min(bw * 0.66, 46);
+  const y = (v) => pad.t + plotH * (1 - v / max);
+  const showVals = n <= 14;
+  const labelEvery = n <= 14 ? 1 : n <= 24 ? 2 : Math.ceil(n / 16);
+  const avgY = y(avg);
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Revenue by month" style={{ display: 'block' }}>
-      {[0, 0.5, 1].map((f, i) => {
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Revenue by ${unit}`} style={{ display: 'block' }}>
+      {/* gridlines + y labels */}
+      {[0, 0.25, 0.5, 0.75, 1].map((f, i) => {
         const gy = y(max * f);
         return (
           <g key={i}>
             <line x1={pad.l} x2={W - pad.r} y1={gy} y2={gy} stroke="var(--line-soft)" strokeWidth="1" />
-            <text x={pad.l - 6} y={gy + 4} textAnchor="end" fontSize="10" fill="var(--muted)">{money(max * f)}</text>
+            {(f === 0 || f === 0.5 || f === 1) && (
+              <text x={pad.l - 8} y={gy + 4} textAnchor="end" fontSize="10.5" fill="var(--muted)">{money(max * f)}</text>
+            )}
           </g>
         );
       })}
-      {data.map((d, i) => {
-        const h = (H - pad.t - pad.b) * (d.revenue / max);
-        const x = pad.l + i * bw + bw * 0.15;
+
+      {/* average line */}
+      {avg > 0 && (
+        <g>
+          <line x1={pad.l} x2={W - pad.r} y1={avgY} y2={avgY} stroke="var(--taupe)" strokeWidth="1" strokeDasharray="4 4" opacity="0.7" />
+          <text x={W - pad.r} y={avgY - 5} textAnchor="end" fontSize="9.5" fill="var(--taupe-dark)">avg {money(avg)}</text>
+        </g>
+      )}
+
+      {/* bars */}
+      {series.map((d, i) => {
+        const h = plotH * (d.revenue / max);
+        const cx = pad.l + i * bw + bw / 2;
+        const isLast = i === n - 1;
+        const showLabel = (i % labelEvery === 0) || isLast;
         return (
-          <g key={d.month}>
-            <rect x={x} y={H - pad.b - h} width={bw * 0.7} height={Math.max(h, 0)} rx="3" fill="var(--taupe)" />
-            <text x={x + bw * 0.35} y={H - pad.b + 14} textAnchor="middle" fontSize="9.5" fill="var(--muted)">{fmtMonth(d.month)}</text>
+          <g key={i}>
+            <title>{d.label}: {money(d.revenue)} · {d.orders} order{d.orders === 1 ? '' : 's'}</title>
+            <rect x={cx - barW / 2} y={H - pad.b - h} width={barW} height={Math.max(h, d.revenue > 0 ? 2 : 0)} rx="3"
+              fill={isLast ? 'var(--charcoal)' : 'var(--taupe)'} />
+            {showVals && d.revenue > 0 && (
+              <text x={cx} y={H - pad.b - h - 5} textAnchor="middle" fontSize="9.5" fill="var(--charcoal)" fontWeight="600">{money(d.revenue)}</text>
+            )}
+            {showLabel && (
+              <text x={cx} y={H - pad.b + 15} textAnchor="middle" fontSize="9.5" fill="var(--muted)">{d.label}</text>
+            )}
           </g>
         );
       })}
@@ -49,10 +79,17 @@ function RevenueChart({ data }) {
   );
 }
 
-function Kpi({ label, value, sub }) {
+function Delta({ d }) {
+  if (!d) return null;
+  if (d.isNew) return <span className="kpi-delta up">▲ new</span>;
+  const sym = d.dir === 'up' ? '▲' : d.dir === 'down' ? '▼' : '•';
+  return <span className={'kpi-delta ' + d.dir}>{sym} {Math.abs(d.pct).toFixed(0)}%</span>;
+}
+
+function Kpi({ label, value, delta, sub }) {
   return (
     <div className="kpi-card">
-      <div className="kpi-value">{value}</div>
+      <div className="kpi-value">{value}{delta !== undefined ? <Delta d={delta} /> : null}</div>
       <div className="kpi-label">{label}</div>
       {sub ? <div className="kpi-sub">{sub}</div> : null}
     </div>
@@ -65,7 +102,7 @@ function statusClass(s) {
   return 'ok';
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }) {
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/dashboard');
   if (!isAdmin(session)) {
@@ -80,81 +117,115 @@ export default async function DashboardPage() {
     return (<div><AdminNav active="dashboard" /><div className="panel">Database not configured — set POSTGRES_URL.</div></div>);
   }
 
+  const period = DASH_PERIODS.some((p) => p.key === searchParams?.period) ? searchParams.period : 'month';
+
   let data = null, customers = [], error = '';
   try {
-    [data, customers] = await Promise.all([dashboardData(), customerList()]);
+    [data, customers] = await Promise.all([revenueDashboard(period), customerList()]);
   } catch (e) {
     console.error('dashboard load failed', e.message);
     error = 'Could not load dashboard data — if you just deployed, run the schema migration under Operations.';
   }
-
   if (error || !data) {
     return (<div><AdminNav active="dashboard" /><div className="error-box">{error || 'No data.'}</div></div>);
   }
 
   const k = data.kpis;
+  const pipe = data.pipeline;
   const fin = await inventoryFinancials();
   const members = customers.filter((c) => c.memberStatus && c.memberStatus !== 'none');
+  const vs = data.hasPrev ? ` vs ${data.prevLabel}` : '';
 
   return (
     <div>
       <AdminNav active="dashboard" />
-      <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Dashboard</h1>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, margin: '4px 0 14px' }}>
+        <h1 style={{ color: 'var(--charcoal)', margin: 0 }}>Dashboard</h1>
+        <span className="hint" style={{ margin: 0 }}>Showing <strong>{periodLabel(period)}</strong>{vs ? ` — compared${vs}` : ''}</span>
+      </div>
 
+      <DashboardFilters periods={DASH_PERIODS} active={period} />
+
+      {/* Headline KPIs for the selected period, each vs the previous period */}
       <div className="dash-kpis">
-        <Kpi label="Revenue (paid)" value={money(k.revenue)} />
-        <Kpi label="Orders" value={k.orders} sub={k.pendingOrders ? `${k.pendingOrders} pending` : null} />
-        <Kpi label="Units sold" value={k.unitsSold} />
-        <Kpi label="Avg order" value={money(k.avgOrder)} />
-        <Kpi label="Customers" value={k.customers} />
-        <Kpi label="Members" value={k.members} sub={k.pendingMembers ? `${k.pendingMembers} pending` : null} />
+        <Kpi label={`Revenue · ${periodLabel(period)}`} value={money(k.revenue)} delta={k.revenueDelta} />
+        <Kpi label="Profit" value={money(k.profit)} delta={k.profitDelta}
+          sub={k.unitsWithCost ? `${k.marginPct.toFixed(1)}% margin` : 'cost not tracked'} />
+        <Kpi label="Orders" value={k.orders} delta={k.ordersDelta} />
+        <Kpi label="Units sold" value={k.units} />
+        <Kpi label="Avg order" value={money(k.avgOrder)} delta={k.avgDelta} />
       </div>
 
+      {/* Pipeline — current outstanding money, not affected by the date filter */}
       <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Revenue by month</h2>
-        <RevenueChart data={data.revenueByMonth} />
-      </div>
-
-      <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Inventory &amp; margins</h2>
-        {fin.unitsWithCost === 0 && (
-          <p className="hint" style={{ marginTop: 0 }}>
-            Per-unit cost isn&apos;t in the catalog yet — re-run the tracker sync (<code>npm run sync</code>) to pull "Total Cost" and light up margins. Counts shown below regardless.
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <h2 style={{ marginTop: 0, marginBottom: 0, color: 'var(--charcoal)' }}>Cash in the pipeline</h2>
+          <span className="hint" style={{ margin: 0 }}>Current outstanding — not affected by the date filter</span>
+        </div>
+        <div className="dash-kpis" style={{ marginTop: 12 }}>
+          <Kpi label="Unpaid invoices" value={money(pipe.invoices.total)}
+            sub={`${pipe.invoices.count} open${pipe.invoices.overdueCount ? ` · ${pipe.invoices.overdueCount} overdue (${money(pipe.invoices.overdueTotal)})` : ''}`} />
+          <Kpi label="Open quotes" value={money(pipe.quotes.total)} sub={`${pipe.quotes.count} awaiting reply`} />
+          <Kpi label="Total potential" value={money(pipe.invoices.total + pipe.quotes.total)} sub="invoices + quotes" />
+        </div>
+        {pipe.invoices.overdueCount > 0 && (
+          <p className="hint" style={{ marginTop: 10 }}>
+            {pipe.invoices.overdueCount} invoice{pipe.invoices.overdueCount === 1 ? ' is' : 's are'} past due —
+            chase under <a href="/admin/invoices" style={{ textDecoration: 'underline' }}>Invoices</a>.
           </p>
         )}
-        <div className="dash-kpis">
-          <Kpi label="In-stock units" value={fin.units} />
-          <Kpi label="Inventory cost" value={money(fin.inventoryCost)} sub="COGS in stock" />
-          <Kpi label="Sale value" value={money(fin.suggestedValue)} sub="at listed prices" />
-          <Kpi label="Potential profit" value={money(fin.potentialProfit)} sub={fin.unitsWithCost ? `${fin.marginPct.toFixed(1)}% margin` : null} />
-          <Kpi label="Retail value" value={money(fin.retailValue)} />
+      </div>
+
+      {/* Trend chart */}
+      <div className="panel" style={{ marginTop: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <h2 style={{ marginTop: 0, marginBottom: 0, color: 'var(--charcoal)' }}>Revenue trend</h2>
+          <span className="hint" style={{ margin: 0 }}>{money(k.revenue)} across {data.series.length} {data.unit}{data.series.length === 1 ? '' : 's'}</span>
         </div>
-        {fin.unitsWithCost > 0 && (
-          <div className="table-wrap" style={{ marginTop: 14 }}><table className="admin">
-            <thead><tr><th>Category</th><th>Units</th><th style={{ textAlign: 'right' }}>Cost</th><th style={{ textAlign: 'right' }}>Sale value</th><th style={{ textAlign: 'right' }}>Potential profit</th><th style={{ textAlign: 'right' }}>Margin</th></tr></thead>
+        <div style={{ marginTop: 10 }}><TrendChart series={data.series} unit={data.unit} /></div>
+      </div>
+
+      {/* What's selling — this period */}
+      <div className="dash-2col">
+        <div className="panel">
+          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Top sellers · {periodLabel(period)}</h2>
+          <div className="table-wrap"><table className="admin">
+            <thead><tr><th>Item</th><th style={{ textAlign: 'right' }}>Sold</th><th style={{ textAlign: 'right' }}>Revenue</th></tr></thead>
             <tbody>
-              {fin.byCategory.map((b) => (
-                <tr key={b.category}>
-                  <td>{b.category}</td>
-                  <td>{b.units}</td>
-                  <td style={{ textAlign: 'right' }}>{money(b.cost)}</td>
-                  <td style={{ textAlign: 'right' }}>{money(b.suggested)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(b.profit)}</td>
-                  <td style={{ textAlign: 'right' }}>{b.margin.toFixed(1)}%</td>
+              {data.topModels.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--muted)' }}>No sales in this period.</td></tr>}
+              {data.topModels.map((m, i) => (
+                <tr key={i}><td>{m.title}</td><td style={{ textAlign: 'right' }}>{m.qty}</td><td style={{ textAlign: 'right', fontWeight: 700 }}>{money(m.revenue)}</td></tr>
+              ))}
+            </tbody>
+          </table></div>
+        </div>
+
+        <div className="panel">
+          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Sales by category · {periodLabel(period)}</h2>
+          <div className="table-wrap"><table className="admin">
+            <thead><tr><th>Category</th><th style={{ textAlign: 'right' }}>Units</th><th style={{ textAlign: 'right' }}>Revenue</th><th style={{ textAlign: 'right' }}>Profit</th></tr></thead>
+            <tbody>
+              {data.byCategory.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--muted)' }}>No sales in this period.</td></tr>}
+              {data.byCategory.map((c) => (
+                <tr key={c.category}>
+                  <td>{c.category}</td><td style={{ textAlign: 'right' }}>{c.units}</td>
+                  <td style={{ textAlign: 'right' }}>{money(c.revenue)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(c.profit)}</td>
                 </tr>
               ))}
             </tbody>
           </table></div>
-        )}
+        </div>
       </div>
 
+      {/* Top customers (period) + recent orders */}
       <div className="dash-2col">
         <div className="panel">
-          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Top customers</h2>
+          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Top customers · {periodLabel(period)}</h2>
           <div className="table-wrap"><table className="admin">
             <thead><tr><th>Customer</th><th>Orders</th><th style={{ textAlign: 'right' }}>Spent</th></tr></thead>
             <tbody>
-              {data.topCustomers.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--muted)' }}>No sales yet.</td></tr>}
+              {data.topCustomers.length === 0 && <tr><td colSpan={3} style={{ color: 'var(--muted)' }}>No sales in this period.</td></tr>}
               {data.topCustomers.map((c) => (
                 <tr key={c.email}>
                   <td>{c.name}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{c.email}</div></td>
@@ -185,6 +256,24 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* Inventory & margins (current stock) */}
+      <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Inventory &amp; margins <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 400 }}>(in stock now)</span></h2>
+        {fin.unitsWithCost === 0 && (
+          <p className="hint" style={{ marginTop: 0 }}>
+            Per-unit cost isn&apos;t in the catalog yet — re-run the tracker sync to pull &quot;Total Cost&quot; and light up margins.
+          </p>
+        )}
+        <div className="dash-kpis">
+          <Kpi label="In-stock units" value={fin.units} />
+          <Kpi label="Inventory cost" value={money(fin.inventoryCost)} sub="COGS in stock" />
+          <Kpi label="Sale value" value={money(fin.suggestedValue)} sub="at listed prices" />
+          <Kpi label="Potential profit" value={money(fin.potentialProfit)} sub={fin.unitsWithCost ? `${fin.marginPct.toFixed(1)}% margin` : null} />
+          <Kpi label="Retail value" value={money(fin.retailValue)} />
+        </div>
+      </div>
+
+      {/* Member + customer databases */}
       <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Member database ({members.length})</h2>
         <div className="table-wrap"><table className="admin">
