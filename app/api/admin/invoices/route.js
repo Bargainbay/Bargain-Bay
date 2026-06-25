@@ -42,6 +42,7 @@ export async function POST(req) {
   const city = String(body.city || '').trim();
   const postal = String(body.postal || '').trim();
   const phone = String(body.phone || '').trim();
+  const sendEmail = body.sendEmail !== false; // default true; only false explicitly skips the email
 
   if (!validEmail(email)) return NextResponse.json({ error: 'Enter a valid customer email.' }, { status: 400 });
   if (!items.some((it) => String(it?.description || '').trim() && Number(it?.amount) > 0)) {
@@ -52,7 +53,7 @@ export async function POST(req) {
   }
 
   try {
-    const invoice = await createAndSendInvoice({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone });
+    const invoice = await createAndSendInvoice({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail });
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
     console.error('create invoice failed', e?.message || e);
