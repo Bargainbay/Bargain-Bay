@@ -95,6 +95,14 @@ export async function POST(req) {
 
   if (!text && !voice) return ok(); // nothing we can act on (photo, sticker, etc.)
 
+  // Utility: any admin can ask for the current chat's id — handy when wiring up a
+  // new group (drivers, management, etc.). Runs before the group-routing gate so
+  // it answers even in a group that isn't configured yet.
+  if (isAdmin && /^\/chatid(@\w+)?$/i.test(text.trim())) {
+    await sendMessage(chatId, `Chat ID: ${chatId}\nType: ${chatType}`);
+    return ok();
+  }
+
   // Who answers, and may this chat use Sarah at all?
   let readOnly;
   let agentKey = 'sarah';
