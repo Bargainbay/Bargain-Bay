@@ -4,141 +4,18 @@ import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { revenueDashboard, DASH_PERIODS } from '../../../lib/analytics';
 import { getSetting } from '../../../lib/settings';
+import { listReps } from '../../../lib/reps';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
 import GoalEditor from '../../../components/GoalEditor';
+import RepsEditor from '../../../components/RepsEditor';
+import { Kpi, Donut, Funnel, TrendChart } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Sales — Bargain Bay' };
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 const periodLabel = (key) => (DASH_PERIODS.find((p) => p.key === key) || {}).label || '';
-
-// ── Trend chart (dark) ───────────────────────────────────────────────────────
-function TrendChart({ series, unit }) {
-  if (!series.length) return <p className="hint">No sales in this period yet.</p>;
-  const n = series.length;
-  const total = series.reduce((s, d) => s + d.revenue, 0);
-  const max = Math.max(...series.map((d) => d.revenue), 1);
-  const avg = total / n;
-  const W = 880, H = 280, pad = { l: 58, r: 16, t: 18, b: 36 };
-  const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
-  const bw = plotW / n;
-  const barW = Math.min(bw * 0.66, 46);
-  const y = (v) => pad.t + plotH * (1 - v / max);
-  const showVals = n <= 14;
-  const labelEvery = n <= 14 ? 1 : n <= 24 ? 2 : Math.ceil(n / 16);
-  const avgY = y(avg);
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Revenue by ${unit}`} style={{ display: 'block' }}>
-      <defs>
-        <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.95" />
-          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.45" />
-        </linearGradient>
-      </defs>
-      {[0, 0.25, 0.5, 0.75, 1].map((f, i) => {
-        const gy = y(max * f);
-        return (
-          <g key={i}>
-            <line x1={pad.l} x2={W - pad.r} y1={gy} y2={gy} stroke="var(--line-soft)" strokeWidth="1" />
-            {(f === 0 || f === 0.5 || f === 1) && (
-              <text x={pad.l - 8} y={gy + 4} textAnchor="end" fontSize="10.5" fill="var(--muted)">{money(max * f)}</text>
-            )}
-          </g>
-        );
-      })}
-      {avg > 0 && (
-        <g>
-          <line x1={pad.l} x2={W - pad.r} y1={avgY} y2={avgY} stroke="var(--taupe)" strokeWidth="1" strokeDasharray="4 4" opacity="0.7" />
-          <text x={W - pad.r} y={avgY - 5} textAnchor="end" fontSize="9.5" fill="var(--taupe-dark)">avg {money(avg)}</text>
-        </g>
-      )}
-      {series.map((d, i) => {
-        const h = plotH * (d.revenue / max);
-        const cx = pad.l + i * bw + bw / 2;
-        const isLast = i === n - 1;
-        const showLabel = (i % labelEvery === 0) || isLast;
-        return (
-          <g key={i}>
-            <title>{d.label}: {money(d.revenue)} · {d.orders} order{d.orders === 1 ? '' : 's'}</title>
-            <rect x={cx - barW / 2} y={H - pad.b - h} width={barW} height={Math.max(h, d.revenue > 0 ? 2 : 0)} rx="3"
-              fill="url(#barGrad)" opacity={isLast ? 1 : 0.82} />
-            {showVals && d.revenue > 0 && (
-              <text x={cx} y={H - pad.b - h - 5} textAnchor="middle" fontSize="9.5" fill="var(--charcoal)" fontWeight="600">{money(d.revenue)}</text>
-            )}
-            {showLabel && (
-              <text x={cx} y={H - pad.b + 15} textAnchor="middle" fontSize="9.5" fill="var(--muted)">{d.label}</text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-// Donut ring from weighted segments.
-function Donut({ segments, centerTop, centerSub, size = 168, thickness = 24 }) {
-  const total = segments.reduce((s, x) => s + x.value, 0);
-  const r = (size - thickness) / 2;
-  const c = 2 * Math.PI * r;
-  let offset = 0;
-  return (
-    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label="Deals won and lost">
-      <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--tint)" strokeWidth={thickness} />
-        {total > 0 && segments.map((s, i) => {
-          const len = (s.value / total) * c;
-          const el = (
-            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={s.color} strokeWidth={thickness}
-              strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-offset} />
-          );
-          offset += len;
-          return el;
-        })}
-      </g>
-      <text x="50%" y="47%" textAnchor="middle" fontSize="30" fontWeight="700" fill="var(--charcoal)">{centerTop}</text>
-      <text x="50%" y="62%" textAnchor="middle" fontSize="11.5" fill="var(--muted)">{centerSub}</text>
-    </svg>
-  );
-}
-
-// Horizontal funnel: rows with proportional bars.
-function Funnel({ stages }) {
-  const max = Math.max(...stages.map((s) => s.value), 1);
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {stages.map((s, i) => (
-        <div key={i}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-            <span style={{ color: 'var(--charcoal)' }}>{s.label}</span>
-            <span style={{ color: 'var(--muted)' }}>{s.value}{s.sub ? ` · ${s.sub}` : ''}</span>
-          </div>
-          <div className="goalbar" style={{ height: 14 }}>
-            <span style={{ width: `${Math.max((s.value / max) * 100, s.value > 0 ? 4 : 0)}%`, background: s.color }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Delta({ d }) {
-  if (!d) return null;
-  if (d.isNew) return <span className="kpi-delta up">▲ new</span>;
-  const sym = d.dir === 'up' ? '▲' : d.dir === 'down' ? '▼' : '•';
-  return <span className={'kpi-delta ' + d.dir}>{sym} {Math.abs(d.pct).toFixed(0)}%</span>;
-}
-
-function Kpi({ label, value, delta, sub }) {
-  return (
-    <div className="kpi-card">
-      <div className="kpi-value">{value}{delta !== undefined ? <Delta d={delta} /> : null}</div>
-      <div className="kpi-label">{label}</div>
-      {sub ? <div className="kpi-sub">{sub}</div> : null}
-    </div>
-  );
-}
 
 function statusClass(s) {
   if (s === 'cancelled') return 'sold';
@@ -163,9 +40,9 @@ export default async function SalesDashboardPage({ searchParams }) {
 
   const period = DASH_PERIODS.some((p) => p.key === searchParams?.period) ? searchParams.period : 'month';
 
-  let data = null, goal = 0, error = '';
+  let data = null, goal = 0, repList = [], error = '';
   try {
-    [data, goal] = await Promise.all([revenueDashboard(period), getSetting('revenue_goal_monthly', 0)]);
+    [data, goal, repList] = await Promise.all([revenueDashboard(period), getSetting('revenue_goal_monthly', 0), listReps()]);
   } catch (e) {
     console.error('sales dashboard load failed', e.message);
     error = 'Could not load dashboard data — if you just deployed, run the schema migration under Operations.';
@@ -177,9 +54,11 @@ export default async function SalesDashboardPage({ searchParams }) {
   const k = data.kpis;
   const pipe = data.pipeline;
   const deals = data.deals;
+  const reps = data.reps || [];
   const vs = data.hasPrev ? ` vs ${data.prevLabel}` : '';
   const goalN = Number(goal) || 0;
   const goalPct = goalN > 0 ? Math.min((k.revenue / goalN) * 100, 100) : 0;
+  const trend = data.series.map((s) => ({ label: s.label, value: s.revenue, hint: `${s.orders} order${s.orders === 1 ? '' : 's'}` }));
 
   return (
     <DashboardShell active="sales">
@@ -199,7 +78,6 @@ export default async function SalesDashboardPage({ searchParams }) {
         <Kpi label="Avg order" value={money(k.avgOrder)} delta={k.avgDelta} />
       </div>
 
-      {/* Monthly goal — only meaningful when viewing the current month */}
       {period === 'month' && (
         <div className="panel" style={{ marginTop: 18 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
@@ -220,12 +98,12 @@ export default async function SalesDashboardPage({ searchParams }) {
         </div>
       )}
 
-      {/* Deals won/lost + sales funnel */}
       <div className="dash-2col">
         <div className="panel">
           <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Deals won / lost · {periodLabel(period)}</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
             <Donut
+              label="Deals won and lost"
               segments={[
                 { label: 'Won', value: deals.won, color: 'var(--c1)' },
                 { label: 'Lost', value: deals.lost, color: 'var(--c5)' },
@@ -256,7 +134,36 @@ export default async function SalesDashboardPage({ searchParams }) {
         </div>
       </div>
 
-      {/* Pipeline — current outstanding money, not affected by the date filter */}
+      {/* Team & attribution */}
+      <div className="panel" style={{ marginTop: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <h2 style={{ marginTop: 0, marginBottom: 0, color: 'var(--charcoal)' }}>By salesperson · {periodLabel(period)}</h2>
+          <RepsEditor current={repList} />
+        </div>
+        {reps.length > 0 ? (
+          <div className="table-wrap" style={{ marginTop: 12 }}><table className="admin">
+            <thead><tr><th>Rep</th><th style={{ textAlign: 'right' }}>Orders</th><th style={{ textAlign: 'right' }}>Revenue</th><th style={{ textAlign: 'right' }}>Share</th></tr></thead>
+            <tbody>
+              {reps.map((r) => (
+                <tr key={r.rep}>
+                  <td>{r.rep}</td>
+                  <td style={{ textAlign: 'right' }}>{r.orders}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(r.revenue)}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--muted)' }}>{k.revenue > 0 ? ((r.revenue / k.revenue) * 100).toFixed(0) : 0}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        ) : (
+          <p className="hint" style={{ marginTop: 10 }}>
+            {repList.length === 0
+              ? 'Add your salespeople, then tag each order with a rep in Operations to see per-person revenue here.'
+              : 'No tagged sales in this period yet — tag orders with a rep in '}
+            {repList.length > 0 && <a href="/admin/operations" style={{ textDecoration: 'underline' }}>Operations</a>}.
+          </p>
+        )}
+      </div>
+
       <div className="panel" style={{ marginTop: 18 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <h2 style={{ marginTop: 0, marginBottom: 0, color: 'var(--charcoal)' }}>Cash in the pipeline</h2>
@@ -276,16 +183,14 @@ export default async function SalesDashboardPage({ searchParams }) {
         )}
       </div>
 
-      {/* Trend chart */}
       <div className="panel" style={{ marginTop: 18 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <h2 style={{ marginTop: 0, marginBottom: 0, color: 'var(--charcoal)' }}>Revenue trend</h2>
           <span className="hint" style={{ margin: 0 }}>{money(k.revenue)} across {data.series.length} {data.unit}{data.series.length === 1 ? '' : 's'}</span>
         </div>
-        <div style={{ marginTop: 10 }}><TrendChart series={data.series} unit={data.unit} /></div>
+        <div style={{ marginTop: 10 }}><TrendChart series={trend} label="revenue" /></div>
       </div>
 
-      {/* What's selling — this period */}
       <div className="dash-2col">
         <div className="panel">
           <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Top sellers · {periodLabel(period)}</h2>
@@ -318,7 +223,6 @@ export default async function SalesDashboardPage({ searchParams }) {
         </div>
       </div>
 
-      {/* Top customers (period) + recent orders */}
       <div className="dash-2col">
         <div className="panel">
           <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Top customers · {periodLabel(period)}</h2>
@@ -355,10 +259,6 @@ export default async function SalesDashboardPage({ searchParams }) {
           </table></div>
         </div>
       </div>
-
-      <p className="hint" style={{ marginTop: 20, textAlign: 'center' }}>
-        Inventory, customers &amp; financial detail are moving to their own dashboards (Fulfilment · Customers · Financial) as those ship.
-      </p>
     </DashboardShell>
   );
 }

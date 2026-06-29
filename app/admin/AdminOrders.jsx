@@ -15,7 +15,7 @@ function fmtPickup(value) {
   return `${wd} · ${h12}:${String(mm).padStart(2, '0')} ${hh < 12 ? 'AM' : 'PM'}`;
 }
 
-export default function AdminOrders({ initialOrders, drivers = [] }) {
+export default function AdminOrders({ initialOrders, drivers = [], reps = [] }) {
   const [orders, setOrders] = useState(initialOrders);
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState('');
@@ -35,6 +35,23 @@ export default function AdminOrders({ initialOrders, drivers = [] }) {
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Update failed'); return; }
       setOrders((os) => os.map((o) => (o.id === id ? { ...o, status } : o)));
+    } catch {
+      setError('Network error');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function setRep(id, rep) {
+    setSavingId(id); setError('');
+    try {
+      const res = await fetch('/api/admin/order-rep', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: id, rep })
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Update failed'); return; }
+      setOrders((os) => os.map((o) => (o.id === id ? { ...o, sales_rep: rep || null } : o)));
     } catch {
       setError('Network error');
     } finally {
@@ -89,6 +106,14 @@ export default function AdminOrders({ initialOrders, drivers = [] }) {
                   {o.name}<br />
                   <a href={`mailto:${o.email}`} style={{ color: 'var(--muted)' }}>{o.email}</a>
                   {o.phone && <div><a href={`tel:${o.phone}`} style={{ color: 'var(--muted)' }}>{o.phone}</a></div>}
+                  {reps.length > 0 && (
+                    <div style={{ marginTop: 6 }} title="Salesperson credited for this order (Sales dashboard).">
+                      <select value={o.sales_rep || ''} disabled={savingId === o.id} onChange={(e) => setRep(o.id, e.target.value)} style={{ width: 'auto', padding: '3px 6px', fontSize: 12 }}>
+                        <option value="">— rep —</option>
+                        {reps.map((r) => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </td>
                 <td>
                   {o.items.map((it) => (
