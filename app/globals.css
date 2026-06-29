@@ -589,3 +589,84 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .unit-option-price { flex: 0 0 auto; text-align: right; display: flex; flex-direction: column; gap: 2px; }
 .unit-option-price .price { font-size: 16px; font-weight: 600; color: var(--taupe-dark); }
 .unit-option-off { font-size: 11.5px; color: var(--ok); font-weight: 600; }
+
+/* ============================================================
+   Owner-portal DASHBOARDS — dark "data" theme.
+   Scoped to .dboard: the design tokens are re-pointed to dark
+   values so existing components (kpi-card, panel, table.admin,
+   pill) re-skin automatically inside this container.
+   ============================================================ */
+.dboard {
+  --bg: #0c0e13;
+  --card: #161a23;
+  --card-2: #1c212c;
+  --line: #2f3645;
+  --line-soft: #242a36;
+  --charcoal: #eef1f6;        /* now the primary text/heading/value colour */
+  --charcoal-soft: #d7dbe4;
+  --muted: #98a1b3;
+  --taupe: #8b94a7;
+  --taupe-dark: #aeb6c6;
+  --tint: #1d2331;
+  --ok: #34d399;  --okbg: rgba(52,211,153,.14);
+  --warn: #fbbf24; --warnbg: rgba(251,191,36,.14);
+  --danger: #f87171; --dangerbg: rgba(248,113,113,.14);
+  /* chart palette (inspo: green primary, violet secondary) */
+  --accent: #34d399;
+  --accent-2: #a78bfa;
+  --c1: #34d399; --c2: #a78bfa; --c3: #38bdf8; --c4: #fbbf24; --c5: #fb7185; --c6: #2dd4bf;
+  background:
+    radial-gradient(1100px 480px at 12% -8%, rgba(52,211,153,.10), transparent 60%),
+    radial-gradient(900px 460px at 95% -10%, rgba(167,139,250,.10), transparent 60%),
+    var(--bg);
+  color: var(--charcoal);
+  min-height: 100vh;
+  padding: 20px clamp(14px, 3vw, 36px) 56px;
+  font-family: var(--font-body);
+}
+.dboard .panel { background: var(--card); border-color: var(--line-soft); box-shadow: 0 1px 0 rgba(255,255,255,.02) inset; }
+.dboard .kpi-card { background: linear-gradient(180deg, var(--card-2), var(--card)); border-color: var(--line-soft); }
+.dboard table.admin th { background: var(--card-2); color: var(--muted); border-color: var(--line-soft); }
+.dboard table.admin td { border-color: var(--line-soft); }
+.dboard .table-wrap { background: var(--card); border-color: var(--line-soft); }
+.dboard a { color: var(--accent); }
+.dboard .hint { color: var(--muted); }
+.dboard .error-box { background: var(--dangerbg); color: var(--danger); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 16px; }
+/* period filter pills inside the dark theme */
+.dboard .dash-filter { background: var(--card-2); color: var(--muted); border-color: var(--line-soft); }
+.dboard .dash-filter:hover { color: var(--charcoal); border-color: var(--line); }
+.dboard .dash-filter.active { background: var(--accent); color: #062018; border-color: var(--accent); }
+
+/* dashboard shell: top bar + 5-tab nav */
+.dboard-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.dboard-brand { display: flex; align-items: baseline; gap: 10px; }
+.dboard-brand b { font-family: var(--font-head); font-size: 18px; letter-spacing: .02em; color: var(--charcoal); }
+.dboard-brand span { font-size: 12px; color: var(--muted); }
+.dboard-portal { font-family: var(--font-head); text-transform: uppercase; letter-spacing: .05em; font-size: 12px; color: var(--muted); border: 1px solid var(--line-soft); border-radius: 999px; padding: 6px 12px; }
+.dboard-portal:hover { color: var(--charcoal); border-color: var(--line); }
+.dnav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line-soft); }
+.dtab { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-head); font-size: 13.5px; letter-spacing: .02em; color: var(--muted); padding: 9px 14px; border-radius: 10px; border: 1px solid transparent; }
+.dtab:hover { color: var(--charcoal); background: var(--card); }
+.dtab.active { color: var(--charcoal); background: var(--card); border-color: var(--line-soft); box-shadow: 0 0 0 1px rgba(52,211,153,.25), 0 6px 18px rgba(0,0,0,.25); }
+.dtab .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .55; }
+.dtab.active .dot { background: var(--accent); opacity: 1; }
+.dtab.soon { opacity: .6; }
+.dtab .soon-tag { font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border: 1px solid var(--line-soft); border-radius: 6px; padding: 1px 5px; }
+
+/* coming-soon stub */
+.dboard-soon { display: grid; place-items: center; min-height: 52vh; text-align: center; }
+.dboard-soon .panel { max-width: 520px; }
+.dboard-soon h2 { color: var(--charcoal); margin: 0 0 8px; }
+
+/* section heading inside dashboards */
+.dboard h1 { color: var(--charcoal); }
+.dboard-section { font-family: var(--font-head); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 22px 2px 10px; }
+
+/* chart legend rows */
+.legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 10px; }
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); }
+.legend-swatch { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
+
+/* mini progress bar (goal) */
+.goalbar { height: 12px; border-radius: 999px; background: var(--tint); overflow: hidden; border: 1px solid var(--line-soft); }
+.goalbar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--c3)); }
