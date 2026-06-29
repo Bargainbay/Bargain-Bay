@@ -16,6 +16,8 @@ import { getAgent } from '../../../../lib/agents/registry';
 import { couldBeForBot, isAddressedToBot } from '../../../../lib/agents/addressing';
 import { loadThread, appendMessage } from '../../../../lib/sarah-threads';
 import { verifyTelegramSecret, getBotUsername, sendMessage, sendChatAction, downloadFile, sendVoice } from '../../../../lib/telegram';
+import { openEscalationByMessage, resolveEscalation } from '../../../../lib/escalations';
+import { appendToPlaybook } from '../../../../lib/playbook';
 import { voiceConfigured, transcribeAudio, synthesizeSpeech } from '../../../../lib/voice';
 
 export const dynamic = 'force-dynamic';
@@ -36,11 +38,30 @@ const adminIds = () => (process.env.SARAH_TELEGRAM_ADMINS || '').split(',').map(
 function agentForGroup(chatId) {
   const id = String(chatId);
   if (process.env.SARAH_TELEGRAM_GROUP_ID && id === String(process.env.SARAH_TELEGRAM_GROUP_ID)) return 'sarah';
+  // The Management oversight group is fronted by Sarah (the chief).
+  if (process.env.SARAH_TELEGRAM_MGMT_GROUP && id === String(process.env.SARAH_TELEGRAM_MGMT_GROUP)) return 'sarah';
   for (const pair of (process.env.SARAH_TELEGRAM_DEPT_GROUPS || '').split(',')) {
     const [gid, key] = pair.split(':').map((s) => s.trim());
     if (gid && key && gid === id) return getAgent(key).key;
   }
   return null;
+}
+
+// In the Management group, an owner replying to an escalation message resolves it:
+// relay the answer to the chat it came from and (auto-learn) save it to the
+// playbook. Returns true if it handled the message.
+async function resolveEscalationReply(msg, answer) {
+  const replied = msg.reply_to_message;
+  if (!replied) return false;
+  const esc = await openEscalationByMessage(replied.message_id);
+  if (!esc) return false;
+  await resolveEscalation(esc.id, answer);
+  if (esc.origin_chat_id) {
+    await sendMessage(esc.origin_chat_id, `📋 Update from management:\n\n${answer}`);
+  }
+  try { await appendToPlaybook(`When asked: "${esc.question}" → ${answer}`, esc.dept || undefined); } catch (e) { console.error('escalation remember', e?.message || e); }
+  await sendMessage(msg.chat.id, `Got it — relayed to ${esc.dept || 'the team'} and saved so I handle it myself next time. ✅`);
+  return true;
 }
 
 // Transcribe a voice/audio note to text (or '' if it can't be made out).
@@ -119,6 +140,12 @@ export async function POST(req) {
     // stays quiet.
     await appendMessage(threadKey, 'user', `${fromName}: ${prompt}`);
 
+    // Management group: an owner replying to an escalation answers it outright —
+    // relay it back to where it came from and learn it, no agent run needed.
+    if (isAdmin && process.env.SARAH_TELEGRAM_MGMT_GROUP && String(chatId) === String(process.env.SARAH_TELEGRAM_MGMT_GROUP) && msg.reply_to_message) {
+      try { if (await resolveEscalationReply(msg, prompt)) return ok(); } catch (e) { console.error('resolve escalation', e?.message || e); }
+    }
+
     // Decide whether she's actually being addressed. Explicit signals win for
     // free; otherwise a fast judge reads the recent chat, but only for messages
     // that look like a question/request (pure chatter never triggers a call).
@@ -133,7 +160,7 @@ export async function POST(req) {
     sendChatAction(chatId, 'typing');
     try {
       const thread = await loadThread(threadKey, 20);
-      const { reply } = await runAgent({ agentKey, messages: thread, readOnly });
+      const { reply } = await runAgent({ agentKey, messages: thread, readOnly, ctx: { originChatId: chatId, dept: getAgent(agentKey).dept } });
       await appendMessage(threadKey, 'assistant', reply);
       await sendMessage(chatId, reply); // groups stay text-only
     } catch (e) {
@@ -148,7 +175,7 @@ export async function POST(req) {
   try {
     await appendMessage(threadKey, 'user', prompt);
     const thread = await loadThread(threadKey, 20);
-    const { reply } = await runAgent({ agentKey, messages: thread, readOnly });
+    const { reply } = await runAgent({ agentKey, messages: thread, readOnly, ctx: { originChatId: chatId, dept: getAgent(agentKey).dept } });
     await appendMessage(threadKey, 'assistant', reply);
     if (wasVoice && voiceConfigured()) {
       try {
