@@ -106,14 +106,6 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_ref       text;    -- order n
 ALTER TABLE products ADD COLUMN IF NOT EXISTS tracker_synced boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_products_sold ON products(sold_at) WHERE sold_at IS NOT NULL;
 
--- Inventory intake: units added in-app (vendor purchase or haul-away) rather than
--- from the Google tracker. origin='intake' shields them from the nightly sync's
--- deactivation; they stay intake_status='pending' (off-store) until tested-working.
-ALTER TABLE products ADD COLUMN IF NOT EXISTS origin        text DEFAULT 'tracker';
-ALTER TABLE products ADD COLUMN IF NOT EXISTS intake_status text;   -- pending | live | rejected
-ALTER TABLE products ADD COLUMN IF NOT EXISTS intake_source text;   -- vendor name or 'Haulaway'
-ALTER TABLE products ADD COLUMN IF NOT EXISTS received_at   timestamptz;
-
 -- Interim offline payments: how the customer intends to pay an order placed
 -- while card checkout is off — 'etransfer' or 'in_person' (pay on pickup/delivery).
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method text;

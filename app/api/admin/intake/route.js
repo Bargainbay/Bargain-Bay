@@ -33,7 +33,7 @@ export async function PATCH(req) {
   if (!sku) return NextResponse.json({ error: 'Missing sku' }, { status: 400 });
   try {
     if (b.action === 'reject') return NextResponse.json({ ok: true, ...(await rejectIntake(sku)) });
-    return NextResponse.json({ ok: true, ...(await markIntakeTested(sku, { price: b.price, condition: b.condition })) });
+    return NextResponse.json({ ok: true, ...(await markIntakeTested(sku, { condition: b.condition })) });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not update.' }, { status: 500 });
   }
