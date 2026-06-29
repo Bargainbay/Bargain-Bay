@@ -1,7 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/expire-reservations", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/sync-inventory", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/sync-inventory", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/sync-ads", "schedule": "30 7 * * *" }
   ]
 }
