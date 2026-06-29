@@ -9,6 +9,7 @@ import { listDrivers } from '../../../lib/drivers';
 import { podPhotosForOrders } from '../../../lib/pod';
 import { listSalvage } from '../../../lib/salvage';
 import { listReps } from '../../../lib/reps';
+import { listIntakePending } from '../../../lib/intake';
 import AdminNav from '../../../components/AdminNav';
 import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
@@ -17,6 +18,7 @@ import AdminMembers from '../AdminMembers';
 import AdminReconcile from '../AdminReconcile';
 import AdminDrivers from '../AdminDrivers';
 import AdminSalvage from '../AdminSalvage';
+import AdminIntake from '../AdminIntake';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Operations — Bargain Bay' };
@@ -106,6 +108,12 @@ export default async function OperationsPage() {
   } catch (e) {
     console.error('reps load failed', e.message);
   }
+  let intake = [];
+  try {
+    intake = await listIntakePending();
+  } catch (e) {
+    console.error('intake load failed', e.message);
+  }
   return (
     <div>
       <AdminNav active="operations" />
@@ -115,6 +123,7 @@ export default async function OperationsPage() {
         </div>
       )}
       <AdminOrders initialOrders={orders} drivers={drivers} reps={reps} />
+      <AdminIntake initial={intake} />
       <AdminReconcile initialItems={sold} />
       <AdminSalvage initial={salvage} />
       <AdminDrivers initialDrivers={drivers} />
