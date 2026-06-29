@@ -10,6 +10,7 @@ import {
 import { round2, HST_RATE, DELIVERY_FEE, CARD_PAYMENTS_ENABLED } from '../../../lib/constants';
 import { resolvePrices } from '../../../lib/pricing';
 import { sendOrderEmails } from '../../../lib/email';
+import { readAttribution, ensureAttributionColumns } from '../../../lib/attribution';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,17 +107,20 @@ export async function POST(req) {
   }
 
   // ---- create order + items + reservations atomically ----
+  // First-touch marketing attribution from the bb_attr cookie (best-effort).
+  const attr = readAttribution(req);
+  try { await ensureAttributionColumns(); } catch (e) { console.error('attribution columns', e.message); }
   let order;
   try {
     order = await withTransaction(async (client) => {
       const { rows } = await client.query(
         `INSERT INTO orders (user_id, email, name, phone, delivery_method, address, city, postal,
-                             status, subtotal, hst, total, payment_method)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',$9,$10,$11,$12)
+                             status, subtotal, hst, total, payment_method, source, utm_campaign, referrer)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',$9,$10,$11,$12,$13,$14,$15)
          RETURNING id`,
         [userId, email, name, phone || null, deliveryMethod,
          address || null, city || null, postal || null, subtotal, hst, total,
-         cardOnline ? null : paymentMethod]
+         cardOnline ? null : paymentMethod, attr.source, attr.campaign, attr.referrer]
       );
       const orderId = rows[0].id;
       const { rows: numbered } = await client.query(

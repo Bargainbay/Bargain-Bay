@@ -1,6 +1,7 @@
 import './globals.css';
 import SiteChrome from '../components/SiteChrome';
 import MetaPixel from '../components/MetaPixel';
+import AttributionTracker from '../components/AttributionTracker';
 import { SALES_EMAIL, PICKUP_ADDRESS } from '../lib/constants';
 import { SITE_URL, jsonLd } from '../lib/site';
 
@@ -53,6 +54,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <MetaPixel />
+        <AttributionTracker />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLd(storeSchema) }}

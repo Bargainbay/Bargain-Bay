@@ -590,6 +590,10 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .unit-option-price .price { font-size: 16px; font-weight: 600; color: var(--taupe-dark); }
 .unit-option-off { font-size: 11.5px; color: var(--ok); font-weight: 600; }
 
+/* Discreet owner-portal shortcut in the footer */
+.owner-portal-link { color: var(--line); text-decoration: none; font-weight: 500; white-space: nowrap; }
+.owner-portal-link:hover { color: #fff; text-decoration: underline; }
+
 /* ============================================================
    Owner-portal DASHBOARDS — dark "data" theme.
    Scoped to .dboard: the design tokens are re-pointed to dark
