@@ -1,7 +1,7 @@
 // Owner-portal top nav. `active` = 'dashboard' | 'operations'.
 export default function AdminNav({ active }) {
   const items = [
-    { key: 'dashboard', label: 'Dashboard', href: '/admin/dashboard' },
+    { key: 'dashboard', label: 'Dashboards', href: '/admin/dashboard' },
     { key: 'copilot', label: 'Sarah', href: '/admin/agent' },
     { key: 'quotes', label: 'Quotes', href: '/admin/quotes' },
     { key: 'invoices', label: 'Invoices', href: '/admin/invoices' },

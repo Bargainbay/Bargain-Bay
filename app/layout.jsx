@@ -1,7 +1,5 @@
 import './globals.css';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
-import ChatWidget from '../components/ChatWidget';
+import SiteChrome from '../components/SiteChrome';
 import MetaPixel from '../components/MetaPixel';
 import { SALES_EMAIL, PICKUP_ADDRESS } from '../lib/constants';
 import { SITE_URL, jsonLd } from '../lib/site';
@@ -59,10 +57,7 @@ export default function RootLayout({ children }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLd(storeSchema) }}
         />
-        <Header />
-        <main className="wrap">{children}</main>
-        <Footer />
-        <ChatWidget />
+        <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
   );

@@ -2,27 +2,25 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
-import { revenueDashboard, customerList, inventoryFinancials, DASH_PERIODS } from '../../../lib/analytics';
-import AdminNav from '../../../components/AdminNav';
+import { revenueDashboard, DASH_PERIODS } from '../../../lib/analytics';
+import { getSetting } from '../../../lib/settings';
+import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
+import GoalEditor from '../../../components/GoalEditor';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Dashboard — Bargain Bay' };
+export const metadata = { title: 'Sales — Bargain Bay' };
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 const periodLabel = (key) => (DASH_PERIODS.find((p) => p.key === key) || {}).label || '';
 
-// ── Trend chart ──────────────────────────────────────────────────────────────
-// Server-rendered SVG. Continuous buckets (zeros filled upstream), value labels
-// on sparse series, current bucket highlighted, average line, hover tooltips.
+// ── Trend chart (dark) ───────────────────────────────────────────────────────
 function TrendChart({ series, unit }) {
   if (!series.length) return <p className="hint">No sales in this period yet.</p>;
   const n = series.length;
   const total = series.reduce((s, d) => s + d.revenue, 0);
-  const nonZero = series.filter((d) => d.revenue > 0).length;
   const max = Math.max(...series.map((d) => d.revenue), 1);
   const avg = total / n;
-
   const W = 880, H = 280, pad = { l: 58, r: 16, t: 18, b: 36 };
   const plotW = W - pad.l - pad.r, plotH = H - pad.t - pad.b;
   const bw = plotW / n;
@@ -31,10 +29,14 @@ function TrendChart({ series, unit }) {
   const showVals = n <= 14;
   const labelEvery = n <= 14 ? 1 : n <= 24 ? 2 : Math.ceil(n / 16);
   const avgY = y(avg);
-
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`Revenue by ${unit}`} style={{ display: 'block' }}>
-      {/* gridlines + y labels */}
+      <defs>
+        <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.95" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.45" />
+        </linearGradient>
+      </defs>
       {[0, 0.25, 0.5, 0.75, 1].map((f, i) => {
         const gy = y(max * f);
         return (
@@ -46,16 +48,12 @@ function TrendChart({ series, unit }) {
           </g>
         );
       })}
-
-      {/* average line */}
       {avg > 0 && (
         <g>
           <line x1={pad.l} x2={W - pad.r} y1={avgY} y2={avgY} stroke="var(--taupe)" strokeWidth="1" strokeDasharray="4 4" opacity="0.7" />
           <text x={W - pad.r} y={avgY - 5} textAnchor="end" fontSize="9.5" fill="var(--taupe-dark)">avg {money(avg)}</text>
         </g>
       )}
-
-      {/* bars */}
       {series.map((d, i) => {
         const h = plotH * (d.revenue / max);
         const cx = pad.l + i * bw + bw / 2;
@@ -65,7 +63,7 @@ function TrendChart({ series, unit }) {
           <g key={i}>
             <title>{d.label}: {money(d.revenue)} · {d.orders} order{d.orders === 1 ? '' : 's'}</title>
             <rect x={cx - barW / 2} y={H - pad.b - h} width={barW} height={Math.max(h, d.revenue > 0 ? 2 : 0)} rx="3"
-              fill={isLast ? 'var(--charcoal)' : 'var(--taupe)'} />
+              fill="url(#barGrad)" opacity={isLast ? 1 : 0.82} />
             {showVals && d.revenue > 0 && (
               <text x={cx} y={H - pad.b - h - 5} textAnchor="middle" fontSize="9.5" fill="var(--charcoal)" fontWeight="600">{money(d.revenue)}</text>
             )}
@@ -76,6 +74,52 @@ function TrendChart({ series, unit }) {
         );
       })}
     </svg>
+  );
+}
+
+// Donut ring from weighted segments.
+function Donut({ segments, centerTop, centerSub, size = 168, thickness = 24 }) {
+  const total = segments.reduce((s, x) => s + x.value, 0);
+  const r = (size - thickness) / 2;
+  const c = 2 * Math.PI * r;
+  let offset = 0;
+  return (
+    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label="Deals won and lost">
+      <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--tint)" strokeWidth={thickness} />
+        {total > 0 && segments.map((s, i) => {
+          const len = (s.value / total) * c;
+          const el = (
+            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={s.color} strokeWidth={thickness}
+              strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-offset} />
+          );
+          offset += len;
+          return el;
+        })}
+      </g>
+      <text x="50%" y="47%" textAnchor="middle" fontSize="30" fontWeight="700" fill="var(--charcoal)">{centerTop}</text>
+      <text x="50%" y="62%" textAnchor="middle" fontSize="11.5" fill="var(--muted)">{centerSub}</text>
+    </svg>
+  );
+}
+
+// Horizontal funnel: rows with proportional bars.
+function Funnel({ stages }) {
+  const max = Math.max(...stages.map((s) => s.value), 1);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {stages.map((s, i) => (
+        <div key={i}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+            <span style={{ color: 'var(--charcoal)' }}>{s.label}</span>
+            <span style={{ color: 'var(--muted)' }}>{s.value}{s.sub ? ` · ${s.sub}` : ''}</span>
+          </div>
+          <div className="goalbar" style={{ height: 14 }}>
+            <span style={{ width: `${Math.max((s.value / max) * 100, s.value > 0 ? 4 : 0)}%`, background: s.color }} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -102,7 +146,7 @@ function statusClass(s) {
   return 'ok';
 }
 
-export default async function DashboardPage({ searchParams }) {
+export default async function SalesDashboardPage({ searchParams }) {
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/dashboard');
   if (!isAdmin(session)) {
@@ -114,39 +158,38 @@ export default async function DashboardPage({ searchParams }) {
     );
   }
   if (!hasDb()) {
-    return (<div><AdminNav active="dashboard" /><div className="panel">Database not configured — set POSTGRES_URL.</div></div>);
+    return (<DashboardShell active="sales"><div className="panel">Database not configured — set POSTGRES_URL.</div></DashboardShell>);
   }
 
   const period = DASH_PERIODS.some((p) => p.key === searchParams?.period) ? searchParams.period : 'month';
 
-  let data = null, customers = [], error = '';
+  let data = null, goal = 0, error = '';
   try {
-    [data, customers] = await Promise.all([revenueDashboard(period), customerList()]);
+    [data, goal] = await Promise.all([revenueDashboard(period), getSetting('revenue_goal_monthly', 0)]);
   } catch (e) {
-    console.error('dashboard load failed', e.message);
+    console.error('sales dashboard load failed', e.message);
     error = 'Could not load dashboard data — if you just deployed, run the schema migration under Operations.';
   }
   if (error || !data) {
-    return (<div><AdminNav active="dashboard" /><div className="error-box">{error || 'No data.'}</div></div>);
+    return (<DashboardShell active="sales"><div className="error-box">{error || 'No data.'}</div></DashboardShell>);
   }
 
   const k = data.kpis;
   const pipe = data.pipeline;
-  const fin = await inventoryFinancials();
-  const members = customers.filter((c) => c.memberStatus && c.memberStatus !== 'none');
+  const deals = data.deals;
   const vs = data.hasPrev ? ` vs ${data.prevLabel}` : '';
+  const goalN = Number(goal) || 0;
+  const goalPct = goalN > 0 ? Math.min((k.revenue / goalN) * 100, 100) : 0;
 
   return (
-    <div>
-      <AdminNav active="dashboard" />
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, margin: '4px 0 14px' }}>
-        <h1 style={{ color: 'var(--charcoal)', margin: 0 }}>Dashboard</h1>
+    <DashboardShell active="sales">
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, margin: '0 0 14px' }}>
+        <h1 style={{ margin: 0 }}>Sales performance</h1>
         <span className="hint" style={{ margin: 0 }}>Showing <strong>{periodLabel(period)}</strong>{vs ? ` — compared${vs}` : ''}</span>
       </div>
 
       <DashboardFilters periods={DASH_PERIODS} active={period} />
 
-      {/* Headline KPIs for the selected period, each vs the previous period */}
       <div className="dash-kpis">
         <Kpi label={`Revenue · ${periodLabel(period)}`} value={money(k.revenue)} delta={k.revenueDelta} />
         <Kpi label="Profit" value={money(k.profit)} delta={k.profitDelta}
@@ -154,6 +197,63 @@ export default async function DashboardPage({ searchParams }) {
         <Kpi label="Orders" value={k.orders} delta={k.ordersDelta} />
         <Kpi label="Units sold" value={k.units} />
         <Kpi label="Avg order" value={money(k.avgOrder)} delta={k.avgDelta} />
+      </div>
+
+      {/* Monthly goal — only meaningful when viewing the current month */}
+      {period === 'month' && (
+        <div className="panel" style={{ marginTop: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            <h2 style={{ marginTop: 0, marginBottom: 0, color: 'var(--charcoal)' }}>Monthly revenue goal</h2>
+            <GoalEditor current={goalN} />
+          </div>
+          {goalN > 0 ? (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, marginBottom: 6 }}>
+                <span style={{ color: 'var(--charcoal)' }}>{money(k.revenue)} of {money(goalN)}</span>
+                <span style={{ color: 'var(--muted)' }}>{goalPct.toFixed(0)}% · {money(Math.max(goalN - k.revenue, 0))} to go</span>
+              </div>
+              <div className="goalbar"><span style={{ width: `${goalPct}%` }} /></div>
+            </div>
+          ) : (
+            <p className="hint" style={{ marginTop: 10 }}>Set a monthly revenue target to track progress here.</p>
+          )}
+        </div>
+      )}
+
+      {/* Deals won/lost + sales funnel */}
+      <div className="dash-2col">
+        <div className="panel">
+          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Deals won / lost · {periodLabel(period)}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+            <Donut
+              segments={[
+                { label: 'Won', value: deals.won, color: 'var(--c1)' },
+                { label: 'Lost', value: deals.lost, color: 'var(--c5)' },
+                { label: 'Open', value: deals.open, color: 'var(--c3)' }
+              ]}
+              centerTop={deals.won + deals.lost > 0 ? `${deals.winRate.toFixed(0)}%` : '—'}
+              centerSub={deals.won + deals.lost > 0 ? 'win rate' : 'no quotes'}
+            />
+            <div style={{ flex: '1 1 160px' }}>
+              <div className="legend" style={{ flexDirection: 'column', gap: 8 }}>
+                <span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--c1)' }} /> Won — {deals.won} ({money(deals.wonValue)})</span>
+                <span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--c5)' }} /> Lost — {deals.lost}</span>
+                <span className="legend-item"><span className="legend-swatch" style={{ background: 'var(--c3)' }} /> Open — {deals.open}</span>
+              </div>
+              <p className="hint" style={{ marginTop: 12 }}>From quotes created this period. Won = accepted/converted; lost = voided/expired.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel">
+          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Sales funnel · {periodLabel(period)}</h2>
+          <Funnel stages={[
+            { label: 'Quotes created', value: data.funnel.quotes, color: 'var(--c3)' },
+            { label: 'Quotes converted', value: data.funnel.converted, color: 'var(--c2)' },
+            { label: 'Invoices paid', value: data.funnel.invoicesPaid, sub: money(data.funnel.paidValue), color: 'var(--c1)' },
+            { label: 'Orders delivered', value: data.funnel.delivered, color: 'var(--c6)' }
+          ]} />
+        </div>
       </div>
 
       {/* Pipeline — current outstanding money, not affected by the date filter */}
@@ -256,64 +356,9 @@ export default async function DashboardPage({ searchParams }) {
         </div>
       </div>
 
-      {/* Inventory & margins (current stock) */}
-      <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Inventory &amp; margins <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 400 }}>(in stock now)</span></h2>
-        {fin.unitsWithCost === 0 && (
-          <p className="hint" style={{ marginTop: 0 }}>
-            Per-unit cost isn&apos;t in the catalog yet — re-run the tracker sync to pull &quot;Total Cost&quot; and light up margins.
-          </p>
-        )}
-        <div className="dash-kpis">
-          <Kpi label="In-stock units" value={fin.units} />
-          <Kpi label="Inventory cost" value={money(fin.inventoryCost)} sub="COGS in stock" />
-          <Kpi label="Sale value" value={money(fin.suggestedValue)} sub="at listed prices" />
-          <Kpi label="Potential profit" value={money(fin.potentialProfit)} sub={fin.unitsWithCost ? `${fin.marginPct.toFixed(1)}% margin` : null} />
-          <Kpi label="Retail value" value={money(fin.retailValue)} />
-          <Kpi label="Salvage revenue" value={money(data.salvage.revenue)} sub={`${data.salvage.disposed} parts unit${data.salvage.disposed === 1 ? '' : 's'} · all-time`} />
-        </div>
-      </div>
-
-      {/* Member + customer databases */}
-      <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Member database ({members.length})</h2>
-        <div className="table-wrap"><table className="admin">
-          <thead><tr><th>Business / Name</th><th>Contact</th><th>Status</th><th>Orders</th><th style={{ textAlign: 'right' }}>Spent</th></tr></thead>
-          <tbody>
-            {members.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--muted)' }}>No member applications yet.</td></tr>}
-            {members.map((m) => (
-              <tr key={m.id}>
-                <td>{m.business || m.name || '—'}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.name}</div></td>
-                <td>{m.email}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.phone || ''}</div></td>
-                <td><span className={'pill ' + (m.memberStatus === 'approved' ? 'ok' : m.memberStatus === 'pending' ? 'warn' : 'sold')}>{m.memberStatus}</span></td>
-                <td>{m.orders}</td>
-                <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(m.spent)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table></div>
-        <p className="hint" style={{ marginTop: 8 }}>Approve / reject members under <a href="/admin/operations" style={{ textDecoration: 'underline' }}>Operations</a>.</p>
-      </div>
-
-      <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Customer database ({customers.length})</h2>
-        <div className="table-wrap"><table className="admin">
-          <thead><tr><th>Name</th><th>Contact</th><th>Joined</th><th>Orders</th><th style={{ textAlign: 'right' }}>Total spent</th><th>Last order</th></tr></thead>
-          <tbody>
-            {customers.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--muted)' }}>No customer accounts yet.</td></tr>}
-            {customers.map((c) => (
-              <tr key={c.id}>
-                <td>{c.name || '—'}{c.role === 'member' && c.memberStatus === 'approved' ? <span className="pill ok" style={{ marginLeft: 6 }}>member</span> : null}</td>
-                <td>{c.email}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{c.phone || ''}</div></td>
-                <td>{fmtDate(c.createdAt)}</td>
-                <td>{c.orders}</td>
-                <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(c.spent)}</td>
-                <td>{fmtDate(c.lastOrder)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table></div>
-      </div>
-    </div>
+      <p className="hint" style={{ marginTop: 20, textAlign: 'center' }}>
+        Inventory, customers &amp; financial detail are moving to their own dashboards (Fulfilment · Customers · Financial) as those ship.
+      </p>
+    </DashboardShell>
   );
 }
