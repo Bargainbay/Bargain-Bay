@@ -8,6 +8,7 @@ import { listSold } from '../../../lib/catalog-sync';
 import { listDrivers } from '../../../lib/drivers';
 import { podPhotosForOrders } from '../../../lib/pod';
 import { listSalvage } from '../../../lib/salvage';
+import { listReps } from '../../../lib/reps';
 import AdminNav from '../../../components/AdminNav';
 import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
@@ -99,6 +100,12 @@ export default async function OperationsPage() {
     console.error('salvage load failed (run migration?)', e.message);
     needsMigration = true;
   }
+  let reps = [];
+  try {
+    reps = await listReps();
+  } catch (e) {
+    console.error('reps load failed', e.message);
+  }
   return (
     <div>
       <AdminNav active="operations" />
@@ -107,7 +114,7 @@ export default async function OperationsPage() {
           Could not read all tables — if you just deployed a new feature, run the schema migration below.
         </div>
       )}
-      <AdminOrders initialOrders={orders} drivers={drivers} />
+      <AdminOrders initialOrders={orders} drivers={drivers} reps={reps} />
       <AdminReconcile initialItems={sold} />
       <AdminSalvage initial={salvage} />
       <AdminDrivers initialDrivers={drivers} />
