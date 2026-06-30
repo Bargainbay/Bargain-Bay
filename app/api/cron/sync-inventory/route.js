@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { syncInventoryFromTracker } from '../../../../lib/catalog-sync';
+import { backfillAllInvoiceOrders } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Nightly inventory sync. Driven by Vercel Cron (vercel.json). If CRON_SECRET is
-// set, require it (Vercel Cron sends Authorization: Bearer <CRON_SECRET>).
+// Nightly inventory sync + self-healing revenue reconcile. Driven by Vercel Cron
+// (vercel.json). If CRON_SECRET is set, require it (Vercel Cron sends
+// Authorization: Bearer <CRON_SECRET>).
 async function run(req) {
   const secret = process.env.CRON_SECRET;
   if (secret) {
@@ -16,12 +18,23 @@ async function run(req) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
     }
   }
+  // Self-heal: back-fill the fulfilment order for any paid invoice missing one, so
+  // a paid sale always lands in the dashboard with zero manual action (covers a
+  // transient hiccup in the live mark-paid path, or legacy invoices). Best-effort
+  // — a reconcile failure must not block the inventory sync.
+  let reconciled = null;
+  try {
+    reconciled = await backfillAllInvoiceOrders();
+    if (reconciled.fixed) console.log('cron reconcile: added', reconciled.fixed, 'paid invoice(s) to the dashboard', JSON.stringify(reconciled.created));
+  } catch (e) {
+    console.error('cron invoice reconcile failed', e?.message || e);
+  }
   try {
     const result = await syncInventoryFromTracker();
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, reconciled, ...result });
   } catch (e) {
     console.error('cron sync-inventory failed', e?.message || e);
-    return NextResponse.json({ ok: false, error: e?.message || 'sync failed' }, { status: 500 });
+    return NextResponse.json({ ok: false, reconciled, error: e?.message || 'sync failed' }, { status: 500 });
   }
 }
 
