@@ -18,6 +18,7 @@ import AdminReconcile from '../AdminReconcile';
 import AdminDrivers from '../AdminDrivers';
 import AdminSalvage from '../AdminSalvage';
 import AdminIntake from '../AdminIntake';
+import PurchaseIntake from '../../../components/PurchaseIntake';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Operations — Bargain Bay' };
@@ -116,6 +117,10 @@ export default async function OperationsPage() {
         </div>
       )}
       <AdminOrders initialOrders={orders} drivers={drivers} reps={reps} />
+      <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Add stock from a purchase invoice</h2>
+        <PurchaseIntake />
+      </div>
       <AdminIntake />
       <AdminReconcile initialItems={sold} />
       <AdminSalvage initial={salvage} />
