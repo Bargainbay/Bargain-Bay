@@ -1,0 +1,138 @@
+'use client';
+import { useState } from 'react';
+
+// Edit an OPEN invoice's line items: add, remove, reprice, change warranty,
+// add a service line, or add a unit from inventory. Saves via PATCH action 'edit'.
+const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
+
+export default function InvoiceEditor({ invoice, inventory = [] }) {
+  const [items, setItems] = useState(
+    (invoice.items || []).map((it) => ({
+      description: it.description || '',
+      amount: it.amount != null ? String(it.amount) : '',
+      sku: it.sku || null,
+      kind: it.kind === 'service' ? 'service' : 'unit',
+      warrantyMonths: it.kind === 'service' ? null : (it.warranty_months ?? it.warrantyMonths ?? 12)
+    }))
+  );
+  const [addHst, setAddHst] = useState(Number(invoice.hst) > 0);
+  const [memo, setMemo] = useState(invoice.memo || '');
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [done, setDone] = useState(false);
+
+  const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
+  const addRow = () => setItems((xs) => [...xs, { description: '', amount: '', kind: 'unit', warrantyMonths: 12 }]);
+  const removeRow = (i) => setItems((xs) => xs.filter((_, j) => j !== i));
+  const addService = (label) => setItems((xs) => [...xs, { description: label, amount: '', kind: 'service', warrantyMonths: null }]);
+
+  const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = q.trim().length >= 2 ? inventory.filter((u) => tokens.every((t) => u.search.includes(t))).slice(0, 8) : [];
+  function pickInventory(u) {
+    setItems((xs) => [...xs, { description: u.description, amount: String(u.price), sku: u.id, kind: 'unit', warrantyMonths: 12 }]);
+    setQ('');
+  }
+
+  const subtotal = items.reduce((a, it) => a + (Number(it.amount) || 0), 0);
+  const hst = addHst ? subtotal * 0.13 : 0;
+  const total = subtotal + hst;
+  const fmt = (n) => '$' + n.toFixed(2);
+
+  async function save() {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/invoices', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items, addHst, memo })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not save.'); return; }
+      setDone(true);
+      setTimeout(() => { window.location.href = '/admin/invoices'; }, 700);
+    } catch {
+      setErr('Network error — please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) return <div className="notice-box">✓ Saved. Returning to invoices…</div>;
+
+  return (
+    <div>
+      {err && <div className="error-box">{err}</div>}
+      <div className="hint" style={{ marginTop: 0 }}>
+        Editing the customer&apos;s email isn&apos;t changed here — only the line items, HST, and memo.
+        The customer is <b>not</b> re-emailed automatically.
+      </div>
+
+      {inventory.length > 0 && (
+        <div className="field">
+          <label>Add a unit from inventory</label>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search stock by model, name, or SKU…" />
+          {matches.length > 0 && (
+            <div style={{ border: '1px solid var(--line)', borderRadius: 8, marginTop: 4, maxHeight: 230, overflowY: 'auto' }}>
+              {matches.map((u) => (
+                <button type="button" key={u.id} onClick={() => pickInventory(u)}
+                  style={{ display: 'flex', justifyContent: 'space-between', gap: 12, width: '100%', textAlign: 'left', padding: '8px 11px', background: 'none', border: 'none', borderBottom: '1px solid var(--line-soft)', cursor: 'pointer', fontSize: 13.5, color: 'var(--ink)' }}>
+                  <span>{u.description}</span>
+                  <span style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontWeight: 600 }}>${u.price.toFixed(2)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <label style={{ fontSize: 13, fontWeight: 500, display: 'block', margin: '4px 0 6px' }}>Line items</label>
+      {items.map((it, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+          <input style={{ flex: 1 }} value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} placeholder={it.kind === 'service' ? 'Service description' : 'e.g. Whirlpool WRS321SDHZ refrigerator'} />
+          {it.kind === 'service' ? (
+            <span className="pill" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>Service</span>
+          ) : (
+            <select value={it.warrantyMonths == null ? '' : it.warrantyMonths} onChange={(e) => setItem(i, 'warrantyMonths', e.target.value === '' ? null : Number(e.target.value))}
+              title="Warranty term shown on the invoice" style={{ width: 120, fontSize: 12.5, padding: '4px 6px' }}>
+              <option value={12}>1-yr warranty</option>
+              <option value={6}>6-mo warranty</option>
+              <option value={3}>3-mo warranty</option>
+              <option value="">No warranty</option>
+            </select>
+          )}
+          <input style={{ width: 110 }} type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="0.00" />
+          <button type="button" className="btn" style={{ padding: '0 12px' }} onClick={() => removeRow(i)} aria-label="Remove line">×</button>
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+        <button type="button" className="btn" onClick={addRow}>+ Add line</button>
+        <span className="hint" style={{ margin: '0 0 0 4px' }}>Add a service:</span>
+        {SERVICES.map((s) => (
+          <button key={s} type="button" className="btn" style={{ fontSize: 12.5 }} onClick={() => addService(s)}>+ {s}</button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+          <input type="checkbox" style={{ width: 'auto' }} checked={addHst} onChange={(e) => setAddHst(e.target.checked)} /> Add 13% HST
+        </label>
+      </div>
+
+      <div className="field">
+        <label>Memo / notes (optional)</label>
+        <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="Shown on the invoice" />
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
+        <div style={{ fontSize: 14, color: 'var(--muted)' }}>
+          Subtotal {fmt(subtotal)}{addHst ? ` · HST ${fmt(hst)}` : ''} · <b style={{ color: 'var(--charcoal)' }}>Total {fmt(total)}</b>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a className="btn" href="/admin/invoices">Cancel</a>
+          <button className="btn accent" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
