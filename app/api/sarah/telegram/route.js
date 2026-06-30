@@ -168,7 +168,7 @@ export async function POST(req) {
     sendChatAction(chatId, 'typing');
     try {
       const thread = await loadThread(threadKey, 20);
-      const { reply } = await runAgent({ agentKey, messages: thread, readOnly, ctx: { originChatId: chatId, dept: getAgent(agentKey).dept } });
+      const { reply } = await runAgent({ agentKey, messages: thread, readOnly, ctx: { originChatId: chatId, dept: getAgent(agentKey).dept, senderName: fromName } });
       await appendMessage(threadKey, 'assistant', reply);
       await sendMessage(chatId, reply); // groups stay text-only
     } catch (e) {
@@ -183,7 +183,7 @@ export async function POST(req) {
   try {
     await appendMessage(threadKey, 'user', prompt);
     const thread = await loadThread(threadKey, 20);
-    const { reply } = await runAgent({ agentKey, messages: thread, readOnly, ctx: { originChatId: chatId, dept: getAgent(agentKey).dept } });
+    const { reply } = await runAgent({ agentKey, messages: thread, readOnly, ctx: { originChatId: chatId, dept: getAgent(agentKey).dept, senderName: fromName } });
     await appendMessage(threadKey, 'assistant', reply);
     if (wasVoice && voiceConfigured()) {
       try {

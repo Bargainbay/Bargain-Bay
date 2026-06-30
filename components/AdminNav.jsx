@@ -6,6 +6,7 @@ export default function AdminNav({ active }) {
     { key: 'quotes', label: 'Quotes', href: '/admin/quotes' },
     { key: 'invoices', label: 'Invoices', href: '/admin/invoices' },
     { key: 'campaigns', label: 'Campaigns', href: '/admin/campaigns' },
+    { key: 'payroll', label: 'Payroll', href: '/admin/payroll' },
     { key: 'operations', label: 'Operations', href: '/admin/operations' }
   ];
   return (
