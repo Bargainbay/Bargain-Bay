@@ -56,7 +56,10 @@ export async function POST(req) {
     const order = await updateOrderStatus(orderId, 'delivered');
     await query('UPDATE orders SET delivered_at = now() WHERE id = $1', [orderId]);
     const { rows: its } = await query('SELECT sku, title, price FROM order_items WHERE order_id = $1', [orderId]);
-    try { await markUnitsSold(its.map((r) => r.sku), { channel: 'order', ref: order.order_number, price: null }); } catch (e) { console.error('markUnitsSold (pod) failed', e.message); }
+    try {
+      const prices = Object.fromEntries(its.map((r) => [r.sku, Number(r.price) || null]));
+      await markUnitsSold(its.map((r) => r.sku), { channel: 'order', ref: order.order_number, prices });
+    } catch (e) { console.error('markUnitsSold (pod) failed', e.message); }
     sendOrderStatusEmail({ ...order, status: 'delivered' }, its.map((r) => ({ title: r.title, price: Number(r.price) })))
       .catch((e) => console.error('delivered email failed', e.message));
 

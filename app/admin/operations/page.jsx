@@ -17,6 +17,7 @@ import AdminMembers from '../AdminMembers';
 import AdminReconcile from '../AdminReconcile';
 import AdminDrivers from '../AdminDrivers';
 import AdminSalvage from '../AdminSalvage';
+import AdminIntake from '../AdminIntake';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Operations — Bargain Bay' };
@@ -115,6 +116,7 @@ export default async function OperationsPage() {
         </div>
       )}
       <AdminOrders initialOrders={orders} drivers={drivers} reps={reps} />
+      <AdminIntake />
       <AdminReconcile initialItems={sold} />
       <AdminSalvage initial={salvage} />
       <AdminDrivers initialDrivers={drivers} />

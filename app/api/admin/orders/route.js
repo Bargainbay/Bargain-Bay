@@ -37,7 +37,8 @@ export async function PATCH(req) {
     // marked sold by the webhook; this covers offline e-transfer / pay-on-pickup.
     if (['confirmed', 'ready', 'out_for_delivery', 'delivered'].includes(status)) {
       try {
-        await markUnitsSold(its.map((r) => r.sku), { channel: 'order', ref: order.order_number, price: null });
+        const prices = Object.fromEntries(its.map((r) => [r.sku, Number(r.price) || null]));
+        await markUnitsSold(its.map((r) => r.sku), { channel: 'order', ref: order.order_number, prices });
         await query('DELETE FROM reservations WHERE order_id = $1', [id]).catch(() => {});
       } catch (e) {
         console.error('mark order confirmed -> sold failed', e.message);
