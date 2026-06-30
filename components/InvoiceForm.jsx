@@ -3,7 +3,7 @@ import { useState, useRef } from 'react';
 import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
 
 // Product lines default to a 1-year warranty (downgrade per item as needed).
-const blankItem = () => ({ description: '', amount: '', kind: 'unit', warrantyMonths: 12 });
+const blankItem = () => ({ description: '', amount: '', kind: 'unit', warrantyMonths: 12, cost: '' });
 const serviceItem = (description) => ({ description, amount: '', kind: 'service', warrantyMonths: null });
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 
@@ -195,7 +195,10 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
               <option value="">No warranty</option>
             </select>
           )}
-          <input style={{ width: 110 }} type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="0.00" />
+          {it.kind !== 'service' && !it.sku && (
+            <input style={{ width: 95 }} type="number" min="0" step="0.01" value={it.cost ?? ''} onChange={(e) => setItem(i, 'cost', e.target.value)} placeholder="cost" title="Your cost for this unit (for margin) — fill in for a unit that isn't in inventory" />
+          )}
+          <input style={{ width: 110 }} type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="price" />
           <button type="button" className="btn" style={{ padding: '0 12px' }} onClick={() => removeRow(i)} aria-label="Remove line">×</button>
         </div>
       ))}
