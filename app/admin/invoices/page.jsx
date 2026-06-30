@@ -76,8 +76,8 @@ export default async function InvoicesPage() {
           <SyncDashboardButton />
         </div>
         <p className="hint" style={{ marginTop: 6 }}>
-          A paid invoice only shows in the dashboard once it has a fulfilment order. Older invoices marked paid before that
-          link existed can be back-filled here (or per-row with <b>+ Add to dashboard</b>).
+          Marking an invoice paid now always counts it as revenue automatically, and a nightly job re-checks for any that
+          slipped — you don&apos;t need to do anything. This button is just an optional <i>fix-it-now</i> for older invoices.
         </p>
         {loadError && (
           <div className="error-box" style={{ marginBottom: 10 }}>{loadError}</div>
