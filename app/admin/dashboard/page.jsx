@@ -70,7 +70,8 @@ export default async function SalesDashboardPage({ searchParams }) {
       <DashboardFilters periods={DASH_PERIODS} active={period} />
 
       <div className="dash-kpis">
-        <Kpi label={`Revenue · ${periodLabel(period)}`} value={money(k.revenue)} delta={k.revenueDelta} />
+        <Kpi label={`Revenue (ex-HST) · ${periodLabel(period)}`} value={money(k.revenue)} delta={k.revenueDelta}
+          sub={k.hstCollected ? `+ ${money(k.hstCollected)} HST collected` : 'pre-tax sales'} />
         <Kpi label="Profit" value={money(k.profit)} delta={k.profitDelta}
           sub={k.unitsWithCost ? `${k.marginPct.toFixed(1)}% margin` : 'cost not tracked'} />
         <Kpi label="Orders" value={k.orders} delta={k.ordersDelta} />
