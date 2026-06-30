@@ -154,8 +154,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   number         text UNIQUE,                 -- 'INV-' || (1000 + id)
   email          text NOT NULL,
   name           text,
-  status         text NOT NULL DEFAULT 'open' -- open | paid | void
-                 CHECK (status IN ('open','paid','void')),
+  status         text NOT NULL DEFAULT 'open' -- open | paid | void | refunded
+                 CHECK (status IN ('open','paid','void','refunded')),
   subtotal       numeric(10,2),
   hst            numeric(10,2),
   total          numeric(10,2),
@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   due_date       date,
   payment_method text,                        -- how it was paid (cash/etransfer/...)
   paid_at        timestamptz,
+  refunded_at    timestamptz,                 -- set when a paid invoice is refunded
   created_at     timestamptz DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS invoice_items (

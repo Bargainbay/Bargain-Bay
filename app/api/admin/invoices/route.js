@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, PAYMENT_METHODS } from '../../../../lib/invoices';
+import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, refundInvoice, deleteInvoice, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -76,6 +76,10 @@ export async function PATCH(req) {
       if (!voided) return NextResponse.json({ error: 'Only an open invoice can be voided.' }, { status: 409 });
       return NextResponse.json({ ok: true, invoice: { id: voided.id, number: voided.number, status: 'void' } });
     }
+    if (body.action === 'refund') {
+      const refunded = await refundInvoice(invoiceId);
+      return NextResponse.json({ ok: true, invoice: refunded });
+    }
     const method = String(body.method || '').trim();
     if (!PAYMENT_METHODS[method]) return NextResponse.json({ error: 'Pick a valid payment method.' }, { status: 400 });
     const invoice = await markInvoicePaid(invoiceId, method);
@@ -83,5 +87,23 @@ export async function PATCH(req) {
   } catch (e) {
     console.error('update invoice failed', e?.message || e);
     return NextResponse.json({ error: e?.message || 'Could not update the invoice.' }, { status: 500 });
+  }
+}
+
+// Permanently delete an invoice created in error (open/void only — paid ones
+// must be refunded). Body: { invoiceId }.
+export async function DELETE(req) {
+  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!hasDb()) return noDb();
+  let body;
+  try { body = await req.json(); } catch { body = {}; }
+  const invoiceId = Number(body.invoiceId);
+  if (!invoiceId) return NextResponse.json({ error: 'invoiceId is required.' }, { status: 400 });
+  try {
+    const res = await deleteInvoice(invoiceId);
+    return NextResponse.json({ ok: true, invoice: res });
+  } catch (e) {
+    console.error('delete invoice failed', e?.message || e);
+    return NextResponse.json({ error: e?.message || 'Could not delete the invoice.' }, { status: 400 });
   }
 }

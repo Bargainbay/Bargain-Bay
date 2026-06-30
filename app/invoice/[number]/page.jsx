@@ -3,7 +3,8 @@ import { hasDb } from '../../../lib/db';
 import { getInvoiceByNumber } from '../../../lib/invoices';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { verifyLinkToken } from '../../../lib/links';
-import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel } from '../../../lib/constants';
+import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel,
+         BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoice — Bargain Bay' };
@@ -49,18 +50,59 @@ export default async function InvoicePage({ params, searchParams }) {
   const open = invoice.status === 'open';
   const paid = invoice.status === 'paid';
   const voided = invoice.status === 'void';
+  const refunded = invoice.status === 'refunded';
+  const delivery = invoice.delivery_method === 'delivery';
+  const statusLabel = paid ? 'Paid' : refunded ? 'Refunded' : voided ? 'Void' : 'Open';
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
-      <h1 style={{ color: 'var(--charcoal)' }}>Invoice {invoice.number}</h1>
+      {/* Business letterhead */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--charcoal)', paddingBottom: 10, marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--charcoal)' }}>{BUSINESS_NAME}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{BUSINESS_LEGAL} · {BUSINESS_ADDRESS}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{SALES_EMAIL} · HST# {HST_NUMBER}</div>
+        </div>
+        <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>INVOICE</div>
+          <div style={{ fontSize: 13 }}>{invoice.number}</div>
+        </div>
+      </div>
+
       <div style={{ marginBottom: 8 }}>
-        <span className={'pill ' + (paid ? 'ok' : voided ? 'sold' : 'warn')}>{paid ? 'Paid' : voided ? 'Void' : 'Open'}</span>
+        <span className={'pill ' + (paid ? 'ok' : (voided || refunded) ? 'sold' : 'warn')}>{statusLabel}</span>
         <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 10 }}>
           Issued {fmtDate(invoice.created_at)}{invoice.due_date && open ? ` · due ${fmtDate(invoice.due_date)}` : ''}
         </span>
       </div>
 
+      {/* Bill To / Ship To */}
+      <div className="panel" style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 220px' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', marginBottom: 3 }}>Bill to</div>
+          {invoice.name && <div style={{ fontWeight: 700 }}>{invoice.name}</div>}
+          <div>{invoice.email}</div>
+          {invoice.phone && <div>{invoice.phone}</div>}
+        </div>
+        <div style={{ flex: '1 1 220px' }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', marginBottom: 3 }}>{delivery ? 'Ship to (delivery)' : 'Fulfilment'}</div>
+          {delivery ? (
+            <>
+              {invoice.name && <div style={{ fontWeight: 700 }}>{invoice.name}</div>}
+              {invoice.address && <div>{invoice.address}</div>}
+              {(invoice.city || invoice.postal) && <div>{[invoice.city, invoice.postal].filter(Boolean).join(' ')}</div>}
+            </>
+          ) : (
+            <>
+              <div>Pickup by appointment</div>
+              <div style={{ color: 'var(--muted)' }}>{PICKUP_ADDRESS}</div>
+            </>
+          )}
+        </div>
+      </div>
+
       {paid && <div className="notice-box">Paid{invoice.paid_at ? ` on ${fmtDate(invoice.paid_at)}` : ''}{invoice.payment_method ? ` · ${invoice.payment_method}` : ''} — thank you!</div>}
+      {refunded && <div className="notice-box">This invoice was refunded{invoice.refunded_at ? ` on ${fmtDate(invoice.refunded_at)}` : ''}. Questions? Email {SALES_EMAIL}.</div>}
       {voided && <div className="error-box">This invoice was voided. Questions? Email {SALES_EMAIL}.</div>}
 
       {open && (
@@ -95,7 +137,18 @@ export default async function InvoicePage({ params, searchParams }) {
         <div className="summary-row total"><span>Total</span><span>{money(invoice.total)}</span></div>
         {invoice.memo && <p style={{ margin: '10px 0 0', fontSize: 13.5, color: 'var(--muted)' }}>{invoice.memo}</p>}
         <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--muted)' }}>
-          RS Solutions Inc. — GST/HST # 708490016 RT0001.
+          {BUSINESS_LEGAL} — GST/HST # {HST_NUMBER}.
+        </p>
+      </div>
+
+      <div className="panel">
+        <h2 style={{ marginTop: 0 }}>Returns &amp; warranty</h2>
+        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>
+          {RETURN_POLICY_SUMMARY.map((p, i) => <li key={i} style={{ marginBottom: 5 }}>{p}</li>)}
+        </ul>
+        <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 0 }}>
+          Returns &amp; warranty claims: <a href={`mailto:${SERVICE_EMAIL}`} style={{ textDecoration: 'underline' }}>{SERVICE_EMAIL}</a> (with your invoice number, model, issue &amp; photos).
+          Full policy: <a href="/policies/returns" style={{ textDecoration: 'underline' }}>bargainbay.ca/policies/returns</a>.
         </p>
       </div>
 

@@ -8,12 +8,13 @@ import { getAll } from '../../../lib/inventory';
 import AdminNav from '../../../components/AdminNav';
 import InvoiceForm from '../../../components/InvoiceForm';
 import MarkPaidControl from '../../../components/MarkPaidControl';
+import InvoiceActions from '../../../components/InvoiceActions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoices — Bargain Bay' };
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
-const statusClass = (s) => (s === 'paid' ? 'ok' : s === 'open' || s === 'draft' ? 'warn' : s === 'void' || s === 'uncollectible' ? 'sold' : 'warn');
+const statusClass = (s) => (s === 'paid' ? 'ok' : s === 'open' || s === 'draft' ? 'warn' : s === 'void' || s === 'refunded' || s === 'uncollectible' ? 'sold' : 'warn');
 
 export default async function InvoicesPage() {
   const session = await getSession();
@@ -87,12 +88,9 @@ export default async function InvoicesPage() {
                 <td>
                   {inv.status === 'open'
                     ? <MarkPaidControl invoiceId={inv.id} />
-                    : (inv.method || (inv.status === 'paid' ? 'Paid' : '—'))}
+                    : (inv.method || (inv.status === 'paid' ? 'Paid' : inv.status === 'refunded' ? 'Refunded' : '—'))}
                 </td>
-                <td>
-                  {inv.hostedUrl ? <a href={inv.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View</a> : ''}
-                  {inv.orderNumber ? <> · <a href="/admin/operations" style={{ textDecoration: 'underline' }} title={`Fulfilment order ${inv.orderNumber}`}>{inv.orderNumber}</a></> : ''}
-                </td>
+                <td><InvoiceActions invoice={inv} /></td>
               </tr>
             ))}
           </tbody>
