@@ -19,6 +19,8 @@ import AdminDrivers from '../AdminDrivers';
 import AdminSalvage from '../AdminSalvage';
 import AdminIntake from '../AdminIntake';
 import PurchaseIntake from '../../../components/PurchaseIntake';
+import IntakeQueue from '../../../components/IntakeQueue';
+import { listPendingIntake } from '../../../lib/intake-queue';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Operations — Bargain Bay' };
@@ -102,6 +104,9 @@ export default async function OperationsPage() {
     console.error('salvage load failed (run migration?)', e.message);
     needsMigration = true;
   }
+  let pendingIntake = [];
+  try { pendingIntake = await listPendingIntake(); } catch (e) { console.error('intake queue load failed', e.message); }
+
   let reps = [];
   try {
     reps = await listReps();
@@ -117,6 +122,12 @@ export default async function OperationsPage() {
         </div>
       )}
       <AdminOrders initialOrders={orders} drivers={drivers} reps={reps} />
+      <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
+          Items waiting to be added{pendingIntake.length ? ` (${pendingIntake.length})` : ''}
+        </h2>
+        <IntakeQueue initialPending={pendingIntake} />
+      </div>
       <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Add stock from a purchase invoice</h2>
         <PurchaseIntake />
