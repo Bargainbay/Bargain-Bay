@@ -73,7 +73,9 @@ export default async function SalesDashboardPage({ searchParams }) {
         <Kpi label={`Revenue (ex-HST) · ${periodLabel(period)}`} value={money(k.revenue)} delta={k.revenueDelta}
           sub={k.hstCollected ? `+ ${money(k.hstCollected)} HST collected` : 'pre-tax sales'} />
         <Kpi label="Profit" value={money(k.profit)} delta={k.profitDelta}
-          sub={k.unitsWithCost ? `${k.marginPct.toFixed(1)}% margin` : 'cost not tracked'} />
+          sub={k.unitsWithCost
+            ? `${k.marginPct.toFixed(1)}% margin · on ${Math.round(k.costCoverage)}% of sales w/ cost`
+            : 'no cost data yet'} />
         <Kpi label="Orders" value={k.orders} delta={k.ordersDelta} />
         <Kpi label="Units sold" value={k.units} />
         <Kpi label="Avg order" value={money(k.avgOrder)} delta={k.avgDelta} />
