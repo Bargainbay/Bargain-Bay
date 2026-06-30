@@ -35,10 +35,13 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
   id       serial PRIMARY KEY,
   order_id int REFERENCES orders(id) ON DELETE CASCADE,
-  sku      text NOT NULL,
+  sku      text,                              -- null for service/fee/ad-hoc lines (no unit SKU)
   title    text,
   price    numeric(10,2)
 );
+-- Older DBs created sku NOT NULL; service/ad-hoc invoice lines have no SKU and
+-- must still bridge into an order, so relax it (idempotent).
+ALTER TABLE order_items ALTER COLUMN sku DROP NOT NULL;
 
 -- One row per SKU. A unit is "held" while expires_at is in the future.
 CREATE TABLE IF NOT EXISTS reservations (
