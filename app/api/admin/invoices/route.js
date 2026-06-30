@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, refundInvoice, deleteInvoice, PAYMENT_METHODS } from '../../../../lib/invoices';
+import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, refundInvoice, deleteInvoice,
+         updateInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -67,10 +68,34 @@ export async function PATCH(req) {
   if (!hasDb()) return noDb();
   let body;
   try { body = await req.json(); } catch { body = {}; }
+
+  // Bulk repair — no specific invoice. Backfills orders for every paid invoice
+  // missing one (fixes paid invoices invisible to the dashboard).
+  if (body.action === 'backfill_all') {
+    try {
+      const r = await backfillAllInvoiceOrders();
+      return NextResponse.json({ ok: true, ...r });
+    } catch (e) {
+      return NextResponse.json({ error: e?.message || 'Backfill failed.' }, { status: 500 });
+    }
+  }
+
   const invoiceId = Number(body.invoiceId);
   if (!invoiceId) return NextResponse.json({ error: 'invoiceId is required.' }, { status: 400 });
 
   try {
+    if (body.action === 'edit') {
+      const updated = await updateInvoice(invoiceId, {
+        items: Array.isArray(body.items) ? body.items : [],
+        addHst: !!body.addHst,
+        memo: body.memo
+      });
+      return NextResponse.json({ ok: true, invoice: updated });
+    }
+    if (body.action === 'backfill') {
+      const r = await backfillInvoiceOrder(invoiceId);
+      return NextResponse.json({ ok: true, invoice: r });
+    }
     if (body.action === 'void') {
       const voided = await voidInvoice(invoiceId);
       if (!voided) return NextResponse.json({ error: 'Only an open invoice can be voided.' }, { status: 409 });

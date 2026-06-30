@@ -39,6 +39,14 @@ export default function InvoiceActions({ invoice }) {
       <a href={`/admin/packing-slip/${number}`} target="_blank" rel="noopener noreferrer" style={link}>Packing slip</a>
       {orderNumber && <a href="/admin/operations" style={link} title={`Fulfilment order ${orderNumber}`}>{orderNumber}</a>}
 
+      {status === 'open' && <a href={`/admin/invoices/${number}/edit`} style={link}>Edit</a>}
+      {status === 'paid' && !orderNumber && (
+        <button style={btn} disabled={!!busy}
+          onClick={() => send('PATCH', { action: 'backfill' }, '', 'backfill')}
+          title="This paid invoice has no fulfilment order, so it's missing from the dashboard. Create it now.">
+          {busy === 'backfill' ? '…' : '+ Add to dashboard'}
+        </button>
+      )}
       {status === 'open' && (
         <button style={btn} disabled={!!busy}
           onClick={() => send('PATCH', { action: 'void' }, `Void invoice ${number}? It stays on record but is marked void.`, 'void')}>

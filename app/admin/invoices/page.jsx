@@ -9,6 +9,7 @@ import AdminNav from '../../../components/AdminNav';
 import InvoiceForm from '../../../components/InvoiceForm';
 import MarkPaidControl from '../../../components/MarkPaidControl';
 import InvoiceActions from '../../../components/InvoiceActions';
+import SyncDashboardButton from '../../../components/SyncDashboardButton';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoices — Bargain Bay' };
@@ -70,7 +71,14 @@ export default async function InvoicesPage() {
       </div>
 
       <div className="panel">
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Recent invoices</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <h2 style={{ marginTop: 0, marginBottom: 0, color: 'var(--charcoal)' }}>Recent invoices</h2>
+          <SyncDashboardButton />
+        </div>
+        <p className="hint" style={{ marginTop: 6 }}>
+          A paid invoice only shows in the dashboard once it has a fulfilment order. Older invoices marked paid before that
+          link existed can be back-filled here (or per-row with <b>+ Add to dashboard</b>).
+        </p>
         {loadError && (
           <div className="error-box" style={{ marginBottom: 10 }}>{loadError}</div>
         )}
