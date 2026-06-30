@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { syncInventoryFromTracker } from '../../../../lib/catalog-sync';
 import { backfillAllInvoiceOrders } from '../../../../lib/invoices';
+import { cronAuthorized } from '../../../../lib/cron-auth';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -10,14 +11,7 @@ export const maxDuration = 60;
 // (vercel.json). If CRON_SECRET is set, require it (Vercel Cron sends
 // Authorization: Bearer <CRON_SECRET>).
 async function run(req) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get('authorization') || '';
-    const key = new URL(req.url).searchParams.get('key') || '';
-    if (auth !== `Bearer ${secret}` && key !== secret) {
-      return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
-    }
-  }
+  if (!cronAuthorized(req)) return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
   // Self-heal: back-fill the fulfilment order for any paid invoice missing one, so
   // a paid sale always lands in the dashboard with zero manual action (covers a
   // transient hiccup in the live mark-paid path, or legacy invoices). Best-effort
