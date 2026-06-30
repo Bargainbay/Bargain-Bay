@@ -16,7 +16,7 @@ import { getAgent } from '../../../../lib/agents/registry';
 import { couldBeForBot, isAddressedToBot } from '../../../../lib/agents/addressing';
 import { loadThread, appendMessage } from '../../../../lib/sarah-threads';
 import { verifyTelegramSecret, getBotUsername, sendMessage, sendChatAction, downloadFile, sendVoice } from '../../../../lib/telegram';
-import { openEscalationByMessage, resolveEscalation } from '../../../../lib/escalations';
+import { openEscalationByMessage, openSingleEscalation, resolveEscalation } from '../../../../lib/escalations';
 import { appendToPlaybook } from '../../../../lib/playbook';
 import { voiceConfigured, transcribeAudio, synthesizeSpeech } from '../../../../lib/voice';
 
@@ -52,8 +52,11 @@ function agentForGroup(chatId) {
 // playbook. Returns true if it handled the message.
 async function resolveEscalationReply(msg, answer) {
   const replied = msg.reply_to_message;
-  if (!replied) return false;
-  const esc = await openEscalationByMessage(replied.message_id);
+  // Prefer an explicit reply (matches the exact escalation). If the owner just
+  // typed an answer without using Telegram's reply, fall back to the single open
+  // escalation — only when there's exactly one, so we never mis-attribute.
+  let esc = replied ? await openEscalationByMessage(replied.message_id) : null;
+  if (!esc && !replied) esc = await openSingleEscalation();
   if (!esc) return false;
   await resolveEscalation(esc.id, answer);
   if (esc.origin_chat_id) {
@@ -150,7 +153,7 @@ export async function POST(req) {
 
     // Management group: an owner replying to an escalation answers it outright —
     // relay it back to where it came from and learn it, no agent run needed.
-    if (isAdmin && process.env.SARAH_TELEGRAM_MGMT_GROUP && String(chatId) === String(process.env.SARAH_TELEGRAM_MGMT_GROUP) && msg.reply_to_message) {
+    if (isAdmin && process.env.SARAH_TELEGRAM_MGMT_GROUP && String(chatId) === String(process.env.SARAH_TELEGRAM_MGMT_GROUP)) {
       try { if (await resolveEscalationReply(msg, prompt)) return ok(); } catch (e) { console.error('resolve escalation', e?.message || e); }
     }
 
