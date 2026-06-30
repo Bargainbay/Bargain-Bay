@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { syncInventoryFromTracker } from '../../../../lib/catalog-sync';
-import { backfillAllInvoiceOrders } from '../../../../lib/invoices';
+import { backfillAllInvoiceOrders, invoiceOrderStats } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,12 +29,13 @@ async function run(req) {
   } catch (e) {
     console.error('cron invoice reconcile failed', e?.message || e);
   }
+  const stats = await invoiceOrderStats().catch(() => null);
   try {
     const result = await syncInventoryFromTracker();
-    return NextResponse.json({ ok: true, reconciled, ...result });
+    return NextResponse.json({ ok: true, reconciled, stats, ...result });
   } catch (e) {
     console.error('cron sync-inventory failed', e?.message || e);
-    return NextResponse.json({ ok: false, reconciled, error: e?.message || 'sync failed' }, { status: 500 });
+    return NextResponse.json({ ok: false, reconciled, stats, error: e?.message || 'sync failed' }, { status: 500 });
   }
 }
 
