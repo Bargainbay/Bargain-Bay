@@ -34,7 +34,8 @@ export async function POST(req) {
   if (!sku) return NextResponse.json({ error: 'sku required' }, { status: 400 });
   if (!Number.isFinite(price) || price <= 0) return NextResponse.json({ error: 'valid price required' }, { status: 400 });
   try {
-    await upsertClearance({ sku, price, warrantyMonths: body.warrantyMonths, note: body.note, active: body.active });
+    const r = await upsertClearance({ sku, price, warrantyMonths: body.warrantyMonths, note: body.note, active: body.active });
+    if (r && r.found === false) return NextResponse.json({ error: `No product with SKU ${sku}.` }, { status: 404 });
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
