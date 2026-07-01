@@ -16,9 +16,9 @@ async function run(req) {
     if (!emails.length) return NextResponse.json({ ok: true, found: false, inbox });
     const full = await readEmail(inbox, emails[0].id);
     const body = full.body || '';
-    const code = (body.match(/\b\d{9}\b/) || [])[0] || null;
-    const link = (body.match(/https:\/\/mail\.google\.com\/mail\/\S*/) || [])[0] || null;
-    return NextResponse.json({ ok: true, found: true, inbox, subject: full.subject, code, link });
+    const code = (body.match(/\b\d{6,9}\b/) || [])[0] || (full.subject.match(/#?(\d{6,9})/) || [])[1] || null;
+    const link = (body.match(/https?:\/\/mail\.google\.com\/mail\/\S+/) || [])[0] || null;
+    return NextResponse.json({ ok: true, found: true, inbox, subject: full.subject, code, link, body: body.slice(0, 1500) });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message || 'failed' }, { status: 500 });
   }
