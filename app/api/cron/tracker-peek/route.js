@@ -26,15 +26,22 @@ async function run(req) {
       suggested: find(/suggested/i), retail: find(/retail/i)
     };
     const at = (row, i) => (i >= 0 ? String(row[i] ?? '').trim() : '');
-    const matches = grid.slice(1)
+    const numify = (s) => Number(String(s || '').replace(/[^0-9.]/g, '')) || 0;
+    const rowInfo = (r) => ({
+      sku: at(r, ci.sku), make: at(r, ci.make), model: at(r, ci.model),
+      status: at(r, ci.status), condition: at(r, ci.condition), conditionPct: at(r, ci.pct),
+      suggested: at(r, ci.suggested), retail: at(r, ci.retail)
+    });
+    const rows = grid.slice(1);
+    const matches = rows
       .filter((r) => q && [ci.make, ci.model, ci.desc].some((i) => at(r, i).toLowerCase().includes(q)))
-      .slice(0, 20)
-      .map((r) => ({
-        sku: at(r, ci.sku), make: at(r, ci.make), model: at(r, ci.model),
-        status: at(r, ci.status), condition: at(r, ci.condition), conditionPct: at(r, ci.pct),
-        suggested: at(r, ci.suggested), retail: at(r, ci.retail)
-      }));
-    return NextResponse.json({ ok: true, report, matchCount: matches.length, matches });
+      .slice(0, 20).map(rowInfo);
+    // Tested-Working rows that WON'T go live because they have no price (no
+    // Condition% and no Suggested price) — the usual "why isn't it showing".
+    const noPrice = rows
+      .filter((r) => /tested working/i.test(at(r, ci.status)) && numify(at(r, ci.pct)) <= 0 && numify(at(r, ci.suggested)) <= 0)
+      .slice(0, 20).map(rowInfo);
+    return NextResponse.json({ ok: true, report, matchCount: matches.length, matches, testedWorkingNoPrice: noPrice });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message || 'failed' }, { status: 500 });
   }
