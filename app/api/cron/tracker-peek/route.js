@@ -18,7 +18,12 @@ async function run(req) {
     const { report } = parseTrackerCsv(csv);
     const grid = parseCsv(csv);
     if (!grid.length) return NextResponse.json({ ok: true, report, matches: [] });
-    const header = grid[0].map((h) => String(h || '').trim());
+    // The header isn't necessarily row 0 (title rows above it) — find it like the
+    // sync does: the row that has an Item ID/SKU column AND a Status column.
+    let hIdx = grid.findIndex((row) => row.some((c) => /item id|sku/i.test(c)) && row.some((c) => /status/i.test(c)));
+    if (hIdx < 0) hIdx = 0;
+    const header = grid[hIdx].map((h) => String(h || '').trim());
+    const dataStart = hIdx + 1;
     const find = (re) => header.findIndex((h) => re.test(h));
     const ci = {
       sku: find(/item id|sku/i), make: find(/^make/i), model: find(/^model/i), desc: find(/description/i),
@@ -32,7 +37,7 @@ async function run(req) {
       status: at(r, ci.status), condition: at(r, ci.condition), conditionPct: at(r, ci.pct),
       suggested: at(r, ci.suggested), retail: at(r, ci.retail)
     });
-    const rows = grid.slice(1);
+    const rows = grid.slice(dataStart);
     const matches = rows
       .filter((r) => q && [ci.make, ci.model, ci.desc].some((i) => at(r, i).toLowerCase().includes(q)))
       .slice(0, 20).map(rowInfo);
