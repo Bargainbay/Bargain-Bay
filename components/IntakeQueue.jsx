@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 // Review queue for AI-extracted purchase invoices (from the email watcher). The
 // owner edits if needed, then approves → units are written to the master tracker.
-const CATEGORIES = ['Refrigerator', 'Freezer', 'Washer', 'Dryer', 'Laundry Center', 'Dishwasher', 'Range', 'Wall Oven', 'Microwave', 'Range Hood', 'Cooktop', 'Other'];
+const CATEGORIES = ['Refrigerator', 'Freezer', 'Washer', 'Dryer', 'Laundry Center', 'Dishwasher', 'Range', 'Wall Oven', 'Microwave', 'Range Hood', 'Cooktop', 'TV', 'Vacuum', 'Small Appliance', 'Other'];
 
 export default function IntakeQueue({ initialPending = [] }) {
   const [pending, setPending] = useState(initialPending);
@@ -59,13 +59,14 @@ export default function IntakeQueue({ initialPending = [] }) {
               <label style={{ fontSize: 13 }}>Invoice # <input value={d.invoice} onChange={(e) => setDraft(q.id, { ...d, invoice: e.target.value })} /></label>
             </div>
             <div className="table-wrap"><table className="admin">
-              <thead><tr><th>Description</th><th>Make</th><th>Model</th><th>Category</th><th style={{ textAlign: 'right' }}>Retail</th><th style={{ textAlign: 'right' }}>Cost</th><th>Qty</th><th></th></tr></thead>
+              <thead><tr><th>Description</th><th>Make</th><th>Model</th><th>Serial</th><th>Category</th><th style={{ textAlign: 'right' }}>Retail</th><th style={{ textAlign: 'right' }}>Cost</th><th>Qty</th><th></th></tr></thead>
               <tbody>
                 {d.items.map((it, i) => (
                   <tr key={i}>
                     <td><input style={{ width: 230 }} value={it.description || ''} onChange={(e) => setItem(q, i, 'description', e.target.value)} placeholder="Searchable title (include appliance type)" /></td>
                     <td><input style={{ width: 85 }} value={it.make || ''} onChange={(e) => setItem(q, i, 'make', e.target.value)} /></td>
                     <td><input style={{ width: 125 }} value={it.model || ''} onChange={(e) => setItem(q, i, 'model', e.target.value)} /></td>
+                    <td><input style={{ width: 95 }} value={it.serial || ''} onChange={(e) => setItem(q, i, 'serial', e.target.value)} /></td>
                     <td><select value={it.category || 'Other'} onChange={(e) => setItem(q, i, 'category', e.target.value)} style={{ fontSize: 12.5 }}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></td>
                     <td><input style={{ width: 75, textAlign: 'right' }} type="number" step="0.01" value={it.retail ?? ''} onChange={(e) => setItem(q, i, 'retail', e.target.value)} /></td>
                     <td><input style={{ width: 75, textAlign: 'right' }} type="number" step="0.01" value={it.cost ?? ''} onChange={(e) => setItem(q, i, 'cost', e.target.value)} /></td>
