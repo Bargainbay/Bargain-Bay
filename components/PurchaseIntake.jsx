@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 // Upload a supplier purchase invoice (PDF/image) → AI extracts the units + costs →
 // review/edit → write them into the master tracker as "Untested".
-const CATEGORIES = ['Refrigerator', 'Freezer', 'Washer', 'Dryer', 'Laundry Center', 'Dishwasher', 'Range', 'Wall Oven', 'Microwave', 'Range Hood', 'Cooktop', 'Other'];
+const CATEGORIES = ['Refrigerator', 'Freezer', 'Washer', 'Dryer', 'Laundry Center', 'Dishwasher', 'Range', 'Wall Oven', 'Microwave', 'Range Hood', 'Cooktop', 'TV', 'Vacuum', 'Small Appliance', 'Other'];
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -17,6 +17,7 @@ function fileToBase64(file) {
 export default function PurchaseIntake() {
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
+  const [warn, setWarn] = useState('');
   const [head, setHead] = useState({ vendor: '', invoice: '', date: '' });
   const [items, setItems] = useState(null);
   const [done, setDone] = useState(null);
@@ -24,7 +25,7 @@ export default function PurchaseIntake() {
   async function onFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setBusy('reading'); setErr(''); setDone(null); setItems(null);
+    setBusy('reading'); setErr(''); setWarn(''); setDone(null); setItems(null);
     try {
       const fileBase64 = await fileToBase64(file);
       const res = await fetch('/api/admin/purchase-intake', {
@@ -35,7 +36,8 @@ export default function PurchaseIntake() {
       if (!res.ok) { setErr(d.error || 'Could not read that file.'); return; }
       setHead({ vendor: d.vendor || '', invoice: d.invoiceNumber || '', date: d.date || '' });
       setItems((d.items || []).map((it) => ({ ...it, retail: it.retail ?? '', cost: it.cost ?? '' })));
-      if (!d.items?.length) setErr('No appliance line items found — try a clearer scan.');
+      if (d.truncated) setWarn(`That invoice was too long to read in one pass — only the first ${d.items?.length || 0} items were read. Check the list against the invoice and upload the remaining pages separately.`);
+      if (!d.items?.length) setErr('No product line items found — try a clearer scan.');
     } catch {
       setErr('Upload failed — try again.');
     } finally {
@@ -76,6 +78,7 @@ export default function PurchaseIntake() {
       </label>
 
       {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
+      {warn && <div className="notice-box" style={{ marginTop: 10 }}>⚠ {warn}</div>}
       {done && (
         <div className="notice-box" style={{ marginTop: 10 }}>
           ✓ Added <b>{done.count}</b> unit{done.count === 1 ? '' : 's'} to the tracker{done.addedSkus?.length ? ` (${done.addedSkus.join(', ')})` : ''}.
@@ -91,13 +94,14 @@ export default function PurchaseIntake() {
             <label style={{ fontSize: 13 }}>Invoice # <input value={head.invoice} onChange={(e) => setHead({ ...head, invoice: e.target.value })} /></label>
           </div>
           <div className="table-wrap"><table className="admin">
-            <thead><tr><th>Description</th><th>Make</th><th>Model</th><th>Category</th><th style={{ textAlign: 'right' }}>Retail</th><th style={{ textAlign: 'right' }}>Cost</th><th>Qty</th><th></th></tr></thead>
+            <thead><tr><th>Description</th><th>Make</th><th>Model</th><th>Serial</th><th>Category</th><th style={{ textAlign: 'right' }}>Retail</th><th style={{ textAlign: 'right' }}>Cost</th><th>Qty</th><th></th></tr></thead>
             <tbody>
               {items.map((it, i) => (
                 <tr key={i}>
                   <td><input style={{ width: 240 }} value={it.description || ''} onChange={(e) => setItem(i, 'description', e.target.value)} placeholder="e.g. Blomberg 24in Washer/Dryer Combo, White" title="Searchable product title — include the appliance type" /></td>
                   <td><input style={{ width: 90 }} value={it.make} onChange={(e) => setItem(i, 'make', e.target.value)} /></td>
                   <td><input style={{ width: 130 }} value={it.model} onChange={(e) => setItem(i, 'model', e.target.value)} /></td>
+                  <td><input style={{ width: 100 }} value={it.serial || ''} onChange={(e) => setItem(i, 'serial', e.target.value)} /></td>
                   <td>
                     <select value={it.category} onChange={(e) => setItem(i, 'category', e.target.value)} style={{ fontSize: 12.5 }}>
                       {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
