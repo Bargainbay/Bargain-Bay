@@ -46,7 +46,11 @@ async function run(req) {
     const noPrice = rows
       .filter((r) => /tested working/i.test(at(r, ci.status)) && priceOf(r) <= 0)
       .slice(0, 20).map((r) => ({ ...rowInfo(r), computedPrice: priceOf(r) }));
-    return NextResponse.json({ ok: true, report, matchCount: matches.length, matches, testedWorkingNoPrice: noPrice });
+    // The most recently added rows (intake appends at the bottom) — to see exactly
+    // what the last upload wrote.
+    const tail = rows.filter((r) => at(r, ci.sku) || at(r, ci.make) || at(r, ci.model))
+      .slice(-12).map((r) => ({ ...rowInfo(r), desc: at(r, ci.desc).slice(0, 50), computedPrice: priceOf(r) }));
+    return NextResponse.json({ ok: true, report, matchCount: matches.length, matches, testedWorkingNoPrice: noPrice, tail });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message || 'failed' }, { status: 500 });
   }
