@@ -36,11 +36,16 @@ async function run(req) {
     const matches = rows
       .filter((r) => q && [ci.make, ci.model, ci.desc].some((i) => at(r, i).toLowerCase().includes(q)))
       .slice(0, 20).map(rowInfo);
-    // Tested-Working rows that WON'T go live because they have no price (no
-    // Condition% and no Suggested price) — the usual "why isn't it showing".
+    // Replicate the sync's price rule: price = retail×condition% (else Suggested).
+    const priceOf = (r) => {
+      const retail = numify(at(r, ci.retail));
+      let pct = numify(at(r, ci.pct)); if (pct > 1.5) pct = pct / 100;
+      const computed = retail > 0 && pct > 0 ? Math.round(retail * pct * 100) / 100 : 0;
+      return computed > 0 ? computed : numify(at(r, ci.suggested));
+    };
     const noPrice = rows
-      .filter((r) => /tested working/i.test(at(r, ci.status)) && numify(at(r, ci.pct)) <= 0 && numify(at(r, ci.suggested)) <= 0)
-      .slice(0, 20).map(rowInfo);
+      .filter((r) => /tested working/i.test(at(r, ci.status)) && priceOf(r) <= 0)
+      .slice(0, 20).map((r) => ({ ...rowInfo(r), computedPrice: priceOf(r) }));
     return NextResponse.json({ ok: true, report, matchCount: matches.length, matches, testedWorkingNoPrice: noPrice });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message || 'failed' }, { status: 500 });
