@@ -59,10 +59,11 @@ export default function IntakeQueue({ initialPending = [] }) {
               <label style={{ fontSize: 13 }}>Invoice # <input value={d.invoice} onChange={(e) => setDraft(q.id, { ...d, invoice: e.target.value })} /></label>
             </div>
             <div className="table-wrap"><table className="admin">
-              <thead><tr><th>Make</th><th>Model</th><th>Category</th><th style={{ textAlign: 'right' }}>Retail</th><th style={{ textAlign: 'right' }}>Cost</th><th>Qty</th><th></th></tr></thead>
+              <thead><tr><th>Description</th><th>Make</th><th>Model</th><th>Category</th><th style={{ textAlign: 'right' }}>Retail</th><th style={{ textAlign: 'right' }}>Cost</th><th>Qty</th><th></th></tr></thead>
               <tbody>
                 {d.items.map((it, i) => (
                   <tr key={i}>
+                    <td><input style={{ width: 230 }} value={it.description || ''} onChange={(e) => setItem(q, i, 'description', e.target.value)} placeholder="Searchable title (include appliance type)" /></td>
                     <td><input style={{ width: 85 }} value={it.make || ''} onChange={(e) => setItem(q, i, 'make', e.target.value)} /></td>
                     <td><input style={{ width: 125 }} value={it.model || ''} onChange={(e) => setItem(q, i, 'model', e.target.value)} /></td>
                     <td><select value={it.category || 'Other'} onChange={(e) => setItem(q, i, 'category', e.target.value)} style={{ fontSize: 12.5 }}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></td>

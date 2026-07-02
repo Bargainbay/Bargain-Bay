@@ -91,10 +91,11 @@ export default function PurchaseIntake() {
             <label style={{ fontSize: 13 }}>Invoice # <input value={head.invoice} onChange={(e) => setHead({ ...head, invoice: e.target.value })} /></label>
           </div>
           <div className="table-wrap"><table className="admin">
-            <thead><tr><th>Make</th><th>Model</th><th>Category</th><th style={{ textAlign: 'right' }}>Retail</th><th style={{ textAlign: 'right' }}>Cost</th><th>Qty</th><th></th></tr></thead>
+            <thead><tr><th>Description</th><th>Make</th><th>Model</th><th>Category</th><th style={{ textAlign: 'right' }}>Retail</th><th style={{ textAlign: 'right' }}>Cost</th><th>Qty</th><th></th></tr></thead>
             <tbody>
               {items.map((it, i) => (
                 <tr key={i}>
+                  <td><input style={{ width: 240 }} value={it.description || ''} onChange={(e) => setItem(i, 'description', e.target.value)} placeholder="e.g. Blomberg 24in Washer/Dryer Combo, White" title="Searchable product title — include the appliance type" /></td>
                   <td><input style={{ width: 90 }} value={it.make} onChange={(e) => setItem(i, 'make', e.target.value)} /></td>
                   <td><input style={{ width: 130 }} value={it.model} onChange={(e) => setItem(i, 'model', e.target.value)} /></td>
                   <td>
