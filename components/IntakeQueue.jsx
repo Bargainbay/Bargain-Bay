@@ -54,6 +54,7 @@ export default function IntakeQueue({ initialPending = [] }) {
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
               From <b>{q.sender || '—'}</b>{q.subject ? ` · ${q.subject}` : ''}
             </div>
+            {q.note && <div className="notice-box" style={{ marginBottom: 8, fontSize: 13 }}>⚠ {q.note}</div>}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
               <label style={{ fontSize: 13 }}>Vendor <input value={d.vendor} onChange={(e) => setDraft(q.id, { ...d, vendor: e.target.value })} placeholder="e.g. SecondShop" /></label>
               <label style={{ fontSize: 13 }}>Invoice # <input value={d.invoice} onChange={(e) => setDraft(q.id, { ...d, invoice: e.target.value })} /></label>
