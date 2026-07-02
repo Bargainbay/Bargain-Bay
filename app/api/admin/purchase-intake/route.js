@@ -39,7 +39,7 @@ export async function POST(req) {
       try {
         const r = await addIntakeUnits({
           make: it.make, model: it.model, category: it.category,
-          cost: it.cost, retail: it.retail,
+          cost: it.cost, retail: it.retail, description: it.description,
           vendor: body.vendor || it.vendor || null,
           invoice: body.invoice || it.invoice || null,
           qty: Math.max(1, Math.round(Number(it.qty) || 1))
