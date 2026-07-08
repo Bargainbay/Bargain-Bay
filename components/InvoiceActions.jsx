@@ -54,10 +54,8 @@ export default function InvoiceActions({ invoice }) {
         </button>
       )}
       {status === 'paid' && (
-        <button style={danger} disabled={!!busy}
-          onClick={() => send('PATCH', { action: 'refund' }, `Refund invoice ${number}? This relists the unit(s) and cancels the linked order.`, 'refund')}>
-          {busy === 'refund' ? '…' : 'Refund'}
-        </button>
+        <a href={`/admin/invoices/${number}/refund`} style={{ ...link, color: 'var(--danger, #c0392b)' }}
+          title="Refund the whole invoice or just the unit(s) coming back">Refund…</a>
       )}
       {(status === 'open' || status === 'void') && (
         <button style={danger} disabled={!!busy}

@@ -166,15 +166,17 @@ CREATE TABLE IF NOT EXISTS invoices (
   due_date       date,
   payment_method text,                        -- how it was paid (cash/etransfer/...)
   paid_at        timestamptz,
-  refunded_at    timestamptz,                 -- set when a paid invoice is refunded
-  created_at     timestamptz DEFAULT now()
+  refunded_at    timestamptz,                 -- set when a paid invoice is FULLY refunded
+  refund_total   numeric(10,2) NOT NULL DEFAULT 0, -- money returned so far, incl. HST share (partial/per-unit refunds)
+  created_at     timestamptz DEFAULT now()    -- issued date; backdatable for late-recorded sales
 );
 CREATE TABLE IF NOT EXISTS invoice_items (
   id          serial PRIMARY KEY,
   invoice_id  int REFERENCES invoices(id) ON DELETE CASCADE,
   description text,
   sku         text,
-  amount      numeric(10,2)
+  amount      numeric(10,2),
+  refunded_at timestamptz                     -- set per line on a partial (per-unit) refund
 );
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);

@@ -52,7 +52,9 @@ export default async function InvoicePage({ params, searchParams }) {
   const voided = invoice.status === 'void';
   const refunded = invoice.status === 'refunded';
   const delivery = invoice.delivery_method === 'delivery';
-  const statusLabel = paid ? 'Paid' : refunded ? 'Refunded' : voided ? 'Void' : 'Open';
+  const refundTotal = Number(invoice.refund_total) || 0;
+  const partialRefund = paid && refundTotal > 0;
+  const statusLabel = paid ? (partialRefund ? 'Paid · partial refund' : 'Paid') : refunded ? 'Refunded' : voided ? 'Void' : 'Open';
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -102,6 +104,12 @@ export default async function InvoicePage({ params, searchParams }) {
       </div>
 
       {paid && <div className="notice-box">Paid{invoice.paid_at ? ` on ${fmtDate(invoice.paid_at)}` : ''}{invoice.payment_method ? ` · ${invoice.payment_method}` : ''} — thank you!</div>}
+      {partialRefund && (
+        <div className="notice-box">
+          {money(refundTotal)} of this invoice was refunded — the refunded item(s) are shown struck through below.
+          Questions? Email {SALES_EMAIL}.
+        </div>
+      )}
       {refunded && <div className="notice-box">This invoice was refunded{invoice.refunded_at ? ` on ${fmtDate(invoice.refunded_at)}` : ''}. Questions? Email {SALES_EMAIL}.</div>}
       {voided && <div className="error-box">This invoice was voided. Questions? Email {SALES_EMAIL}.</div>}
 
@@ -118,13 +126,15 @@ export default async function InvoicePage({ params, searchParams }) {
         <h2>Items</h2>
         {invoice.items.map((it) => {
           const w = warrantyLabel(it.warranty_months);
+          const lineRefunded = !!it.refunded_at && (partialRefund || refunded);
           return (
-            <div className="summary-row" key={it.id} style={{ alignItems: 'flex-start' }}>
-              <span>
+            <div className="summary-row" key={it.id} style={{ alignItems: 'flex-start', opacity: lineRefunded ? 0.6 : 1 }}>
+              <span style={{ textDecoration: lineRefunded ? 'line-through' : 'none' }}>
                 {it.description}{it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({it.sku})</span> : null}
-                {w && <span style={{ display: 'block', fontSize: 12.5, color: 'var(--green, #0f6e56)' }}>✓ {w}</span>}
+                {lineRefunded && <span className="pill sold" style={{ fontSize: 11, marginLeft: 6 }}>Refunded</span>}
+                {w && !lineRefunded && <span style={{ display: 'block', fontSize: 12.5, color: 'var(--green, #0f6e56)' }}>✓ {w}</span>}
               </span>
-              <span>{money(it.amount)}</span>
+              <span style={{ textDecoration: lineRefunded ? 'line-through' : 'none' }}>{money(it.amount)}</span>
             </div>
           );
         })}
@@ -135,6 +145,12 @@ export default async function InvoicePage({ params, searchParams }) {
           <div className="summary-row"><span>HST (13%)</span><span>{money(invoice.hst)}</span></div>
         )}
         <div className="summary-row total"><span>Total</span><span>{money(invoice.total)}</span></div>
+        {partialRefund && (
+          <>
+            <div className="summary-row"><span>Refunded</span><span>−{money(refundTotal)}</span></div>
+            <div className="summary-row total"><span>Net after refund</span><span>{money(Math.max(0, Number(invoice.total) - refundTotal))}</span></div>
+          </>
+        )}
         {invoice.memo && <p style={{ margin: '10px 0 0', fontSize: 13.5, color: 'var(--muted)' }}>{invoice.memo}</p>}
         <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--muted)' }}>
           {BUSINESS_LEGAL} — GST/HST # {HST_NUMBER}.

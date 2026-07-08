@@ -17,6 +17,8 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   );
   const [addHst, setAddHst] = useState(Number(invoice.hst) > 0);
   const [memo, setMemo] = useState(invoice.memo || '');
+  const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate || '');
+  const todayToronto = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -45,7 +47,10 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
       const res = await fetch('/api/admin/invoices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items, addHst, memo })
+        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items, addHst, memo,
+          // Only send a date the owner actually changed — sending the original
+          // back unchanged would still re-stamp created_at to noon that day.
+          invoiceDate: invoiceDate !== (invoice.invoiceDate || '') ? invoiceDate : '' })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not save.'); return; }
@@ -116,6 +121,11 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
           <input type="checkbox" style={{ width: 'auto' }} checked={addHst} onChange={(e) => setAddHst(e.target.checked)} /> Add 13% HST
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
+          title="Backdate for a sale rung up late — the invoice shows this date. Revenue counts on the PAID date, set when you mark it paid.">
+          Invoice date
+          <input style={{ width: 150 }} type="date" max={todayToronto} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
         </label>
       </div>
 

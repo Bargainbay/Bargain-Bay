@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, refundInvoice, deleteInvoice,
+import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, deleteInvoice,
          updateInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
@@ -44,6 +44,7 @@ export async function POST(req) {
   const postal = String(body.postal || '').trim();
   const phone = String(body.phone || '').trim();
   const sendEmail = body.sendEmail !== false; // default true; only false explicitly skips the email
+  const invoiceDate = String(body.invoiceDate || '').trim(); // optional 'YYYY-MM-DD' backdate (validated in lib)
 
   if (!validEmail(email)) return NextResponse.json({ error: 'Enter a valid customer email.' }, { status: 400 });
   if (!items.some((it) => String(it?.description || '').trim() && Number(it?.amount) > 0)) {
@@ -54,7 +55,7 @@ export async function POST(req) {
   }
 
   try {
-    const invoice = await createAndSendInvoice({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail });
+    const invoice = await createAndSendInvoice({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate });
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
     console.error('create invoice failed', e?.message || e);
@@ -88,7 +89,8 @@ export async function PATCH(req) {
       const updated = await updateInvoice(invoiceId, {
         items: Array.isArray(body.items) ? body.items : [],
         addHst: !!body.addHst,
-        memo: body.memo
+        memo: body.memo,
+        invoiceDate: String(body.invoiceDate || '').trim()
       });
       return NextResponse.json({ ok: true, invoice: updated });
     }
@@ -105,9 +107,15 @@ export async function PATCH(req) {
       const refunded = await refundInvoice(invoiceId);
       return NextResponse.json({ ok: true, invoice: refunded });
     }
+    // Per-unit refund: refund only the selected line items (invoice_items.id).
+    if (body.action === 'refund_items') {
+      const itemIds = Array.isArray(body.itemIds) ? body.itemIds : [];
+      const refunded = await refundInvoiceItems(invoiceId, { itemIds });
+      return NextResponse.json({ ok: true, invoice: refunded });
+    }
     const method = String(body.method || '').trim();
     if (!PAYMENT_METHODS[method]) return NextResponse.json({ error: 'Pick a valid payment method.' }, { status: 400 });
-    const invoice = await markInvoicePaid(invoiceId, method);
+    const invoice = await markInvoicePaid(invoiceId, method, String(body.paidDate || '').trim());
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
     console.error('update invoice failed', e?.message || e);

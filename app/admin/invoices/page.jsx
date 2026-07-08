@@ -90,7 +90,14 @@ export default async function InvoicesPage() {
               <tr key={inv.id}>
                 <td style={{ fontWeight: 700 }}>{inv.number}</td>
                 <td>{inv.email || '—'}</td>
-                <td><span className={'pill ' + statusClass(inv.status)}>{inv.status}</span></td>
+                <td>
+                  <span className={'pill ' + statusClass(inv.status)}>{inv.status}</span>
+                  {inv.status === 'paid' && inv.refundedTotal > 0 && (
+                    <span className="pill sold" style={{ marginLeft: 4 }} title={`${money(inv.refundedTotal)} of this invoice has been refunded`}>
+                      −{money(inv.refundedTotal)}
+                    </span>
+                  )}
+                </td>
                 <td>{fmtDate(inv.created)}</td>
                 <td style={{ textAlign: 'right' }}>{money(inv.total)}</td>
                 <td>
