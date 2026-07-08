@@ -49,7 +49,12 @@ export default async function EditInvoicePage({ params }) {
 
   const editorInvoice = {
     id: invoice.id, number: invoice.number, email: invoice.email,
-    hst: invoice.hst, memo: invoice.memo, items: invoice.items
+    hst: invoice.hst, memo: invoice.memo, items: invoice.items,
+    // Issued date shown in the editor (Toronto), so the owner can backdate a
+    // sale that was rung up late.
+    invoiceDate: invoice.created_at
+      ? new Date(invoice.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Toronto' })
+      : null
   };
 
   return (

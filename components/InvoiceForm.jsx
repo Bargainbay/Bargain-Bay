@@ -6,6 +6,8 @@ import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
 const blankItem = () => ({ description: '', amount: '', kind: 'unit', warrantyMonths: 12, cost: '' });
 const serviceItem = (description) => ({ description, amount: '', kind: 'service', warrantyMonths: null });
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
+// Business days run on Toronto time (same as the dashboard's buckets).
+const todayToronto = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
 
 export default function InvoiceForm({ inventory = [], customers = [] }) {
   const [name, setName] = useState('');
@@ -16,6 +18,7 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   const [addHst, setAddHst] = useState(true);
   const [sendEmail, setSendEmail] = useState(true);
   const [daysUntilDue, setDaysUntilDue] = useState(14);
+  const [invoiceDate, setInvoiceDate] = useState(todayToronto());
   const [memo, setMemo] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('pickup');
   const [address, setAddress] = useState('');
@@ -108,12 +111,12 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
       const res = await fetch('/api/admin/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail })
+        body: JSON.stringify({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not create the invoice.'); return; }
       setDone(d.invoice);
-      setName(''); setEmail(''); setItems([blankItem()]); setMemo('');
+      setName(''); setEmail(''); setItems([blankItem()]); setMemo(''); setInvoiceDate(todayToronto());
       setDeliveryMethod('pickup'); setAddress(''); setCity(''); setPostal(''); setPhone('');
     } catch {
       setErr('Network error — please try again.');
@@ -213,6 +216,11 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
           <input type="checkbox" style={{ width: 'auto' }} checked={addHst} onChange={(e) => setAddHst(e.target.checked)} /> Add 13% HST
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
+          title="Backdate for a sale you rang up late — the invoice shows this date and the due date counts from it. When you mark it paid, set the paid date too so revenue lands on the right day.">
+          Invoice date
+          <input style={{ width: 150 }} type="date" max={todayToronto()} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
           Due in
