@@ -1,7 +1,8 @@
-// Operating expenses CRUD. Admin-only.
+// Operating expenses CRUD (one-off + recurring templates). Admin-only.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { listExpenses, addExpense, deleteExpense } from '../../../../lib/finance';
+import { listExpenses, addExpense, deleteExpense,
+         listRecurringExpenses, addRecurringExpense, deleteRecurringExpense } from '../../../../lib/finance';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -10,14 +11,21 @@ async function admin() { const s = await getSession(); return !!(s && isAdmin(s)
 
 export async function GET() {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
-  return NextResponse.json({ expenses: await listExpenses() });
+  const [expenses, recurring] = await Promise.all([listExpenses(), listRecurringExpenses()]);
+  return NextResponse.json({ expenses, recurring });
 }
 
 export async function POST(req) {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   let b; try { b = await req.json(); } catch { b = {}; }
-  if (!b.incurredOn || !(Number(b.amount) > 0)) return NextResponse.json({ error: 'Date and amount are required.' }, { status: 400 });
   try {
+    // Recurring template (rent/storage/subscription): auto-posts each cycle.
+    if (b.recurring) {
+      if (!(Number(b.amount) > 0)) return NextResponse.json({ error: 'Amount is required.' }, { status: 400 });
+      const id = await addRecurringExpense({ category: b.category, vendor: b.vendor, amount: b.amount, cadence: b.cadence, dayOf: b.dayOf, note: b.note });
+      return NextResponse.json({ ok: true, id });
+    }
+    if (!b.incurredOn || !(Number(b.amount) > 0)) return NextResponse.json({ error: 'Date and amount are required.' }, { status: 400 });
     const id = await addExpense({ incurredOn: b.incurredOn, category: b.category, vendor: b.vendor, amount: b.amount, note: b.note });
     return NextResponse.json({ ok: true, id });
   } catch (e) {
@@ -27,8 +35,13 @@ export async function POST(req) {
 
 export async function DELETE(req) {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
-  const id = Number(new URL(req.url).searchParams.get('id'));
+  const url = new URL(req.url);
+  const id = Number(url.searchParams.get('id'));
+  const recurring = url.searchParams.get('recurring') === '1';
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
-  try { await deleteExpense(id); return NextResponse.json({ ok: true }); }
-  catch (e) { return NextResponse.json({ error: e?.message || 'Could not delete.' }, { status: 500 }); }
+  try {
+    if (recurring) await deleteRecurringExpense(id);
+    else await deleteExpense(id);
+    return NextResponse.json({ ok: true });
+  } catch (e) { return NextResponse.json({ error: e?.message || 'Could not delete.' }, { status: 500 }); }
 }

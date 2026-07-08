@@ -3,7 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { financialDashboard, DASH_PERIODS } from '../../../lib/analytics';
-import { listExpenses, EXPENSE_CATEGORIES } from '../../../lib/finance';
+import { listExpenses, listRecurringExpenses, EXPENSE_CATEGORIES } from '../../../lib/finance';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
 import ExpenseEditor from '../../../components/ExpenseEditor';
@@ -24,8 +24,8 @@ export default async function FinancialDashboardPage({ searchParams }) {
   if (!hasDb()) return (<DashboardShell active="financial"><div className="panel">Database not configured.</div></DashboardShell>);
 
   const period = DASH_PERIODS.some((p) => p.key === searchParams?.period) ? searchParams.period : 'month';
-  let d = null, expenses = [], error = '';
-  try { [d, expenses] = await Promise.all([financialDashboard(period), listExpenses()]); }
+  let d = null, expenses = [], recurring = [], error = '';
+  try { [d, expenses, recurring] = await Promise.all([financialDashboard(period), listExpenses(), listRecurringExpenses()]); }
   catch (e) { console.error('financial load failed', e.message); error = 'Could not load financial data.'; }
   if (error || !d) return (<DashboardShell active="financial"><div className="error-box">{error || 'No data.'}</div></DashboardShell>);
 
@@ -42,8 +42,9 @@ export default async function FinancialDashboardPage({ searchParams }) {
       <div className="dash-kpis">
         <Kpi label="Revenue" value={money(k.revenue)} />
         <Kpi label="Gross profit" value={money(k.grossProfit)} sub={`${k.marginPct.toFixed(1)}% margin · COGS ${money(k.cogs)}`} />
-        <Kpi label="Operating costs" value={money(k.opex)} sub={`${money(k.expenses)} ops + ${money(k.adSpend)} ads`} />
-        <Kpi label="Net profit" value={money(k.netProfit)} sub="gross − operating" />
+        <Kpi label="Labor" value={money(k.labor || 0)} sub="crew pay this period (payroll)" />
+        <Kpi label="Operating costs" value={money(k.opex)} sub={`${money(k.expenses)} ops + ${money(k.labor || 0)} labor + ${money(k.adSpend)} ads`} />
+        <Kpi label="Net profit" value={money(k.netProfit)} sub="gross − labor − expenses − ads" />
         <Kpi label="Inventory capital" value={money(k.inventoryCost)} sub="COGS in stock" />
       </div>
 
@@ -81,7 +82,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
         )}
         <p className="hint" style={{ marginTop: 0 }}>Log expenses to turn gross profit into <strong>true net profit</strong>. (QuickBooks doesn&apos;t connect in Canada — this is the manual ledger.)</p>
         <div style={{ marginTop: 10 }}>
-          <ExpenseEditor initial={expenses} categories={EXPENSE_CATEGORIES} />
+          <ExpenseEditor initial={expenses} recurringInitial={recurring} categories={EXPENSE_CATEGORIES} />
         </div>
       </div>
     </DashboardShell>
