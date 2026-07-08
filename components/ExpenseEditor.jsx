@@ -76,9 +76,16 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td>{r.incurredOn}</td><td>{r.category}</td><td>{r.vendor || '—'}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.note}</div></td>
+                <td>{r.incurredOn}</td>
+                <td>{r.category}{r.source === 'qbo' && <span className="pill" style={{ fontSize: 10, marginLeft: 5 }} title="Pulled from QuickBooks automatically">QB</span>}</td>
+                <td>{r.vendor || '—'}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.note}</div></td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(r.amount)}</td>
-                <td style={{ textAlign: 'right' }}><button className="dash-filter" disabled={busy} onClick={() => del(r.id)}>Delete</button></td>
+                <td style={{ textAlign: 'right' }}>
+                  {/* A QuickBooks row would just re-sync if deleted — fix it in QBO instead. */}
+                  {r.source === 'qbo'
+                    ? <span className="hint" style={{ fontSize: 11 }}>edit in QB</span>
+                    : <button className="dash-filter" disabled={busy} onClick={() => del(r.id)}>Delete</button>}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -89,6 +96,8 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
         <h3 style={{ margin: '0 0 4px', fontSize: 15, color: 'var(--charcoal)' }}>Recurring expenses</h3>
         <p className="hint" style={{ margin: '0 0 10px' }}>
           Rent, storage, subscriptions — set once and they post themselves every cycle. No more forgetting fixed costs.
+          (If QuickBooks is connected and the cost already comes out of a linked bank account or card, don&apos;t also add it
+          here — the bank feed brings it in and it would count twice.)
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <select value={rform.category} onChange={(e) => setRform({ ...rform, category: e.target.value })} style={{ ...inp, width: 'auto' }}>

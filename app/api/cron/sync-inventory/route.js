@@ -4,6 +4,7 @@ import { backfillAllInvoiceOrders } from '../../../../lib/invoices';
 import { watchInvoiceInbox } from '../../../../lib/intake-watch';
 import { postDueRecurringExpenses } from '../../../../lib/finance';
 import { sendWeeklyFinanceBrief } from '../../../../lib/finance-report';
+import { syncQboExpenses } from '../../../../lib/qbo';
 import { cronAuthorized } from '../../../../lib/cron-auth';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,16 @@ async function run(req) {
     if (r.posted) console.log('cron recurring expenses posted', JSON.stringify(r.details));
   } catch (e) { console.error('cron recurring expenses failed', e?.message || e); }
 
+  // Pull expenses from QuickBooks (bank-feed transactions) so the ledger stays
+  // current with zero manual entry. No-ops until QBO is connected. Runs BEFORE
+  // the Monday brief so the week's numbers include the freshest expenses.
+  let qbo = null;
+  try {
+    const r = await syncQboExpenses();
+    if (r.configured) qbo = { synced: r.synced, errors: r.errors?.length || 0 };
+    if (r.errors?.length) console.error('cron qbo sync issues', JSON.stringify(r.errors));
+  } catch (e) { console.error('cron qbo sync failed', e?.message || e); }
+
   // Mondays (Toronto): send last week's P&L to the management Telegram group.
   // Once per week (settings-key dedupe); no-ops quietly on other days.
   let brief = null;
@@ -49,10 +60,10 @@ async function run(req) {
 
   try {
     const result = await syncInventoryFromTracker();
-    return NextResponse.json({ ok: true, reconciled: fixed, intake, recurringPosted, brief, ...result });
+    return NextResponse.json({ ok: true, reconciled: fixed, intake, recurringPosted, qbo, brief, ...result });
   } catch (e) {
     console.error('cron sync-inventory failed', e?.message || e);
-    return NextResponse.json({ ok: false, reconciled: fixed, recurringPosted, brief, error: e?.message || 'sync failed' }, { status: 500 });
+    return NextResponse.json({ ok: false, reconciled: fixed, recurringPosted, qbo, brief, error: e?.message || 'sync failed' }, { status: 500 });
   }
 }
 

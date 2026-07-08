@@ -4,9 +4,11 @@ import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { financialDashboard, DASH_PERIODS } from '../../../lib/analytics';
 import { listExpenses, listRecurringExpenses, EXPENSE_CATEGORIES } from '../../../lib/finance';
+import { qboStatus } from '../../../lib/qbo';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
 import ExpenseEditor from '../../../components/ExpenseEditor';
+import QboPanel from '../../../components/QboPanel';
 import { Kpi, HBars, TrendChart } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
@@ -27,6 +29,8 @@ export default async function FinancialDashboardPage({ searchParams }) {
   let d = null, expenses = [], recurring = [], error = '';
   try { [d, expenses, recurring] = await Promise.all([financialDashboard(period), listExpenses(), listRecurringExpenses()]); }
   catch (e) { console.error('financial load failed', e.message); error = 'Could not load financial data.'; }
+  let qbo = { configured: false, connected: false };
+  try { qbo = await qboStatus(); } catch { /* panel shows setup state */ }
   if (error || !d) return (<DashboardShell active="financial"><div className="error-box">{error || 'No data.'}</div></DashboardShell>);
 
   const k = d.kpis;
@@ -74,13 +78,21 @@ export default async function FinancialDashboardPage({ searchParams }) {
       </div>
 
       <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
+          QuickBooks — automatic expense tracking
+          {qbo.connected && <span className="pill ok" style={{ marginLeft: 8, fontSize: 11 }}>connected</span>}
+        </h2>
+        <QboPanel status={qbo} />
+      </div>
+
+      <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Operating expenses · {periodLabel(period)}</h2>
         {d.expensesByCategory.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             <HBars money rows={d.expensesByCategory.map((e, i) => ({ label: e.category, value: e.amount, color: ['var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)'][i % 5] }))} />
           </div>
         )}
-        <p className="hint" style={{ marginTop: 0 }}>Log expenses to turn gross profit into <strong>true net profit</strong>. (QuickBooks doesn&apos;t connect in Canada — this is the manual ledger.)</p>
+        <p className="hint" style={{ marginTop: 0 }}>Log expenses to turn gross profit into <strong>true net profit</strong>. With QuickBooks connected above, bank + card spends arrive automatically — this manual entry is for cash and anything the bank feed can&apos;t see.</p>
         <div style={{ marginTop: 10 }}>
           <ExpenseEditor initial={expenses} recurringInitial={recurring} categories={EXPENSE_CATEGORIES} />
         </div>
