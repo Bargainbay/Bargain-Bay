@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { syncInventoryFromTracker } from '../../../../lib/catalog-sync';
 import { backfillAllInvoiceOrders } from '../../../../lib/invoices';
 import { watchInvoiceInbox } from '../../../../lib/intake-watch';
+import { postDueRecurringExpenses } from '../../../../lib/finance';
+import { sendWeeklyFinanceBrief } from '../../../../lib/finance-report';
 import { cronAuthorized } from '../../../../lib/cron-auth';
 
 export const dynamic = 'force-dynamic';
@@ -31,12 +33,26 @@ async function run(req) {
   let intake = null;
   try { intake = await watchInvoiceInbox(); } catch (e) { console.error('cron intake-watch failed', e?.message || e); }
 
+  // Post any recurring expenses (rent/storage/subscriptions) due this cycle, so
+  // fixed costs land in the P&L without anyone remembering. Best-effort.
+  let recurringPosted = 0;
+  try {
+    const r = await postDueRecurringExpenses();
+    recurringPosted = r.posted;
+    if (r.posted) console.log('cron recurring expenses posted', JSON.stringify(r.details));
+  } catch (e) { console.error('cron recurring expenses failed', e?.message || e); }
+
+  // Mondays (Toronto): send last week's P&L to the management Telegram group.
+  // Once per week (settings-key dedupe); no-ops quietly on other days.
+  let brief = null;
+  try { brief = await sendWeeklyFinanceBrief(); } catch (e) { console.error('cron finance brief failed', e?.message || e); }
+
   try {
     const result = await syncInventoryFromTracker();
-    return NextResponse.json({ ok: true, reconciled: fixed, intake, ...result });
+    return NextResponse.json({ ok: true, reconciled: fixed, intake, recurringPosted, brief, ...result });
   } catch (e) {
     console.error('cron sync-inventory failed', e?.message || e);
-    return NextResponse.json({ ok: false, reconciled: fixed, error: e?.message || 'sync failed' }, { status: 500 });
+    return NextResponse.json({ ok: false, reconciled: fixed, recurringPosted, brief, error: e?.message || 'sync failed' }, { status: 500 });
   }
 }
 
