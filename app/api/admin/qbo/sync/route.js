@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../../lib/auth';
 import { syncQboExpenses, qboStatus, qboDisconnect } from '../../../../../lib/qbo';
+import { query } from '../../../../../lib/db';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -23,6 +24,13 @@ export async function POST(req) {
     if (b.action === 'disconnect') {
       await qboDisconnect();
       return NextResponse.json({ ok: true, disconnected: true });
+    }
+    // Wipe every QuickBooks-synced expense row (used when switching from the
+    // sandbox test company to the real books, so fake data never pollutes the
+    // P&L). Owner-entered and recurring rows are untouched.
+    if (b.action === 'purge_synced') {
+      const r = await query("DELETE FROM expenses WHERE ext_id LIKE 'qbo:%'");
+      return NextResponse.json({ ok: true, purged: r.rowCount || 0 });
     }
     const days = Math.min(Math.max(parseInt(b.days, 10) || 60, 1), 365);
     const r = await syncQboExpenses({ days });
