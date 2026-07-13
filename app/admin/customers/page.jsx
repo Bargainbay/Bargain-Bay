@@ -2,10 +2,12 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
-import { customersDashboard, customerList, DASH_PERIODS } from '../../../lib/analytics';
+import { customersDashboard, DASH_PERIODS } from '../../../lib/analytics';
+import { listCustomers } from '../../../lib/customers';
 import { ratingStats } from '../../../lib/ratings';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
+import CustomerSearch from '../../../components/CustomerSearch';
 import { Kpi, Donut, HBars } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
@@ -23,8 +25,9 @@ export default async function CustomersDashboardPage({ searchParams }) {
   if (!hasDb()) return (<DashboardShell active="customers"><div className="panel">Database not configured.</div></DashboardShell>);
 
   const period = DASH_PERIODS.some((p) => p.key === searchParams?.period) ? searchParams.period : 'month';
+  const q = String(searchParams?.q || '').slice(0, 100);
   let d = null, customers = [], csat = null, error = '';
-  try { [d, customers, csat] = await Promise.all([customersDashboard(period), customerList(), ratingStats()]); }
+  try { [d, customers, csat] = await Promise.all([customersDashboard(period), listCustomers({ q }), ratingStats()]); }
   catch (e) { console.error('customers load failed', e.message); error = 'Could not load customer data.'; }
   if (error || !d) return (<DashboardShell active="customers"><div className="error-box">{error || 'No data.'}</div></DashboardShell>);
 
@@ -119,7 +122,7 @@ export default async function CustomersDashboardPage({ searchParams }) {
             {members.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--muted)' }}>No member applications yet.</td></tr>}
             {members.map((m) => (
               <tr key={m.id}>
-                <td>{m.business || m.name || '—'}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.name}</div></td>
+                <td><a href={`/admin/customers/${m.id}`} style={{ textDecoration: 'underline' }}>{m.business || m.name || m.email}</a><div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.name}</div></td>
                 <td>{m.email}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.phone || ''}</div></td>
                 <td><span className={'pill ' + (m.memberStatus === 'approved' ? 'ok' : m.memberStatus === 'pending' ? 'warn' : 'sold')}>{m.memberStatus}</span></td>
                 <td>{m.orders}</td>
@@ -132,15 +135,27 @@ export default async function CustomersDashboardPage({ searchParams }) {
       </div>
 
       <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Customer database ({customers.length})</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+          <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Client database ({customers.length}{q ? ` matching “${q}”` : ''})</h2>
+          <CustomerSearch initial={q} />
+        </div>
+        <p className="hint" style={{ marginTop: 0 }}>
+          Every client — guests, invoiced customers, and account holders alike. Click a name for their full
+          history, notes, and editable contact details.
+        </p>
         <div className="table-wrap"><table className="admin">
-          <thead><tr><th>Name</th><th>Contact</th><th>Joined</th><th>Orders</th><th style={{ textAlign: 'right' }}>Total spent</th><th>Last order</th></tr></thead>
+          <thead><tr><th>Name</th><th>Contact</th><th>City</th><th>Since</th><th>Orders</th><th style={{ textAlign: 'right' }}>Total spent</th><th>Last order</th></tr></thead>
           <tbody>
-            {customers.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--muted)' }}>No customer accounts yet.</td></tr>}
+            {customers.length === 0 && <tr><td colSpan={7} style={{ color: 'var(--muted)' }}>{q ? 'No customers match that search.' : 'No customers yet.'}</td></tr>}
             {customers.map((c) => (
               <tr key={c.id}>
-                <td>{c.name || '—'}{c.role === 'member' && c.memberStatus === 'approved' ? <span className="pill ok" style={{ marginLeft: 6 }}>member</span> : null}</td>
+                <td>
+                  <a href={`/admin/customers/${c.id}`} style={{ textDecoration: 'underline', fontWeight: 600 }}>{c.name || c.email}</a>
+                  {c.memberStatus === 'approved' ? <span className="pill ok" style={{ marginLeft: 6 }}>member</span> : null}
+                  {!c.hasAccount ? <span className="pill" style={{ marginLeft: 6 }} title="No login account — bought as a guest or via invoice">guest</span> : null}
+                </td>
                 <td>{c.email}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{c.phone || ''}</div></td>
+                <td>{c.city || '—'}</td>
                 <td>{fmtDate(c.createdAt)}</td>
                 <td>{c.orders}</td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(c.spent)}</td>

@@ -5,6 +5,7 @@ import {
   SESSION_COOKIE, normalizeEmail, validEmail
 } from '../../../../lib/auth';
 import { notifyOwner, esc } from '../../../../lib/email';
+import { upsertCustomer } from '../../../../lib/customers';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,8 @@ export async function POST(req) {
     const user = rows[0];
     // Claim any guest orders previously placed with this email.
     await query('UPDATE orders SET user_id = $1 WHERE user_id IS NULL AND email = $2', [user.id, email]).catch(() => {});
+    // Fold into the client database (links the record to this new account).
+    upsertCustomer({ email, name, phone, userId: user.id }).catch(() => {});
 
     // Notify the owner (fire-and-forget; never blocks signup).
     notifyOwner(

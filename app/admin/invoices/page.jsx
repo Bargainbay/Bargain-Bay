@@ -3,7 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
 import { listInvoices } from '../../../lib/invoices';
-import { customerContacts } from '../../../lib/analytics';
+import { contactsForAutofill } from '../../../lib/customers';
 import { getAll } from '../../../lib/inventory';
 import AdminNav from '../../../components/AdminNav';
 import InvoiceForm from '../../../components/InvoiceForm';
@@ -36,8 +36,9 @@ export default async function InvoicesPage() {
 
   let customers = [];
   try {
-    customers = (await customerContacts()).map((c) => ({
+    customers = (await contactsForAutofill()).map((c) => ({
       name: c.name, email: c.email, phone: c.phone,
+      address: c.address, city: c.city, postal: c.postal,
       search: `${c.name} ${c.email} ${c.phone}`.toLowerCase()
     }));
   } catch { customers = []; }
