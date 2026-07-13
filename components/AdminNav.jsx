@@ -19,6 +19,11 @@ export default function AdminNav({ active }) {
           </a>
         ))}
         <a href="/" className="admin-nav-link">View store →</a>
+        {/* One box over customers, orders, invoices, and quotes (GET → /admin/search). */}
+        <form action="/admin/search" style={{ marginLeft: 'auto' }}>
+          <input name="q" placeholder="Search customer / BB- / INV- / Q-…" aria-label="Search everything"
+            style={{ width: 220, padding: '5px 10px', fontSize: 13 }} />
+        </form>
       </div>
     </nav>
   );
