@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import ProductCard from '../../components/ProductCard';
 import { COLLECTIONS, collectionFilter } from '../../lib/constants';
+import { matchesQuery } from '../../lib/search-terms';
 
 const PRICE_BANDS = [
   { id: '', label: 'Any price' },
@@ -11,9 +12,6 @@ const PRICE_BANDS = [
   { id: '2000+', label: '$2,000+', min: 2000, max: Infinity }
 ];
 
-const normalizeSearch = (s) =>
-  s.toLowerCase().replace(/["\u201d\u2033]/g, ' inch ').replace(/\b(inches|inch|in)\b/g, ' inch ').replace(/\s+/g, ' ').trim();
-
 const CONDITION_OPTIONS = [
   'New in Box', 'New Open Box', 'Scratch & Dent', 'Refurbished', 'Used', 'Tested & Working'
 ];
@@ -22,10 +20,25 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
   const [q, setQ] = useState(initialQuery || '');
   const [collection, setCollection] = useState(initialCollection || '');
   const [cat, setCat] = useState('');
+  const [style, setStyle] = useState('');
   const [cond, setCond] = useState('');
   const [band, setBand] = useState('');
   const [make, setMake] = useState('');
   const [sort, setSort] = useState('newest');
+
+  // Category options narrow to the picked collection; the Type dropdown lists
+  // the styles (French Door, Front Load, 55"+…) actually present in the
+  // current collection/category slice — SecondShop-style depth from our data.
+  const colDef = COLLECTIONS.find((c) => c.slug === collection);
+  const catOptions = useMemo(
+    () => (colDef?.cats ? cats.filter((c) => colDef.cats.includes(c)) : cats),
+    [cats, colDef]
+  );
+  const styleOptions = useMemo(() => {
+    let l = units.filter(collectionFilter(collection));
+    if (cat) l = l.filter((u) => u.category === cat);
+    return [...new Set(l.map((u) => u.style).filter(Boolean))].sort();
+  }, [units, collection, cat]);
 
   // Filter individual units, then collapse identical make+model into one card
   // (SecondShop-style). Each group keeps its cheapest unit as the representative;
@@ -34,6 +47,7 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
   const groups = useMemo(() => {
     let l = units.filter(collectionFilter(collection));
     if (cat) l = l.filter((u) => u.category === cat);
+    if (style) l = l.filter((u) => u.style === style);
     if (cond) l = l.filter((u) => u.condition === cond);
     if (make) l = l.filter((u) => u.make === make);
     if (band) {
@@ -41,11 +55,9 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
       if (b) l = l.filter((u) => u.price >= b.min && u.price < b.max);
     }
     if (q.trim()) {
-      const tokens = normalizeSearch(q).split(' ').filter(Boolean);
-      l = l.filter((u) => {
-        const hay = u.kw || '';
-        return tokens.every((t) => hay.includes(t));
-      });
+      // Synonym + plural aware ("tvs" finds Televisions, "fridges" finds
+      // Refrigerators) — see lib/search-terms.
+      l = l.filter((u) => matchesQuery(u.kw || '', q));
     }
     // Group by make+model in filtered (catalog) order.
     const map = new Map();
@@ -62,7 +74,7 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
     else if (sort === 'hi') g.sort((a, b) => b.maxPrice - a.maxPrice);
     else g.reverse(); // newest = most recently added models first
     return g;
-  }, [units, q, collection, cat, cond, band, make, sort]);
+  }, [units, q, collection, cat, style, cond, band, make, sort]);
 
   const totalUnits = groups.reduce((n, g) => n + g.count, 0);
 
@@ -80,14 +92,20 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
           onChange={(e) => setQ(e.target.value)}
           aria-label="Search inventory"
         />
-        <select value={collection} onChange={(e) => { setCollection(e.target.value); setCat(''); }} aria-label="Collection">
+        <select value={collection} onChange={(e) => { setCollection(e.target.value); setCat(''); setStyle(''); }} aria-label="Collection">
           <option value="">All collections</option>
           {COLLECTIONS.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
         </select>
-        <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Category">
+        <select value={cat} onChange={(e) => { setCat(e.target.value); setStyle(''); }} aria-label="Category">
           <option value="">All categories</option>
-          {cats.map((c) => <option key={c} value={c}>{c}</option>)}
+          {catOptions.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
+        {styleOptions.length > 1 && (
+          <select value={style} onChange={(e) => setStyle(e.target.value)} aria-label="Type">
+            <option value="">All types</option>
+            {styleOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
         <select value={cond} onChange={(e) => setCond(e.target.value)} aria-label="Condition">
           <option value="">Any condition</option>
           {CONDITION_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -113,7 +131,7 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
 
       {groups.length === 0 ? (
         <div className="panel" style={{ textAlign: 'center', padding: 40 }}>
-          No units match those filters. <button className="btn" style={{ marginLeft: 8 }} onClick={() => { setQ(''); setCollection(''); setCat(''); setCond(''); setBand(''); setMake(''); }}>Clear filters</button>
+          No units match those filters. <button className="btn" style={{ marginLeft: 8 }} onClick={() => { setQ(''); setCollection(''); setCat(''); setStyle(''); setCond(''); setBand(''); setMake(''); }}>Clear filters</button>
         </div>
       ) : (
         <div className="grid">
