@@ -50,7 +50,7 @@ export default function LoginForm() {
           No account? <a href={`/signup?next=${encodeURIComponent(next)}`} style={{ fontWeight: 700, color: 'var(--charcoal)' }}>Create one</a>.
         </p>
         <p className="hint">
-          Forgot your password? Email <a href="mailto:sales@bargainbay.ca" style={{ textDecoration: 'underline' }}>sales@bargainbay.ca</a> to reset.
+          <a href="/forgot-password" style={{ textDecoration: 'underline' }}>Forgot your password?</a>
         </p>
       </div>
     </div>

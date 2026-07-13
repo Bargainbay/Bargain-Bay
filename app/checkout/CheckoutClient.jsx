@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { getCart, removeFromCart, clearCart, onCartChange } from '../../lib/cart';
 import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS, CARD_PAYMENTS_ENABLED, ETRANSFER_EMAIL } from '../../lib/constants';
+import { loadGoogleMaps, placesReady, mapsKey } from '../../lib/maps';
 
 export default function CheckoutClient({ catalog, session, prefill }) {
   const [skus, setSkus] = useState(null);
@@ -16,11 +17,39 @@ export default function CheckoutClient({ catalog, session, prefill }) {
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const acDone = useRef(false);
 
   useEffect(() => {
     setSkus(getCart());
     return onCartChange(setSkus);
   }, []);
+
+  // Google Places autocomplete on the delivery street address (same pattern as
+  // the admin invoice form): attach on first focus, poll until Places is
+  // actually ready. No-op without NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.
+  async function attachAutocomplete(e) {
+    if (acDone.current || !mapsKey()) return;
+    const input = e.currentTarget;
+    await loadGoogleMaps();
+    const places = await placesReady();
+    if (acDone.current || !places || !input) return;
+    acDone.current = true;
+    try {
+      const ac = new places.Autocomplete(input, {
+        componentRestrictions: { country: 'ca' },
+        fields: ['address_components'],
+        types: ['address']
+      });
+      ac.addListener('place_changed', () => {
+        const comps = ac.getPlace()?.address_components || [];
+        const get = (type, short) => comps.find((c) => c.types.includes(type))?.[short ? 'short_name' : 'long_name'] || '';
+        const street = [get('street_number'), get('route')].filter(Boolean).join(' ');
+        const town = get('locality') || get('postal_town') || get('sublocality_level_1') || '';
+        const code = get('postal_code', true);
+        setForm((f) => ({ ...f, address: street || f.address, city: town || f.city, postal: code || f.postal }));
+      });
+    } catch { acDone.current = false; }
+  }
 
   if (skus === null) return <p>Loading checkout…</p>;
 
@@ -120,7 +149,9 @@ export default function CheckoutClient({ catalog, session, prefill }) {
                 <div style={{ marginTop: 12 }}>
                   <div className="field">
                     <label htmlFor="co-addr">Street address</label>
-                    <input id="co-addr" required autoComplete="street-address" value={form.address} onChange={set('address')} />
+                    <input id="co-addr" required autoComplete="off" onFocus={attachAutocomplete}
+                      placeholder={mapsKey() ? 'Start typing your address…' : undefined}
+                      value={form.address} onChange={set('address')} />
                   </div>
                   <div className="form-2col">
                     <div className="field">
