@@ -101,6 +101,8 @@ export default function AdminOrders({ initialOrders, drivers = [], reps = [] }) 
                 <td>
                   <a href={`/order/${o.order_number}?email=${encodeURIComponent(o.email)}`} style={{ fontWeight: 700, color: 'var(--charcoal)' }}>{o.order_number}</a>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>{new Date(o.created_at).toLocaleString('en-CA')}</div>
+                  <a href={`/admin/orders/${o.order_number}/edit`} style={{ fontSize: 12, textDecoration: 'underline' }}
+                    title="Edit contact/address, change line items, or refund — even after payment.">Edit / refund</a>
                 </td>
                 <td>
                   {o.name}<br />
@@ -197,25 +199,31 @@ export default function AdminOrders({ initialOrders, drivers = [], reps = [] }) 
                       )}
                     </>
                   )}
-                  <br />
-                  <select
-                    value={o.status}
-                    disabled={savingId === o.id}
-                    onChange={(e) => setStatus(o.id, e.target.value)}
-                  >
-                    {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-                  </select>
-                  <label style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: 'var(--muted)' }} title="Uncheck to change status without emailing the customer (e.g. a quiet in-person payment).">
-                    <input type="checkbox" style={{ width: 'auto', marginRight: 4 }} checked={!silent[o.id]} onChange={(e) => setSilent((s) => ({ ...s, [o.id]: !e.target.checked }))} />
-                    Email customer
-                  </label>
+                  {o.status !== 'refunded' && (
+                    <>
+                      <br />
+                      <select
+                        value={o.status}
+                        disabled={savingId === o.id}
+                        onChange={(e) => setStatus(o.id, e.target.value)}
+                      >
+                        {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                      </select>
+                      <label style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: 'var(--muted)' }} title="Uncheck to change status without emailing the customer (e.g. a quiet in-person payment).">
+                        <input type="checkbox" style={{ width: 'auto', marginRight: 4 }} checked={!silent[o.id]} onChange={(e) => setSilent((s) => ({ ...s, [o.id]: !e.target.checked }))} />
+                        Email customer
+                      </label>
+                    </>
+                  )}
                 </td>
                 <td style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 150 }}>
                   {o.status === 'cancelled'
                     ? 'Cancelled — unit released back to the site.'
-                    : o.status === 'pending_payment'
-                      ? 'Confirmed, awaiting payment — click Mark paid once it lands.'
-                      : 'Sold — see Tracker reconciliation below.'}
+                    : o.status === 'refunded'
+                      ? 'Refunded — unit(s) relisted, money off the books.'
+                      : o.status === 'pending_payment'
+                        ? 'Confirmed, awaiting payment — click Mark paid once it lands.'
+                        : 'Sold — see Tracker reconciliation below.'}
                   {(o.pod_signature || (o.pod_photo_ids && o.pod_photo_ids.length > 0)) && (
                     <div style={{ marginTop: 6, color: 'var(--charcoal)' }}>
                       <b>POD:</b>{' '}

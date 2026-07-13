@@ -135,8 +135,9 @@ export default async function OrderPage({ params, searchParams }) {
         </div>
       )}
       {cancelled && <div className="error-box">This order was cancelled. Questions? Email {SALES_EMAIL}.</div>}
+      {order.status === 'refunded' && <div className="error-box">This order was refunded. Questions? Email {SALES_EMAIL}.</div>}
 
-      {!cancelled && (
+      {!cancelled && order.status !== 'refunded' && (
         <div className="panel">
           <div className="timeline">
             {steps.map((s, i) => {

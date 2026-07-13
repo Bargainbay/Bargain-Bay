@@ -262,3 +262,12 @@ CREATE TABLE IF NOT EXISTS customers (
   updated_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_customers_name ON customers (lower(name));
+
+-- Order-level refunds (storefront orders; invoice-bridged ones refund via the
+-- invoice). lib/orders.js self-provisions these + widens the status CHECK to
+-- include 'refunded'; kept here as the canonical reference.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_at  timestamptz;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_total numeric(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check
+  CHECK (status IN ('pending_payment','confirmed','ready','out_for_delivery','delivered','cancelled','refunded'));
