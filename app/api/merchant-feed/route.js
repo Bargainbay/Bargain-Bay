@@ -17,9 +17,16 @@ const esc = (s) =>
     .replace(/'/g, '&apos;');
 
 function gCondition(condition) {
-  if (condition === 'New in Box') return 'new';
-  if (condition === 'Refurbished') return 'refurbished';
-  return 'used';
+  const map = {
+    'New in Box': 'new',
+    'New Open Box': 'new',
+    'Scratch & Dent': 'new',
+    'Refurbished': 'refurbished',
+    'Used': 'used',
+    'Tested & Working': 'used',
+    'Haul-away': 'used',
+  };
+  return map[condition] || 'used';
 }
 
 function absoluteImage(img) {
