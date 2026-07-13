@@ -271,3 +271,6 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_total numeric(10,2) NOT NULL 
 ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
 ALTER TABLE orders ADD CONSTRAINT orders_status_check
   CHECK (status IN ('pending_payment','confirmed','ready','out_for_delivery','delivered','cancelled','refunded'));
+
+-- Customer quote acceptance (hosted quote page "Accept" button).
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS accepted_at timestamptz;

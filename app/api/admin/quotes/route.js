@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { createAndSendQuote, listQuotes, convertQuoteToInvoice, voidQuote } from '../../../../lib/quotes';
+import { createAndSendQuote, updateQuote, listQuotes, convertQuoteToInvoice, voidQuote } from '../../../../lib/quotes';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -76,6 +76,22 @@ export async function PATCH(req) {
     if (body.action === 'convert') {
       const result = await convertQuoteToInvoice(quoteId);
       return NextResponse.json({ ok: true, ...result });
+    }
+    if (body.action === 'update') {
+      const email = normalizeEmail(body.email);
+      if (!validEmail(email)) return NextResponse.json({ error: 'Enter a valid customer email.' }, { status: 400 });
+      const quote = await updateQuote(quoteId, {
+        name: body.name,
+        email,
+        items: Array.isArray(body.items) ? body.items : [],
+        bundlePct: body.bundlePct,
+        cashDeal: body.cashDeal,
+        freeDelivery: !!body.freeDelivery,
+        addHst: body.addHst !== false,
+        daysValid: body.daysValid,
+        memo: body.memo
+      });
+      return NextResponse.json({ ok: true, quote });
     }
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (e) {
