@@ -94,7 +94,7 @@ export default async function QuotesPage({ searchParams }) {
                 <td>
                   {qt.source === 'customer' && qt.status === 'open'
                     ? <a className="btn accent" style={{ padding: '5px 10px' }} href={`/admin/quotes?from=${qt.id}`}>Price &amp; send →</a>
-                    : <QuoteActions quoteId={qt.id} status={qt.status} invoiceUrl={qt.convertedInvoiceId ? `/admin/invoices` : null} />}
+                    : <QuoteActions quoteId={qt.id} status={qt.status} number={qt.number} invoiceUrl={qt.convertedInvoiceId ? `/admin/invoices` : null} />}
                 </td>
                 <td>{qt.hostedUrl ? <a href={qt.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View</a> : ''}</td>
               </tr>

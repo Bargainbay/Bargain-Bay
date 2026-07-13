@@ -4,7 +4,9 @@ import { useState } from 'react';
 const blankItem = () => ({ description: '', retail: '', amount: '', sku: '' });
 const fmt = (n) => '$' + (Number(n) || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function QuoteBuilder({ inventory = [], customers = [], initial = null }) {
+// editQuote = { quoteId, number, bundlePct, cashDeal, freeDelivery, addHst, daysValid, memo }
+// switches the builder into edit-in-place mode: same Q- number, PATCH instead of create.
+export default function QuoteBuilder({ inventory = [], customers = [], initial = null, editQuote = null }) {
   const [name, setName] = useState(initial?.name || '');
   const [email, setEmail] = useState(initial?.email || '');
   const [items, setItems] = useState(
@@ -12,15 +14,15 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
       ? initial.items.map((it) => ({ description: it.description || '', retail: it.retail || '', amount: it.amount || '', sku: it.sku || '' }))
       : [blankItem()]
   );
-  const sourceQuoteId = initial?.sourceQuoteId || null;
+  const sourceQuoteId = editQuote ? null : (initial?.sourceQuoteId || null);
   const [q, setQ] = useState('');
   const [custOpen, setCustOpen] = useState(false);
-  const [bundlePct, setBundlePct] = useState(10);
-  const [cashDeal, setCashDeal] = useState('');
-  const [freeDelivery, setFreeDelivery] = useState(false);
-  const [addHst, setAddHst] = useState(true);
-  const [daysValid, setDaysValid] = useState(14);
-  const [memo, setMemo] = useState('');
+  const [bundlePct, setBundlePct] = useState(editQuote?.bundlePct ?? 10);
+  const [cashDeal, setCashDeal] = useState(editQuote?.cashDeal ?? '');
+  const [freeDelivery, setFreeDelivery] = useState(!!editQuote?.freeDelivery);
+  const [addHst, setAddHst] = useState(editQuote ? editQuote.addHst !== false : true);
+  const [daysValid, setDaysValid] = useState(editQuote?.daysValid ?? 14);
+  const [memo, setMemo] = useState(editQuote?.memo || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(null);
@@ -71,14 +73,16 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
     setBusy(true); setErr(''); setDone(null);
     try {
       const res = await fetch('/api/admin/quotes', {
-        method: 'POST',
+        method: editQuote ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, items, bundlePct: pct, cashDeal, freeDelivery, addHst, daysValid, memo, sourceQuoteId })
+        body: JSON.stringify(editQuote
+          ? { action: 'update', quoteId: editQuote.quoteId, name, email, items, bundlePct: pct, cashDeal, freeDelivery, addHst, daysValid, memo }
+          : { name, email, items, bundlePct: pct, cashDeal, freeDelivery, addHst, daysValid, memo, sourceQuoteId })
       });
       const d = await res.json();
-      if (!res.ok) { setErr(d.error || 'Could not create the quote.'); return; }
+      if (!res.ok) { setErr(d.error || (editQuote ? 'Could not update the quote.' : 'Could not create the quote.')); return; }
       setDone(d.quote);
-      setName(''); setEmail(''); setItems([blankItem()]); setMemo(''); setCashDeal(''); setFreeDelivery(false);
+      if (!editQuote) { setName(''); setEmail(''); setItems([blankItem()]); setMemo(''); setCashDeal(''); setFreeDelivery(false); }
     } catch {
       setErr('Network error — please try again.');
     } finally {
@@ -89,11 +93,13 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
   if (done) {
     return (
       <div className="notice-box" style={{ lineHeight: 1.6 }}>
-        ✓ Quote <b>{done.number}</b> for <b>{fmt(done.total)}</b> created and emailed to <b>{done.email}</b>.
+        ✓ Quote <b>{done.number}</b> for <b>{fmt(done.total)}</b> {editQuote ? 'updated and re-emailed to' : 'created and emailed to'} <b>{done.email}</b>.
         {done.hostedUrl && <> <a href={done.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>Open quote / copy link →</a></>}
         <div className="hint" style={{ marginTop: 4 }}>Nothing is reserved — the units stay live until you convert this quote to an invoice.</div>
         <div style={{ marginTop: 10 }}>
-          <button className="btn" onClick={() => setDone(null)}>Build another</button>
+          {editQuote
+            ? <a className="btn" href="/admin/quotes">← Back to quotes</a>
+            : <button className="btn" onClick={() => setDone(null)}>Build another</button>}
         </div>
       </div>
     );
@@ -206,7 +212,9 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-        <button className="btn accent" disabled={busy}>{busy ? 'Creating…' : 'Create & send quote'}</button>
+        <button className="btn accent" disabled={busy}>
+          {busy ? 'Saving…' : editQuote ? `Update & resend ${editQuote.number}` : 'Create & send quote'}
+        </button>
       </div>
     </form>
   );

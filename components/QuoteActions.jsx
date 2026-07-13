@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 // Per-row admin actions for a quote: convert it to an invoice (the moment stock
 // is committed) or void it. Open/accepted/expired quotes can be converted.
-export default function QuoteActions({ quoteId, status, invoiceUrl }) {
+export default function QuoteActions({ quoteId, status, invoiceUrl, number }) {
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState('');
@@ -42,6 +42,9 @@ export default function QuoteActions({ quoteId, status, invoiceUrl }) {
       <button className="btn accent" style={{ padding: '5px 10px' }} disabled={!!busy} onClick={() => act('convert')}>
         {busy === 'convert' ? '…' : 'Convert'}
       </button>
+      {status === 'open' && number && (
+        <a className="btn" style={{ padding: '5px 10px' }} href={`/admin/quotes/${encodeURIComponent(number)}/edit`}>Edit</a>
+      )}
       <button className="btn" style={{ padding: '5px 10px' }} disabled={!!busy} onClick={() => act('void')}>
         {busy === 'void' ? '…' : 'Void'}
       </button>

@@ -4,6 +4,7 @@ import { getQuoteByNumber } from '../../../lib/quotes';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { verifyLinkToken } from '../../../lib/links';
 import { money, SALES_EMAIL } from '../../../lib/constants';
+import AcceptQuote from '../../../components/AcceptQuote';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Quote — Bargain Bay' };
@@ -64,9 +65,22 @@ export default async function QuotePage({ params, searchParams }) {
       </div>
 
       {live && (
+        <>
+          <div className="notice-box" style={{ lineHeight: 1.6 }}>
+            <b>This is a quote — not an order.</b> Nothing is reserved yet, and units are first-come, first-served.
+            Ready to go ahead? Accept below and we&apos;ll send your invoice to lock it in.
+          </div>
+          <AcceptQuote
+            number={quote.number}
+            token={verifyLinkToken('quote', quote.number, searchParams?.t) ? searchParams.t : ''}
+            email={guestEmail || (session?.email?.toLowerCase() === quote.email?.toLowerCase() ? session.email : '')}
+          />
+        </>
+      )}
+      {quote.status === 'accepted' && (
         <div className="notice-box" style={{ lineHeight: 1.6 }}>
-          <b>This is a quote — not an order.</b> Nothing is reserved yet, and units are first-come, first-served.
-          Ready to go ahead? Reply to your quote email or contact us and we&apos;ll lock it in.
+          <b>✓ You&apos;ve accepted this quote.</b> We&apos;ll email your invoice with payment details shortly — your
+          units are locked in once it&apos;s issued.
         </div>
       )}
       {expired && quote.status !== 'void' && <div className="error-box">This quote has expired. Email {SALES_EMAIL} and we&apos;ll refresh it for you.</div>}
