@@ -301,6 +301,7 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
 .status-out_for_delivery { background: var(--tint); color: var(--taupe-dark); }
 .status-delivered { background: var(--okbg); color: var(--ok); }
 .status-cancelled { background: var(--dangerbg); color: var(--danger); }
+.status-refunded { background: var(--dangerbg); color: var(--danger); }
 
 .order-card { background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 12px; }
 .order-card .row1 { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
