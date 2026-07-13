@@ -5,6 +5,7 @@ import { COLLECTIONS } from '../../lib/constants';
 import ShopClient from './ShopClient';
 import specs from '../../data/specs.json';
 import { unitKeywords } from '../../lib/keywords';
+import { styleFor } from '../../lib/styles';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,12 @@ export async function generateMetadata({ searchParams }) {
 
 export default async function ShopPage({ searchParams }) {
   const units = await decorate(await getAvailable(), await getSession());
-  const enriched = units.map((u) => ({ ...u, kw: unitKeywords(u, specs[u.id]) }));
+  const enriched = units.map((u) => ({
+    ...u,
+    kw: unitKeywords(u, specs[u.id]),
+    // Subcategory ("type") for the shop filter — French Door, Front Load, etc.
+    style: styleFor(u, specs[u.id])
+  }));
   return (
     <ShopClient
       units={enriched}
