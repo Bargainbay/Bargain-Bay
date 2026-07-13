@@ -3,14 +3,14 @@ import { useEffect, useState } from 'react';
 import { getCart, removeFromCart, clearCart, onCartChange } from '../../lib/cart';
 import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS, CARD_PAYMENTS_ENABLED, ETRANSFER_EMAIL } from '../../lib/constants';
 
-export default function CheckoutClient({ catalog, session }) {
+export default function CheckoutClient({ catalog, session, prefill }) {
   const [skus, setSkus] = useState(null);
   const [form, setForm] = useState({
-    name: session?.name || '',
+    name: session?.name || prefill?.name || '',
     email: session?.email || '',
-    phone: '',
+    phone: prefill?.phone || '',
     deliveryMethod: 'pickup',
-    address: '', city: '', postal: '',
+    address: prefill?.address || '', city: prefill?.city || '', postal: prefill?.postal || '',
     paymentMethod: 'etransfer',
     password: ''
   });

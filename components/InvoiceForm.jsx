@@ -84,9 +84,15 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
   const custMatches = custOpen && custQuery.length >= 2
     ? customers.filter((c) => c.search.includes(custQuery) && c.email.toLowerCase() !== email.trim().toLowerCase()).slice(0, 6)
     : [];
+  // Fill the whole contact from the client database — phone and the last known
+  // delivery address too (the address fields show once Delivery is selected).
   function pickCustomer(c) {
     setName(c.name || '');
     setEmail(c.email || '');
+    if (c.phone) setPhone(c.phone);
+    if (c.address) setAddress(c.address);
+    if (c.city) setCity(c.city);
+    if (c.postal) setPostal(c.postal);
     setCustOpen(false);
   }
   function pickInventory(u) {
@@ -157,7 +163,8 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
           {custMatches.map((c) => (
             <button type="button" key={c.email} onClick={() => pickCustomer(c)}
               style={{ display: 'flex', justifyContent: 'space-between', gap: 12, width: '100%', textAlign: 'left', padding: '8px 11px', background: 'none', border: 'none', borderBottom: '1px solid var(--line-soft)', cursor: 'pointer', fontSize: 13.5, color: 'var(--ink)' }}>
-              <span>{c.name || '(no name)'}<span style={{ color: 'var(--muted)' }}> · {c.email}</span></span>
+              <span>{c.name || '(no name)'}<span style={{ color: 'var(--muted)' }}> · {c.email}</span>
+                {c.address ? <span style={{ display: 'block', fontSize: 12, color: 'var(--muted)' }}>{[c.address, c.city].filter(Boolean).join(', ')}</span> : null}</span>
               <span style={{ whiteSpace: 'nowrap', color: 'var(--muted)' }}>{c.phone || ''}</span>
             </button>
           ))}

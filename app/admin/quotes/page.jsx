@@ -3,7 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
 import { listQuotes, getQuoteForBuilder } from '../../../lib/quotes';
-import { customerContacts } from '../../../lib/analytics';
+import { contactsForAutofill } from '../../../lib/customers';
 import { getAll } from '../../../lib/inventory';
 import AdminNav from '../../../components/AdminNav';
 import QuoteBuilder from '../../../components/QuoteBuilder';
@@ -34,7 +34,7 @@ export default async function QuotesPage({ searchParams }) {
 
   let customers = [];
   try {
-    customers = (await customerContacts()).map((c) => ({
+    customers = (await contactsForAutofill()).map((c) => ({
       name: c.name, email: c.email, phone: c.phone,
       search: `${c.name} ${c.email} ${c.phone}`.toLowerCase()
     }));

@@ -244,3 +244,21 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS member_approved_at  timestamptz;
 -- Session revocation: bumped on logout / password change to invalidate any JWT
 -- issued before it (lib/auth embeds it in the token as `tv`).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version       int NOT NULL DEFAULT 0;
+
+-- Client database: one consolidated customer record per email, fed by every
+-- checkout / invoice / quote / signup (lib/customers.js self-provisions this;
+-- kept here as the canonical reference).
+CREATE TABLE IF NOT EXISTS customers (
+  id         serial PRIMARY KEY,
+  email      text UNIQUE NOT NULL,                  -- lowercased identity key
+  name       text,
+  phone      text,
+  address    text,                                  -- last known delivery address
+  city       text,
+  postal     text,
+  notes      text,                                  -- owner's freeform notes
+  user_id    int,                                   -- linked account, when one exists
+  created_at timestamptz DEFAULT now(),             -- earliest sighting across sources
+  updated_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_customers_name ON customers (lower(name));

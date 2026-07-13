@@ -11,6 +11,7 @@ import { round2, HST_RATE, DELIVERY_FEE, CARD_PAYMENTS_ENABLED } from '../../../
 import { resolvePrices } from '../../../lib/pricing';
 import { sendOrderEmails } from '../../../lib/email';
 import { readAttribution, ensureAttributionColumns } from '../../../lib/attribution';
+import { upsertCustomer } from '../../../lib/customers';
 
 export const dynamic = 'force-dynamic';
 
@@ -148,6 +149,11 @@ export async function POST(req) {
     console.error('checkout transaction failed', e);
     return NextResponse.json({ error: 'Could not create your order. Please try again.' }, { status: 500 });
   }
+
+  // Fold this buyer into the client database (guests included). Best-effort —
+  // the CRM must never block a sale.
+  upsertCustomer({ email, name, phone, address, city, postal, userId })
+    .catch((e) => console.error('customer upsert failed', e.message));
 
   const trackUrl = `/order/${order.orderNumber}` + (userId ? '' : `?email=${encodeURIComponent(email)}`);
 
