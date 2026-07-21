@@ -96,6 +96,20 @@ export default async function Product({ params }) {
       <ProductBuyPanel units={units} initialId={u.id} />
 
       <div className="product-desc">
+        {u.rsopsPhotos?.length > 1 && (
+          <>
+            <h2>Photos of this exact unit</h2>
+            <p>Taken by our technicians during inspection — what you see is the unit you get.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+              {u.rsopsPhotos.map((p) => (
+                <a key={p.url} href={p.url} target="_blank" rel="noopener">
+                  <img src={p.url} alt={`${u.make} ${u.model} — ${p.slot}`} loading="lazy"
+                    style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8 }} />
+                </a>
+              ))}
+            </div>
+          </>
+        )}
         <h2>About this unit</h2>
         <p>{leadSentence(u)}</p>
         <p>
