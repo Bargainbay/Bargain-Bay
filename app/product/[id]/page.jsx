@@ -96,7 +96,7 @@ export default async function Product({ params }) {
       <ProductBuyPanel units={units} initialId={u.id} />
 
       <div className="product-desc">
-        {u.rsopsPhotos?.length > 1 && (
+        {u.rsopsPhotos?.length > 0 && (
           <>
             <h2>Photos of this exact unit</h2>
             <p>Taken by our technicians during inspection — what you see is the unit you get.</p>
