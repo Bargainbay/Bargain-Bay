@@ -29,6 +29,7 @@ function Section({ title, rows, render }) {
 }
 
 export default async function AdminSearchPage({ searchParams }) {
+  const sParams = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/search');
   if (!isAdmin(session)) {
@@ -36,7 +37,7 @@ export default async function AdminSearchPage({ searchParams }) {
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
     </div></div>);
   }
-  const q = String(searchParams?.q || '').slice(0, 100);
+  const q = String(sParams?.q || '').slice(0, 100);
   let results = { customers: [], orders: [], invoices: [], quotes: [] };
   let error = '';
   if (hasDb() && q.trim().length >= 2) {

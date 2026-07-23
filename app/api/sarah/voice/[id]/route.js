@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(req, { params }) {
-  const id = String(params?.id || '').replace(/\.mp3$/i, '');
+  const resolvedParams = await params;
+  const id = String(resolvedParams?.id || '').replace(/\.mp3$/i, '');
   const bytes = await getAudio(id);
   if (!bytes) return new Response('Not found', { status: 404 });
   return new Response(bytes, {

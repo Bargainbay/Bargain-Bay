@@ -13,8 +13,9 @@ export const metadata = { title: 'Packing slip — Bargain Bay' };
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
 
 export default async function PackingSlipPage({ params }) {
+  const { number } = await params;
   const session = await getSession();
-  if (!session) redirect(`/login?next=/admin/packing-slip/${params.number}`);
+  if (!session) redirect(`/login?next=/admin/packing-slip/${number}`);
   if (!isAdmin(session)) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
@@ -23,7 +24,7 @@ export default async function PackingSlipPage({ params }) {
   }
   if (!hasDb()) return <div className="narrow"><div className="panel">Database not configured.</div></div>;
 
-  const slip = await getPackingSlip(params.number).catch(() => null);
+  const slip = await getPackingSlip(number).catch(() => null);
   if (!slip) return notFound();
 
   const delivery = slip.delivery_method === 'delivery';

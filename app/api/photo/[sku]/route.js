@@ -8,7 +8,8 @@ export const runtime = 'nodejs';
 // store, giving storefront cards + the Merchant feed a stable public URL on our
 // own domain without exposing the blob store. Path: /api/photo/<sku>.
 export async function GET(req, { params }) {
-  const sku = String(params?.sku || '').trim().replace(/[^\w.-]/g, '_');
+  const resolvedParams = await params;
+  const sku = String(resolvedParams?.sku || '').trim().replace(/[^\w.-]/g, '_');
   if (!sku) return new NextResponse('Not found', { status: 404 });
   try {
     const res = await get(`products/${sku}.jpg`, { access: 'private' });

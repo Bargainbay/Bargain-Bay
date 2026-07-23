@@ -16,6 +16,7 @@ const periodLabel = (key) => (DASH_PERIODS.find((p) => p.key === key) || {}).lab
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 
 export default async function CustomersDashboardPage({ searchParams }) {
+  const sParams = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/customers');
   if (!isAdmin(session)) {
@@ -24,8 +25,8 @@ export default async function CustomersDashboardPage({ searchParams }) {
   }
   if (!hasDb()) return (<DashboardShell active="customers"><div className="panel">Database not configured.</div></DashboardShell>);
 
-  const period = DASH_PERIODS.some((p) => p.key === searchParams?.period) ? searchParams.period : 'month';
-  const q = String(searchParams?.q || '').slice(0, 100);
+  const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
+  const q = String(sParams?.q || '').slice(0, 100);
   let d = null, customers = [], csat = null, error = '';
   try { [d, customers, csat] = await Promise.all([customersDashboard(period), listCustomers({ q }), ratingStats()]); }
   catch (e) { console.error('customers load failed', e.message); error = 'Could not load customer data.'; }

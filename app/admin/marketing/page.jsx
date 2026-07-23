@@ -19,6 +19,7 @@ const plain = (n) => `${Math.round(n)}`;
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '—');
 
 export default async function MarketingDashboardPage({ searchParams }) {
+  const sParams = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/marketing');
   if (!isAdmin(session)) {
@@ -27,7 +28,7 @@ export default async function MarketingDashboardPage({ searchParams }) {
   }
   if (!hasDb()) return (<DashboardShell active="marketing"><div className="panel">Database not configured.</div></DashboardShell>);
 
-  const period = DASH_PERIODS.some((p) => p.key === searchParams?.period) ? searchParams.period : 'month';
+  const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
   let d = null, adSpendRows = [], lastSync = null, error = '';
   try { [d, adSpendRows, lastSync] = await Promise.all([marketingDashboard(period), listAdSpend(), getSetting('meta_ads_last_sync', null)]); }
   catch (e) { console.error('marketing load failed', e.message); error = 'Could not load marketing data.'; }

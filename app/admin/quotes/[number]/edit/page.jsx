@@ -11,8 +11,9 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Edit quote — Bargain Bay' };
 
 export default async function EditQuotePage({ params }) {
+  const { number } = await params;
   const session = await getSession();
-  if (!session) redirect(`/login?next=/admin/quotes/${params.number}/edit`);
+  if (!session) redirect(`/login?next=/admin/quotes/${number}/edit`);
   if (!isAdmin(session)) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
@@ -20,7 +21,7 @@ export default async function EditQuotePage({ params }) {
   }
   if (!hasDb()) return <div className="narrow"><div className="panel">Database not configured.</div></div>;
 
-  const quote = await getQuoteByNumber(params.number).catch(() => null);
+  const quote = await getQuoteByNumber(number).catch(() => null);
   if (!quote) return notFound();
 
   if (quote.status !== 'open') {
