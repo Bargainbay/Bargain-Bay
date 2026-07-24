@@ -6,12 +6,11 @@ const nextConfig = {
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' }
     ]
   },
-  experimental: {
-    // /api/admin/migrate reads db/schema.sql at runtime — make sure the file
-    // ships with the serverless function on Vercel.
-    outputFileTracingIncludes: {
-      '/api/admin/migrate': ['./db/schema.sql']
-    }
+  // /api/admin/migrate reads db/schema.sql at runtime — make sure the file
+  // ships with the serverless function on Vercel. (Stable top-level option
+  // since Next 15; was experimental.* on Next 14.)
+  outputFileTracingIncludes: {
+    '/api/admin/migrate': ['./db/schema.sql']
   }
 };
 export default nextConfig;

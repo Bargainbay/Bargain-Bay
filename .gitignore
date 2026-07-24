@@ -3,3 +3,6 @@ node_modules
 .env
 .env.local
 data/reservations.json
+
+# Vercel CLI local artifacts (contains tokens)
+.vercel
