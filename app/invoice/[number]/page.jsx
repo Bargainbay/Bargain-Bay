@@ -12,20 +12,22 @@ export const metadata = { title: 'Invoice — Bargain Bay' };
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) : null);
 
 export default async function InvoicePage({ params, searchParams }) {
+  const { number } = await params;
+  const sParams = await searchParams;
   if (!hasDb()) {
     return <div className="narrow"><div className="panel">Invoices are not available — database not configured.</div></div>;
   }
-  const invoice = await getInvoiceByNumber(params.number).catch(() => null);
+  const invoice = await getInvoiceByNumber(number).catch(() => null);
   if (!invoice) return notFound();
 
   // Access: logged-in admin, or anyone with the matching ?email= (as in the
   // confirmation email link). Keeps invoice amounts from being enumerable.
   const session = await getSession();
-  const guestEmail = String(searchParams?.email || '').trim().toLowerCase();
+  const guestEmail = String(sParams?.email || '').trim().toLowerCase();
   const owns =
     (session && isAdmin(session)) ||
     (session && session.email?.toLowerCase() === invoice.email?.toLowerCase()) ||
-    verifyLinkToken('invoice', invoice.number, searchParams?.t) ||
+    verifyLinkToken('invoice', invoice.number, sParams?.t) ||
     (guestEmail && guestEmail === invoice.email?.toLowerCase());
   if (!owns) {
     return (
@@ -33,9 +35,9 @@ export default async function InvoicePage({ params, searchParams }) {
         <div className="panel">
           <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Find your invoice</h1>
           <p style={{ fontSize: 14, color: 'var(--muted)' }}>
-            To view invoice <b>{params.number}</b>, open the link from your invoice email (it includes your email), or enter it below.
+            To view invoice <b>{number}</b>, open the link from your invoice email (it includes your email), or enter it below.
           </p>
-          <form method="GET" action={`/invoice/${params.number}`}>
+          <form method="GET" action={`/invoice/${number}`}>
             <div className="field">
               <label htmlFor="inv-email">Email on the invoice</label>
               <input id="inv-email" name="email" type="email" required placeholder="you@example.com" />

@@ -17,6 +17,7 @@ const periodLabel = (key) => (DASH_PERIODS.find((p) => p.key === key) || {}).lab
 const methodLabel = (m) => ({ etransfer: 'E-transfer', cash: 'Cash', in_person: 'In person', card: 'Card', unspecified: 'Unspecified' }[m] || m);
 
 export default async function FinancialDashboardPage({ searchParams }) {
+  const sParams = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/financial');
   if (!isAdmin(session)) {
@@ -25,7 +26,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
   }
   if (!hasDb()) return (<DashboardShell active="financial"><div className="panel">Database not configured.</div></DashboardShell>);
 
-  const period = DASH_PERIODS.some((p) => p.key === searchParams?.period) ? searchParams.period : 'month';
+  const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
   let d = null, expenses = [], recurring = [], error = '';
   try { [d, expenses, recurring] = await Promise.all([financialDashboard(period), listExpenses(), listRecurringExpenses()]); }
   catch (e) { console.error('financial load failed', e.message); error = 'Could not load financial data.'; }

@@ -13,20 +13,22 @@ const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-CA', { month: 'lo
 const num = (v) => Number(v) || 0;
 
 export default async function QuotePage({ params, searchParams }) {
+  const { number } = await params;
+  const sParams = await searchParams;
   if (!hasDb()) {
     return <div className="narrow"><div className="panel">Quotes are not available — database not configured.</div></div>;
   }
-  const quote = await getQuoteByNumber(params.number).catch(() => null);
+  const quote = await getQuoteByNumber(number).catch(() => null);
   if (!quote) return notFound();
 
   // Access: logged-in admin, or anyone with the matching ?email= (as sent in the
   // quote email). Keeps quote amounts from being enumerable.
   const session = await getSession();
-  const guestEmail = String(searchParams?.email || '').trim().toLowerCase();
+  const guestEmail = String(sParams?.email || '').trim().toLowerCase();
   const owns =
     (session && isAdmin(session)) ||
     (session && session.email?.toLowerCase() === quote.email?.toLowerCase()) ||
-    verifyLinkToken('quote', quote.number, searchParams?.t) ||
+    verifyLinkToken('quote', quote.number, sParams?.t) ||
     (guestEmail && guestEmail === quote.email?.toLowerCase());
   if (!owns) {
     return (
@@ -34,9 +36,9 @@ export default async function QuotePage({ params, searchParams }) {
         <div className="panel">
           <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Find your quote</h1>
           <p style={{ fontSize: 14, color: 'var(--muted)' }}>
-            To view quote <b>{params.number}</b>, open the link from your quote email (it includes your email), or enter it below.
+            To view quote <b>{number}</b>, open the link from your quote email (it includes your email), or enter it below.
           </p>
-          <form method="GET" action={`/quote/${params.number}`}>
+          <form method="GET" action={`/quote/${number}`}>
             <div className="field">
               <label htmlFor="q-email">Email on the quote</label>
               <input id="q-email" name="email" type="email" required placeholder="you@example.com" />
@@ -72,7 +74,7 @@ export default async function QuotePage({ params, searchParams }) {
           </div>
           <AcceptQuote
             number={quote.number}
-            token={verifyLinkToken('quote', quote.number, searchParams?.t) ? searchParams.t : ''}
+            token={verifyLinkToken('quote', quote.number, sParams?.t) ? sParams.t : ''}
             email={guestEmail || (session?.email?.toLowerCase() === quote.email?.toLowerCase() ? session.email : '')}
           />
         </>

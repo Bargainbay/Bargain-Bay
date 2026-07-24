@@ -16,6 +16,7 @@ const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { mont
 const statusClass = (s) => (s === 'converted' || s === 'accepted' ? 'ok' : s === 'open' ? 'warn' : 'sold');
 
 export default async function QuotesPage({ searchParams }) {
+  const sParams = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/quotes');
   if (!isAdmin(session)) {
@@ -41,8 +42,8 @@ export default async function QuotesPage({ searchParams }) {
   } catch { customers = []; }
 
   let initial = null;
-  if (searchParams?.from) {
-    try { initial = await getQuoteForBuilder(searchParams.from); } catch { initial = null; }
+  if (sParams?.from) {
+    try { initial = await getQuoteForBuilder(sParams.from); } catch { initial = null; }
   }
 
   let inventory = [];

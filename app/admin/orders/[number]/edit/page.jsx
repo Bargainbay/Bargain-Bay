@@ -11,8 +11,9 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Edit order — Bargain Bay' };
 
 export default async function EditOrderPage({ params }) {
+  const { number } = await params;
   const session = await getSession();
-  if (!session) redirect(`/login?next=/admin/orders/${params.number}/edit`);
+  if (!session) redirect(`/login?next=/admin/orders/${number}/edit`);
   if (!isAdmin(session)) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
@@ -20,7 +21,7 @@ export default async function EditOrderPage({ params }) {
   }
   if (!hasDb()) return <div className="narrow"><div className="panel">Database not configured.</div></div>;
 
-  const order = await getOrderByNumber(params.number).catch(() => null);
+  const order = await getOrderByNumber(number).catch(() => null);
   if (!order) return notFound();
   const bridged = await orderInvoiceLink(order.id);
 

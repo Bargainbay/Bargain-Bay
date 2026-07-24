@@ -23,19 +23,21 @@ function timelineSteps(order) {
 }
 
 export default async function OrderPage({ params, searchParams }) {
+  const { orderNumber } = await params;
+  const sParams = await searchParams;
   if (!hasDb()) {
     return <div className="narrow"><div className="panel">Order tracking is not available — database not configured.</div></div>;
   }
-  const order = await getOrderByNumber(params.orderNumber).catch(() => null);
+  const order = await getOrderByNumber(orderNumber).catch(() => null);
   if (!order) return notFound();
 
   // Access: logged-in owner, or guest with matching ?email=
   const session = await getSession();
-  const guestEmail = String(searchParams?.email || '').trim().toLowerCase();
+  const guestEmail = String(sParams?.email || '').trim().toLowerCase();
   const owns =
     (session && order.user_id && session.userId === order.user_id) ||
     (session && session.email?.toLowerCase() === order.email?.toLowerCase()) ||
-    verifyLinkToken('order', order.order_number, searchParams?.t) ||
+    verifyLinkToken('order', order.order_number, sParams?.t) ||
     (guestEmail && guestEmail === order.email?.toLowerCase());
   if (!owns) {
     return (
@@ -43,10 +45,10 @@ export default async function OrderPage({ params, searchParams }) {
         <div className="panel">
           <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Find your order</h1>
           <p style={{ fontSize: 14, color: 'var(--muted)' }}>
-            To view order <b>{params.orderNumber}</b>, <a href={`/login?next=/order/${params.orderNumber}`} style={{ textDecoration: 'underline' }}>log in</a>,
+            To view order <b>{orderNumber}</b>, <a href={`/login?next=/order/${orderNumber}`} style={{ textDecoration: 'underline' }}>log in</a>,
             or open the tracking link from your confirmation (it includes your email), e.g.:
           </p>
-          <form method="GET" action={`/order/${params.orderNumber}`}>
+          <form method="GET" action={`/order/${orderNumber}`}>
             <div className="field">
               <label htmlFor="track-email">Email used on the order</label>
               <input id="track-email" name="email" type="email" required placeholder="you@example.com" />
@@ -67,7 +69,7 @@ export default async function OrderPage({ params, searchParams }) {
   const pickup = order.delivery_method !== 'delivery';
   const cancelled = order.status === 'cancelled';
   const pendingPayment = order.status === 'pending_payment';
-  const justPaid = searchParams?.status === 'success';
+  const justPaid = sParams?.status === 'success';
 
   // Pickup self-scheduling opens once a pickup order is Ready.
   const showPickupBooker = pickup && order.status === 'ready';

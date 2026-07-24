@@ -10,7 +10,8 @@ import { styleFor } from '../../lib/styles';
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ searchParams }) {
-  const col = COLLECTIONS.find((c) => c.slug === searchParams?.collection);
+  const sParams = await searchParams;
+  const col = COLLECTIONS.find((c) => c.slug === sParams?.collection);
   const label = col ? col.label : 'Shop All Inventory';
   return {
     title: `${label} — Tested & Working`,
@@ -19,6 +20,7 @@ export async function generateMetadata({ searchParams }) {
 }
 
 export default async function ShopPage({ searchParams }) {
+  const sParams = await searchParams;
   const units = await decorate(await getAvailable(), await getSession());
   const enriched = units.map((u) => ({
     ...u,
@@ -31,8 +33,8 @@ export default async function ShopPage({ searchParams }) {
       units={enriched}
       cats={categories(units)}
       makes={brands(units)}
-      initialCollection={searchParams?.collection || ''}
-      initialQuery={searchParams?.q || ''}
+      initialCollection={sParams?.collection || ''}
+      initialQuery={sParams?.q || ''}
     />
   );
 }

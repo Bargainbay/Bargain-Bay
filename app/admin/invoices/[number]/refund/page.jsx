@@ -12,8 +12,9 @@ export const metadata = { title: 'Refund invoice — Bargain Bay' };
 // Per-unit refund page: tick the line(s) coming back on a PAID invoice. Ticking
 // every line is a full refund (same as the old Refund button).
 export default async function RefundInvoicePage({ params }) {
+  const { number } = await params;
   const session = await getSession();
-  if (!session) redirect(`/login?next=/admin/invoices/${params.number}/refund`);
+  if (!session) redirect(`/login?next=/admin/invoices/${number}/refund`);
   if (!isAdmin(session)) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
@@ -21,7 +22,7 @@ export default async function RefundInvoicePage({ params }) {
   }
   if (!hasDb()) return <div className="narrow"><div className="panel">Database not configured.</div></div>;
 
-  const invoice = await getInvoiceByNumber(params.number).catch(() => null);
+  const invoice = await getInvoiceByNumber(number).catch(() => null);
   if (!invoice) return notFound();
 
   if (invoice.status !== 'paid') {

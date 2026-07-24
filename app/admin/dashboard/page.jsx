@@ -24,6 +24,7 @@ function statusClass(s) {
 }
 
 export default async function SalesDashboardPage({ searchParams }) {
+  const sParams = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/dashboard');
   if (!isAdmin(session)) {
@@ -38,7 +39,7 @@ export default async function SalesDashboardPage({ searchParams }) {
     return (<DashboardShell active="sales"><div className="panel">Database not configured — set POSTGRES_URL.</div></DashboardShell>);
   }
 
-  const period = DASH_PERIODS.some((p) => p.key === searchParams?.period) ? searchParams.period : 'month';
+  const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
 
   let data = null, goal = 0, repList = [], error = '';
   try {

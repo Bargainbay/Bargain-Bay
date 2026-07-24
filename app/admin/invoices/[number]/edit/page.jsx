@@ -11,8 +11,9 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Edit invoice — Bargain Bay' };
 
 export default async function EditInvoicePage({ params }) {
+  const { number } = await params;
   const session = await getSession();
-  if (!session) redirect(`/login?next=/admin/invoices/${params.number}/edit`);
+  if (!session) redirect(`/login?next=/admin/invoices/${number}/edit`);
   if (!isAdmin(session)) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
@@ -20,7 +21,7 @@ export default async function EditInvoicePage({ params }) {
   }
   if (!hasDb()) return <div className="narrow"><div className="panel">Database not configured.</div></div>;
 
-  const invoice = await getInvoiceByNumber(params.number).catch(() => null);
+  const invoice = await getInvoiceByNumber(number).catch(() => null);
   if (!invoice) return notFound();
 
   if (invoice.status !== 'open') {

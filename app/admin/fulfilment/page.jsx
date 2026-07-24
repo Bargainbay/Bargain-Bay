@@ -12,6 +12,7 @@ const periodLabel = (key) => (DASH_PERIODS.find((p) => p.key === key) || {}).lab
 const plain = (n) => `${Math.round(n)}`;
 
 export default async function FulfilmentDashboardPage({ searchParams }) {
+  const sParams = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/fulfilment');
   if (!isAdmin(session)) {
@@ -20,7 +21,7 @@ export default async function FulfilmentDashboardPage({ searchParams }) {
   }
   if (!hasDb()) return (<DashboardShell active="fulfilment"><div className="panel">Database not configured.</div></DashboardShell>);
 
-  const period = DASH_PERIODS.some((p) => p.key === searchParams?.period) ? searchParams.period : 'month';
+  const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
   let d = null, error = '';
   try { d = await fulfilmentDashboard(period); } catch (e) { console.error('fulfilment load failed', e.message); error = 'Could not load fulfilment data.'; }
   if (error || !d) return (<DashboardShell active="fulfilment"><div className="error-box">{error || 'No data.'}</div></DashboardShell>);

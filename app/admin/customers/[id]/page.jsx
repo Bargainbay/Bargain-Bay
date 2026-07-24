@@ -19,8 +19,9 @@ const pillClass = (s) => (
 const label = (s) => String(s || '').replace(/_/g, ' ');
 
 export default async function CustomerProfilePage({ params }) {
+  const { id } = await params;
   const session = await getSession();
-  if (!session) redirect(`/login?next=/admin/customers/${params.id}`);
+  if (!session) redirect(`/login?next=/admin/customers/${id}`);
   if (!isAdmin(session)) {
     return (<div className="narrow"><div className="panel"><h1 style={{ marginTop: 0 }}>Not authorized</h1>
       <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the admin list.</p></div></div>);
@@ -28,7 +29,7 @@ export default async function CustomerProfilePage({ params }) {
   if (!hasDb()) return (<DashboardShell active="customers"><div className="panel">Database not configured.</div></DashboardShell>);
 
   let c = null;
-  try { c = await getCustomerProfile(params.id); } catch (e) { console.error('customer profile load failed', e.message); }
+  try { c = await getCustomerProfile(id); } catch (e) { console.error('customer profile load failed', e.message); }
   if (!c) {
     return (
       <DashboardShell active="customers">
