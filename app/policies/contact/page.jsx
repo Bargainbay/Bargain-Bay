@@ -12,7 +12,7 @@ export default function ContactPage() {
         <li><b>Sales &amp; orders:</b> <a href="mailto:sales@bargainbay.ca" style={{ textDecoration: 'underline' }}>sales@bargainbay.ca</a></li>
         <li><b>Service, returns &amp; warranty:</b> <a href="mailto:Service@rssolutions.ca" style={{ textDecoration: 'underline' }}>Service@rssolutions.ca</a></li>
         <li><b>Warehouse / mailing address:</b> 1135 Squires Beach Rd, Pickering, ON L1W 3T9, Canada</li>
-        <li><b>Hours:</b> 10am–8pm</li>
+        <li><b>Hours:</b> Open 7 days a week, 10am–8pm</li>
       </ul>
       <p>We typically reply within <b>1–2 business days</b>.</p>
 

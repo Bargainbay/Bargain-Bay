@@ -11,7 +11,7 @@ export default function Footer() {
             <p style={{ fontSize: 14, margin: '0 0 8px' }}>
               Name-brand appliances at liquidation prices — every unit tested &amp; working and backed
               by a one-year warranty. Pickup, delivery &amp; freight serving Pickering, Scarborough and the GTA.
-              <br />1135 Squires Beach Rd, Pickering, ON L1W 3T9 · Open 10am–8pm (pickup by appointment).
+              <br />1135 Squires Beach Rd, Pickering, ON L1W 3T9 · Open 7 days, 10am–8pm (pickup by appointment).
             </p>
             <p style={{ fontSize: 13.5, margin: 0 }}>
               {PICKUP_ADDRESS}<br />
