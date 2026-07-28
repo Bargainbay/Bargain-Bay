@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, isAdmin } from '../../../lib/auth';
+import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { revenueDashboard, DASH_PERIODS } from '../../../lib/analytics';
@@ -27,16 +27,18 @@ export default async function SalesDashboardPage({ searchParams }) {
   const sParams = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/dashboard');
-  if (!isAdmin(session)) {
+  if (!isStaff(session)) {
     return (
       <div className="narrow"><div className="panel">
         <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
-        <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the admin list.</p>
+        <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the staff list.</p>
       </div></div>
     );
   }
+  // Sales associates see selling performance only — no cost-derived figures.
+  const salesOnly = !isAdmin(session);
   if (!hasDb()) {
-    return (<DashboardShell active="sales"><div className="panel">Database not configured — set POSTGRES_URL.</div></DashboardShell>);
+    return (<DashboardShell active="sales" salesOnly={salesOnly}><div className="panel">Database not configured — set POSTGRES_URL.</div></DashboardShell>);
   }
 
   const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
@@ -49,7 +51,7 @@ export default async function SalesDashboardPage({ searchParams }) {
     error = 'Could not load dashboard data — if you just deployed, run the schema migration under Operations.';
   }
   if (error || !data) {
-    return (<DashboardShell active="sales"><div className="error-box">{error || 'No data.'}</div></DashboardShell>);
+    return (<DashboardShell active="sales" salesOnly={salesOnly}><div className="error-box">{error || 'No data.'}</div></DashboardShell>);
   }
 
   const k = data.kpis;
@@ -62,7 +64,7 @@ export default async function SalesDashboardPage({ searchParams }) {
   const trend = data.series.map((s) => ({ label: s.label, value: s.revenue, hint: `${s.orders} order${s.orders === 1 ? '' : 's'}` }));
 
   return (
-    <DashboardShell active="sales">
+    <DashboardShell active="sales" salesOnly={salesOnly}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, margin: '0 0 14px' }}>
         <h1 style={{ margin: 0 }}>Sales performance</h1>
         <span className="hint" style={{ margin: 0 }}>Showing <strong>{periodLabel(period)}</strong>{vs ? ` — compared${vs}` : ''}</span>
@@ -73,10 +75,12 @@ export default async function SalesDashboardPage({ searchParams }) {
       <div className="dash-kpis">
         <Kpi label={`Revenue (ex-HST) · ${periodLabel(period)}`} value={money(k.revenue)} delta={k.revenueDelta}
           sub={k.hstCollected ? `+ ${money(k.hstCollected)} HST collected` : 'pre-tax sales'} />
-        <Kpi label="Profit" value={money(k.profit)} delta={k.profitDelta}
-          sub={k.unitsWithCost
-            ? `${k.marginPct.toFixed(1)}% margin · on ${Math.round(k.costCoverage)}% of sales w/ cost`
-            : 'no cost data yet'} />
+        {!salesOnly && (
+          <Kpi label="Profit" value={money(k.profit)} delta={k.profitDelta}
+            sub={k.unitsWithCost
+              ? `${k.marginPct.toFixed(1)}% margin · on ${Math.round(k.costCoverage)}% of sales w/ cost`
+              : 'no cost data yet'} />
+        )}
         <Kpi label="Orders" value={k.orders} delta={k.ordersDelta} />
         <Kpi label="Units sold" value={k.units} />
         <Kpi label="Avg order" value={money(k.avgOrder)} delta={k.avgDelta} />
@@ -212,14 +216,14 @@ export default async function SalesDashboardPage({ searchParams }) {
         <div className="panel">
           <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Sales by category · {periodLabel(period)}</h2>
           <div className="table-wrap"><table className="admin">
-            <thead><tr><th>Category</th><th style={{ textAlign: 'right' }}>Units</th><th style={{ textAlign: 'right' }}>Revenue</th><th style={{ textAlign: 'right' }}>Profit</th></tr></thead>
+            <thead><tr><th>Category</th><th style={{ textAlign: 'right' }}>Units</th><th style={{ textAlign: 'right' }}>Revenue</th>{!salesOnly && <th style={{ textAlign: 'right' }}>Profit</th>}</tr></thead>
             <tbody>
-              {data.byCategory.length === 0 && <tr><td colSpan={4} style={{ color: 'var(--muted)' }}>No sales in this period.</td></tr>}
+              {data.byCategory.length === 0 && <tr><td colSpan={salesOnly ? 3 : 4} style={{ color: 'var(--muted)' }}>No sales in this period.</td></tr>}
               {data.byCategory.map((c) => (
                 <tr key={c.category}>
                   <td>{c.category}</td><td style={{ textAlign: 'right' }}>{c.units}</td>
                   <td style={{ textAlign: 'right' }}>{money(c.revenue)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(c.profit)}</td>
+                  {!salesOnly && <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(c.profit)}</td>}
                 </tr>
               ))}
             </tbody>

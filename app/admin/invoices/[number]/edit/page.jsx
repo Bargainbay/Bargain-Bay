@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation';
-import { getSession, isAdmin } from '../../../../../lib/auth';
+import { getSession, isAdmin, isStaff } from '../../../../../lib/auth';
 import { hasDb } from '../../../../../lib/db';
 import { getInvoiceByNumber } from '../../../../../lib/invoices';
 import { getAll } from '../../../../../lib/inventory';
@@ -14,7 +14,7 @@ export default async function EditInvoicePage({ params }) {
   const { number } = await params;
   const session = await getSession();
   if (!session) redirect(`/login?next=/admin/invoices/${number}/edit`);
-  if (!isAdmin(session)) {
+  if (!isStaff(session)) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
     </div></div>);
@@ -27,7 +27,7 @@ export default async function EditInvoicePage({ params }) {
   if (invoice.status !== 'open') {
     return (
       <div>
-        <AdminNav active="invoices" />
+        <AdminNav active="invoices" salesOnly={!isAdmin(session)} />
         <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Edit {invoice.number}</h1>
         <div className="error-box">
           This invoice is <b>{invoice.status}</b> and can&apos;t be edited — editing a paid invoice would desync the
@@ -60,7 +60,7 @@ export default async function EditInvoicePage({ params }) {
 
   return (
     <div>
-      <AdminNav active="invoices" />
+      <AdminNav active="invoices" salesOnly={!isAdmin(session)} />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 8px' }}>Edit {invoice.number}</h1>
       <p className="hint" style={{ marginTop: 0 }}>For <b>{invoice.name || invoice.email}</b> · current total {money(invoice.total)}</p>
       <div className="panel">

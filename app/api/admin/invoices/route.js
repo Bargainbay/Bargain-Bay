@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
+import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, deleteInvoice,
          updateInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, PAYMENT_METHODS } from '../../../../lib/invoices';
@@ -12,12 +12,19 @@ async function admin() {
   return !!(s && isAdmin(s));
 }
 
+// Selling surfaces (create/send/edit/mark-paid/void/refund invoices + quotes)
+// are open to sales associates as well as admins.
+async function staff() {
+  const s = await getSession();
+  return !!(s && isStaff(s));
+}
+
 function noDb() {
   return NextResponse.json({ error: 'Database not configured (set POSTGRES_URL).' }, { status: 503 });
 }
 
 export async function GET() {
-  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return NextResponse.json({ invoices: [] });
   try {
     return NextResponse.json({ invoices: await listInvoices(25) });
@@ -27,7 +34,7 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return noDb();
   let body;
   try { body = await req.json(); } catch { body = {}; }
@@ -65,7 +72,7 @@ export async function POST(req) {
 
 // Mark an open invoice paid (cash / e-transfer / etc.) or void it.
 export async function PATCH(req) {
-  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return noDb();
   let body;
   try { body = await req.json(); } catch { body = {}; }
@@ -126,7 +133,7 @@ export async function PATCH(req) {
 // Permanently delete an invoice created in error (open/void only — paid ones
 // must be refunded). Body: { invoiceId }.
 export async function DELETE(req) {
-  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return noDb();
   let body;
   try { body = await req.json(); } catch { body = {}; }
