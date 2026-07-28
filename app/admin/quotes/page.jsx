@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, isAdmin } from '../../../lib/auth';
+import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
 import { listQuotes, getQuoteForBuilder } from '../../../lib/quotes';
@@ -19,10 +19,10 @@ export default async function QuotesPage({ searchParams }) {
   const sParams = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/quotes');
-  if (!isAdmin(session)) {
+  if (!isStaff(session)) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
-      <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the admin list.</p>
+      <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the staff list.</p>
     </div></div>);
   }
 
@@ -59,7 +59,7 @@ export default async function QuotesPage({ searchParams }) {
 
   return (
     <div>
-      <AdminNav active="quotes" />
+      <AdminNav active="quotes" salesOnly={!isAdmin(session)} />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Quotes</h1>
 
       {!hasDb() && (

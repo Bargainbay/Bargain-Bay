@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
+import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { createAndSendQuote, updateQuote, listQuotes, convertQuoteToInvoice, voidQuote } from '../../../../lib/quotes';
 
@@ -10,12 +10,19 @@ async function admin() {
   const s = await getSession();
   return !!(s && isAdmin(s));
 }
+
+// Selling surfaces (create/send/edit/mark-paid/void/refund invoices + quotes)
+// are open to sales associates as well as admins.
+async function staff() {
+  const s = await getSession();
+  return !!(s && isStaff(s));
+}
 function noDb() {
   return NextResponse.json({ error: 'Database not configured (set POSTGRES_URL).' }, { status: 503 });
 }
 
 export async function GET() {
-  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return NextResponse.json({ quotes: [] });
   try {
     return NextResponse.json({ quotes: await listQuotes(25) });
@@ -25,7 +32,7 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return noDb();
 
   let body;
@@ -59,7 +66,7 @@ export async function POST(req) {
 }
 
 export async function PATCH(req) {
-  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return noDb();
 
   let body;

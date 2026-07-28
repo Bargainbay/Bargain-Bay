@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, isAdmin } from '../../../lib/auth';
+import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
 import { listInvoices } from '../../../lib/invoices';
@@ -20,10 +20,10 @@ const statusClass = (s) => (s === 'paid' ? 'ok' : s === 'open' || s === 'draft' 
 export default async function InvoicesPage() {
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/invoices');
-  if (!isAdmin(session)) {
+  if (!isStaff(session)) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
-      <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the admin list.</p>
+      <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the staff list.</p>
     </div></div>);
   }
 
@@ -55,7 +55,7 @@ export default async function InvoicesPage() {
 
   return (
     <div>
-      <AdminNav active="invoices" />
+      <AdminNav active="invoices" salesOnly={!isAdmin(session)} />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Invoices</h1>
 
       {!hasDb() && (
@@ -68,7 +68,7 @@ export default async function InvoicesPage() {
           Emails the customer an itemized invoice to pay by Interac e-transfer (auto-deposit) or in person.
           Good for offline / custom / wholesale sales. Mark it paid here when the money lands.
         </p>
-        <InvoiceForm inventory={inventory} customers={customers} />
+        <InvoiceForm inventory={inventory} customers={customers} hideCost={!isAdmin(session)} />
       </div>
 
       <div className="panel">

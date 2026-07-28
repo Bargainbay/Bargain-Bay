@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation';
-import { getSession, isAdmin } from '../../../../../lib/auth';
+import { getSession, isAdmin, isStaff } from '../../../../../lib/auth';
 import { hasDb } from '../../../../../lib/db';
 import { getQuoteByNumber } from '../../../../../lib/quotes';
 import { contactsForAutofill } from '../../../../../lib/customers';
@@ -14,7 +14,7 @@ export default async function EditQuotePage({ params }) {
   const { number } = await params;
   const session = await getSession();
   if (!session) redirect(`/login?next=/admin/quotes/${number}/edit`);
-  if (!isAdmin(session)) {
+  if (!isStaff(session)) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
     </div></div>);
@@ -27,7 +27,7 @@ export default async function EditQuotePage({ params }) {
   if (quote.status !== 'open') {
     return (
       <div>
-        <AdminNav active="quotes" />
+        <AdminNav active="quotes" salesOnly={!isAdmin(session)} />
         <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Edit {quote.number}</h1>
         <div className="error-box">
           This quote is <b>{quote.status}</b> and can&apos;t be edited.{' '}
@@ -80,7 +80,7 @@ export default async function EditQuotePage({ params }) {
 
   return (
     <div>
-      <AdminNav active="quotes" />
+      <AdminNav active="quotes" salesOnly={!isAdmin(session)} />
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Edit {quote.number}</h1>
         <a href="/admin/quotes" className="hint" style={{ textDecoration: 'underline' }}>← Back to quotes</a>

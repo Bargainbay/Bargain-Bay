@@ -9,7 +9,7 @@ const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 // Business days run on Toronto time (same as the dashboard's buckets).
 const todayToronto = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
 
-export default function InvoiceForm({ inventory = [], customers = [] }) {
+export default function InvoiceForm({ inventory = [], customers = [], hideCost = false }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [items, setItems] = useState([blankItem()]);
@@ -205,7 +205,7 @@ export default function InvoiceForm({ inventory = [], customers = [] }) {
               <option value="">No warranty</option>
             </select>
           )}
-          {it.kind !== 'service' && !it.sku && (
+          {it.kind !== 'service' && !it.sku && !hideCost && (
             <input style={{ width: 95 }} type="number" min="0" step="0.01" value={it.cost ?? ''} onChange={(e) => setItem(i, 'cost', e.target.value)} placeholder="cost" title="Your cost for this unit (for margin) — fill in for a unit that isn't in inventory" />
           )}
           <input style={{ width: 110 }} type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="price" />
