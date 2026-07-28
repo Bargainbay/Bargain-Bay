@@ -11,7 +11,7 @@ export default function ShippingPage() {
 
       <h2>Free warehouse pickup</h2>
       <p>Pick up any order <b>free</b> at our warehouse, <b>by appointment</b>:</p>
-      <p><b>Bargain Bay — 2764 Governors Road, Lynden, ON L0R 1T0</b></p>
+      <p><b>Bargain Bay — 1135 Squires Beach Rd, Pickering, ON L1W 3T9</b></p>
       <p>
         After you order, we&apos;ll confirm a pickup time by email. Please bring your order confirmation and
         photo ID, and a vehicle/help suited to the size of the appliance.
@@ -19,12 +19,12 @@ export default function ShippingPage() {
 
       <h2>Local delivery</h2>
       <p>
-        We deliver throughout Hamilton, the GTA, and surrounding areas. Online checkout offers flat-rate{' '}
-        <b>$75 local delivery</b> for addresses within roughly 50 km of our Lynden warehouse. Farther out is
+        We deliver throughout Durham Region, the GTA, and surrounding areas. Online checkout offers flat-rate{' '}
+        <b>$75 local delivery</b> for addresses within roughly 50 km of our Pickering warehouse. Farther out is
         priced by distance:
       </p>
       <table>
-        <thead><tr><th>Distance from Lynden</th><th>Delivery fee</th></tr></thead>
+        <thead><tr><th>Distance from Pickering</th><th>Delivery fee</th></tr></thead>
         <tbody>
           <tr><td>0–50 km</td><td><b>$75</b></td></tr>
           <tr><td>51–100 km</td><td><b>$125</b> (by arrangement — email us)</td></tr>
@@ -67,12 +67,12 @@ export default function ShippingPage() {
       </p>
 
       <h2>Areas we serve</h2>
-      <p>Ontario — local delivery around Hamilton/GTA per the zones above; freight available farther out by quote.</p>
+      <p>Ontario — local delivery around Durham/GTA per the zones above; freight available farther out by quote.</p>
 
       <h2>Questions</h2>
       <p>
         <a href="mailto:Service@rssolutions.ca" style={{ textDecoration: 'underline' }}>Service@rssolutions.ca</a> — Bargain Bay /
-        RS Solutions, 2764 Governors Road, Lynden, ON L0R 1T0.
+        RS Solutions, 1135 Squires Beach Rd, Pickering, ON L1W 3T9.
       </p>
     </div>
   );

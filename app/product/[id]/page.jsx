@@ -117,7 +117,7 @@ export default async function Product({ params }) {
         <p>
           Like every appliance at Bargain Bay, it was put through a functional bench test by our
           technicians before listing and is backed by a {warrantyLabel}. Free warehouse pickup,
-          flat-fee local delivery, and freight options serve Hamilton, Scarborough and the GTA.
+          flat-fee local delivery, and freight options serve Pickering, Scarborough and the GTA.
         </p>
 
         <h2>Condition: {u.condition}</h2>

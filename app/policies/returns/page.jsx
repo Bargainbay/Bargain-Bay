@@ -68,7 +68,7 @@ export default function ReturnsPage() {
         reply within 1–2 business days with next steps. Approved returns can be dropped off at or picked up from
         our warehouse:
       </p>
-      <p><b>Bargain Bay — 2764 Governors Road, Lynden, ON L0R 1T0</b> (by appointment).</p>
+      <p><b>Bargain Bay — 1135 Squires Beach Rd, Pickering, ON L1W 3T9</b> (by appointment).</p>
 
       <h2>Refunds</h2>
       <p>

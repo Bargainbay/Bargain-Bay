@@ -166,7 +166,7 @@ export async function POST(req) {
           name: `${u.make} ${u.model}`,
           priceCents: Math.round(priceOf(u) * 100)
         })),
-        ...(deliveryFee ? [{ name: 'Local delivery (Hamilton & area)', priceCents: Math.round(deliveryFee * 100) }] : []),
+        ...(deliveryFee ? [{ name: 'Local delivery (Pickering & area)', priceCents: Math.round(deliveryFee * 100) }] : []),
         { name: 'HST 13% (Ontario)', priceCents: Math.round(hst * 100) }
       ];
       const { url, sessionId } = await createCheckoutSession({

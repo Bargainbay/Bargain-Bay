@@ -75,7 +75,7 @@ export default function PrivacyPage() {
       <p>
         Privacy questions or requests:{' '}
         <a href="mailto:Service@rssolutions.ca" style={{ textDecoration: 'underline' }}>Service@rssolutions.ca</a><br />
-        Bargain Bay / RS Solutions, 2764 Governors Road, Lynden, ON L0R 1T0.
+        Bargain Bay / RS Solutions, 1135 Squires Beach Rd, Pickering, ON L1W 3T9.
       </p>
     </div>
   );

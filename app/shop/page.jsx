@@ -15,7 +15,7 @@ export async function generateMetadata({ searchParams }) {
   const label = col ? col.label : 'Shop All Inventory';
   return {
     title: `${label} — Tested & Working`,
-    description: `${label} at liquidation prices — tested & working, one-year warranty, in stock now. Pickup, delivery & freight serving Hamilton, Scarborough and the GTA.`
+    description: `${label} at liquidation prices — tested & working, one-year warranty, in stock now. Pickup, delivery & freight serving Pickering, Scarborough and the GTA.`
   };
 }
 

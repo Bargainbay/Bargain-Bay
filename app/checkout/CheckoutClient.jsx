@@ -142,7 +142,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
                 <input type="radio" name="deliveryMethod" value="delivery" checked={form.deliveryMethod === 'delivery'} onChange={() => setForm((f) => ({ ...f, deliveryMethod: 'delivery', paymentMethod: 'etransfer' }))} />
                 <span>
                   <b>Local delivery — {money(DELIVERY_FEE)} flat</b>
-                  <span className="sub" style={{ display: 'block' }}>Hamilton &amp; area (within ~50 km of Lynden). To your door / ground floor. Farther out? Email us for a freight quote.</span>
+                  <span className="sub" style={{ display: 'block' }}>Pickering &amp; area (within ~50 km of Pickering). To your door / ground floor. Farther out? Email us for a freight quote.</span>
                 </span>
               </label>
               {form.deliveryMethod === 'delivery' && (
