@@ -11,7 +11,8 @@ export default function ContactPage() {
       <ul>
         <li><b>Sales &amp; orders:</b> <a href="mailto:sales@bargainbay.ca" style={{ textDecoration: 'underline' }}>sales@bargainbay.ca</a></li>
         <li><b>Service, returns &amp; warranty:</b> <a href="mailto:Service@rssolutions.ca" style={{ textDecoration: 'underline' }}>Service@rssolutions.ca</a></li>
-        <li><b>Warehouse / mailing address:</b> 2764 Governors Road, Lynden, ON L0R 1T0, Canada</li>
+        <li><b>Warehouse / mailing address:</b> 1135 Squires Beach Rd, Pickering, ON L1W 3T9, Canada</li>
+        <li><b>Hours:</b> 10am–8pm</li>
       </ul>
       <p>We typically reply within <b>1–2 business days</b>.</p>
 
@@ -24,7 +25,7 @@ export default function ContactPage() {
       </ul>
 
       <blockquote>
-        Pickup is <b>by appointment</b> at the Lynden warehouse — please don&apos;t visit without a confirmed time.
+        Pickup is <b>by appointment</b> at the Pickering warehouse — please don&apos;t visit without a confirmed time.
       </blockquote>
 
       <h2>Track an order</h2>

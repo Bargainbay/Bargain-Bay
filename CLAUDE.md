@@ -3,7 +3,7 @@
 Context for Claude Code working in this repo. Read this first.
 
 ## What this is
-Bargain Bay is RS Solutions' customer-facing **liquidation appliance storefront** (Hamilton/Scarborough/GTA, Ontario, Canada). Every unit is **one-of-a-kind (qty 1)** — open-box, scratch & dent, refurbished, tested-working appliances. Custom e-commerce site, **not** Shopify (the Shopify store exists but is under review; this custom build is the live store).
+Bargain Bay is RS Solutions' customer-facing **liquidation appliance storefront** (Pickering/Durham Region/Scarborough/GTA, Ontario, Canada). **Warehouse + pickup: 1135 Squires Beach Rd, Pickering, ON L1W 3T9, open 10am–8pm** (moved from Lynden/Hamilton Jul 2026 — `PICKUP_ADDRESS` / `BUSINESS_ADDRESS` / `BUSINESS_HOURS` in `lib/constants.js` are the source of truth; pickup slot hours live in `lib/pickup.js`). Every unit is **one-of-a-kind (qty 1)** — open-box, scratch & dent, refurbished, tested-working appliances. Custom e-commerce site, **not** Shopify (the Shopify store exists but is under review; this custom build is the live store).
 
 - **Live site:** https://bargainbay.ca (canonical Vercel URL: bargain-bay-two.vercel.app)
 - **Repo:** `Bargainbay/Bargain-Bay` (public), default branch `main`, auto-deploys to Vercel on push.
@@ -52,7 +52,7 @@ A unit object: `{ id (SKU), make, model, category, title, condition, price, comp
 - Two **Shopify-managed** catalogs also exist (partner-controlled) — do NOT use them for ads; that's exactly the problem we left behind.
 
 ## Pricing rules (don't break these)
-- **HST 13%**, $79 delivery / free Lynden pickup. CAD throughout.
+- **HST 13%**, $79 delivery / free Pickering pickup. CAD throughout. Delivery zones in `/policies/shipping` are distance-from-Pickering (re-anchored Jul 2026; fees unchanged).
 - **Member/wholesale:** 55% of retail on regular items (floored at cost+10% via `data/member-prices.json` to keep cost private), and 10% off the clearance price on clearance items. Approval-gated (`role=member`, `member_status=approved`).
 - **Clearance keeps the standard ONE-YEAR warranty** (`warranty_months` default 12 — NOT the 3 months that was originally spec'd). Clearance threshold = units aged > 45 days.
 - A real bug we already fixed: checkout/cart once charged full catalog price on clearance units. `lib/pricing.js` is now authoritative for both display AND checkout. Keep it that way.

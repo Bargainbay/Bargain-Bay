@@ -63,7 +63,7 @@ export async function GET() {
   <channel>
     <title>Bargain Bay — Liquidation Appliances</title>
     <link>${esc(SITE_URL)}</link>
-    <description>Tested &amp; working name-brand appliances with a one-year warranty. Hamilton, Scarborough &amp; the GTA.</description>
+    <description>Tested &amp; working name-brand appliances with a one-year warranty. Pickering, Scarborough &amp; the GTA.</description>
 ${items}
   </channel>
 </rss>

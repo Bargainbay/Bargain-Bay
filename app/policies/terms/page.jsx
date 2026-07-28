@@ -44,7 +44,7 @@ export default function TermsPage() {
 
       <h2>6. Pickup, delivery &amp; freight</h2>
       <p>
-        Free pickup is available at our Lynden warehouse <b>by appointment</b>. Local delivery and freight are
+        Free pickup is available at our Pickering warehouse <b>by appointment</b>. Local delivery and freight are
         offered at the rates shown at checkout. <b>Title and risk of loss pass to you upon pickup, or upon
         delivery to your address.</b> Please ensure clear access and that the appliance fits your space and
         doorways; missed or failed deliveries may incur a re-delivery fee.
@@ -93,7 +93,7 @@ export default function TermsPage() {
       <h2>13. Contact us</h2>
       <p>
         <a href="mailto:Service@rssolutions.ca" style={{ textDecoration: 'underline' }}>Service@rssolutions.ca</a><br />
-        Bargain Bay / RS Solutions, 2764 Governors Road, Lynden, ON L0R 1T0.
+        Bargain Bay / RS Solutions, 1135 Squires Beach Rd, Pickering, ON L1W 3T9.
       </p>
     </div>
   );

@@ -7,10 +7,11 @@ export default function Footer() {
         <div className="cols">
           <div>
             <img src="/bargain-bay-logo-on-charcoal.png" alt="Bargain Bay" className="footer-logo" />
-            <p className="tagline">Tested. Working. Warrantied. Hamilton &amp; the GTA.</p>
+            <p className="tagline">Tested. Working. Warrantied. Durham Region &amp; the GTA.</p>
             <p style={{ fontSize: 14, margin: '0 0 8px' }}>
               Name-brand appliances at liquidation prices — every unit tested &amp; working and backed
-              by a one-year warranty. Pickup, delivery &amp; freight serving Hamilton, Scarborough and the GTA.
+              by a one-year warranty. Pickup, delivery &amp; freight serving Pickering, Scarborough and the GTA.
+              <br />1135 Squires Beach Rd, Pickering, ON L1W 3T9 · Open 10am–8pm (pickup by appointment).
             </p>
             <p style={{ fontSize: 13.5, margin: 0 }}>
               {PICKUP_ADDRESS}<br />
@@ -34,7 +35,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="legal">
-          © {new Date().getFullYear()} Bargain Bay / RS Solutions · Hamilton (Lynden), Ontario — serving Hamilton, Scarborough &amp; the GTA · All prices in CAD, HST added at checkout.
+          © {new Date().getFullYear()} Bargain Bay / RS Solutions · Pickering, Ontario — serving Pickering, Scarborough &amp; the GTA · All prices in CAD, HST added at checkout.
           <span style={{ margin: '0 6px' }}>·</span>
           <a href="/admin" className="owner-portal-link">Owner Portal →</a>
         </div>

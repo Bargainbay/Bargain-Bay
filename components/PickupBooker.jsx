@@ -44,7 +44,7 @@ export default function PickupBooker({ orderNumber, email, slots = [], currentVa
       ) : (
         <>
           <p className="hint" style={{ marginTop: 0 }}>
-            Pick a 30-minute appointment window (Mon–Fri, 10:00am–5:00pm). We&apos;ll have your order ready at the counter.
+            Pick a 30-minute appointment window (Mon–Fri, 10:00am–8:00pm). We&apos;ll have your order ready at the counter.
           </p>
           {err && <div className="error-box">{err}</div>}
           {slots.length === 0 ? (

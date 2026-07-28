@@ -8,11 +8,11 @@ import { SITE_URL, jsonLd } from '../lib/site';
 export const metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Bargain Bay — Discount Appliances Hamilton & Scarborough | Tested & Working',
-    template: '%s | Bargain Bay — Discount Appliances Hamilton & Scarborough'
+    default: 'Bargain Bay — Discount Appliances Pickering & Scarborough | Tested & Working',
+    template: '%s | Bargain Bay — Discount Appliances Pickering & Scarborough'
   },
   description:
-    'Name-brand appliances at liquidation prices — every unit tested & working with a one-year warranty. Pickup, delivery & freight serving Hamilton, Scarborough and the GTA.',
+    'Name-brand appliances at liquidation prices — every unit tested & working with a one-year warranty. Pickup, delivery & freight serving Pickering, Durham Region, Scarborough and the GTA.',
   icons: { icon: '/bargain-bay-favicon.png' },
   openGraph: {
     siteName: 'Bargain Bay',
@@ -34,17 +34,28 @@ const storeSchema = {
   logo: `${SITE_URL}/bargain-bay-logo-transparent.png`,
   address: {
     '@type': 'PostalAddress',
-    streetAddress: '2764 Governors Road',
-    addressLocality: 'Lynden',
+    streetAddress: '1135 Squires Beach Rd',
+    addressLocality: 'Pickering',
     addressRegion: 'ON',
-    postalCode: 'L0R 1T0',
+    postalCode: 'L1W 3T9',
     addressCountry: 'CA'
   },
   areaServed: [
-    { '@type': 'City', name: 'Hamilton' },
+    { '@type': 'City', name: 'Pickering' },
+    { '@type': 'City', name: 'Ajax' },
+    { '@type': 'City', name: 'Whitby' },
+    { '@type': 'City', name: 'Oshawa' },
     { '@type': 'City', name: 'Scarborough' },
+    { '@type': 'City', name: 'Toronto' },
+    { '@type': 'AdministrativeArea', name: 'Durham Region' },
     { '@type': 'AdministrativeArea', name: 'Greater Toronto Area' }
   ],
+  openingHoursSpecification: [{
+    '@type': 'OpeningHoursSpecification',
+    dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    opens: '10:00',
+    closes: '20:00'
+  }],
   priceRange: '$$',
   currenciesAccepted: 'CAD'
 };

@@ -92,7 +92,7 @@ export default function ProductBuyPanel({ units, initialId }) {
         </div>
 
         <div className="meta-list" style={{ marginTop: 18 }}>
-          <div>🚚 Free pickup at {PICKUP_ADDRESS} (by appointment), flat-fee local delivery, or freight — Hamilton, Scarborough &amp; the GTA.</div>
+          <div>🚚 Free pickup at {PICKUP_ADDRESS} (by appointment), flat-fee local delivery, or freight — Pickering, Scarborough &amp; the GTA.</div>
           <div>✔️ Bench-tested &amp; certified working before listing.</div>
           <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; one-year warranty</a></div>
         </div>

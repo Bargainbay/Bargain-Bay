@@ -27,7 +27,7 @@ export default function Header() {
         <div className="header-row">
           <a href="/" className="logo" aria-label="Bargain Bay home">
             <img src="/bargain-bay-logo-transparent.png" alt="Bargain Bay" />
-            <span className="logo-sub">Liquidation appliances · Hamilton / GTA</span>
+            <span className="logo-sub">Liquidation appliances · Durham Region / GTA</span>
           </a>
           <nav className={'main-nav' + (open ? ' open' : '')} onClick={() => setOpen(false)}>
             <a href="/shop">Shop</a>

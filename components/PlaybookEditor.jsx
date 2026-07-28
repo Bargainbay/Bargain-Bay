@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 const GLOBAL_TEMPLATE = `# Bargain Bay Playbook — how we run, in my words
 
 ## About us
-We sell tested, name-brand liquidation appliances (one of each unit, 1-year warranty), Hamilton / GTA.
+We sell tested, name-brand liquidation appliances (one of each unit, 1-year warranty), Durham Region / GTA.
 
 ## How we operate (everyone)
 - Tone with customers, what we will and won't do, delivery hours / areas: ...
