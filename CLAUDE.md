@@ -1626,6 +1626,15 @@ can be deleted.
 5. `data/catalog.json` can lag; availability is sourced live from Postgres — don't "fix" by trusting the JSON for stock.
 6. Some tracker rows have messy/mis-categorized titles (a few units land in a vague "Appliance" category); they render as-is. Clean at the sheet, not in code.
 7. Product photos are manufacturer/dealer stock images (AJ Madison, authorized-dealer) — standard for resellers. Don't scrape copyrighted marketplace images.
+8. **Card payments are OFF** (`CARD_PAYMENTS_ENABLED = false` in `lib/constants.js`, pending the Stripe appeal). This means an order is created with **no payment step at all** while still reserving a qty-1 unit — so anything that weakens the checks in `lib/antifraud.js` directly hands fake orders the power to strip real stock off the storefront. Note the stale references to Clover elsewhere in this file: checkout is on **Stripe** now (`lib/stripe.js`, `app/api/stripe-webhook`).
+
+## Fake-order defences (added 2026-08-01)
+Because there is no payment step, these stand in for it. All of them **degrade open** — a database error lets the order through, since losing a real sale is worse than admitting a junk one.
+- `lib/antifraud.js` — honeypot (`components/HoneypotField.jsx`, an invisible `website` field on the checkout + signup forms), per-IP/per-email order rate limits, a cap on units held unpaid at once, disposable-domain rejection, and the owner's `blocklist` table. Rate limits **count rows in Postgres, not in memory**: serverless gives each instance its own memory, so the in-process counter in `/api/chat` only throttles a burst that lands on one instance.
+- `lib/order-verify.js` — guest offline orders get a "confirm it's really you" email. The unit **is** held immediately (a real buyer must never lose a one-of-a-kind unit while they go find the email); not clicking within `ORDER_VERIFY_HOURS` is what releases it. Signed-in customers skip this and are stamped verified on creation.
+- `lib/reservations.js` — `OFFLINE_HOLD_DAYS` is **7**, was 60. The sweep in `expireReservations()` now has three clocks: card orders at 24h, offline orders at 7 days, unverified orders at 12h. The offline clock is deliberately scoped to orders carrying a `verify_token`/`verified_at` so it can never mass-cancel orders that predate this feature.
+- `orders.ip` / `orders.user_agent` are recorded so a burst from one source is actually visible — before this there was no way to characterise the traffic at all.
+- Admin: `/api/admin/blocklist` (POST with `cancelOrders: true` blocks an identifier *and* cancels+relists every unpaid order matching it in one call), and an **⚠ Email unconfirmed** badge on the order board.
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
