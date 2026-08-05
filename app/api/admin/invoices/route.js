@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, deleteInvoice,
-         updateInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, PAYMENT_METHODS } from '../../../../lib/invoices';
+         updateInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -103,6 +103,15 @@ export async function PATCH(req) {
     }
     if (body.action === 'backfill') {
       const r = await backfillInvoiceOrder(invoiceId);
+      return NextResponse.json({ ok: true, invoice: r });
+    }
+    // Partial payment (deposit / instalment). Auto-completes to fully paid when
+    // the recorded payments reach the invoice total.
+    if (body.action === 'record_payment') {
+      const r = await recordInvoicePayment(invoiceId, {
+        amount: body.amount, method: String(body.method || '').trim(),
+        paidDate: String(body.paidDate || '').trim(), note: body.note
+      });
       return NextResponse.json({ ok: true, invoice: r });
     }
     if (body.action === 'void') {

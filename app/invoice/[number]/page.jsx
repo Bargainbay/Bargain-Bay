@@ -50,13 +50,16 @@ export default async function InvoicePage({ params, searchParams }) {
   }
 
   const open = invoice.status === 'open';
+  const partial = invoice.status === 'partial';
   const paid = invoice.status === 'paid';
   const voided = invoice.status === 'void';
   const refunded = invoice.status === 'refunded';
   const delivery = invoice.delivery_method === 'delivery';
   const refundTotal = Number(invoice.refund_total) || 0;
   const partialRefund = paid && refundTotal > 0;
-  const statusLabel = paid ? (partialRefund ? 'Paid · partial refund' : 'Paid') : refunded ? 'Refunded' : voided ? 'Void' : 'Open';
+  const amountPaid = Number(invoice.amountPaid) || 0;
+  const balance = Number(invoice.balance) || 0;
+  const statusLabel = paid ? (partialRefund ? 'Paid · partial refund' : 'Paid') : refunded ? 'Refunded' : voided ? 'Void' : partial ? 'Partially paid' : 'Open';
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -115,10 +118,11 @@ export default async function InvoicePage({ params, searchParams }) {
       {refunded && <div className="notice-box">This invoice was refunded{invoice.refunded_at ? ` on ${fmtDate(invoice.refunded_at)}` : ''}. Questions? Email {SALES_EMAIL}.</div>}
       {voided && <div className="error-box">This invoice was voided. Questions? Email {SALES_EMAIL}.</div>}
 
-      {open && (
+      {(open || partial) && (
         <div className="notice-box" style={{ lineHeight: 1.6 }}>
           <b>Pay by Interac e-Transfer.</b><br />
-          Send <b>{money(invoice.total)}</b> to <b>{ETRANSFER_EMAIL}</b> (auto-deposit — no security question).
+          {partial && <>We&apos;ve received <b>{money(amountPaid)}</b> so far — thank you! </>}
+          Send <b>{money(partial ? balance : invoice.total)}</b> to <b>{ETRANSFER_EMAIL}</b> (auto-deposit — no security question).
           Put invoice number <b>{invoice.number}</b> in the message so we can match it. Prefer to pay in person?
           Reply to your invoice email and we&apos;ll arrange it.
         </div>
@@ -147,6 +151,12 @@ export default async function InvoicePage({ params, searchParams }) {
           <div className="summary-row"><span>HST (13%)</span><span>{money(invoice.hst)}</span></div>
         )}
         <div className="summary-row total"><span>Total</span><span>{money(invoice.total)}</span></div>
+        {partial && (
+          <>
+            <div className="summary-row"><span>Paid so far</span><span>−{money(amountPaid)}</span></div>
+            <div className="summary-row total"><span>Balance owing</span><span>{money(balance)}</span></div>
+          </>
+        )}
         {partialRefund && (
           <>
             <div className="summary-row"><span>Refunded</span><span>−{money(refundTotal)}</span></div>
