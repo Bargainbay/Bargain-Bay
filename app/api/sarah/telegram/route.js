@@ -19,6 +19,7 @@ import { verifyTelegramSecret, getBotUsername, sendMessage, sendChatAction, down
 import { openEscalationByMessage, openSingleEscalation, resolveEscalation } from '../../../../lib/escalations';
 import { appendToPlaybook } from '../../../../lib/playbook';
 import { voiceConfigured, transcribeAudio, synthesizeSpeech } from '../../../../lib/voice';
+import { WRITE_TOOL_NAMES } from '../../../../lib/agent-tools';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -45,6 +46,24 @@ function agentForGroup(chatId) {
     if (gid && key && gid === id) return getAgent(key).key;
   }
   return null;
+}
+
+// Deterministic trust footer, built from the engine's real tool-execution log —
+// the model can neither fake it nor suppress it. Writes that ran are listed;
+// failed writes are flagged; and a reply that CLAIMS a completed action while no
+// write tool ran at all gets called out (the fabricated-invoice failure mode).
+const CLAIMS_ACTION_RE = /\b(i(?:['’]ve| have| just)?\s+(?:created|issued|sent|emailed|voided|refunded|marked|logged|recorded|updated)|(?:invoice|order|expense|payment)\s+(?:has been|is now|was)\s+(?:created|issued|sent|emailed|voided|refunded|recorded|marked))\b/i;
+function actionFooter(reply, actions) {
+  const writes = (actions || []).filter((a) => WRITE_TOOL_NAMES.includes(a.name));
+  const done = [...new Set(writes.filter((a) => a.ok).map((a) => a.name))];
+  const failed = [...new Set(writes.filter((a) => !a.ok).map((a) => a.name))];
+  const lines = [];
+  if (done.length) lines.push(`✅ Recorded in the system: ${done.join(', ')}`);
+  if (failed.length) lines.push(`⚠️ Not saved (tool failed): ${failed.join(', ')}`);
+  if (!writes.length && CLAIMS_ACTION_RE.test(reply)) {
+    lines.push('⚠️ Note: no invoice, order, or other system change was actually made in this reply.');
+  }
+  return lines.length ? `\n\n${lines.join('\n')}` : '';
 }
 
 // In the Management group, an owner replying to an escalation message resolves it:
@@ -115,7 +134,12 @@ export async function POST(req) {
   } else if (inGroup) {
     agentKey = agentForGroup(chatId);
     if (!agentKey) return ok();         // only the team group / mapped dept groups
-    readOnly = !isAdmin;               // admins keep full power even in the group
+    // Department groups (sales, dispatch, …) are invite-only — the owner controls
+    // who's in them, so membership IS the permission: every member works with that
+    // department's toolset (already scoped by the agent's allow-list; e.g. the
+    // sales crew can create/mark-paid/void invoices but not refund or delete).
+    // Sarah-fronted groups (main team, management) keep writes admin-only.
+    readOnly = agentKey === 'sarah' ? !isAdmin : false;
   } else {
     return ok();
   }
@@ -171,9 +195,9 @@ export async function POST(req) {
     sendChatAction(chatId, 'typing');
     try {
       const thread = await loadThread(threadKey, 20);
-      const { reply } = await runAgent({ agentKey, messages: thread, readOnly, ctx: { originChatId: chatId, dept: getAgent(agentKey).dept, senderName: fromName } });
+      const { reply, actions } = await runAgent({ agentKey, messages: thread, readOnly, ctx: { originChatId: chatId, dept: getAgent(agentKey).dept, senderName: fromName } });
       await appendMessage(threadKey, 'assistant', reply);
-      await sendMessage(chatId, reply); // groups stay text-only
+      await sendMessage(chatId, reply + actionFooter(reply, actions)); // groups stay text-only
     } catch (e) {
       console.error('sarah telegram run', e?.message || e);
       await sendMessage(chatId, 'Sorry — I hit a snag. Try me again in a moment.');
@@ -186,7 +210,7 @@ export async function POST(req) {
   try {
     await appendMessage(threadKey, 'user', prompt);
     const thread = await loadThread(threadKey, 20);
-    const { reply } = await runAgent({ agentKey, messages: thread, readOnly, ctx: { originChatId: chatId, dept: getAgent(agentKey).dept, senderName: fromName } });
+    const { reply, actions } = await runAgent({ agentKey, messages: thread, readOnly, ctx: { originChatId: chatId, dept: getAgent(agentKey).dept, senderName: fromName } });
     await appendMessage(threadKey, 'assistant', reply);
     if (wasVoice && voiceConfigured()) {
       try {
@@ -194,7 +218,7 @@ export async function POST(req) {
         if (ogg) await sendVoice(chatId, ogg);
       } catch (e) { console.error('telegram tts', e?.message || e); }
     }
-    await sendMessage(chatId, reply);
+    await sendMessage(chatId, reply + actionFooter(reply, actions));
   } catch (e) {
     console.error('sarah telegram run', e?.message || e);
     await sendMessage(chatId, 'Sorry — I hit a snag. Try me again in a moment.');
