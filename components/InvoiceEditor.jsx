@@ -22,7 +22,8 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState('');
+  const [resend, setResend] = useState(true);
 
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const addRow = () => setItems((xs) => [...xs, { description: '', amount: '', kind: 'unit', warrantyMonths: 12 }]);
@@ -47,15 +48,20 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
       const res = await fetch('/api/admin/invoices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items, addHst, memo,
+        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items, addHst, memo, resend,
           // Only send a date the owner actually changed — sending the original
           // back unchanged would still re-stamp created_at to noon that day.
           invoiceDate: invoiceDate !== (invoice.invoiceDate || '') ? invoiceDate : '' })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not save.'); return; }
-      setDone(true);
-      setTimeout(() => { window.location.href = '/admin/invoices'; }, 700);
+      if (d.emailError) {
+        // Saved, but the email didn't go out — stay on the page so it's seen.
+        setErr(`Saved, but the email failed: ${d.emailError} Use “Resend email” on the invoice list to retry.`);
+        return;
+      }
+      setDone(d.emailed ? `✓ Saved — updated invoice emailed to ${invoice.email}. Returning…` : '✓ Saved. Returning to invoices…');
+      setTimeout(() => { window.location.href = '/admin/invoices'; }, 900);
     } catch {
       setErr('Network error — please try again.');
     } finally {
@@ -63,14 +69,14 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
     }
   }
 
-  if (done) return <div className="notice-box">✓ Saved. Returning to invoices…</div>;
+  if (done) return <div className="notice-box">{done}</div>;
 
   return (
     <div>
       {err && <div className="error-box">{err}</div>}
       <div className="hint" style={{ marginTop: 0 }}>
-        Editing the customer&apos;s email isn&apos;t changed here — only the line items, HST, and memo.
-        The customer is <b>not</b> re-emailed automatically.
+        The customer&apos;s email address isn&apos;t changed here — only the line items, HST, and memo.
+        Tick &quot;Email the updated invoice&quot; below to re-send it when you save.
       </div>
 
       {inventory.length > 0 && (
@@ -138,9 +144,14 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
         <div style={{ fontSize: 14, color: 'var(--muted)' }}>
           Subtotal {fmt(subtotal)}{addHst ? ` · HST ${fmt(hst)}` : ''} · <b style={{ color: 'var(--charcoal)' }}>Total {fmt(total)}</b>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5 }}
+            title={`Re-send the invoice email (with e-transfer instructions) to ${invoice.email} after saving`}>
+            <input type="checkbox" style={{ width: 'auto' }} checked={resend} onChange={(e) => setResend(e.target.checked)} />
+            Email the updated invoice
+          </label>
           <a className="btn" href="/admin/invoices">Cancel</a>
-          <button className="btn accent" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button>
+          <button className="btn accent" disabled={busy} onClick={save}>{busy ? 'Saving…' : resend ? 'Save & email' : 'Save changes'}</button>
         </div>
       </div>
     </div>

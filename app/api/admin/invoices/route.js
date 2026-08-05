@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, deleteInvoice,
-         updateInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
+         updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -99,7 +99,19 @@ export async function PATCH(req) {
         memo: body.memo,
         invoiceDate: String(body.invoiceDate || '').trim()
       });
-      return NextResponse.json({ ok: true, invoice: updated });
+      // Optionally re-email the customer the updated invoice. The save already
+      // succeeded, so a mail failure is reported as a warning, not an error.
+      let emailed = false, emailError = null;
+      if (body.resend) {
+        try { await resendInvoice(invoiceId); emailed = true; }
+        catch (e) { emailError = e?.message || 'The invoice saved, but the email failed to send.'; }
+      }
+      return NextResponse.json({ ok: true, invoice: updated, emailed, emailError });
+    }
+    // Re-send the invoice email as-is (customer lost it / wrong inbox found).
+    if (body.action === 'resend') {
+      const r = await resendInvoice(invoiceId);
+      return NextResponse.json({ ok: true, invoice: r });
     }
     if (body.action === 'backfill') {
       const r = await backfillInvoiceOrder(invoiceId);
