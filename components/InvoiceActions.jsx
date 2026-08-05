@@ -3,7 +3,8 @@ import { useState } from 'react';
 
 // Per-row invoice actions in the admin list: view, packing slip, and the
 // lifecycle actions (void/delete for unpaid, refund for paid).
-//   open      → Void · Delete · Packing slip
+//   open      → Edit · Resend · Void · Delete · Packing slip
+//   partial   → Resend (balance-aware) · Packing slip
 //   void      → Delete · Packing slip
 //   paid      → Refund · Packing slip
 //   refunded  → Packing slip
@@ -11,6 +12,7 @@ export default function InvoiceActions({ invoice }) {
   const { id, number, status, hostedUrl, orderNumber } = invoice;
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
+  const [sent, setSent] = useState(false);
 
   async function send(method, bodyExtra, confirmMsg, label) {
     if (confirmMsg && !window.confirm(confirmMsg)) return;
@@ -29,6 +31,26 @@ export default function InvoiceActions({ invoice }) {
     }
   }
 
+  // Re-email the invoice (payment request) to the customer. No reload — nothing
+  // on the row changes; show a "Sent ✓" in place instead.
+  async function resend() {
+    setBusy('resend'); setErr(''); setSent(false);
+    try {
+      const res = await fetch('/api/admin/invoices', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId: id, action: 'resend' })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Failed'); return; }
+      setSent(true);
+    } catch {
+      setErr('Network error');
+    } finally {
+      setBusy('');
+    }
+  }
+
   const link = { textDecoration: 'underline', cursor: 'pointer' };
   const danger = { ...link, color: 'var(--danger, #c0392b)', background: 'none', border: 'none', padding: 0, font: 'inherit' };
   const btn = { ...link, background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'var(--charcoal)' };
@@ -40,6 +62,15 @@ export default function InvoiceActions({ invoice }) {
       {orderNumber && <a href="/admin/operations" style={link} title={`Fulfilment order ${orderNumber}`}>{orderNumber}</a>}
 
       {status === 'open' && <a href={`/admin/invoices/${number}/edit`} style={link}>Edit</a>}
+      {(status === 'open' || status === 'partial') && (sent
+        ? <span style={{ color: 'var(--success, #0f6e56)' }}>Sent ✓</span>
+        : <button style={btn} disabled={!!busy}
+            onClick={resend}
+            title={status === 'partial'
+              ? 'Re-email this invoice showing payments to date, asking for the balance owing'
+              : 'Re-email this invoice (with e-transfer instructions) to the customer'}>
+            {busy === 'resend' ? 'Sending…' : 'Resend email'}
+          </button>)}
       {status === 'paid' && !orderNumber && (
         <button style={btn} disabled={!!busy}
           onClick={() => send('PATCH', { action: 'backfill' }, '', 'backfill')}
