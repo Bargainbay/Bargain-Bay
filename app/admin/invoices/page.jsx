@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoices — Bargain Bay' };
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
-const statusClass = (s) => (s === 'paid' ? 'ok' : s === 'open' || s === 'draft' ? 'warn' : s === 'void' || s === 'refunded' || s === 'uncollectible' ? 'sold' : 'warn');
+const statusClass = (s) => (s === 'paid' ? 'ok' : s === 'open' || s === 'partial' || s === 'draft' ? 'warn' : s === 'void' || s === 'refunded' || s === 'uncollectible' ? 'sold' : 'warn');
 
 export default async function InvoicesPage() {
   const session = await getSession();
@@ -98,12 +98,22 @@ export default async function InvoicesPage() {
                       −{money(inv.refundedTotal)}
                     </span>
                   )}
+                  {inv.status === 'partial' && (
+                    <span className="pill ok" style={{ marginLeft: 4 }} title={`${money(inv.amountPaid)} received so far — ${money(inv.balance)} still owing`}>
+                      {money(inv.amountPaid)} in
+                    </span>
+                  )}
                 </td>
                 <td>{fmtDate(inv.created)}</td>
-                <td style={{ textAlign: 'right' }}>{money(inv.total)}</td>
+                <td style={{ textAlign: 'right' }}>
+                  {money(inv.total)}
+                  {inv.status === 'partial' && (
+                    <div style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>owing {money(inv.balance)}</div>
+                  )}
+                </td>
                 <td>
-                  {inv.status === 'open'
-                    ? <MarkPaidControl invoiceId={inv.id} />
+                  {inv.status === 'open' || inv.status === 'partial'
+                    ? <MarkPaidControl invoiceId={inv.id} balance={inv.balance ?? inv.total} />
                     : (inv.method || (inv.status === 'paid' ? 'Paid' : inv.status === 'refunded' ? 'Refunded' : '—'))}
                 </td>
                 <td><InvoiceActions invoice={inv} /></td>

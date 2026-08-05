@@ -157,8 +157,8 @@ CREATE TABLE IF NOT EXISTS invoices (
   number         text UNIQUE,                 -- 'INV-' || (1000 + id)
   email          text NOT NULL,
   name           text,
-  status         text NOT NULL DEFAULT 'open' -- open | paid | void | refunded
-                 CHECK (status IN ('open','paid','void','refunded')),
+  status         text NOT NULL DEFAULT 'open' -- open | partial | paid | void | refunded
+                 CHECK (status IN ('open','partial','paid','void','refunded')),
   subtotal       numeric(10,2),
   hst            numeric(10,2),
   total          numeric(10,2),
@@ -180,6 +180,17 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 );
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
+-- Individual payments against an invoice (deposits / instalments / the closing
+-- balance). A paid invoice's rows sum to its total; 'partial' invoices have some.
+CREATE TABLE IF NOT EXISTS invoice_payments (
+  id         serial PRIMARY KEY,
+  invoice_id int NOT NULL,
+  amount     numeric(10,2) NOT NULL,
+  method     text NOT NULL,
+  note       text,
+  paid_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invoice_payments_invoice ON invoice_payments(invoice_id);
 -- Fulfilment intent captured on the invoice; when it's marked paid, a matching
 -- order is created (delivery_method/address flow into the order). order_id links
 -- the created fulfilment order back (and guards against double-creation).
