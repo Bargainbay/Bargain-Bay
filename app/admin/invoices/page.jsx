@@ -113,7 +113,7 @@ export default async function InvoicesPage() {
                 </td>
                 <td>
                   {inv.status === 'open' || inv.status === 'partial'
-                    ? <MarkPaidControl invoiceId={inv.id} balance={inv.balance ?? inv.total} />
+                    ? <MarkPaidControl invoiceId={inv.id} balance={inv.balance ?? inv.total} payments={inv.payments || []} />
                     : (inv.method || (inv.status === 'paid' ? 'Paid' : inv.status === 'refunded' ? 'Refunded' : '—'))}
                 </td>
                 <td><InvoiceActions invoice={inv} /></td>
