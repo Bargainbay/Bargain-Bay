@@ -8,7 +8,7 @@ const fmt = (n) => '$' + (Number(n) || 0).toFixed(2);
 // Leave the amount blank to mark the whole balance paid (the classic flow);
 // type a smaller amount to record a deposit / instalment — the invoice moves to
 // "partial" and auto-completes to paid once payments reach the total.
-export default function MarkPaidControl({ invoiceId, balance }) {
+export default function MarkPaidControl({ invoiceId, balance, payments = [] }) {
   // No default — force the owner to pick how it was actually paid (was silently
   // defaulting to e-transfer, so cash sales got mis-recorded).
   const [method, setMethod] = useState('');
@@ -22,6 +22,27 @@ export default function MarkPaidControl({ invoiceId, balance }) {
   const bal = Number(balance) || 0;
   const amt = Number(amount);
   const isPartial = amount !== '' && Number.isFinite(amt) && amt > 0 && bal > 0 && amt < bal - 0.005;
+
+  // Remove a payment recorded in error (double-entry / wrong amount). Only
+  // possible while the invoice isn't settled — paid ledgers are locked.
+  async function voidPayment(p) {
+    if (!window.confirm(`Remove the ${fmt(p.amount)} ${p.method} payment recorded for ${p.date}? The balance owing goes back up — use this only for payments entered by mistake.`)) return;
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/invoices', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'void_payment', invoiceId, paymentId: p.id })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Failed'); return; }
+      window.location.reload();
+    } catch {
+      setErr('Network error');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function mark() {
     if (!method) { setErr('Pick how it was paid'); return; }
@@ -67,6 +88,20 @@ export default function MarkPaidControl({ invoiceId, balance }) {
         {busy ? '…' : isPartial ? `Record ${fmt(amt)}` : 'Mark paid'}
       </button>
       {err && <span style={{ color: 'var(--danger)', fontSize: 12 }}>{err}</span>}
+      {payments.length > 0 && (
+        <span style={{ display: 'block', width: '100%', fontSize: 11.5, color: 'var(--muted)' }}>
+          {payments.map((p) => (
+            <span key={p.id} style={{ marginRight: 10, whiteSpace: 'nowrap' }}>
+              {fmt(p.amount)} {p.method} · {p.date}
+              <button type="button" disabled={busy} onClick={() => voidPayment(p)}
+                title="Remove this payment (entered in error)"
+                style={{ marginLeft: 3, border: 'none', background: 'none', color: 'var(--danger)', cursor: 'pointer', font: 'inherit', padding: 0 }}>
+                ✕
+              </button>
+            </span>
+          ))}
+        </span>
+      )}
     </span>
   );
 }

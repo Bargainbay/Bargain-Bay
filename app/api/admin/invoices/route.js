@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, deleteInvoice,
-         updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
+         updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, voidInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -124,6 +124,11 @@ export async function PATCH(req) {
         amount: body.amount, method: String(body.method || '').trim(),
         paidDate: String(body.paidDate || '').trim(), note: body.note
       });
+      return NextResponse.json({ ok: true, invoice: r });
+    }
+    // Remove a payment recorded in error (only while the invoice isn't settled).
+    if (body.action === 'void_payment') {
+      const r = await voidInvoicePayment(invoiceId, body.paymentId);
       return NextResponse.json({ ok: true, invoice: r });
     }
     if (body.action === 'void') {
