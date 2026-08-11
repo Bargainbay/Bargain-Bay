@@ -78,18 +78,25 @@ export default async function OrderPage({ params, searchParams }) {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <h1 style={{ color: 'var(--charcoal)' }}>Order {order.order_number}</h1>
-      <div style={{ marginBottom: 8 }}>
-        {pendingPayment ? (
-          <>
-            <span className="status-chip status-confirmed">Confirmed</span>
-            <span className="pill warn" style={{ marginLeft: 8 }}>Pending payment</span>
-          </>
-        ) : (
-          <span className={`status-chip status-${order.status}`}>{STATUS_LABELS[order.status]}</span>
-        )}
-        <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 10 }}>
-          Placed {new Date(order.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+        <span>
+          {pendingPayment ? (
+            <>
+              <span className="status-chip status-confirmed">Confirmed</span>
+              <span className="pill warn" style={{ marginLeft: 8 }}>Pending payment</span>
+            </>
+          ) : (
+            <span className={`status-chip status-${order.status}`}>{STATUS_LABELS[order.status]}</span>
+          )}
+          <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 10 }}>
+            Placed {new Date(order.created_at).toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </span>
         </span>
+        {/* Access is already proven to render this page; the token keeps the
+            download working for guests who arrived via ?email=. */}
+        <a className="btn" href={`/order/${encodeURIComponent(order.order_number)}/pdf?t=${linkToken('order', order.order_number)}`}>
+          ⬇ Download PDF
+        </a>
       </div>
       <OrderLiveRefresh orderNumber={order.order_number} token={linkToken('order', order.order_number)} status={order.status} />
 

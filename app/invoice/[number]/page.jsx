@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { hasDb } from '../../../lib/db';
 import { getInvoiceByNumber } from '../../../lib/invoices';
 import { getSession, isAdmin } from '../../../lib/auth';
-import { verifyLinkToken } from '../../../lib/links';
+import { linkToken, verifyLinkToken } from '../../../lib/links';
 import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel,
          BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY } from '../../../lib/constants';
 
@@ -76,11 +76,18 @@ export default async function InvoicePage({ params, searchParams }) {
         </div>
       </div>
 
-      <div style={{ marginBottom: 8 }}>
-        <span className={'pill ' + (paid ? 'ok' : (voided || refunded) ? 'sold' : 'warn')}>{statusLabel}</span>
-        <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 10 }}>
-          Issued {fmtDate(invoice.created_at)}{invoice.due_date && open ? ` · due ${fmtDate(invoice.due_date)}` : ''}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+        <span>
+          <span className={'pill ' + (paid ? 'ok' : (voided || refunded) ? 'sold' : 'warn')}>{statusLabel}</span>
+          <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 10 }}>
+            Issued {fmtDate(invoice.created_at)}{invoice.due_date && open ? ` · due ${fmtDate(invoice.due_date)}` : ''}
+          </span>
         </span>
+        {/* The token gate is already passed to render this page, so embedding a
+            fresh token keeps the download working however the viewer got here. */}
+        <a className="btn" href={`/invoice/${encodeURIComponent(invoice.number)}/pdf?t=${linkToken('invoice', invoice.number)}`}>
+          ⬇ Download PDF
+        </a>
       </div>
 
       {/* Bill To / Ship To */}

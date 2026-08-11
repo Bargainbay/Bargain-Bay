@@ -99,7 +99,11 @@ export default async function AccountPage() {
                   <span className={'pill ' + pillClass(inv.status)} style={{ marginLeft: 8 }}>{inv.status}</span>
                   {inv.status === 'open' && inv.due && <span style={{ fontSize: 12.5, color: 'var(--muted)', marginLeft: 8 }}>due {inv.due}</span>}
                 </span>
-                <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{money(inv.total)}</span>
+                <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>
+                  {money(inv.total)}
+                  <a href={`/invoice/${encodeURIComponent(inv.number)}/pdf?t=${linkToken('invoice', inv.number)}`}
+                     style={{ fontSize: 12.5, fontWeight: 400, textDecoration: 'underline', marginLeft: 10 }}>PDF</a>
+                </span>
               </div>
             ))}
           </div>
