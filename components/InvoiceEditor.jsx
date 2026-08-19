@@ -106,6 +106,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
           ) : (
             <select value={it.warrantyMonths == null ? '' : it.warrantyMonths} onChange={(e) => setItem(i, 'warrantyMonths', e.target.value === '' ? null : Number(e.target.value))}
               title="Warranty term shown on the invoice" style={{ width: 120, fontSize: 12.5, padding: '4px 6px' }}>
+              <option value={24}>2-yr warranty</option>
               <option value={12}>1-yr warranty</option>
               <option value={6}>6-mo warranty</option>
               <option value={3}>3-mo warranty</option>
