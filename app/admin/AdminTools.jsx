@@ -12,6 +12,8 @@ export default function AdminTools({ initialReservations }) {
   const [emailBusy, setEmailBusy] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [repairMsg, setRepairMsg] = useState('');
+  const [repairing, setRepairing] = useState(false);
   const [importMsg, setImportMsg] = useState('');
   const [importing, setImporting] = useState(false);
 
@@ -58,6 +60,24 @@ export default function AdminTools({ initialReservations }) {
       setSyncMsg('✗ Network error');
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function repairFormulas() {
+    setRepairing(true); setRepairMsg('');
+    try {
+      const res = await fetch('/api/admin/tracker-formulas', { method: 'POST' });
+      const d = await res.json();
+      const cols = d.byColumn ? Object.entries(d.byColumn).map(([c, n]) => `${c}\u00d7${n}`).join(', ') : '';
+      setRepairMsg(res.ok
+        ? (d.cells
+            ? `\u2713 Restored ${d.cells} formula cell${d.cells === 1 ? '' : 's'} across ${d.rows} row${d.rows === 1 ? '' : 's'}${cols ? ` (${cols})` : ''}. Re-check the tracker's Available Inventory tab.`
+            : `\u2713 Nothing to repair \u2014 all ${d.unitRows} unit rows already have their formulas.`)
+        : `\u2717 ${d.error || 'Repair failed'}`);
+    } catch {
+      setRepairMsg('\u2717 Network error');
+    } finally {
+      setRepairing(false);
     }
   }
 
@@ -166,6 +186,17 @@ export default function AdminTools({ initialReservations }) {
           and removes anything no longer in stock. Needs <code>GOOGLE_CREDENTIALS</code> + <code>SHEET_ID</code>.
         </span>
         {syncMsg && <span style={{ fontSize: 13.5, fontWeight: 600, flexBasis: '100%' }}>{syncMsg}</span>}
+        <div style={{ flexBasis: '100%', borderTop: '1px solid var(--line-soft)', paddingTop: 12, marginTop: 2 }}>
+          <button className="btn" disabled={repairing} onClick={repairFormulas}>
+            {repairing ? 'Repairing\u2026' : 'Repair tracker formulas'}
+          </button>
+          <span style={{ fontSize: 13.5, color: 'var(--muted)', marginLeft: 12 }}>
+            Restores the tracker's white formula cells on rows added through this app — including
+            <code>AvailRank</code>, the column its <strong>Available Inventory</strong> tab counts. Run it if the sheet
+            shows fewer available units than the sync does. Only fills empty cells, so manual prices survive.
+          </span>
+          {repairMsg && <div style={{ fontSize: 13.5, fontWeight: 600, marginTop: 8 }}>{repairMsg}</div>}
+        </div>
         <div style={{ flexBasis: '100%', borderTop: '1px solid var(--line-soft)', paddingTop: 12, marginTop: 2 }}>
           <label className="btn" style={{ cursor: 'pointer', opacity: importing ? 0.6 : 1 }}>
             {importing ? 'Importing…' : 'Import inventory CSV'}
