@@ -163,11 +163,11 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
         <span style={{ width: 34 }} />
       </div>
       {items.map((it, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-          <input style={{ flex: 1 }} value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} placeholder="e.g. 24&quot; Whirlpool WRT112CZJZ fridge" />
-          <input style={{ width: 110 }} type="number" min="0" step="0.01" value={it.retail} onChange={(e) => setItem(i, 'retail', e.target.value)} placeholder="retail" />
-          <input style={{ width: 110 }} type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="price" />
-          <button type="button" className="btn" style={{ padding: '0 12px' }} onClick={() => removeRow(i)} aria-label="Remove line">×</button>
+        <div key={i} className="inv-line">
+          <input className="inv-desc" value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} autoComplete="off" autoCorrect="off" spellCheck={false} placeholder="e.g. 24&quot; Whirlpool WRT112CZJZ fridge" />
+          <input className="inv-cost" type="number" inputMode="decimal" min="0" step="0.01" value={it.retail} onChange={(e) => setItem(i, 'retail', e.target.value)} placeholder="retail" />
+          <input className="inv-amt" type="number" inputMode="decimal" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="price" />
+          <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
         </div>
       ))}
       <button type="button" className="btn" onClick={addRow} style={{ marginBottom: 12 }}>+ Add line</button>

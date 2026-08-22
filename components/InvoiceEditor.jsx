@@ -1,11 +1,26 @@
 'use client';
 import { useState } from 'react';
 
-// Edit an OPEN invoice's line items: add, remove, reprice, change warranty,
-// add a service line, or add a unit from inventory. Saves via PATCH action 'edit'.
+// Edit an invoice: the customer's details, the line items (add, remove, reprice,
+// change warranty, add a service or a unit from stock), HST, memo and issue date.
+// Works on a settled invoice too — correcting a three-month-old sale adjusts that
+// sale in the month it happened, rather than booking anything new today.
+// Saves via PATCH action 'edit'.
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
+const fmtMoney = (n) => '$' + (Number(n) || 0).toFixed(2);
 
 export default function InvoiceEditor({ invoice, inventory = [] }) {
+  const status = invoice.status || 'open';
+  const settled = status === 'paid';
+  const paidSoFar = Number(invoice.amountPaid) || 0;
+  const originalTotal = Number(invoice.total) || 0;
+  const [name, setName] = useState(invoice.name || '');
+  const [email, setEmail] = useState(invoice.email || '');
+  const [phone, setPhone] = useState(invoice.phone || '');
+  const [deliveryMethod, setDeliveryMethod] = useState(invoice.deliveryMethod === 'delivery' ? 'delivery' : 'pickup');
+  const [address, setAddress] = useState(invoice.address || '');
+  const [city, setCity] = useState(invoice.city || '');
+  const [postal, setPostal] = useState(invoice.postal || '');
   const [items, setItems] = useState(
     (invoice.items || []).map((it) => ({
       description: it.description || '',
@@ -23,7 +38,9 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState('');
-  const [resend, setResend] = useState(true);
+  // The invoice email is a payment request, so it's only offered — and only
+  // pre-ticked — while money is still owed.
+  const [resend, setResend] = useState(!settled);
 
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const addRow = () => setItems((xs) => [...xs, { description: '', amount: '', kind: 'unit', warrantyMonths: 12 }]);
@@ -41,6 +58,11 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   const hst = addHst ? subtotal * 0.13 : 0;
   const total = subtotal + hst;
   const fmt = (n) => '$' + n.toFixed(2);
+  // How this edit lands: which way the sale moves, and where that leaves the
+  // customer against what they've already handed over.
+  const delta = total - originalTotal;
+  const owing = Math.max(0, total - paidSoFar);
+  const overpaid = Math.max(0, paidSoFar - total);
 
   async function save() {
     setBusy(true); setErr('');
@@ -48,7 +70,9 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
       const res = await fetch('/api/admin/invoices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items, addHst, memo, resend,
+        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items, addHst, memo,
+          resend: resend && !settled,
+          name, email, phone, deliveryMethod, address, city, postal,
           // Only send a date the owner actually changed — sending the original
           // back unchanged would still re-stamp created_at to noon that day.
           invoiceDate: invoiceDate !== (invoice.invoiceDate || '') ? invoiceDate : '' })
@@ -74,9 +98,50 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   return (
     <div>
       {err && <div className="error-box">{err}</div>}
-      <div className="hint" style={{ marginTop: 0 }}>
-        The customer&apos;s email address isn&apos;t changed here — only the line items, HST, and memo.
-        Tick &quot;Email the updated invoice&quot; below to re-send it when you save.
+      {settled && (
+        <div className="notice-box" style={{ marginTop: 0 }}>
+          This invoice is <b>paid</b>. Correcting it adjusts the original sale <b>on its own date</b> —
+          drop a $1,500 line to $1,300 and that month&apos;s revenue moves by −$200. Nothing is booked today
+          and nothing is counted twice.
+          <div style={{ marginTop: 4 }}>
+            Repricing a line leaves its unit sold and off the website. Only <b>removing</b> a line puts that
+            unit back on sale.
+          </div>
+        </div>
+      )}
+
+      <div className="form-2col">
+        <div className="field">
+          <label>Customer name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Smith" />
+        </div>
+        <div className="field">
+          <label>Customer email *</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@example.com" autoComplete="off" />
+        </div>
+      </div>
+
+      <div className="field">
+        <label>Fulfilment</label>
+        <div style={{ display: 'flex', gap: 18, margin: '2px 0 6px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 400 }}>
+            <input type="radio" name="edm" style={{ width: 'auto' }} checked={deliveryMethod === 'pickup'} onChange={() => setDeliveryMethod('pickup')} /> Pickup
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 400 }}>
+            <input type="radio" name="edm" style={{ width: 'auto' }} checked={deliveryMethod === 'delivery'} onChange={() => setDeliveryMethod('delivery')} /> Delivery
+          </label>
+        </div>
+        {deliveryMethod === 'delivery' && (
+          <div style={{ marginTop: 4 }}>
+            <input style={{ marginBottom: 8 }} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street address" />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" />
+              <input style={{ width: 150 }} value={postal} onChange={(e) => setPostal(e.target.value)} placeholder="Postal code" />
+            </div>
+          </div>
+        )}
+        <input style={{ marginTop: 8 }} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Customer phone (optional)" />
+        <div className="hint">These flow onto the matching BB order too, so the two never disagree.</div>
       </div>
 
       {inventory.length > 0 && (
@@ -99,13 +164,13 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
 
       <label style={{ fontSize: 13, fontWeight: 500, display: 'block', margin: '4px 0 6px' }}>Line items</label>
       {items.map((it, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-          <input style={{ flex: 1 }} value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} placeholder={it.kind === 'service' ? 'Service description' : 'e.g. Whirlpool WRS321SDHZ refrigerator'} />
+        <div key={i} className="inv-line">
+          <input className="inv-desc" value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} autoComplete="off" autoCorrect="off" autoCapitalize="sentences" spellCheck={false} placeholder={it.kind === 'service' ? 'Service description' : 'e.g. Whirlpool WRS321SDHZ refrigerator'} />
           {it.kind === 'service' ? (
-            <span className="pill" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>Service</span>
+            <span className="pill inv-tag">Service</span>
           ) : (
-            <select value={it.warrantyMonths == null ? '' : it.warrantyMonths} onChange={(e) => setItem(i, 'warrantyMonths', e.target.value === '' ? null : Number(e.target.value))}
-              title="Warranty term shown on the invoice" style={{ width: 120, fontSize: 12.5, padding: '4px 6px' }}>
+            <select className="inv-warr" value={it.warrantyMonths == null ? '' : it.warrantyMonths} onChange={(e) => setItem(i, 'warrantyMonths', e.target.value === '' ? null : Number(e.target.value))}
+              title="Warranty term shown on the invoice">
               <option value={24}>2-yr warranty</option>
               <option value={12}>1-yr warranty</option>
               <option value={6}>6-mo warranty</option>
@@ -113,8 +178,8 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
               <option value="">No warranty</option>
             </select>
           )}
-          <input style={{ width: 110 }} type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="0.00" />
-          <button type="button" className="btn" style={{ padding: '0 12px' }} onClick={() => removeRow(i)} aria-label="Remove line">×</button>
+          <input className="inv-amt" type="number" inputMode="decimal" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="0.00" />
+          <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
         </div>
       ))}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
@@ -141,18 +206,49 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
         <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="Shown on the invoice" />
       </div>
 
+      {/* What this edit actually does to the money, before it's saved. */}
+      {(Math.abs(total - originalTotal) > 0.005 || paidSoFar > 0) && (
+        <div className={overpaid > 0.005 ? 'error-box' : 'notice-box'} style={{ lineHeight: 1.6 }}>
+          {Math.abs(total - originalTotal) > 0.005 && (
+            <div>
+              Total {delta < 0 ? 'drops' : 'rises'} from <b>{fmtMoney(originalTotal)}</b> to <b>{fmtMoney(total)}</b> —
+              this sale&apos;s revenue moves by <b>{delta < 0 ? '−' : '+'}{fmtMoney(Math.abs(delta))}</b>
+              {invoice.invoiceDate ? <> on <b>{invoice.invoiceDate}</b>, its original date</> : null}.
+            </div>
+          )}
+          {paidSoFar > 0 && (
+            <div>
+              {fmtMoney(paidSoFar)} received so far.{' '}
+              {overpaid > 0.005
+                ? <b>You&apos;ll owe the customer {fmtMoney(overpaid)} back</b>
+                : owing > 0.005
+                  ? <>The invoice will show <b>{fmtMoney(owing)} still owing</b>{settled ? ' and go back to part-paid' : ''}.</>
+                  : <>That covers it in full.</>}
+            </div>
+          )}
+          {overpaid > 0.005 && (
+            <div style={{ marginTop: 4 }}>
+              Saving records the corrected sale. Handing the money back is a separate step —
+              this doesn&apos;t move any cash on its own.
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
         <div style={{ fontSize: 14, color: 'var(--muted)' }}>
           Subtotal {fmt(subtotal)}{addHst ? ` · HST ${fmt(hst)}` : ''} · <b style={{ color: 'var(--charcoal)' }}>Total {fmt(total)}</b>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5 }}
-            title={`Re-send the invoice email (with e-transfer instructions) to ${invoice.email} after saving`}>
-            <input type="checkbox" style={{ width: 'auto' }} checked={resend} onChange={(e) => setResend(e.target.checked)} />
-            Email the updated invoice
-          </label>
+          {!settled && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5 }}
+              title={`Re-send the invoice email (with e-transfer instructions) to ${email} after saving`}>
+              <input type="checkbox" style={{ width: 'auto' }} checked={resend} onChange={(e) => setResend(e.target.checked)} />
+              Email the updated invoice
+            </label>
+          )}
           <a className="btn" href="/admin/invoices">Cancel</a>
-          <button className="btn accent" disabled={busy} onClick={save}>{busy ? 'Saving…' : resend ? 'Save & email' : 'Save changes'}</button>
+          <button className="btn accent" disabled={busy} onClick={save}>{busy ? 'Saving…' : (resend && !settled) ? 'Save & email' : 'Save changes'}</button>
         </div>
       </div>
     </div>

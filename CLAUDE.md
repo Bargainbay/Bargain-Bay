@@ -71,6 +71,52 @@ See `.env.example` for the full annotated list. The site builds and browses with
 ## Deploy workflow
 Push to `main` → Vercel auto-builds and promotes to Production (bargainbay.ca). DB bootstrap: deploy, sign in with an `ADMIN_EMAILS` account, open `/admin`, click **Run schema migration** (`/api/admin/migrate`, runs `db/schema.sql`, idempotent).
 
+## Invoicing, orders & what counts as revenue (changed 2026-08-22)
+An invoice raises its **fulfilment order immediately**, not when it's paid — see
+`createAndSendInvoice` in `lib/invoices.js`.
+
+- The order is created `pending_payment`, dated to the **invoice date**, and
+  linked via `invoices.order_id`. `markInvoicePaid` flips it to `confirmed`.
+- Its units are held off the storefront by a long **reservation**
+  (`OFFLINE_HOLD_MINUTES`), not by the order's status — so nothing tells the rest
+  of the system the unit is *sold* until the money is actually in.
+  `markUnitsSold` (and the tracker's Sold write-back) still happen at payment.
+- **Revenue is booked on the invoice date.** `SALE` in `lib/analytics.js` is a
+  predicate, not an IN-list: it counts settled orders *plus* a `pending_payment`
+  order backed by an `open`/`partial` invoice. Deposits therefore count on the
+  day of sale. The Revenue KPI splits "collected · still owing".
+- `lib/finance-report.js` keeps its **own cash-basis `SALE`** on purpose — the
+  books report money collected. Don't unify the two without deciding which basis
+  each surface should use. `lib/customers.js` and `lib/campaigns.js` likewise.
+- Void / delete / refund / per-line refund all cancel-or-shrink that order and
+  drop its hold, which is what makes the dashboard self-correct.
+- `expireReservations` **must** keep excluding invoice-bridged orders. They live
+  in `pending_payment` with no `payment_method` until they settle, which is
+  exactly the shape the 24h abandoned-checkout sweep cancels.
+- The nightly backfill sweep only reaches back `LIVE_BACKFILL_DAYS` (14) for
+  unpaid invoices; `backfillAllInvoiceOrders({ all: true })` — the Sync button —
+  is the opt-in full pass. Reaching further on a schedule would move historical
+  revenue and delist stock behind invoices nobody expects to be paid.
+
+`listInvoices({ q, status, limit, offset })` searches **every** invoice (number,
+BB order number, name/email/phone, memo, line description, SKU); `status:
+'unpaid'` is the open+partial meta-filter.
+
+**Editing a SETTLED invoice is allowed** (`updateInvoice` takes open/partial/paid;
+void/refunded are closed records). Correcting an old sale adjusts it **in its own
+month** — the bridged order keeps its `created_at` and only its total moves, so a
+$1,500 May sale corrected to $1,300 in August moves May by −$200 with no second
+record anywhere. Rules that must hold:
+- a line kept at a **different price** does NOT move stock. It stays sold and off
+  the site; the new price is pushed to `products.sold_price` and the tracker.
+- a line **removed** relists its unit + `reverseTrackerSale`; a line **added** sells it.
+- crossing the settled line re-syncs stock both ways. Going settled → owing
+  un-sells the units but **re-holds everything the invoice still carries** —
+  otherwise the edit puts a unit the customer is still buying back on sale.
+- status is re-derived from the payment ledger. Paying more than the corrected
+  total is reported as `overpaid`; no refund record is invented, because no money
+  has physically moved.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.

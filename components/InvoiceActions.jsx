@@ -1,13 +1,17 @@
 'use client';
 import { useState } from 'react';
 
-// Per-row invoice actions in the admin list: view, packing slip, and the
-// lifecycle actions (void/delete for unpaid, refund for paid).
+// Per-row invoice actions in the admin list.
 //   open      → Edit · Resend · Void · Delete · Packing slip
-//   partial   → Resend (balance-aware) · Packing slip
+//   partial   → Edit · Resend (balance-aware) · Void* · Packing slip
+//   paid      → Edit · Refund… · Packing slip
 //   void      → Delete · Packing slip
-//   paid      → Refund · Packing slip
 //   refunded  → Packing slip
+// Edit reaches SETTLED invoices too: a three-month-old sale is exactly the kind
+// that needs correcting, and the edit adjusts that sale on its original date
+// rather than booking anything new today.
+// * Voiding a partly-paid invoice is refused server-side until its deposit is
+//   removed or refunded — the button explains that rather than hiding.
 export default function InvoiceActions({ invoice }) {
   const { id, number, status, hostedUrl, orderNumber } = invoice;
   const [busy, setBusy] = useState('');
@@ -61,7 +65,12 @@ export default function InvoiceActions({ invoice }) {
       <a href={`/admin/packing-slip/${number}`} target="_blank" rel="noopener noreferrer" style={link}>Packing slip</a>
       {orderNumber && <a href="/admin/operations" style={link} title={`Fulfilment order ${orderNumber}`}>{orderNumber}</a>}
 
-      {status === 'open' && <a href={`/admin/invoices/${number}/edit`} style={link}>Edit</a>}
+      {(status === 'open' || status === 'partial' || status === 'paid') && (
+        <a href={`/admin/invoices/${number}/edit`} style={link}
+           title={status === 'paid'
+             ? 'Correct this sale — details, lines or prices. Changes adjust the revenue on its original date.'
+             : 'Edit this invoice'}>Edit</a>
+      )}
       {(status === 'open' || status === 'partial') && (sent
         ? <span style={{ color: 'var(--success, #0f6e56)' }}>Sent ✓</span>
         : <button style={btn} disabled={!!busy}
@@ -78,9 +87,13 @@ export default function InvoiceActions({ invoice }) {
           {busy === 'backfill' ? '…' : '+ Add to dashboard'}
         </button>
       )}
-      {status === 'open' && (
+      {(status === 'open' || status === 'partial') && (
         <button style={btn} disabled={!!busy}
-          onClick={() => send('PATCH', { action: 'void' }, `Void invoice ${number}? It stays on record but is marked void.`, 'void')}>
+          title={status === 'partial'
+            ? 'This invoice has a deposit against it — remove or refund that payment first, then void.'
+            : 'Cancel this invoice. It stays on record, its order is cancelled and the unit goes back on sale.'}
+          onClick={() => send('PATCH', { action: 'void' },
+            `Void invoice ${number}? It stays on record, its order is cancelled and any held unit goes back on sale.`, 'void')}>
           {busy === 'void' ? '…' : 'Void'}
         </button>
       )}

@@ -194,12 +194,20 @@ CREATE INDEX IF NOT EXISTS idx_invoice_payments_invoice ON invoice_payments(invo
 -- Fulfilment intent captured on the invoice; when it's marked paid, a matching
 -- order is created (delivery_method/address flow into the order). order_id links
 -- the created fulfilment order back (and guards against double-creation).
+-- The order is raised as soon as the invoice is WRITTEN, not when it's paid: it
+-- sits in 'pending_payment' holding the units off the storefront until the money
+-- is in, so a deposit sale has a BB- number, a slot on the fulfilment board, and
+-- a place on the revenue dashboard from day one.
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS delivery_method text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS address  text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS city     text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS postal   text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS phone    text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS order_id int REFERENCES orders(id) ON DELETE SET NULL;
+-- The dashboards ask "is this order backed by a live invoice?" for every order
+-- row they touch, and the 24h abandoned-checkout sweep asks it too. Without this
+-- index that's a sequential scan of invoices per order.
+CREATE INDEX IF NOT EXISTS idx_invoices_order ON invoices(order_id) WHERE order_id IS NOT NULL;
 
 -- ── Quotes ──────────────────────────────────────────────────────────────────
 -- Non-binding package quotes the owner builds in /admin/quotes and shares with a

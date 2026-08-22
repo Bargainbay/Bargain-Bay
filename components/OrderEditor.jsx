@@ -196,11 +196,11 @@ export default function OrderEditor({ order, initialItems, inventory = [], bridg
               )}
             </div>
             {items.map((it, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                {it.sku ? <span className="pill" style={{ fontFamily: 'monospace', fontSize: 11, whiteSpace: 'nowrap' }}>{it.sku}</span> : <span className="pill" style={{ fontSize: 11 }}>ad-hoc</span>}
-                <input style={{ flex: 1 }} value={it.title} onChange={(e) => setItem(i, 'title', e.target.value)} placeholder="Line description" />
-                <input style={{ width: 110 }} type="number" min="0" step="0.01" value={it.price} onChange={(e) => setItem(i, 'price', e.target.value)} placeholder="price" />
-                <button type="button" className="btn" style={{ padding: '0 12px' }} onClick={() => removeRow(i)} aria-label="Remove line">×</button>
+              <div key={i} className="inv-line">
+                {it.sku ? <span className="pill inv-tag" style={{ fontFamily: 'monospace' }}>{it.sku}</span> : <span className="pill inv-tag">ad-hoc</span>}
+                <input className="inv-desc" value={it.title} onChange={(e) => setItem(i, 'title', e.target.value)} autoComplete="off" autoCorrect="off" spellCheck={false} placeholder="Line description" />
+                <input className="inv-amt" type="number" inputMode="decimal" min="0" step="0.01" value={it.price} onChange={(e) => setItem(i, 'price', e.target.value)} placeholder="price" />
+                <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
               </div>
             ))}
             <button type="button" className="btn" onClick={addRow}>+ Add ad-hoc line</button>
