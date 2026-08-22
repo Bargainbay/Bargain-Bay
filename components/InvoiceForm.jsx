@@ -192,13 +192,13 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
 
       <label style={{ fontSize: 13, fontWeight: 500, display: 'block', margin: '4px 0 6px' }}>Line items</label>
       {items.map((it, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-          <input style={{ flex: 1 }} value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} placeholder={it.kind === 'service' ? 'Service description' : 'e.g. Whirlpool WRS321SDHZ refrigerator'} />
+        <div key={i} className="inv-line">
+          <input className="inv-desc" value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} autoComplete="off" autoCorrect="off" autoCapitalize="sentences" spellCheck={false} placeholder={it.kind === 'service' ? 'Service description' : 'e.g. Whirlpool WRS321SDHZ refrigerator'} />
           {it.kind === 'service' ? (
-            <span className="pill" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>Service</span>
+            <span className="pill inv-tag">Service</span>
           ) : (
-            <select value={it.warrantyMonths == null ? '' : it.warrantyMonths} onChange={(e) => setItem(i, 'warrantyMonths', e.target.value === '' ? null : Number(e.target.value))}
-              title="Warranty term shown on the invoice" style={{ width: 120, fontSize: 12.5, padding: '4px 6px' }}>
+            <select className="inv-warr" value={it.warrantyMonths == null ? '' : it.warrantyMonths} onChange={(e) => setItem(i, 'warrantyMonths', e.target.value === '' ? null : Number(e.target.value))}
+              title="Warranty term shown on the invoice">
               <option value={24}>2-yr warranty</option>
               <option value={12}>1-yr warranty</option>
               <option value={6}>6-mo warranty</option>
@@ -207,10 +207,10 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
             </select>
           )}
           {it.kind !== 'service' && !it.sku && !hideCost && (
-            <input style={{ width: 95 }} type="number" min="0" step="0.01" value={it.cost ?? ''} onChange={(e) => setItem(i, 'cost', e.target.value)} placeholder="cost" title="Your cost for this unit (for margin) — fill in for a unit that isn't in inventory" />
+            <input className="inv-cost" type="number" inputMode="decimal" min="0" step="0.01" value={it.cost ?? ''} onChange={(e) => setItem(i, 'cost', e.target.value)} placeholder="cost" title="Your cost for this unit (for margin) — fill in for a unit that isn't in inventory" />
           )}
-          <input style={{ width: 110 }} type="number" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="price" />
-          <button type="button" className="btn" style={{ padding: '0 12px' }} onClick={() => removeRow(i)} aria-label="Remove line">×</button>
+          <input className="inv-amt" type="number" inputMode="decimal" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="price" />
+          <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
         </div>
       ))}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>

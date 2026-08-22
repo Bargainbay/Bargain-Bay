@@ -282,6 +282,44 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
 .form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 @media (max-width: 540px) { .form-2col { grid-template-columns: 1fr; } }
 
+/* ---------- invoice / quote line-item rows ----------
+   One row per line: description + warranty + cost + price + remove.
+
+   MOBILE BUG THIS FIXES: the row used to be a single `flex-wrap: nowrap` line
+   whose non-description controls are fixed-width (120 + 95 + 110 + 35 + gaps
+   = ~392px). On a phone that is already wider than the panel, and because a
+   flex item defaults to `min-width: auto` an <input> refuses to shrink below
+   its intrinsic size — so the row overflowed horizontally and the description
+   field was squeezed to a sliver. Focusing it then put the caret inside a
+   horizontally-scrolling container, and on iOS Safari / Chrome-Android the
+   browser re-scrolls the focused field into view on every input event, which
+   dropped focus and dismissed the keyboard after a single character.
+   Two fixes, both needed: `min-width: 0` so the field can actually shrink, and
+   a stacked layout under 700px that gives the description its own full row. */
+.inv-line { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.inv-line > .inv-desc { flex: 1 1 auto; min-width: 0; }
+.inv-line > .inv-warr { flex: 0 0 auto; width: 120px; font-size: 12.5px; padding: 4px 6px; }
+.inv-line > .inv-cost { flex: 0 0 auto; width: 95px; }
+.inv-line > .inv-amt  { flex: 0 0 auto; width: 110px; }
+.inv-line > .inv-tag  { flex: 0 0 auto; font-size: 11px; white-space: nowrap; }
+.inv-line > .inv-del  { flex: 0 0 auto; padding: 0 12px; }
+
+@media (max-width: 700px) {
+  .inv-line { flex-wrap: wrap; row-gap: 6px; margin-bottom: 14px; }
+  .inv-line > .inv-desc { flex: 1 0 100%; }
+  .inv-line > .inv-warr { flex: 1 1 130px; width: auto; padding: 9px 8px; }
+  .inv-line > .inv-cost,
+  .inv-line > .inv-amt  { flex: 1 1 90px; width: auto; }
+  .inv-line > .inv-del  { margin-left: auto; }
+}
+
+/* iOS Safari zooms the page in whenever a focused field's font-size is under
+   16px, and the zoom-out on blur fights every subsequent tap. Bump form fields
+   to 16px on phones — this is the standard fix and applies site-wide. */
+@media (max-width: 700px) {
+  input, select, textarea { font-size: 16px; }
+}
+
 /* ---------- order status / account ---------- */
 .timeline { display: grid; gap: 0; margin: 20px 0; }
 .tl-step { display: grid; grid-template-columns: 28px 1fr; gap: 12px; }
