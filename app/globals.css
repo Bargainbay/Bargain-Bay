@@ -296,6 +296,16 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
    dropped focus and dismissed the keyboard after a single character.
    Two fixes, both needed: `min-width: 0` so the field can actually shrink, and
    a stacked layout under 700px that gives the description its own full row. */
+/* Invoice search bar (admin invoices page) */
+.inv-search { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0 2px; }
+.inv-search input[type="search"] { flex: 1 1 320px; min-width: 0; }
+.inv-search select { flex: 0 1 210px; width: auto; }
+.inv-search .btn { flex: 0 0 auto; }
+@media (max-width: 700px) {
+  .inv-search input[type="search"] { flex: 1 0 100%; }
+  .inv-search select { flex: 1 1 auto; }
+}
+
 .inv-line { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
 .inv-line > .inv-desc { flex: 1 1 auto; min-width: 0; }
 .inv-line > .inv-warr { flex: 0 0 auto; width: 120px; font-size: 12.5px; padding: 4px 6px; }

@@ -23,13 +23,22 @@ function noDb() {
   return NextResponse.json({ error: 'Database not configured (set POSTGRES_URL).' }, { status: 503 });
 }
 
-export async function GET() {
+// ?q= search (number, BB order number, customer, memo, line description, SKU),
+// ?status= filter, ?limit= / ?offset= paging. No params = the recent invoices.
+export async function GET(req) {
   if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
-  if (!hasDb()) return NextResponse.json({ invoices: [] });
+  if (!hasDb()) return NextResponse.json({ invoices: [], total: 0, owing: 0, hasMore: false });
+  const sp = new URL(req.url).searchParams;
   try {
-    return NextResponse.json({ invoices: await listInvoices(25) });
+    const res = await listInvoices({
+      q: (sp.get('q') || '').slice(0, 100),
+      status: sp.get('status') || '',
+      limit: sp.get('limit') || 25,
+      offset: sp.get('offset') || 0
+    });
+    return NextResponse.json(res);
   } catch (e) {
-    return NextResponse.json({ invoices: [], error: e?.message || 'Could not load invoices.' }, { status: 200 });
+    return NextResponse.json({ invoices: [], total: 0, owing: 0, hasMore: false, error: e?.message || 'Could not load invoices.' }, { status: 200 });
   }
 }
 
