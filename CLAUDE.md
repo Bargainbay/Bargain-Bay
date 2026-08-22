@@ -102,6 +102,21 @@ An invoice raises its **fulfilment order immediately**, not when it's paid — s
 BB order number, name/email/phone, memo, line description, SKU); `status:
 'unpaid'` is the open+partial meta-filter.
 
+**Editing a SETTLED invoice is allowed** (`updateInvoice` takes open/partial/paid;
+void/refunded are closed records). Correcting an old sale adjusts it **in its own
+month** — the bridged order keeps its `created_at` and only its total moves, so a
+$1,500 May sale corrected to $1,300 in August moves May by −$200 with no second
+record anywhere. Rules that must hold:
+- a line kept at a **different price** does NOT move stock. It stays sold and off
+  the site; the new price is pushed to `products.sold_price` and the tracker.
+- a line **removed** relists its unit + `reverseTrackerSale`; a line **added** sells it.
+- crossing the settled line re-syncs stock both ways. Going settled → owing
+  un-sells the units but **re-holds everything the invoice still carries** —
+  otherwise the edit puts a unit the customer is still buying back on sale.
+- status is re-derived from the payment ledger. Paying more than the corrected
+  total is reported as `overpaid`; no refund record is invented, because no money
+  has physically moved.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.

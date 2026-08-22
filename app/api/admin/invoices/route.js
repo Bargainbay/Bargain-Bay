@@ -103,11 +103,32 @@ export async function PATCH(req) {
 
   try {
     if (body.action === 'edit') {
+      // Customer / fulfilment fields are optional on an edit: only keys actually
+      // present are forwarded, so an editor that submits just the line items
+      // can't blank someone's address.
+      const has = (k) => Object.prototype.hasOwnProperty.call(body, k);
+      if (has('email')) {
+        const e = normalizeEmail(body.email);
+        if (!validEmail(e)) return NextResponse.json({ error: 'Enter a valid customer email.' }, { status: 400 });
+      }
+      if (has('deliveryMethod') && body.deliveryMethod === 'delivery') {
+        const need = ['address', 'city', 'postal'].filter((k) => !String(body[k] || '').trim());
+        if (need.length) {
+          return NextResponse.json({ error: 'Delivery requires a street address, city, and postal code.' }, { status: 400 });
+        }
+      }
       const updated = await updateInvoice(invoiceId, {
         items: Array.isArray(body.items) ? body.items : [],
         addHst: !!body.addHst,
         memo: body.memo,
-        invoiceDate: String(body.invoiceDate || '').trim()
+        invoiceDate: String(body.invoiceDate || '').trim(),
+        ...(has('name') ? { name: body.name } : {}),
+        ...(has('email') ? { email: normalizeEmail(body.email) } : {}),
+        ...(has('phone') ? { phone: body.phone } : {}),
+        ...(has('deliveryMethod') ? { deliveryMethod: body.deliveryMethod } : {}),
+        ...(has('address') ? { address: body.address } : {}),
+        ...(has('city') ? { city: body.city } : {}),
+        ...(has('postal') ? { postal: body.postal } : {})
       });
       // Optionally re-email the customer the updated invoice. The save already
       // succeeded, so a mail failure is reported as a warning, not an error.

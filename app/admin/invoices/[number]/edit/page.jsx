@@ -24,14 +24,17 @@ export default async function EditInvoicePage({ params }) {
   const invoice = await getInvoiceByNumber(number).catch(() => null);
   if (!invoice) return notFound();
 
-  if (invoice.status !== 'open') {
+  // void / refunded are closed records. Everything still live — open, partly
+  // paid, or settled — can be corrected; a three-month-old sale is exactly the
+  // kind that needs it.
+  if (invoice.status === 'void' || invoice.status === 'refunded') {
     return (
       <div>
         <AdminNav active="invoices" salesOnly={!isAdmin(session)} />
         <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Edit {invoice.number}</h1>
         <div className="error-box">
-          This invoice is <b>{invoice.status}</b> and can&apos;t be edited — editing a paid invoice would desync the
-          recorded sale. {invoice.status === 'paid' ? 'Refund it and reissue a corrected invoice instead.' : ''}
+          This invoice is <b>{invoice.status}</b> — a closed record, so it can&apos;t be edited.
+          Raise a new invoice instead.
         </div>
         <p><a className="btn" href="/admin/invoices">← Back to invoices</a></p>
       </div>
@@ -51,6 +54,16 @@ export default async function EditInvoicePage({ params }) {
   const editorInvoice = {
     id: invoice.id, number: invoice.number, email: invoice.email,
     hst: invoice.hst, memo: invoice.memo, items: invoice.items,
+    status: invoice.status,
+    // Payment ledger, so the editor can say what changing the total will mean
+    // (money still owing, or money that now needs handing back).
+    amountPaid: invoice.amountPaid || 0,
+    total: Number(invoice.total) || 0,
+    // Customer + fulfilment details — editable here for the first time; this is
+    // the parity the BB order editor already had.
+    name: invoice.name || '', phone: invoice.phone || '',
+    deliveryMethod: invoice.delivery_method === 'delivery' ? 'delivery' : 'pickup',
+    address: invoice.address || '', city: invoice.city || '', postal: invoice.postal || '',
     // Issued date shown in the editor (Toronto), so the owner can backdate a
     // sale that was rung up late.
     invoiceDate: invoice.created_at
@@ -62,7 +75,11 @@ export default async function EditInvoicePage({ params }) {
     <div>
       <AdminNav active="invoices" salesOnly={!isAdmin(session)} />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 8px' }}>Edit {invoice.number}</h1>
-      <p className="hint" style={{ marginTop: 0 }}>For <b>{invoice.name || invoice.email}</b> · current total {money(invoice.total)}</p>
+      <p className="hint" style={{ marginTop: 0 }}>
+        For <b>{invoice.name || invoice.email}</b> · current total {money(invoice.total)}
+        {invoice.amountPaid > 0 && <> · {money(invoice.amountPaid)} received</>}
+        {' · '}<span className="pill">{invoice.status}</span>
+      </p>
       <div className="panel">
         <InvoiceEditor invoice={editorInvoice} inventory={inventory} />
       </div>
