@@ -90,7 +90,8 @@ export async function PATCH(req) {
   // missing one (fixes paid invoices invisible to the dashboard).
   if (body.action === 'backfill_all') {
     try {
-      const r = await backfillAllInvoiceOrders();
+      // The Sync button is the owner explicitly asking for the full sweep.
+      const r = await backfillAllInvoiceOrders({ all: true });
       return NextResponse.json({ ok: true, ...r });
     } catch (e) {
       return NextResponse.json({ error: e?.message || 'Backfill failed.' }, { status: 500 });

@@ -89,7 +89,9 @@ export default async function InvoicesPage({ searchParams }) {
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>New invoice</h2>
         <p className="hint" style={{ marginTop: 0 }}>
           Emails the customer an itemized invoice to pay by Interac e-transfer (auto-deposit) or in person.
-          Good for offline / custom / wholesale sales. Mark it paid here when the money lands.
+          Good for offline / custom / wholesale sales. It gets a <b>BB- order number and counts as revenue
+          straight away</b>, dated to the invoice — take a deposit now and collect the balance on delivery.
+          Mark it paid here when the rest of the money lands.
         </p>
         <InvoiceForm inventory={inventory} customers={customers} hideCost={!isAdmin(session)} />
       </div>

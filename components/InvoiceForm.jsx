@@ -137,6 +137,19 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
         ✓ Invoice <b>{done.number}</b> for <b>{fmt(done.total)}</b>{' '}
         {done.emailed ? <>emailed to <b>{done.email}</b> with e-transfer instructions.</> : <>created (<b>not emailed</b>) — for <b>{done.email}</b>.</>}
         {done.hostedUrl && <> <a href={done.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View invoice →</a></>}
+        {done.orderNumber && (
+          <div style={{ marginTop: 6 }}>
+            Order <b>{done.orderNumber}</b> is on the board to fulfil, the sale is on today&apos;s
+            revenue, and the unit is off the website. Mark the invoice paid when the money lands.
+          </div>
+        )}
+        {done.contested?.length > 0 && (
+          <div className="error-box" style={{ marginTop: 8 }}>
+            Heads up — {done.contested.join(', ')} {done.contested.length === 1 ? 'was' : 'were'} already
+            held by another order or invoice, so {done.contested.length === 1 ? 'it isn\u2019t' : 'they aren\u2019t'} reserved
+            for this one. Check before you promise it.
+          </div>
+        )}
         <div style={{ marginTop: 10 }}>
           <button className="btn" onClick={() => setDone(null)}>Create another</button>
         </div>
@@ -226,7 +239,7 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
           <input type="checkbox" style={{ width: 'auto' }} checked={addHst} onChange={(e) => setAddHst(e.target.checked)} /> Add 13% HST
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
-          title="Backdate for a sale you rang up late — the invoice shows this date and the due date counts from it. When you mark it paid, set the paid date too so revenue lands on the right day.">
+          title="Backdate for a sale you rang up late. Revenue counts on THIS date — the day the sale was made — not the day the money clears.">
           Invoice date
           <input style={{ width: 150 }} type="date" max={todayToronto()} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
         </label>
@@ -249,7 +262,7 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
             <input type="radio" name="dm" style={{ width: 'auto' }} checked={deliveryMethod === 'delivery'} onChange={() => setDeliveryMethod('delivery')} /> Delivery
           </label>
         </div>
-        <div className="hint" style={{ marginTop: 0 }}>When you mark this invoice paid, a matching <b>{deliveryMethod}</b> order is created in Operations to fulfil.</div>
+        <div className="hint" style={{ marginTop: 0 }}>A matching <b>{deliveryMethod}</b> order goes onto the Operations board as soon as you create this invoice — so you can schedule it on a deposit — and its units come off the website straight away.</div>
         {deliveryMethod === 'delivery' && (
           <div style={{ marginTop: 8 }}>
             <input onFocus={attachAutocomplete} autoComplete="off" style={{ marginBottom: 8 }} value={address} onChange={(e) => setAddress(e.target.value)} placeholder={hasMaps ? 'Start typing the street address…' : 'Street address'} />

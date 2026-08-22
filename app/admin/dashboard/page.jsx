@@ -73,8 +73,10 @@ export default async function SalesDashboardPage({ searchParams }) {
       <DashboardFilters periods={DASH_PERIODS} active={period} />
 
       <div className="dash-kpis">
-        <Kpi label={`Revenue (ex-HST) · ${periodLabel(period)}`} value={money(k.revenue)} delta={k.revenueDelta}
-          sub={k.hstCollected ? `+ ${money(k.hstCollected)} HST collected` : 'pre-tax sales'} />
+        <Kpi label={`Revenue booked (ex-HST) · ${periodLabel(period)}`} value={money(k.revenue)} delta={k.revenueDelta}
+          sub={k.owing > 0
+            ? `${money(k.collected)} collected · ${money(k.owing)} still owing`
+            : (k.hstCollected ? `all collected · + ${money(k.hstCollected)} HST` : 'pre-tax sales')} />
         {!salesOnly && (
           <Kpi label="Profit" value={money(k.profit)} delta={k.profitDelta}
             sub={k.unitsWithCost
@@ -174,14 +176,19 @@ export default async function SalesDashboardPage({ searchParams }) {
 
       <div className="panel" style={{ marginTop: 18 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-          <h2 style={{ marginTop: 0, marginBottom: 0, color: 'var(--charcoal)' }}>Cash in the pipeline</h2>
-          <span className="hint" style={{ margin: 0 }}>Current outstanding — not affected by the date filter</span>
+          <h2 style={{ marginTop: 0, marginBottom: 0, color: 'var(--charcoal)' }}>Still to collect</h2>
+          <span className="hint" style={{ margin: 0 }}>Everything outstanding right now — not affected by the date filter</span>
         </div>
+        <p className="hint" style={{ marginTop: 6 }}>
+          An invoice counts as revenue the day it&apos;s written, so the balance below is money
+          <b> already in the Revenue figure</b> that hasn&apos;t landed yet — not extra sales on top of it.
+          Quotes haven&apos;t been sold and aren&apos;t counted anywhere else.
+        </p>
         <div className="dash-kpis" style={{ marginTop: 12 }}>
-          <Kpi label="Unpaid invoices" value={money(pipe.invoices.total)}
-            sub={`${pipe.invoices.count} open${pipe.invoices.overdueCount ? ` · ${pipe.invoices.overdueCount} overdue (${money(pipe.invoices.overdueTotal)})` : ''}`} />
-          <Kpi label="Open quotes" value={money(pipe.quotes.total)} sub={`${pipe.quotes.count} awaiting reply`} />
-          <Kpi label="Total potential" value={money(pipe.invoices.total + pipe.quotes.total)} sub="invoices + quotes" />
+          <Kpi label="Owed on invoices" value={money(pipe.invoices.total)}
+            sub={`${pipe.invoices.count} unpaid${pipe.invoices.overdueCount ? ` · ${pipe.invoices.overdueCount} overdue (${money(pipe.invoices.overdueTotal)})` : ''}`} />
+          <Kpi label="Open quotes" value={money(pipe.quotes.total)} sub={`${pipe.quotes.count} awaiting reply — not yet sold`} />
+          <Kpi label="Total potential" value={money(pipe.invoices.total + pipe.quotes.total)} sub="owed + quoted" />
         </div>
         {pipe.invoices.overdueCount > 0 && (
           <p className="hint" style={{ marginTop: 10 }}>
