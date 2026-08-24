@@ -315,12 +315,19 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
 .inv-line > .inv-del  { flex: 0 0 auto; padding: 0 12px; }
 
 @media (max-width: 700px) {
-  .inv-line { flex-wrap: wrap; row-gap: 6px; margin-bottom: 14px; }
+  /* Three tidy rows per line item: description, then warranty, then the money
+     fields with the remove button. The flex-basis values matter — set them any
+     wider and cost/price can't share a row inside a ~340px panel, so every
+     control lands on a line of its own and one item fills the screen. */
+  .inv-line { flex-wrap: wrap; row-gap: 6px; margin-bottom: 16px; }
   .inv-line > .inv-desc { flex: 1 0 100%; }
-  .inv-line > .inv-warr { flex: 1 1 130px; width: auto; padding: 9px 8px; }
+  .inv-line > .inv-warr { flex: 1 0 100%; width: auto; padding: 9px 10px; }
   .inv-line > .inv-cost,
-  .inv-line > .inv-amt  { flex: 1 1 90px; width: auto; }
-  .inv-line > .inv-del  { margin-left: auto; }
+  .inv-line > .inv-amt  { flex: 1 1 100px; width: auto; min-width: 0; }
+  .inv-line > .inv-del  { flex: 0 0 auto; margin-left: auto; }
+  /* Separate one line item from the next — without the single-row shape they'd
+     otherwise read as one long stack of unrelated boxes. */
+  .inv-line + .inv-line { border-top: 1px solid var(--line-soft); padding-top: 12px; }
 }
 
 /* iOS Safari zooms the page in whenever a focused field's font-size is under
