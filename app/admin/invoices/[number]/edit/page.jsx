@@ -79,6 +79,9 @@ export default async function EditInvoicePage({ params }) {
         For <b>{invoice.name || invoice.email}</b> · current total {money(invoice.total)}
         {invoice.amountPaid > 0 && <> · {money(invoice.amountPaid)} received</>}
         {' · '}<span className="pill">{invoice.status}</span>
+        {(invoice.created_by_name || invoice.created_by) && (
+          <> · raised by <b>{invoice.created_by_name || String(invoice.created_by).split('@')[0]}</b></>
+        )}
       </p>
       <div className="panel">
         <InvoiceEditor invoice={editorInvoice} inventory={inventory} />
