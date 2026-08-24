@@ -81,7 +81,8 @@ export async function PATCH(req) {
       return NextResponse.json({ ok: true, quote: { id: voided.id, number: voided.number, status: 'void' } });
     }
     if (body.action === 'convert') {
-      const result = await convertQuoteToInvoice(quoteId);
+      const s = await getSession();
+      const result = await convertQuoteToInvoice(quoteId, { email: s?.email, name: s?.name });
       return NextResponse.json({ ok: true, ...result });
     }
     if (body.action === 'update') {

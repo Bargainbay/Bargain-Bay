@@ -208,6 +208,14 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS order_id int REFERENCES orders(id)
 -- row they touch, and the 24h abandoned-checkout sweep asks it too. Without this
 -- index that's a sequential scan of invoices per order.
 CREATE INDEX IF NOT EXISTS idx_invoices_order ON invoices(order_id) WHERE order_id IS NOT NULL;
+-- Who raised the invoice. created_by (email) is the stable identity — it's what
+-- the SALES_EMAILS gate keys off — and created_by_name is snapshotted at
+-- creation so the record still reads right after a rename or a departure. Also
+-- pushed onto orders.sales_rep, which is what the dashboard's per-rep revenue
+-- leaderboard reads.
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by      text;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by_name text;
+CREATE INDEX IF NOT EXISTS idx_invoices_created_by ON invoices(lower(created_by));
 
 -- ── Quotes ──────────────────────────────────────────────────────────────────
 -- Non-binding package quotes the owner builds in /admin/quotes and shares with a

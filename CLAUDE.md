@@ -102,6 +102,17 @@ An invoice raises its **fulfilment order immediately**, not when it's paid — s
 BB order number, name/email/phone, memo, line description, SKU); `status:
 'unpaid'` is the open+partial meta-filter.
 
+**Every invoice records who raised it.** `invoices.created_by` (email — the stable
+identity, matching the `SALES_EMAILS` gate) and `created_by_name` (snapshotted at
+creation so the record survives a rename or a departure). Stamped **from the
+session, never from the request body** — otherwise one rep could raise an invoice
+in another's name. Quote conversions credit whoever converted; Sarah's phone
+orders credit `sarah@bargainbay.ca`. The name is also pushed onto the bridged
+order's `sales_rep`, which is what the dashboard's per-rep revenue leaderboard
+reads — nothing populated that before, which is why the panel was always empty.
+The invoice list has a "Raised by" column (click a name to filter) and a rep
+filter including "No rep recorded" for invoices predating this.
+
 **Editing a SETTLED invoice is allowed** (`updateInvoice` takes open/partial/paid;
 void/refunded are closed records). Correcting an old sale adjusts it **in its own
 month** — the bridged order keeps its `created_at` and only its total moves, so a

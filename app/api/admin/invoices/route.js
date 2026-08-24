@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { createAndSendInvoice, listInvoices, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, deleteInvoice,
+import { createAndSendInvoice, listInvoices, listInvoiceAuthors, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, deleteInvoice,
          updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, voidInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
@@ -33,10 +33,11 @@ export async function GET(req) {
     const res = await listInvoices({
       q: (sp.get('q') || '').slice(0, 100),
       status: sp.get('status') || '',
+      rep: (sp.get('rep') || '').slice(0, 200),
       limit: sp.get('limit') || 25,
       offset: sp.get('offset') || 0
     });
-    return NextResponse.json(res);
+    return NextResponse.json({ ...res, authors: await listInvoiceAuthors().catch(() => []) });
   } catch (e) {
     return NextResponse.json({ invoices: [], total: 0, owing: 0, hasMore: false, error: e?.message || 'Could not load invoices.' }, { status: 200 });
   }
@@ -70,8 +71,15 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Delivery requires a street address, city, and postal code.' }, { status: 400 });
   }
 
+  // Stamp the invoice with whoever is signed in. Taken from the session, never
+  // from the request body — otherwise one rep could raise an invoice in another's
+  // name, and the whole point is knowing who actually did it.
+  const session = await getSession();
   try {
-    const invoice = await createAndSendInvoice({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate });
+    const invoice = await createAndSendInvoice({
+      name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate,
+      createdBy: { email: session?.email, name: session?.name }
+    });
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
     console.error('create invoice failed', e?.message || e);
