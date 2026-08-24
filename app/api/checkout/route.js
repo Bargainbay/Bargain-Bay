@@ -11,6 +11,7 @@ import { round2, HST_RATE, DELIVERY_FEE, CARD_PAYMENTS_ENABLED } from '../../../
 import { resolvePrices } from '../../../lib/pricing';
 import { sendOrderEmails } from '../../../lib/email';
 import { readAttribution, ensureAttributionColumns } from '../../../lib/attribution';
+import { createAndSendInvoice } from '../../../lib/invoices';
 import { upsertCustomer } from '../../../lib/customers';
 
 export const dynamic = 'force-dynamic';
@@ -154,6 +155,32 @@ export async function POST(req) {
   // the CRM must never block a sale.
   upsertCustomer({ email, name, phone, address, city, postal, userId })
     .catch((e) => console.error('customer upsert failed', e.message));
+
+  // Give the web sale an INV- number and a row in the invoice ledger, so every
+  // sale carries the same paperwork whether it came from the storefront or from
+  // a rep. It ATTACHES to the order just created rather than raising a new one,
+  // and it is not emailed — the order confirmation below already carries the same
+  // itemisation and e-transfer instructions, so a second email would just confuse
+  // the customer. The order remains the source of truth; the invoice mirrors it.
+  // Best-effort: paperwork must never cost us the sale.
+  try {
+    await createAndSendInvoice({
+      name, email, phone,
+      items: [
+        ...items.map((u) => ({ description: u.title || `${u.make} ${u.model}`, amount: priceOf(u), sku: u.id })),
+        ...(deliveryFee ? [{ description: 'Local delivery (Pickering & area)', amount: deliveryFee, kind: 'service' }] : [])
+      ],
+      addHst: hst > 0,
+      deliveryMethod, address, city, postal,
+      memo: `Online order ${order.orderNumber}.`,
+      sendEmail: false,
+      channel: 'web',
+      attachToOrderId: order.id,
+      createdBy: { email: 'website@bargainbay.ca', name: 'Website' }
+    });
+  } catch (e) {
+    console.error('web order invoice creation failed', order.orderNumber, e.message);
+  }
 
   const trackUrl = `/order/${order.orderNumber}` + (userId ? '' : `?email=${encodeURIComponent(email)}`);
 
