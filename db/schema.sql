@@ -213,6 +213,12 @@ CREATE INDEX IF NOT EXISTS idx_invoices_order ON invoices(order_id) WHERE order_
 -- creation so the record still reads right after a rename or a departure. Also
 -- pushed onto orders.sales_rep, which is what the dashboard's per-rep revenue
 -- leaderboard reads.
+-- Where the invoice came from: 'manual' (a rep in /admin/invoices), 'web' (raised
+-- automatically for a storefront checkout), 'phone', 'quote', 'salvage'. It has
+-- real behaviour attached: a WEB invoice MIRRORS its order rather than driving
+-- it, and must not shield an abandoned checkout from the 24h auto-cancel sweep
+-- the way a manual (deposit) invoice does.
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS channel text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by      text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by_name text;
 CREATE INDEX IF NOT EXISTS idx_invoices_created_by ON invoices(lower(created_by));

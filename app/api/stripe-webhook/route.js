@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { mirrorOrderToWebInvoice } from '../../../lib/web-invoices';
 import { hasDb, query } from '../../../lib/db';
 import { getStripe } from '../../../lib/stripe';
 import { getOrderByStripeSession } from '../../../lib/orders';
@@ -55,6 +56,7 @@ export async function POST(req) {
       const order = await findOrder();
       if (order && paid && order.status === 'pending_payment') {
         await query("UPDATE orders SET status = 'confirmed' WHERE id = $1", [order.id]);
+        await mirrorOrderToWebInvoice(order.id, 'confirmed');
         const { rows: orderItems } = await query('SELECT sku, title, price FROM order_items WHERE order_id = $1', [order.id]);
         // Record the sale in the local sold ledger so the units drop off the site
         // durably (survive tracker re-import) and show on the reconciliation list.
@@ -83,6 +85,7 @@ export async function POST(req) {
       const order = await findOrder();
       if (order && order.status === 'pending_payment') {
         await query("UPDATE orders SET status = 'cancelled' WHERE id = $1", [order.id]);
+        await mirrorOrderToWebInvoice(order.id, 'cancelled');
         await query('DELETE FROM reservations WHERE order_id = $1', [order.id]);
       }
     } else if (event.type === 'invoice.paid') {

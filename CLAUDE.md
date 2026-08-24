@@ -102,6 +102,32 @@ An invoice raises its **fulfilment order immediately**, not when it's paid — s
 BB order number, name/email/phone, memo, line description, SKU); `status:
 'unpaid'` is the open+partial meta-filter.
 
+**Every sale has an INV number, storefront ones included.** Checkout raises an
+invoice with `channel='web'` that ATTACHES to the order it just created
+(`attachToOrderId`) rather than raising a second one — a second order would book
+the sale twice. It is not emailed: the order confirmation already carries the
+same itemisation and e-transfer box.
+
+For a web sale **the order leads and the invoice follows** —
+`mirrorOrderToWebInvoice` (in `lib/web-invoices.js`) maps order status onto the
+invoice (confirmed/ready/out/delivered→paid, cancelled→void, refunded→refunded)
+and does nothing else: no emails, no unit delisting, no writes back to orders.
+A `manual` invoice is the opposite — it DRIVES its order — so the mirror only
+ever touches `channel='web'` rows. Hooked into `updateOrderStatus`, `refundOrder`,
+and the payment webhook.
+
+`lib/web-invoices.js` exists as its own module **only to break an import cycle**
+(`lib/invoices.js` imports `lib/orders.js`, so orders/reservations importing the
+mirror from invoices.js closed a loop through the checkout path). Keep its
+imports to `./db`.
+
+**LANDMINE:** `expireReservations`' 24h abandoned-checkout sweep skips orders
+protected by an invoice — that guard MUST stay scoped to
+`COALESCE(channel,'manual') <> 'web'`. Every checkout now has an invoice, so
+guarding on "has an invoice" would stop the sweep dead and let abandoned card
+checkouts hold their unit forever. The sweep also voids the web invoices of the
+orders it cancels.
+
 **Every invoice records who raised it.** `invoices.created_by` (email — the stable
 identity, matching the `SALES_EMAILS` gate) and `created_by_name` (snapshotted at
 creation so the record survives a rename or a departure). Stamped **from the
