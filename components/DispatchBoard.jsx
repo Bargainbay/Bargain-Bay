@@ -96,7 +96,16 @@ function BoardColumn({ title, count, children, bodyKey }) {
     return () => window.removeEventListener('resize', measure);
   }, [measure, bodyKey]);
 
-  const nudge = (dir) => body.current?.scrollBy({ top: dir * 260, behavior: 'smooth' });
+  // Plain assignment, NOT scrollBy({behavior:'smooth'}): a smooth scroll is an
+  // animation, and where the browser doesn't run one — reduced-motion settings,
+  // some managed/kiosk browsers — the call is a silent no-op and the arrow is a
+  // dead button. Moving instantly always works, which is the whole job here.
+  const nudge = (dir) => {
+    const el = body.current;
+    if (!el) return;
+    el.scrollTop += dir * 260;
+    measure();
+  };
 
   return (
     <section className="disp-col">
@@ -411,7 +420,8 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     if (!el) return;
     const col = el.querySelector('.disp-col');
     const step = (col?.getBoundingClientRect().width || 300) + 14;   // + the gap
-    el.scrollBy({ left: dir * step, behavior: 'smooth' });
+    el.scrollLeft += dir * step;                                     // see nudge()
+    measureStrip();
   };
 
   const byDriver = (id) => board.jobs.filter((j) => j.driverId === id)
