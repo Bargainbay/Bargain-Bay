@@ -10,6 +10,9 @@ export default function AdminTools({ initialReservations }) {
   const [error, setError] = useState('');
   const [emailMsg, setEmailMsg] = useState('');
   const [emailBusy, setEmailBusy] = useState(false);
+  // Which business to send the test AS — the two use different domains, so a
+  // working Bargain Bay send proves nothing about RS Solutions.
+  const [emailBrand, setEmailBrand] = useState('bargain_bay');
   const [syncMsg, setSyncMsg] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [repairMsg, setRepairMsg] = useState('');
@@ -84,7 +87,10 @@ export default function AdminTools({ initialReservations }) {
   async function testEmail() {
     setEmailBusy(true); setEmailMsg('');
     try {
-      const res = await fetch('/api/admin/test-email', { method: 'POST' });
+      const res = await fetch('/api/admin/test-email', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand: emailBrand })
+      });
       const d = await res.json();
       if (!d.configured) {
         setEmailMsg('✗ RESEND_API_KEY is not set in Vercel — emails are disabled.');
@@ -211,6 +217,11 @@ export default function AdminTools({ initialReservations }) {
 
       <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Email</h2>
       <div className="panel" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <select value={emailBrand} onChange={(e) => setEmailBrand(e.target.value)}
+          style={{ width: 'auto', marginRight: 8 }} title="Which business to send the test as">
+          <option value="bargain_bay">As Bargain Bay</option>
+          <option value="rs_solutions">As RS Solutions</option>
+        </select>
         <button className="btn primary" disabled={emailBusy} onClick={testEmail}>
           {emailBusy ? 'Sending…' : 'Send test email'}
         </button>
