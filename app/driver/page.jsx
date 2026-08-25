@@ -15,6 +15,9 @@ export const metadata = {
   title: 'My stops',
   robots: { index: false },
   manifest: '/driver.webmanifest',
+  // iOS reads apple-touch-icon, NOT the manifest — without this the home screen
+  // gets a screenshot of the page instead of the RS mark.
+  icons: { icon: '/driver-icon-192.png', apple: '/driver-icon-192.png' },
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'My stops' }
 };
 export const viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#3A3937' };
