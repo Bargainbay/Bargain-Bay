@@ -5,7 +5,8 @@ import { hasDb } from '../../../../lib/db';
 import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
   upsertClient, importReadyBargainBayOrders, dispatchBoard,
-  completeServiceVisit, setTicketStatus, listTickets
+  completeServiceVisit, setTicketStatus, listTickets,
+  findServiceCustomers, ordersForServiceCall
 } from '../../../../lib/jobs';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,14 @@ export async function GET(req) {
   if (!hasDb()) return noDb();
   const sp = new URL(req.url).searchParams;
   try {
+    // Raising a service call against something we sold: find the buyer, then
+    // pick which of their orders needs the visit.
+    if (sp.get('view') === 'customers') {
+      return NextResponse.json({ customers: await findServiceCustomers(sp.get('q') || '') });
+    }
+    if (sp.get('view') === 'orders') {
+      return NextResponse.json({ orders: await ordersForServiceCall(sp.get('email') || '') });
+    }
     if (sp.get('view') === 'tickets') {
       return NextResponse.json(await listTickets({ status: sp.get('status') || 'open_states' }));
     }

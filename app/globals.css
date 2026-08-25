@@ -842,3 +842,14 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .disp-setup-list { list-style: none; padding: 0; margin: 0 0 12px; font-size: 14px; }
 .disp-setup-list li { padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
 .disp-setup-form { display: flex; flex-direction: column; gap: 8px; }
+
+/* Customer hits when raising a service call against one of our own sales */
+.disp-hits { border: 1px solid var(--line); border-radius: 8px; margin-top: 4px; max-height: 220px; overflow-y: auto; }
+.disp-hits button {
+  display: flex; justify-content: space-between; gap: 12px; width: 100%;
+  text-align: left; padding: 8px 11px; background: none; border: none;
+  border-bottom: 1px solid var(--line-soft); cursor: pointer;
+  font: inherit; font-size: 13.5px; color: var(--ink);
+}
+.disp-hits button:last-child { border-bottom: none; }
+.disp-hits button:hover { background: var(--tint); }

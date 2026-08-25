@@ -84,6 +84,10 @@ export default function TicketQueue({ onChanged }) {
                   {t.ticketNumber}
                   {t.priority === 'urgent' && <span className="pill sold" style={{ marginLeft: 4 }}>Urgent</span>}
                   {t.clientName && <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)' }}>{t.clientName}</div>}
+                  {t.orderNumber && (
+                    <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)' }}
+                         title="The sale this call is against">{t.orderNumber}</div>
+                  )}
                 </td>
                 <td>
                   {t.customerName || '—'}
