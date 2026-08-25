@@ -15,6 +15,12 @@ const STATUS_LABEL = {
   arrived: 'Arrived', done: 'Done', failed: "Couldn't complete", cancelled: 'Cancelled'
 };
 const TYPE_LABEL = { delivery: 'Delivery', service_call: 'Service', pickup: 'Pickup' };
+const SHIPMENT_LABEL = { white_glove: 'White glove', threshold: 'Threshold' };
+const SERVICE_LABEL = {
+  delivery_only: 'Delivery only', install: 'Install', haul_away: 'Haul away',
+  exchange: 'Exchange', return_pickup: 'Return pickup',
+  parts_drop: 'Parts drop-off', warranty: 'Warranty'
+};
 const FAIL_REASONS = {
   no_answer: 'Nobody home', refused: 'Customer refused', wrong_address: 'Wrong / bad address',
   no_access: "Wouldn't fit / no access", damaged: 'Item damaged',
@@ -43,7 +49,12 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
       <div className="disp-addr">{[job.address, job.city].filter(Boolean).join(', ')}</div>
       <div className="disp-meta">
         <span className="disp-tag">{TYPE_LABEL[job.type] || job.type}</span>
-        {job.shipmentType && <span className="disp-tag">{job.shipmentType}</span>}
+        {job.shipmentType && (
+          <span className={'disp-tag' + (job.shipmentType === 'white_glove' ? ' is-glove' : '')}>
+            {SHIPMENT_LABEL[job.shipmentType] || job.shipmentType}
+          </span>
+        )}
+        {job.services?.map((k) => <span key={k} className="disp-tag">{SERVICE_LABEL[k] || k}</span>)}
         {job.clientName && <span className="disp-tag">{job.clientName}</span>}
         <span className="disp-num">{job.ticketNumber || job.jobNumber}</span>
       </div>

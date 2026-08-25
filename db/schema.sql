@@ -418,9 +418,14 @@ CREATE INDEX IF NOT EXISTS idx_tickets_status ON service_tickets(status);
 
 -- A visit belongs to a ticket; deliveries have none.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ticket_id     int REFERENCES service_tickets(id) ON DELETE SET NULL;
--- What kind of run it is — free text with suggestions rather than a fixed list,
--- because each client company words this differently.
+-- How far into the property the crew goes: 'white_glove' (into the room,
+-- unpacked, placed) or 'threshold' (the door and no further). The driver needs
+-- to know which before they get out of the van.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS shipment_type text;
+-- What's being done on the stop — install, haul away, exchange and so on. Tags
+-- rather than free text so they can be counted and filtered; one visit is
+-- routinely several of them at once.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS services      text[];
 -- Service visit record.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS time_in       timestamptz;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS time_out      timestamptz;

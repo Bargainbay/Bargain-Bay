@@ -811,3 +811,18 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .svc-form .svc-row input { width: 130px; }
 .svc-form .svc-block { display: block; }
 .svc-form .hint { display: block; margin-top: 3px; }
+
+/* Service tags on a job — multi-select chips */
+.svc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.svc-chip {
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px;
+  cursor: pointer; transition: background .12s, border-color .12s, color .12s;
+}
+.svc-chip:hover { background: var(--tint); }
+.svc-chip.is-on {
+  background: var(--charcoal); border-color: var(--charcoal); color: #fff; font-weight: 600;
+}
+.svc-chip:focus-visible { outline: 2px solid var(--taupe); outline-offset: 1px; }
+/* White glove is the one the crew must not miss on a glance. */
+.disp-tag.is-glove { background: var(--charcoal); color: #fff; }

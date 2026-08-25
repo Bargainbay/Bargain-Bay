@@ -14,6 +14,12 @@ const prettyDate = (iso) =>
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 const win = (j) => (j.windowStart && j.windowEnd ? `${j.windowStart}–${j.windowEnd}` : 'Any time');
+const SHIPMENT_LABEL = { white_glove: 'WHITE GLOVE', threshold: 'THRESHOLD' };
+const SERVICE_LABEL = {
+  delivery_only: 'Delivery only', install: 'Install', haul_away: 'Haul away',
+  exchange: 'Exchange', return_pickup: 'Return pickup',
+  parts_drop: 'Parts drop-off', warranty: 'Warranty'
+};
 
 export default async function RunSheetPage({ searchParams }) {
   const sp = await searchParams;
@@ -101,10 +107,16 @@ export default async function RunSheetPage({ searchParams }) {
                     {j.notes ? <><br /><span className="note">{j.notes}</span></> : null}
                   </td>
                   <td>
-                    {j.items?.length ? j.items.map((it) => it.description).join(', ') : '—'}
+                    {j.type === 'service_call'
+                      ? [j.appliance, j.issue].filter(Boolean).join(' — ') || 'Service call'
+                      : (j.items?.length ? j.items.map((it) => it.description).join(', ') : '—')}
+                    {j.shipmentType && <><br /><strong>{SHIPMENT_LABEL[j.shipmentType]}</strong></>}
+                    {j.services?.length > 0 && (
+                      <><br />{j.services.map((k) => SERVICE_LABEL[k] || k).join(' · ')}</>
+                    )}
                     <br />
                     <span className="note">
-                      {j.jobNumber}{j.clientName ? ` · ${j.clientName}` : ''}
+                      {j.ticketNumber || j.jobNumber}{j.clientName ? ` · ${j.clientName}` : ''}
                     </span>
                   </td>
                   <td className="sig"></td>

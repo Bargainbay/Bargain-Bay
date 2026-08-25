@@ -178,8 +178,14 @@ the paper run sheet that replaces it.
   time in/out, outcome, parts used/needed and who signed, and the OUTCOME is what
   moves the ticket (`OUTCOME_TO_TICKET`): fixed/no-fault resolve it, parts_needed
   parks it on `awaiting_parts`, not_fixed/pending leave it open.
-- `shipment_type` is **free text with suggestions**, not an enum — each client
-  company words it differently.
+- `shipment_type` is **white_glove | threshold** — how far into the property the
+  crew goes (into the room and unpacked, vs the door and no further). The driver
+  has to know before getting out of the van, so it's shown on the board card and
+  in bold on the run sheet.
+- `jobs.services` is a **text[] of tags** (`JOB_SERVICES`: delivery_only, install,
+  haul_away, exchange, return_pickup, parts_drop, warranty) — one visit is
+  routinely several at once. Tags rather than free text so they stay countable;
+  anything unusual goes in `notes`. Unknown tags are dropped on write.
 - **Lat/lng is captured from the address autocomplete at entry time**, so routing
   never pays to geocode the same address twice. Keep that in any new job form.
 - **A failed stop is a real outcome** with a reason code (`FAIL_REASONS`), not an

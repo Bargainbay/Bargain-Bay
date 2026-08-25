@@ -13,9 +13,17 @@ const QUICK_WINDOWS = [
   { label: '4–8', start: '16:00', end: '20:00' },
   { label: 'All day', start: '08:00', end: '20:00' }
 ];
+// How far in the crew goes. The driver needs this before they get out of the van.
 const SHIPMENT_TYPES = [
-  'Delivery only', 'Delivery + install', 'Delivery + haul away',
-  'Exchange / swap', 'Return pickup', 'Parts drop-off', 'Warranty call'
+  ['white_glove', 'White glove', 'Into the room, unpacked and placed'],
+  ['threshold', 'Threshold', 'To the door and no further']
+];
+// What's being done on the stop. Multi-select — one visit is routinely a
+// delivery AND an install AND a haul-away.
+const SERVICES = [
+  ['delivery_only', 'Delivery only'], ['install', 'Install'], ['haul_away', 'Haul away'],
+  ['exchange', 'Exchange / swap'], ['return_pickup', 'Return pickup'],
+  ['parts_drop', 'Parts drop-off'], ['warranty', 'Warranty call']
 ];
 
 export default function JobForm({ date, clients = [], drivers = [], canManageClients, onDone }) {
@@ -32,6 +40,8 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
   const [windowStart, setWindowStart] = useState('');
   const [windowEnd, setWindowEnd] = useState('');
   const [shipmentType, setShipmentType] = useState('');
+  const [services, setServices] = useState([]);
+  const toggleService = (k) => setServices((xs) => (xs.includes(k) ? xs.filter((v) => v !== k) : [...xs, k]));
   const [appliance, setAppliance] = useState('');
   const [issue, setIssue] = useState('');
   const [driverId, setDriverId] = useState('');
@@ -86,7 +96,7 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           jobDate: jobDate || null,
           windowStart: windowStart || null,
           windowEnd: windowEnd || null,
-          shipmentType, appliance, issue,
+          shipmentType: shipmentType || null, services, appliance, issue,
           driverId: driverId || null,
           notes,
           items: what.split(',').map((s) => s.trim()).filter(Boolean).map((d) => ({ description: d }))
@@ -156,17 +166,10 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
 
       {type === 'service_call' ? (
         <>
-          <div className="form-2col">
-            <div className="field">
-              <label>Appliance</label>
-              <input value={appliance} onChange={(e) => setAppliance(e.target.value)}
-                placeholder="Whirlpool WRS321SDHZ fridge" />
-            </div>
-            <div className="field">
-              <label>Shipment / call type</label>
-              <input list="shipment-types" value={shipmentType} onChange={(e) => setShipmentType(e.target.value)}
-                placeholder="Warranty call" />
-            </div>
+          <div className="field">
+            <label>Appliance</label>
+            <input value={appliance} onChange={(e) => setAppliance(e.target.value)}
+              placeholder="Whirlpool WRS321SDHZ fridge" />
           </div>
           <div className="field">
             <label>Reported problem</label>
@@ -184,14 +187,29 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           </div>
           <div className="field">
             <label>Shipment type</label>
-            <input list="shipment-types" value={shipmentType} onChange={(e) => setShipmentType(e.target.value)}
-              placeholder="Delivery + install" />
+            <select value={shipmentType} onChange={(e) => setShipmentType(e.target.value)}>
+              <option value="">Not set</option>
+              {SHIPMENT_TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+            <div className="hint">
+              {SHIPMENT_TYPES.find(([k]) => k === shipmentType)?.[2] || 'How far into the property the crew goes.'}
+            </div>
           </div>
         </div>
       )}
-      <datalist id="shipment-types">
-        {SHIPMENT_TYPES.map((t) => <option key={t} value={t} />)}
-      </datalist>
+
+      <div className="field">
+        <label>Services on this stop</label>
+        <div className="svc-chips">
+          {SERVICES.map(([k, l]) => (
+            <button key={k} type="button"
+              className={'svc-chip' + (services.includes(k) ? ' is-on' : '')}
+              aria-pressed={services.includes(k)}
+              onClick={() => toggleService(k)}>{l}</button>
+          ))}
+        </div>
+        <div className="hint">Tap all that apply. Anything unusual goes in the notes below.</div>
+      </div>
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
         <div className="field" style={{ marginBottom: 0 }}>
