@@ -26,9 +26,11 @@ const SERVICES = [
   ['parts_drop', 'Parts drop-off'], ['warranty', 'Warranty call']
 ];
 
-export default function JobForm({ date, clients = [], drivers = [], canManageClients, onDone }) {
+export default function JobForm({ date, clients = [], drivers = [], canManageClients, onDone, onClientAdded }) {
   const [type, setType] = useState('delivery');
   const [clientId, setClientId] = useState('');
+  const [newClient, setNewClient] = useState('');
+  const [addingClient, setAddingClient] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -83,6 +85,26 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
     } catch { acDone.current = false; }
   }
 
+  // Add a client without leaving the job you're in the middle of typing.
+  async function saveClient() {
+    const nm = newClient.trim();
+    if (!nm) { setAddingClient(false); return; }
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'client', name: nm })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not add that client.'); return; }
+      onClientAdded?.(d.client);
+      setClientId(String(d.client.id));
+      setAddingClient(false); setNewClient('');
+    } catch { setErr('Network error — the client was not added.'); }
+    finally { setBusy(false); }
+  }
+
   async function submit(e) {
     e.preventDefault();
     setBusy(true); setErr('');
@@ -126,13 +148,28 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
         </div>
         <div className="field">
           <label>For which client</label>
-          <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
-            <option value="">Us / no client</option>
-            {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          {clients.length === 0 && canManageClients && (
-            <div className="hint">No clients set up yet — add them under Operations.</div>
+          {addingClient ? (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input autoFocus value={newClient} onChange={(e) => setNewClient(e.target.value)}
+                placeholder="New client company name"
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveClient(); } }} />
+              <button type="button" className="btn accent" onClick={saveClient} disabled={busy}>Save</button>
+              <button type="button" className="btn" onClick={() => { setAddingClient(false); setNewClient(''); }}>×</button>
+            </div>
+          ) : (
+            <select value={clientId}
+              onChange={(e) => {
+                if (e.target.value === '__new') { setAddingClient(true); return; }
+                setClientId(e.target.value);
+              }}>
+              <option value="">Us / no client</option>
+              {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="__new">+ Add a new client…</option>
+            </select>
           )}
+          <div className="hint">
+            {addingClient ? 'It’s saved and picked the moment you hit Save.' : 'New company on the phone? Add them right here.'}
+          </div>
         </div>
       </div>
 

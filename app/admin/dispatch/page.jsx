@@ -44,7 +44,8 @@ export default async function DispatchPage({ searchParams }) {
       )}
       {loadError && <div className="error-box">{loadError}</div>}
 
-      <DispatchBoard initial={board} canManageClients={isAdmin(session)} openTickets={openTickets} />
+      <DispatchBoard initial={board} canManageClients={isAdmin(session)} openTickets={openTickets}
+        initialView={String(sp?.view || 'board')} />
     </div>
   );
 }

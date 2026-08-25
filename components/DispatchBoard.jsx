@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import JobForm from './JobForm';
 import ServiceVisitForm from './ServiceVisitForm';
+import TicketQueue from './TicketQueue';
+import DispatchSetup from './DispatchSetup';
 
 // The day's run sheet, on screen. One unassigned pile plus a column per driver.
 // Assignment is by tap, not drag: drag is pleasant on a desktop and miserable on
@@ -106,12 +108,16 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
   );
 }
 
-export default function DispatchBoard({ initial, canManageClients, openTickets }) {
+export default function DispatchBoard({ initial, canManageClients, openTickets, initialView = 'board' }) {
   const [board, setBoard] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [adding, setAdding] = useState(false);
   const [closing, setClosing] = useState(null);   // the service visit being closed out
+  // Everything dispatch does happens on this page — no tab-hopping to add a
+  // client or chase a service call mid-shift.
+  const [view, setView] = useState(['board', 'tickets', 'setup'].includes(initialView) ? initialView : 'board');
+  const [tickets, setTickets] = useState(openTickets);
 
   async function refresh(date = board.date) {
     setErr('');
@@ -168,8 +174,28 @@ export default function DispatchBoard({ initial, canManageClients, openTickets }
   const unassignedToday = board.jobs.filter((j) => !j.driverId);
   const openCount = board.jobs.filter((j) => !['done', 'failed', 'cancelled'].includes(j.status)).length;
 
+  const Tab = ({ id, children }) => (
+    <button type="button" className={'disp-tab' + (view === id ? ' is-on' : '')}
+      aria-current={view === id} onClick={() => setView(id)}>{children}</button>
+  );
+
   return (
     <div>
+      <div className="disp-tabs">
+        <Tab id="board">Board</Tab>
+        <Tab id="tickets">Service calls{tickets ? ` (${tickets})` : ''}</Tab>
+        <Tab id="setup">Clients &amp; drivers</Tab>
+      </div>
+
+      {view === 'tickets' && <TicketQueue onChanged={() => refresh()} />}
+
+      {view === 'setup' && (
+        <DispatchSetup clients={board.clients} drivers={board.drivers}
+          canManageDrivers={canManageClients} onChanged={() => refresh()} />
+      )}
+
+      {view !== 'board' ? null : (
+      <div>
       <div className="disp-bar">
         <div className="disp-nav">
           <button type="button" className="btn" onClick={() => refresh(shiftDate(board.date, -1))}>←</button>
@@ -179,9 +205,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets }
         </div>
         <div className="disp-bar-actions">
           <span className="hint" style={{ margin: 0 }}>{openCount} still to do</span>
-          <a className="btn" href="/admin/dispatch/tickets">
-            Service calls{typeof openTickets === 'number' ? ` (${openTickets})` : ''}
-          </a>
+
           <button type="button" className="btn" disabled={busy}
             title="Pull in Bargain Bay delivery orders that aren't on the board yet"
             onClick={() => send('POST', { action: 'import_bb' })}>Pull Bargain Bay orders</button>
@@ -205,6 +229,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets }
         <div className="panel">
           <JobForm date={board.date} clients={board.clients} drivers={board.drivers}
             canManageClients={canManageClients}
+            onClientAdded={(c) => setBoard((b) => ({ ...b, clients: [...b.clients, c].sort((x, y) => x.name.localeCompare(y.name)) }))}
             onDone={() => { setAdding(false); refresh(); }} />
         </div>
       )}
@@ -258,6 +283,8 @@ export default function DispatchBoard({ initial, canManageClients, openTickets }
           );
         })}
       </div>
+      </div>
+      )}
     </div>
   );
 }

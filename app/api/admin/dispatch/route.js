@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin, isStaff } from '../../../../lib/auth';
+import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
+import { setDriverByEmail } from '../../../../lib/drivers';
 import { hasDb } from '../../../../lib/db';
 import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
@@ -49,9 +50,19 @@ export async function POST(req) {
       return NextResponse.json({ ok: true, ...(await importReadyBargainBayOrders({ by: who(s) })) });
     }
     if (body.action === 'client') {
-      // Adding a client is an owner-level decision, not a per-job one.
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can add or edit a client.' }, { status: 403 });
+      // Open to all staff on purpose. A client is a company name — gating it
+      // behind an admin is the exact friction that sends someone back to paper
+      // when a new company calls mid-shift.
       return NextResponse.json({ ok: true, client: await upsertClient(body) });
+    }
+    if (body.action === 'driver') {
+      // Making someone a driver IS a permission, so this one stays admin-only.
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can add or remove a driver.' }, { status: 403 });
+      const email = normalizeEmail(body.email);
+      if (!validEmail(email)) return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
+      const r = await setDriverByEmail(email, body.on !== false);
+      if (!r.ok) return NextResponse.json({ error: r.reason || 'No account with that email — have them sign up first.' }, { status: 400 });
+      return NextResponse.json({ ok: true, driver: r.user });
     }
     const job = await createJob({ ...body, createdBy: who(s) });
     return NextResponse.json({ ok: true, job });
