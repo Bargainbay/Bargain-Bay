@@ -37,19 +37,26 @@ export default function AddToHome({ welcome = false }) {
     const inApp = /FBAN|FBAV|Instagram|LinkedInApp|Line\/|MicroMessenger|Snapchat|Twitter|WhatsApp/i.test(ua) ||
       iosOtherBrowser || (iOS && !/Safari/.test(ua));
 
-    const onPrompt = (e) => {
-      e.preventDefault();
-      prompt.current = e;
-      setMode('install');                                     // Chrome will do it for us
-    };
+    // The event usually fires before React hydrates, so a snippet in the page
+    // parks it on window; this picks it up either way.
+    const take = (e) => { prompt.current = e; setMode('install'); };
+    if (window.__rsInstall) take(window.__rsInstall);
+    const onParked = () => { if (window.__rsInstall) take(window.__rsInstall); };
+    const onPrompt = (e) => { e.preventDefault(); take(e); };
+    window.addEventListener('rs-installable', onParked);
     window.addEventListener('beforeinstallprompt', onPrompt);
 
-    if (inApp) setMode('inapp');
-    else if (iOS) setMode('ios');
-    else if (/Android/.test(ua)) setMode('android');
-    else setMode(welcome ? 'desktop' : 'hidden');
+    if (!window.__rsInstall) {
+      if (inApp) setMode('inapp');
+      else if (iOS) setMode('ios');
+      else if (/Android/.test(ua)) setMode('android');
+      else setMode(welcome ? 'desktop' : 'hidden');
+    }
 
-    return () => window.removeEventListener('beforeinstallprompt', onPrompt);
+    return () => {
+      window.removeEventListener('rs-installable', onParked);
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+    };
   }, [welcome]);
 
   if (mode === 'hidden') return null;
@@ -90,8 +97,19 @@ export default function AddToHome({ welcome = false }) {
 
       {mode === 'android' && (
         <div>
-          To keep this a tap away: open the <b>⋮ menu</b> (top right of Chrome) and choose
+          To keep this a tap away: open the <b>⋮ menu</b> (top right) and choose
           {' '}<b>Add to Home screen</b>.
+          {/* Tapping the link in a text opens a Chrome Custom Tab, which looks
+              like Chrome, has the same user agent, and cannot install anything.
+              Its ⋮ says "Open in Chrome" and that is the whole fix — but nobody
+              guesses it, so it is written down. */}
+          <div className="hint" style={{ margin: '4px 0 0' }}>
+            Only see a few options, or no <b>Add to Home screen</b>? You opened this straight from the
+            text message. Tap <b>⋮ → Open in Chrome</b> first, then try again.
+          </div>
+          <button type="button" className="drv-btn small" onClick={copy}>
+            {copied ? 'Link copied' : 'Copy this link'}
+          </button>
         </div>
       )}
 

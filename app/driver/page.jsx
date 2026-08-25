@@ -15,6 +15,9 @@ export const metadata = {
   title: 'My stops',
   robots: { index: false },
   manifest: '/driver.webmanifest',
+  // iOS reads apple-touch-icon, NOT the manifest — without this the home screen
+  // gets a screenshot of the page instead of the RS mark.
+  icons: { icon: '/driver-icon-192.png', apple: '/driver-icon-192.png' },
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'My stops' }
 };
 export const viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#3A3937' };
@@ -57,6 +60,16 @@ export default async function DriverPage({ searchParams }) {
 
   return (
     <DriverShell>
+      {/* Chrome fires beforeinstallprompt as soon as it decides the page is
+          installable, which is routinely BEFORE React has hydrated — a listener
+          added in an effect misses it and the Install button never appears.
+          This runs before hydration and parks the event for AddToHome. */}
+      <script
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html:
+          "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__rsInstall=e;window.dispatchEvent(new Event('rs-installable'))});"
+        }}
+      />
       {/* Which phone this is decides the instructions — see AddToHome. Naming
           iPhone Safari's Share button to an Android driver just tells them the
           app is broken. */}
