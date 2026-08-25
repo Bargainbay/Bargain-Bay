@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { queueAction, flush, pending, newRef } from '../lib/driver-outbox';
 import DriverFinish from './DriverFinish';
+import DriverPhotos from './DriverPhotos';
 
 // The driver's day. Designed for one hand, in a van, in the sun: big targets,
 // one obvious next action per stop, and no screen that needs reading.
@@ -32,6 +33,7 @@ export default function DriverStops({ initial, driverName }) {
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState(0);
   const [finishing, setFinishing] = useState(null);   // the stop being closed out
+  const [adding, setAdding] = useState(null);         // a finished stop getting more photos
   const [err, setErr] = useState('');
   const timer = useRef(null);
 
@@ -77,6 +79,16 @@ export default function DriverStops({ initial, driverName }) {
     setErr('');
     setStops((xs) => xs.map((s) => (s.id === stop.id ? { ...s, ...patch } : s)));
     await queueAction({ kind: 'patch', jobId: stop.id, body: { jobId: stop.id, ...body }, ref: newRef() });
+    push();
+  }
+
+  // Photos onto a stop that's already done. Same queue as everything else, so a
+  // driver standing in a basement can still add them and drive off.
+  async function addPhotos(stop, blobs) {
+    setErr('');
+    await queueAction({ kind: 'photos', jobId: stop.id, photos: blobs, fields: { mode: 'photos' }, ref: newRef() });
+    setStops((xs) => xs.map((s) => (s.id === stop.id ? { ...s, photoCount: (s.photoCount || 0) + blobs.length } : s)));
+    setAdding(null);
     push();
   }
 
@@ -128,8 +140,16 @@ export default function DriverStops({ initial, driverName }) {
       {closed.length > 0 && (
         <>
           <h2 className="drv-sub">Finished</h2>
-          {closed.map((s) => <StopCard key={s.id} stop={s} done />)}
+          {closed.map((s) => <StopCard key={s.id} stop={s} done onAddPhotos={() => setAdding(s)} />)}
         </>
+      )}
+
+      {adding && (
+        <DriverPhotos
+          stop={adding}
+          onClose={() => setAdding(null)}
+          onAdded={(blobs) => addPhotos(adding, blobs)}
+        />
       )}
 
       {finishing && (
@@ -147,7 +167,7 @@ export default function DriverStops({ initial, driverName }) {
   );
 }
 
-function StopCard({ stop, n, done, onStart, onArrive, onFinish, onFail }) {
+function StopCard({ stop, n, done, onStart, onArrive, onFinish, onFail, onAddPhotos }) {
   const addr = fullAddress(stop);
   const isService = stop.type === 'service_call';
   return (
@@ -187,11 +207,20 @@ function StopCard({ stop, n, done, onStart, onArrive, onFinish, onFail }) {
       </div>
 
       {done ? (
-        <div className="drv-doneline">
-          {stop.status === 'failed'
-            ? (FAIL_REASONS[stop.failReason] || "Couldn't complete")
-            : `Done${stop.hasSignature ? ' · signed' : ''}${stop.photoCount ? ` · ${stop.photoCount} photo${stop.photoCount === 1 ? '' : 's'}` : ''}`}
-        </div>
+        <>
+          <div className="drv-doneline">
+            {stop.status === 'failed'
+              ? (FAIL_REASONS[stop.failReason] || "Couldn't complete")
+              : `Done${stop.hasSignature ? ' · signed' : ''}${stop.photoCount ? ` · ${stop.photoCount} photo${stop.photoCount === 1 ? '' : 's'}` : ''}`}
+          </div>
+          {/* The pictures are what a driver remembers after walking away. Without
+              this the only route was texting them to the office. */}
+          {onAddPhotos && (
+            <button type="button" className="drv-btn small" onClick={onAddPhotos}>
+              📷 {stop.photoCount ? 'Add more photos' : 'Add photos'}
+            </button>
+          )}
+        </>
       ) : (
         <>
           <div className="drv-row">
