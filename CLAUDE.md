@@ -275,6 +275,15 @@ the paper run sheet that replaces it.
 - **The card can move a stop to another day** (the Day picker → `assignJob`'s
   `jobDate`). Before that the only route was cancel-and-retype, which is absurd
   for the most ordinary thing that happens to a delivery.
+- **Dispatch mail goes to the RS inbox** (`DISPATCH_INBOX()` = `DISPATCH_EMAIL`
+  env, else `SERVICE_EMAIL` = Service@rssolutions.ca). Left to `sendEmail`'s
+  default it falls back to `NOTIFY_EMAIL`, a **Bargain Bay gmail** — the people
+  running the runs would never see it.
+- **A failed stop emails the office immediately** (`emailJobFailed`, off
+  `setJobStatus`). It is the one thing that has to be acted on TODAY — rebooked,
+  customer rung, someone sent back — and waiting for whoever next opens the board
+  to notice is how it becomes tomorrow's angry phone call. Office only: a client
+  hears about a failure from a person, not an automated apology.
 - **Somebody is told when a stop finishes.** `emailJobComplete` mails the office
   every completion and the CLIENT when `clients.notify_on_complete` is set —
   that column was collected in the form, stored, and read by nothing, so a client
