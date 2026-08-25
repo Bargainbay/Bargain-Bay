@@ -289,6 +289,26 @@ the paper run sheet that replaces it.
   that column was collected in the form, stored, and read by nothing, so a client
   company found out by asking. Best-effort and after the write: a mail hiccup
   must never fail a completion a driver is standing in a doorway waiting on.
+- **The signed POD form is the paper form.** `jobs.pod_form` (jsonb) holds the
+  two damage answers, the explanation, the per-item table and the printed name;
+  `/admin/dispatch/pod/<id>` renders it for printing or emailing to a client.
+  One jsonb because it is a FORM — read back whole, printed whole, its shape
+  following the paper it replaces rather than a query. `normalizePodForm`
+  sanitises on the way in (a phone running an old build can never widen it), and
+  the write is `COALESCE($8, pod_form)` so a replayed completion off the offline
+  queue can't blank a form somebody already signed. The consent paragraph names
+  the CLIENT company when the job has one — on a shared form the indemnified
+  party has to follow the job.
+- **Item lines are prefilled from the job**, ticked by default, untickable. A
+  driver retyping a model number on a doorstep is how "Whirlpool WRFF3536SW"
+  becomes "whirpool fridge".
+- **Driver pay is single-sourced by an EXPLICIT dispatch amount.** `payroll.js`
+  pays a flat rate per delivered BB order; dispatch pays `jobs.pay_amount` per
+  stop. Payroll now skips an order whose job carries a `pay_amount` — and ONLY
+  then. An unpriced job still earns the flat rate, because silently leaving a
+  driver unpaid is a far worse failure than counting a delivery twice. The
+  payroll table shows what it carried ("+2 paid on dispatch") so a short count
+  is never a mystery.
 - **Proof of delivery is downloadable**, not just viewable:
   `/api/admin/pod?...&download=1&name=<label>` sets Content-Disposition, the card
   has a ⤓ per item and a "save all", and the filename is the job + order, never a

@@ -73,7 +73,17 @@ export default function PayrollManager() {
                   <td style={{ textAlign: 'right' }}>{w.tested || '—'}</td>
                   <td style={{ textAlign: 'right' }}>{w.cleaned || '—'}</td>
                   <td style={{ textAlign: 'right' }}>{w.repaired || '—'}</td>
-                  <td style={{ textAlign: 'right' }}>{w.deliveries || '—'}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    {w.deliveries || '—'}
+                    {/* A delivery priced on the dispatch board is paid there, not
+                        here. Saying so is what stops a short count reading as a
+                        missing day's work. */}
+                    {w.dispatchDeliveries > 0 && (
+                      <div className="hint" style={{ margin: 0, fontSize: 11 }}>
+                        +{w.dispatchDeliveries} paid on dispatch (${Number(w.dispatchPaid || 0).toFixed(2)})
+                      </div>
+                    )}
+                  </td>
                   <td style={{ textAlign: 'right' }}>{w.hours || '—'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>{money0(w.amount)}</td>
                 </tr>
@@ -81,7 +91,12 @@ export default function PayrollManager() {
             </tbody>
           </table></div>
         )}
-        <p className="hint" style={{ marginTop: 8 }}>Drivers&apos; deliveries are counted automatically from delivery records; shop work comes from Telegram reports / entries below.</p>
+        <p className="hint" style={{ marginTop: 8 }}>
+          Drivers&apos; deliveries are counted automatically from delivery records; shop work comes from
+          Telegram reports / entries below. A stop that was given a price on the <b>dispatch Pay tab</b> is
+          paid there and left out of this rate, so nothing is counted twice — anything without a dispatch
+          price still earns the flat delivery rate here.
+        </p>
       </div>
 
       {rates && (

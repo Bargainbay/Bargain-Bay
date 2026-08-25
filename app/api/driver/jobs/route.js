@@ -166,7 +166,8 @@ export async function POST(req) {
       partsUsed: form.get('partsUsed') || null,
       partsNeeded: form.get('partsNeeded') || null,
       signedBy: form.get('signedBy') || null,
-      note: form.get('note') || null
+      note: form.get('note') || null,
+      podForm: form.get('podForm') || null
     }, who(s));
 
     // The customer's side of the same fact: their order is delivered, they get

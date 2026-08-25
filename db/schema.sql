@@ -497,5 +497,9 @@ CREATE INDEX IF NOT EXISTS idx_job_photos_job ON job_photos(job_id);
 -- Which batch a photo arrived in. Photos added after a stop was closed out
 -- can't share the completion's pod_ref, so they carry their own. Not unique:
 -- one batch is several rows sharing a ref.
+-- The signed Proof of Delivery form: damage answers, the per-item table, the
+-- explanation and the printed name. One jsonb because it is read back, and
+-- printed, whole.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pod_form jsonb;
 ALTER TABLE job_photos ADD COLUMN IF NOT EXISTS ref text;
 CREATE INDEX IF NOT EXISTS idx_job_photos_ref ON job_photos(job_id, ref);
