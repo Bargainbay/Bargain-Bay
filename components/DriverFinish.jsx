@@ -22,6 +22,22 @@ export default function DriverFinish({ stop, onClose, onDone }) {
   const signed = useRef(false);
   const [photos, setPhotos] = useState([]);
   const [signedBy, setSignedBy] = useState('');
+  // The Proof of Delivery form, as the paper one reads: two damage questions, an
+  // explanation when the answer is No, and the item table the customer checks
+  // off. Items are PREFILLED from what's on the van — a driver retyping a model
+  // number on a doorstep is how "Whirlpool WRFF3536SW" becomes "whirpool fridge".
+  const [productOk, setProductOk] = useState('');
+  const [propertyOk, setPropertyOk] = useState('');
+  const [explain, setExplain] = useState('');
+  const [lines, setLines] = useState(() =>
+    (stop.items || []).map((it) => ({
+      description: it.description || it.sku || '',
+      serial: it.sku || '',
+      delivered: true,
+      notes: ''
+    }))
+  );
+  const setLine = (i, patch) => setLines((xs) => xs.map((l, n) => (n === i ? { ...l, ...patch } : l)));
   const [outcome, setOutcome] = useState('fixed');
   const [partsUsed, setPartsUsed] = useState('');
   const [partsNeeded, setPartsNeeded] = useState('');
@@ -88,6 +104,16 @@ export default function DriverFinish({ stop, onClose, onDone }) {
   async function submit() {
     setErr('');
     if (isService && !SERVICE_OUTCOMES[outcome]) { setErr('Say how the visit ended.'); return; }
+    // The two damage answers are the whole point of the form — an unanswered one
+    // is what a customer disputes six weeks later.
+    if (!isService) {
+      if (!productOk) { setErr('Is the product damage free? Tap Yes or No.'); return; }
+      if (!propertyOk) { setErr('Is the property damage free? Tap Yes or No.'); return; }
+      if ((productOk === 'no' || propertyOk === 'no') && !explain.trim()) {
+        setErr('Say what the damage is — that box is the whole reason the answer was No.');
+        return;
+      }
+    }
     if (collect && !(Number(amount) > 0)) { setErr('How much did you take?'); return; }
     setBusy(true);
     try {
@@ -113,7 +139,14 @@ export default function DriverFinish({ stop, onClose, onDone }) {
           outcome: isService ? outcome : '',
           partsUsed: isService ? partsUsed : '',
           partsNeeded: isService ? partsNeeded : '',
-          signedBy, note
+          signedBy, note,
+          podForm: isService ? '' : JSON.stringify({
+            productDamageFree: productOk,
+            propertyDamageFree: propertyOk,
+            explanation: explain,
+            printName: signedBy,
+            items: lines
+          })
         }
       });
       onDone({ hasSignature: !!sig, photoCount: photos.length, balanceDue: collect ? 0 : stop.balanceDue });
@@ -175,6 +208,68 @@ export default function DriverFinish({ stop, onClose, onDone }) {
           </>
         )}
 
+        {!isService && (
+          <div className="drv-pod">
+            <div className="drv-pod-head">Proof of delivery</div>
+
+            {/* Big Yes/No, not checkboxes: this is answered standing in a
+                doorway with a phone in one hand. */}
+            <div className="drv-field">
+              <label>Product is damage free</label>
+              <div className="drv-yesno">
+                {['yes', 'no'].map((v) => (
+                  <button type="button" key={v}
+                    className={'drv-btn' + (productOk === v ? ' is-on' : '')}
+                    onClick={() => setProductOk(v)}>{v === 'yes' ? 'Yes' : 'No'}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="drv-field">
+              <label>Property is damage free</label>
+              <div className="drv-yesno">
+                {['yes', 'no'].map((v) => (
+                  <button type="button" key={v}
+                    className={'drv-btn' + (propertyOk === v ? ' is-on' : '')}
+                    onClick={() => setPropertyOk(v)}>{v === 'yes' ? 'Yes' : 'No'}</button>
+                ))}
+              </div>
+            </div>
+
+            {(productOk === 'no' || propertyOk === 'no') && (
+              <div className="drv-field">
+                <label>What&apos;s the damage?</label>
+                <textarea rows={3} value={explain} onChange={(e) => setExplain(e.target.value)}
+                  placeholder="Where it is, how bad, and take a photo of it below" />
+              </div>
+            )}
+
+            {lines.length > 0 && (
+              <div className="drv-field">
+                <label>What was delivered</label>
+                {lines.map((l, i) => (
+                  <div className={'drv-pod-item' + (l.delivered ? '' : ' is-off')} key={i}>
+                    <label className="drv-pod-tick">
+                      <input type="checkbox" checked={l.delivered}
+                        onChange={(e) => setLine(i, { delivered: e.target.checked })} />
+                      <span>{l.description}</span>
+                    </label>
+                    <div className="drv-pod-fields">
+                      <input value={l.serial} onChange={(e) => setLine(i, { serial: e.target.value })}
+                        placeholder="Serial / SKU" />
+                      <input value={l.notes} onChange={(e) => setLine(i, { notes: e.target.value })}
+                        placeholder="Notes" />
+                    </div>
+                  </div>
+                ))}
+                <div className="hint" style={{ marginTop: 4 }}>
+                  Untick anything that didn&apos;t go in. It prints on the form the customer signs.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* TWO buttons, not one input. `capture` makes an input camera-ONLY on
             iOS — no library, and `multiple` ignored — so a driver who shot the
             delivery with the normal Camera app had no way to attach it, and a
@@ -214,8 +309,9 @@ export default function DriverFinish({ stop, onClose, onDone }) {
         </div>
 
         <div className="drv-field">
-          <label>Signed by</label>
-          <input value={signedBy} onChange={(e) => setSignedBy(e.target.value)} placeholder="Name" />
+          <label>Print name</label>
+          <input value={signedBy} onChange={(e) => setSignedBy(e.target.value)}
+            placeholder="Who signed, in full" autoComplete="name" />
         </div>
 
         <div className="drv-field">

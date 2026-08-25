@@ -250,6 +250,11 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
           {job.photoIds?.length > 1 && (
             <button type="button" className="disp-dl-all" onClick={() => savePod(job)}>save all</button>
           )}
+          {/* The signed form itself, on paper — what actually goes to a client
+              who is arguing about a dent. */}
+          {job.hasPodForm && (
+            <> · <a href={`/admin/dispatch/pod/${job.id}`} target="_blank" rel="noopener noreferrer">POD form</a></>
+          )}
         </div>
       )}
 

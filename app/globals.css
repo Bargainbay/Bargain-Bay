@@ -1031,6 +1031,22 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .drv-money select { flex: 1 1 150px; }
 .drv-warn { margin-top: 8px; font-size: 14px; font-weight: 600; color: var(--warn); }
 .drv-sig { width: 100%; height: 170px; background: #fff; border: 1px dashed var(--line); border-radius: 10px; touch-action: none; }
+/* The Proof of Delivery block — the paper form, on a phone. */
+.drv-pod { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 16px; background: var(--card); }
+.drv-pod-head { font-weight: 800; font-size: 15px; color: var(--charcoal); margin-bottom: 10px; }
+.drv-yesno { display: flex; gap: 8px; }
+.drv-yesno .drv-btn { flex: 1 1 0; margin-top: 0; }
+.drv-yesno .drv-btn.is-on { background: var(--charcoal); color: #fff; border-color: var(--charcoal); }
+.drv-pod-item { border-top: 1px solid var(--line-soft); padding: 8px 0; }
+.drv-pod-item.is-off { opacity: .5; }
+.drv-pod-tick { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; font-weight: 600; margin: 0 0 6px; }
+.drv-pod-tick input { width: 26px; height: 26px; flex: 0 0 26px; }
+.drv-pod-fields { display: flex; gap: 8px; }
+.drv-pod-fields input { flex: 1 1 0; }
+.drv-field textarea {
+  width: 100%; font-size: 16px; padding: 12px; border-radius: 10px;
+  border: 1px solid var(--line); font-family: inherit;
+}
 .drv-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .drv-thumbs img { width: 74px; height: 74px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; }
 .drv-thumbs button { background: none; border: none; padding: 0; cursor: pointer; }
