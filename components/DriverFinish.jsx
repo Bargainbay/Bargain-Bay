@@ -15,20 +15,47 @@ const SERVICE_OUTCOMES = {
 };
 const PAY_METHODS = { cash: 'Cash', etransfer: 'E-transfer', card: 'Card (manual)', cheque: 'Cheque', other: 'Other' };
 
+// Decoding a photo off a phone, the long way round on purpose. An iPhone hands
+// back HEIC from the library, and createImageBitmap refuses it on iOS versions
+// that will happily render the same file in an <img>. Trying only the fast path
+// is why a driver's photos silently vanished.
+async function decode(file) {
+  try {
+    const bmp = await createImageBitmap(file);
+    return { src: bmp, w: bmp.width, h: bmp.height, done: () => bmp.close?.() };
+  } catch { /* fall through to the <img> path */ }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  await new Promise((ok, no) => {
+    img.onload = ok;
+    img.onerror = () => no(new Error("that photo couldn't be read"));
+    img.src = url;
+  });
+  return { src: img, w: img.naturalWidth, h: img.naturalHeight, done: () => URL.revokeObjectURL(url) };
+}
+
 // Phone photos are several megabytes each; a stop with six of them would not
-// survive a serverless body limit, let alone a rural upload.
+// survive a serverless body limit, let alone a rural upload. If any step of the
+// shrink fails we send the ORIGINAL rather than nothing — a 4MB photo that
+// arrives beats a tidy one that doesn't.
 async function compress(file) {
-  const img = await createImageBitmap(file);
-  const max = 1400;
-  let { width, height } = img;
-  if (width > max || height > max) {
-    const s = Math.min(max / width, max / height);
-    width = Math.round(width * s); height = Math.round(height * s);
+  const { src, w, h, done } = await decode(file);
+  try {
+    const max = 1400;
+    let width = w, height = h;
+    if (!width || !height) return file;
+    if (width > max || height > max) {
+      const s = Math.min(max / width, max / height);
+      width = Math.round(width * s); height = Math.round(height * s);
+    }
+    const c = document.createElement('canvas');
+    c.width = width; c.height = height;
+    c.getContext('2d').drawImage(src, 0, 0, width, height);
+    const out = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.72));
+    return out || file;
+  } finally {
+    done();
   }
-  const c = document.createElement('canvas');
-  c.width = width; c.height = height;
-  c.getContext('2d').drawImage(img, 0, 0, width, height);
-  return await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.72));
 }
 
 export default function DriverFinish({ stop, onClose, onDone }) {
@@ -84,15 +111,26 @@ export default function DriverFinish({ stop, onClose, onDone }) {
     signed.current = false;
   }
 
+  // A photo that can't be read now SAYS SO. It used to be swallowed, so a driver
+  // tapped, saw nothing appear, and drove off assuming the app didn't do photos.
   async function onPick(e) {
     const files = [...e.target.files].slice(0, 8);
+    if (!files.length) return;
+    setErr('');
+    setBusy(true);
     const out = [];
+    let failed = 0;
     for (const f of files) {
-      try { out.push({ blob: await compress(f), url: URL.createObjectURL(f) }); } catch { /* skip unreadable */ }
+      try { out.push({ blob: await compress(f), url: URL.createObjectURL(f) }); }
+      catch { failed += 1; }
     }
     setPhotos((p) => [...p, ...out].slice(0, 8));
+    setBusy(false);
+    if (failed) setErr(`${failed} photo${failed === 1 ? '' : 's'} couldn't be read — try taking it again.`);
     e.target.value = '';
   }
+
+  const dropPhoto = (i) => setPhotos((p) => p.filter((_, n) => n !== i));
 
   async function submit() {
     setErr('');
@@ -184,14 +222,32 @@ export default function DriverFinish({ stop, onClose, onDone }) {
           </>
         )}
 
+        {/* TWO buttons, not one input. `capture` makes an input camera-ONLY on
+            iOS — no library, and `multiple` ignored — so a driver who shot the
+            delivery with the normal Camera app had no way to attach it, and a
+            bare file input on a phone doesn't read as something you can tap. */}
         <div className="drv-field">
           <label>Photos</label>
-          <input type="file" accept="image/*" capture="environment" multiple onChange={onPick} />
+          <div className="drv-photo-btns">
+            <label className="drv-btn small">
+              📷 Take a photo
+              <input className="drv-file" type="file" accept="image/*" capture="environment" onChange={onPick} />
+            </label>
+            <label className="drv-btn small">
+              🖼 Choose from phone
+              <input className="drv-file" type="file" accept="image/*" multiple onChange={onPick} />
+            </label>
+          </div>
+          <div className="hint" style={{ marginTop: 4 }}>
+            {photos.length ? `${photos.length} of 8 added — tap one to remove it.` : 'Up to 8. Optional, but it settles a damage claim.'}
+          </div>
           {photos.length > 0 && (
             <div className="drv-thumbs">
               {photos.map((p, i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={p.url} alt={`Photo ${i + 1}`} />
+                <button type="button" key={i} onClick={() => dropPhoto(i)} title="Remove">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt={`Photo ${i + 1}`} />
+                </button>
               ))}
             </div>
           )}
