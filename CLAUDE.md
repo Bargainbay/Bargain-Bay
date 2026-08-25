@@ -154,6 +154,51 @@ record anywhere. Rules that must hold:
   total is reported as `overpaid`; no refund record is invented, because no money
   has physically moved.
 
+## Dispatch — deliveries & service calls (added 2026-08-25)
+The daily run sheet used to be built by hand because the work comes from several
+client companies through several channels (email, spreadsheet, phone) and no one
+system holds it all. `/admin/dispatch` is the board; `/admin/dispatch/print` is
+the paper run sheet that replaces it.
+
+- **A job is NOT an order.** Orders carry money, tax, inventory and revenue
+  meaning; a service call run for another company carries none of it, and putting
+  it in `orders` would pollute every revenue query. A Bargain Bay delivery is a
+  job that links back via `jobs.order_id`. See `lib/jobs.js`, tables `jobs` /
+  `job_items` / `job_events` / `clients`.
+- **Delivery windows are promised to customers and set per job by the team —
+  they can start at ANY hour.** So an arbitrary `window_start` / `window_end` is
+  the real input; `WINDOW_PRESETS` are only one-tap shortcuts. Routing (phase 3)
+  therefore sorts by `window_start` and may only reorder stops whose windows
+  OVERLAP — a route can never be resequenced across a promise, which is what
+  keeps the cheap Directions API sufficient instead of the fleet solver.
+- **A service ticket is the customer's PROBLEM; a job is one visit against it**
+  (`service_tickets`, `jobs.ticket_id`). They're separate because a repair
+  routinely takes several trips, and "how many open service calls?" has to count
+  problems or every revisit inflates the number. `completeServiceVisit` records
+  time in/out, outcome, parts used/needed and who signed, and the OUTCOME is what
+  moves the ticket (`OUTCOME_TO_TICKET`): fixed/no-fault resolve it, parts_needed
+  parks it on `awaiting_parts`, not_fixed/pending leave it open.
+- `shipment_type` is **white_glove | threshold** — how far into the property the
+  crew goes (into the room and unpacked, vs the door and no further). The driver
+  has to know before getting out of the van, so it's shown on the board card and
+  in bold on the run sheet.
+- `jobs.services` is a **text[] of tags** (`JOB_SERVICES`: delivery_only, install,
+  haul_away, exchange, return_pickup, parts_drop, warranty) — one visit is
+  routinely several at once. Tags rather than free text so they stay countable;
+  anything unusual goes in `notes`. Unknown tags are dropped on write.
+- **Lat/lng is captured from the address autocomplete at entry time**, so routing
+  never pays to geocode the same address twice. Keep that in any new job form.
+- **A failed stop is a real outcome** with a reason code (`FAIL_REASONS`), not an
+  absence of a completion. `setJobStatus` refuses `failed` without one.
+- Bargain Bay orders enter by **pull, not push** (`importReadyBargainBayOrders`,
+  the "Pull Bargain Bay orders" button). Deliberate: nothing new hangs off the
+  order-status path the storefront depends on, and the dispatcher controls the
+  day. Idempotent — an order that already has a job is skipped.
+- **Gate exception:** dispatch uses `isStaff`, making it a FOURTH staff surface
+  beyond the three named in the gate rule below. Intentional — whoever answers
+  the phone has to be able to put the job on the board. Adding or editing a
+  *client* is still `isAdmin`.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.

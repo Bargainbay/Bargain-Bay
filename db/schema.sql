@@ -307,3 +307,130 @@ ALTER TABLE orders ADD CONSTRAINT orders_status_check
 
 -- Customer quote acceptance (hosted quote page "Accept" button).
 ALTER TABLE quotes ADD COLUMN IF NOT EXISTS accepted_at timestamptz;
+
+-- ============================================================================
+-- Dispatch: deliveries and service calls, from any source
+-- ============================================================================
+-- A JOB is not an order. An order carries money, tax, inventory and revenue
+-- meaning; a service call run for another company carries none of that, and
+-- forcing it into `orders` would pollute every revenue query. A Bargain Bay
+-- delivery becomes a job that LINKS BACK to its order (jobs.order_id), so
+-- completing the job can still advance the order.
+CREATE TABLE IF NOT EXISTS clients (
+  id                 serial PRIMARY KEY,
+  name               text NOT NULL UNIQUE,
+  contact_email      text,
+  contact_phone      text,
+  notes              text,
+  notify_on_complete boolean NOT NULL DEFAULT false,
+  active             boolean NOT NULL DEFAULT true,
+  created_at         timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS jobs (
+  id            serial PRIMARY KEY,
+  job_number    text UNIQUE,                      -- 'RS-' || (1000 + id)
+  type          text NOT NULL DEFAULT 'delivery'
+                CHECK (type IN ('delivery','service_call','pickup')),
+  -- unscheduled: on the board, no day yet. scheduled: has a day (+ driver or not).
+  -- failed is a REAL outcome with a reason, not an absence of a completion.
+  status        text NOT NULL DEFAULT 'unscheduled'
+                CHECK (status IN ('unscheduled','scheduled','on_the_way','arrived','done','failed','cancelled')),
+  client_id     int REFERENCES clients(id) ON DELETE SET NULL,
+  source        text NOT NULL DEFAULT 'manual',   -- manual | bargain_bay | email | import
+  order_id      int REFERENCES orders(id) ON DELETE SET NULL,
+
+  customer_name text,
+  phone         text,
+  email         text,
+  address       text,
+  city          text,
+  postal        text,
+  -- Captured from the address autocomplete at entry time, so routing never has
+  -- to pay to geocode the same address later.
+  lat           numeric(9,6),
+  lng           numeric(9,6),
+
+  job_date      date,
+  window_start  time,                             -- the promised window
+  window_end    time,
+
+  driver_id     int REFERENCES users(id) ON DELETE SET NULL,
+  seq           int,                              -- position in that driver's day
+
+  notes         text,                             -- access: stairs, buzzer, dog
+  fail_reason   text,
+  created_by      text,
+  created_by_name text,
+  created_at    timestamptz DEFAULT now(),
+  started_at    timestamptz,
+  arrived_at    timestamptz,
+  completed_at  timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS job_items (
+  id          serial PRIMARY KEY,
+  job_id      int REFERENCES jobs(id) ON DELETE CASCADE,
+  description text NOT NULL,
+  sku         text,                               -- set when it came from Bargain Bay
+  qty         int NOT NULL DEFAULT 1
+);
+
+-- Timestamped audit trail. This is what answers "what actually happened Tuesday".
+CREATE TABLE IF NOT EXISTS job_events (
+  id       serial PRIMARY KEY,
+  job_id   int REFERENCES jobs(id) ON DELETE CASCADE,
+  event    text NOT NULL,
+  detail   text,
+  by_email text,
+  by_name  text,
+  at       timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_date        ON jobs(job_date);
+CREATE INDEX IF NOT EXISTS idx_jobs_driver_date ON jobs(driver_id, job_date);
+CREATE INDEX IF NOT EXISTS idx_jobs_status      ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_order       ON jobs(order_id) WHERE order_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_job_items_job    ON job_items(job_id);
+CREATE INDEX IF NOT EXISTS idx_job_events_job   ON job_events(job_id);
+
+-- ── Service tickets ─────────────────────────────────────────────────────────
+-- A ticket is the CUSTOMER'S PROBLEM; a job is one visit against it. They are
+-- separate because a service call routinely takes more than one trip — diagnose,
+-- order the part, come back — and "how many open service calls do we have" has
+-- to count problems, not visits, or every revisit inflates the number.
+CREATE TABLE IF NOT EXISTS service_tickets (
+  id            serial PRIMARY KEY,
+  ticket_number text UNIQUE,                      -- 'SC-' || (1000 + id)
+  client_id     int REFERENCES clients(id) ON DELETE SET NULL,
+  customer_name text, phone text, email text,
+  address text, city text, postal text,
+  appliance     text,                             -- what it is
+  issue         text,                             -- what's wrong, as reported
+  status        text NOT NULL DEFAULT 'open'
+                CHECK (status IN ('open','awaiting_parts','scheduled','resolved','closed','cancelled')),
+  priority      text NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal','urgent')),
+  opened_at     timestamptz NOT NULL DEFAULT now(),
+  closed_at     timestamptz,
+  created_by    text, created_by_name text
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON service_tickets(status);
+
+-- A visit belongs to a ticket; deliveries have none.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ticket_id     int REFERENCES service_tickets(id) ON DELETE SET NULL;
+-- How far into the property the crew goes: 'white_glove' (into the room,
+-- unpacked, placed) or 'threshold' (the door and no further). The driver needs
+-- to know which before they get out of the van.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS shipment_type text;
+-- What's being done on the stop — install, haul away, exchange and so on. Tags
+-- rather than free text so they can be counted and filtered; one visit is
+-- routinely several of them at once.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS services      text[];
+-- Service visit record.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS time_in       timestamptz;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS time_out      timestamptz;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS outcome       text;   -- fixed | not_fixed | parts_needed | pending | no_fault
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS parts_used    text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS parts_needed  text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS signed_by     text;
+CREATE INDEX IF NOT EXISTS idx_jobs_ticket ON jobs(ticket_id) WHERE ticket_id IS NOT NULL;
