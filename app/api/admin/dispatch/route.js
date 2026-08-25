@@ -5,8 +5,9 @@ import { hasDb } from '../../../../lib/db';
 import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
   upsertClient, importReadyBargainBayOrders, dispatchBoard,
-  completeServiceVisit, setTicketStatus, listTickets,
-  findServiceCustomers, ordersForServiceCall
+  setTicketStatus, listTickets,
+  findServiceCustomers, ordersForServiceCall,
+  completeJob, setJobPay, payReport, bookRevisit
 } from '../../../../lib/jobs';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +38,9 @@ export async function GET(req) {
     }
     if (sp.get('view') === 'orders') {
       return NextResponse.json({ orders: await ordersForServiceCall(sp.get('email') || '') });
+    }
+    if (sp.get('view') === 'pay') {
+      return NextResponse.json(await payReport({ from: sp.get('from'), to: sp.get('to') }));
     }
     if (sp.get('view') === 'tickets') {
       return NextResponse.json(await listTickets({ status: sp.get('status') || 'open_states' }));
@@ -89,6 +93,9 @@ export async function PATCH(req) {
   const jobId = Number(body.jobId);
 
   try {
+    if (body.action === 'revisit') {
+      return NextResponse.json({ ok: true, ...(await bookRevisit(body.ticketId, who(s))) });
+    }
     if (body.action === 'ticket_status') {
       return NextResponse.json({ ok: true, ticket: await setTicketStatus(body.ticketId, body.status, who(s)) });
     }
@@ -102,8 +109,13 @@ export async function PATCH(req) {
     if (body.action === 'status') {
       return NextResponse.json({ ok: true, job: await setJobStatus(jobId, body.status, body, who(s)) });
     }
-    if (body.action === 'service_complete') {
-      return NextResponse.json({ ok: true, job: await completeServiceVisit(jobId, body, who(s)) });
+    if (body.action === 'service_complete' || body.action === 'complete') {
+      return NextResponse.json({ ok: true, job: await completeJob(jobId, body, who(s)) });
+    }
+    if (body.action === 'pay') {
+      // Money, so admin only — same line the rest of the app draws.
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set what a job pays.' }, { status: 403 });
+      return NextResponse.json({ ok: true, job: await setJobPay(jobId, body, who(s)) });
     }
     if (body.action === 'cancel') {
       return NextResponse.json({ ok: true, job: await cancelJob(jobId, body.reason, who(s)) });

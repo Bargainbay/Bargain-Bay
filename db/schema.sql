@@ -436,3 +436,10 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS signed_by     text;
 CREATE INDEX IF NOT EXISTS idx_jobs_ticket ON jobs(ticket_id) WHERE ticket_id IS NOT NULL;
 -- A warranty call on something we sold points back at the sale.
 ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS order_id int REFERENCES orders(id) ON DELETE SET NULL;
+-- What the person who did the job is owed for it. Per job and set after the
+-- fact, because the rate depends on what the stop actually turned out to be.
+-- SEPARATE from lib/payroll.js, which pays shop work by piece rate and drivers a
+-- flat rate per Bargain Bay ORDER delivered — using both for the same delivery
+-- counts it twice.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pay_amount numeric(10,2);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pay_note   text;

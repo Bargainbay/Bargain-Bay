@@ -4,6 +4,7 @@ import JobForm from './JobForm';
 import ServiceVisitForm from './ServiceVisitForm';
 import TicketQueue from './TicketQueue';
 import DispatchSetup from './DispatchSetup';
+import PayReport from './PayReport';
 
 // The day's run sheet, on screen. One unassigned pile plus a column per driver.
 // Assignment is by tap, not drag: drag is pleasant on a desktop and miserable on
@@ -70,6 +71,15 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
             <div className="disp-items">{job.items.map((i) => i.description).join(' · ')}</div>
           )}
       {job.partsNeeded && <div className="disp-fail">Waiting on: {job.partsNeeded}</div>}
+      {(job.timeIn || job.payAmount != null) && (
+        <div className="disp-times">
+          {job.timeIn && (
+            <>on site {new Date(job.timeIn).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}
+              {job.timeOut && `–${new Date(job.timeOut).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}`}</>
+          )}
+          {job.payAmount != null && <> · pays ${Number(job.payAmount).toFixed(2)}</>}
+        </div>
+      )}
       {job.failReason && <div className="disp-fail">{FAIL_REASONS[job.failReason] || job.failReason}</div>}
 
       <button type="button" className="disp-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
@@ -93,9 +103,12 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
           </a>
           {!closed && (
             <>
-              <button type="button" className="btn" disabled={busy}
-                onClick={() => (job.type === 'service_call' ? onServiceDone(job) : onStatus(job.id, 'done'))}>
-                {job.type === 'service_call' ? 'Close out visit' : 'Mark done'}
+              {job.status === 'scheduled' && (
+                <button type="button" className="btn" disabled={busy}
+                  onClick={() => onStatus(job.id, 'on_the_way')}>Start</button>
+              )}
+              <button type="button" className="btn" disabled={busy} onClick={() => onServiceDone(job)}>
+                {job.type === 'service_call' ? 'Close out visit' : 'Close out'}
               </button>
               <button type="button" className="btn" disabled={busy} onClick={() => onStatus(job.id, 'failed')}>Couldn&apos;t complete</button>
               <button type="button" className="btn danger" disabled={busy} onClick={() => onCancel(job.id)}>Cancel</button>
@@ -146,8 +159,17 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
 
   const onAssign = (jobId, patch) => send('PATCH', { action: 'assign', jobId, jobDate: board.date, ...patch });
 
-  async function onServiceComplete(payload) {
-    const ok = await send('PATCH', { action: 'service_complete', jobId: closing.id, ...payload });
+  async function onServiceComplete({ pay, payNote, ...payload }) {
+    const ok = await send('PATCH', { action: 'complete', jobId: closing.id, ...payload });
+    // Pay is a separate, admin-only call — a failure there must not undo the
+    // close-out, which is the part the crew is waiting on.
+    if (ok && pay !== undefined) {
+      await fetch('/api/admin/dispatch', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'pay', jobId: closing.id, amount: pay, note: payNote })
+      }).catch(() => {});
+      await refresh();
+    }
     if (ok) setClosing(null);
   }
 
@@ -184,10 +206,13 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       <div className="disp-tabs">
         <Tab id="board">Board</Tab>
         <Tab id="tickets">Service calls{tickets ? ` (${tickets})` : ''}</Tab>
+        <Tab id="pay">Pay</Tab>
         <Tab id="setup">Clients &amp; drivers</Tab>
       </div>
 
       {view === 'tickets' && <TicketQueue onChanged={() => refresh()} />}
+
+      {view === 'pay' && <PayReport canSetPay={canManageClients} />}
 
       {view === 'setup' && (
         <DispatchSetup clients={board.clients} drivers={board.drivers}
@@ -220,7 +245,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
 
       {closing && (
         <div className="panel">
-          <ServiceVisitForm job={closing} busy={busy}
+          <ServiceVisitForm job={closing} busy={busy} canSetPay={canManageClients}
             onSubmit={onServiceComplete} onCancel={() => setClosing(null)} />
         </div>
       )}
