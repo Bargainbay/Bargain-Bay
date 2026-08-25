@@ -17,7 +17,8 @@ const OUTCOMES = [
 
 const nowHHMM = () => new Date().toTimeString().slice(0, 5);
 
-export default function ServiceVisitForm({ job, busy, onSubmit, onCancel }) {
+export default function ServiceVisitForm({ job, busy, canSetPay, onSubmit, onCancel }) {
+  const isService = job.type === 'service_call';
   const [timeIn, setTimeIn] = useState('');
   const [timeOut, setTimeOut] = useState(nowHHMM());
   const [outcome, setOutcome] = useState('fixed');
@@ -26,6 +27,8 @@ export default function ServiceVisitForm({ job, busy, onSubmit, onCancel }) {
   const [signedBy, setSignedBy] = useState('');
   const [note, setNote] = useState('');
   const [err, setErr] = useState('');
+  const [pay, setPay] = useState(job.payAmount == null ? '' : String(job.payAmount));
+  const [payNote, setPayNote] = useState('');
 
   const needsParts = outcome === 'parts_needed';
 
@@ -38,14 +41,17 @@ export default function ServiceVisitForm({ job, busy, onSubmit, onCancel }) {
 
   function submit(e) {
     e.preventDefault();
-    if (needsParts && !partsNeeded.trim()) {
+    if (isService && needsParts && !partsNeeded.trim()) {
       setErr('List the parts needed — that’s what the ticket waits on.');
       return;
     }
     setErr('');
     onSubmit({
       timeIn: stamp(timeIn), timeOut: stamp(timeOut),
-      outcome, partsUsed, partsNeeded, signedBy, note
+      outcome: isService ? outcome : null,
+      partsUsed, partsNeeded, signedBy, note,
+      pay: canSetPay && pay !== '' ? Number(pay) : undefined,
+      payNote: canSetPay ? payNote : undefined
     });
   }
 
@@ -53,7 +59,9 @@ export default function ServiceVisitForm({ job, busy, onSubmit, onCancel }) {
     <form onSubmit={submit} className="svc-form">
       <h4 style={{ margin: '0 0 2px' }}>Close out {job.jobNumber}</h4>
       <p className="hint" style={{ marginTop: 0 }}>
-        {job.appliance || 'Service call'}{job.ticketNumber ? ` · ticket ${job.ticketNumber}` : ''}
+        {isService
+          ? `${job.appliance || 'Service call'}${job.ticketNumber ? ` · ticket ${job.ticketNumber}` : ''}`
+          : `${job.customerName || 'Delivery'}${job.address ? ` · ${job.address}` : ''}`}
       </p>
       {err && <div className="error-box">{err}</div>}
 
@@ -66,6 +74,7 @@ export default function ServiceVisitForm({ job, busy, onSubmit, onCancel }) {
         </label>
       </div>
 
+      {isService && <>
       <label className="svc-block">Outcome
         <select value={outcome} onChange={(e) => setOutcome(e.target.value)}>
           {OUTCOMES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
@@ -84,6 +93,8 @@ export default function ServiceVisitForm({ job, busy, onSubmit, onCancel }) {
           placeholder="Compressor relay W10613606" />
       </label>
 
+      </>}
+
       <label className="svc-block">Signed by
         <input value={signedBy} onChange={(e) => setSignedBy(e.target.value)}
           placeholder="Name of whoever signed" />
@@ -93,6 +104,24 @@ export default function ServiceVisitForm({ job, busy, onSubmit, onCancel }) {
       <label className="svc-block">Notes
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What was done" />
       </label>
+
+      {canSetPay && (
+        <div className="svc-row" style={{ alignItems: 'flex-end' }}>
+          <label style={{ marginBottom: 0 }}>What this pays
+            <input type="number" min="0" step="0.01" inputMode="decimal" value={pay}
+              onChange={(e) => setPay(e.target.value)} placeholder="0.00" />
+          </label>
+          <label style={{ flex: 1, marginBottom: 0 }}>Pay note
+            <input style={{ width: '100%' }} value={payNote} onChange={(e) => setPayNote(e.target.value)}
+              placeholder="Long job, two flights of stairs" />
+          </label>
+        </div>
+      )}
+      {canSetPay && (
+        <p className="hint" style={{ marginTop: 4 }}>
+          What the person who did this job is owed. It rolls up per person on the Pay tab.
+        </p>
+      )}
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
         <button type="button" className="btn" onClick={onCancel}>Cancel</button>

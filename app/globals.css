@@ -853,3 +853,4 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 }
 .disp-hits button:last-child { border-bottom: none; }
 .disp-hits button:hover { background: var(--tint); }
+.disp-times { font-size: 12px; color: var(--muted); margin-top: 5px; font-variant-numeric: tabular-nums; }

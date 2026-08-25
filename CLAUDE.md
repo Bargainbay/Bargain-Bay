@@ -206,6 +206,20 @@ the paper run sheet that replaces it.
   it to another route: sending someone elsewhere to add a client mid-call is the
   friction that sends a dispatcher back to paper.
   `/admin/dispatch/tickets` is only a redirect kept so older links resolve.
+- **Times and pay.** Closing out ANY job (not just a service call) records
+  `time_in` / `time_out` — time actually on site — plus who signed. `pay_amount`
+  is what the person who did that job is owed, set per job at close-out and
+  **admin-only**. The Pay tab rolls it up per person for today / this week / this
+  month, counting COMPLETED jobs only, and reports how many are still unpriced so
+  a short total is never mistaken for a finished one.
+  **This is separate from `lib/payroll.js`**, which pays shop work by piece rate
+  and drivers a flat rate per Bargain Bay *order* delivered. Using both for the
+  same delivery counts it twice — external clients' work only exists here, so
+  there's no overlap on that side.
+- **Revisits.** `bookRevisit(ticketId)` — the "+ Revisit" button on a ticket row —
+  copies the customer, address and appliance onto a new visit against the SAME
+  ticket and drops it in "To assign". Without it a second trip opens a second
+  ticket and the open-service-call count inflates.
 - **Gate exception:** dispatch uses `isStaff`, making it a FOURTH staff surface
   beyond the three named in the gate rule below. Intentional — whoever answers
   the phone has to be able to put the job on the board. Adding a **client** is
