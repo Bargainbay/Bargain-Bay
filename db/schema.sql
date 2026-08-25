@@ -455,3 +455,7 @@ CREATE INDEX IF NOT EXISTS idx_jobs_invoice ON jobs(invoice_id) WHERE invoice_id
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_address text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_city    text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_postal  text;
+-- Which business an invoice goes out as: 'bargain_bay' (the storefront) or
+-- 'rs_solutions' (the delivery/service company billing its own clients).
+-- Identity only — sender, letterhead and contact details; the logic is identical.
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS brand text;
