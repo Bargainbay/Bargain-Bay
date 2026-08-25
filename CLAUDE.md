@@ -194,10 +194,17 @@ the paper run sheet that replaces it.
   the "Pull Bargain Bay orders" button). Deliberate: nothing new hangs off the
   order-status path the storefront depends on, and the dispatcher controls the
   day. Idempotent — an order that already has a job is skipped.
+- **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
+  queue, and clients/drivers are TABS on that one page, not separate screens, and
+  a client can be added from inside the new-job form itself. Do not move any of
+  it to another route: sending someone elsewhere to add a client mid-call is the
+  friction that sends a dispatcher back to paper.
+  `/admin/dispatch/tickets` is only a redirect kept so older links resolve.
 - **Gate exception:** dispatch uses `isStaff`, making it a FOURTH staff surface
   beyond the three named in the gate rule below. Intentional — whoever answers
-  the phone has to be able to put the job on the board. Adding or editing a
-  *client* is still `isAdmin`.
+  the phone has to be able to put the job on the board. Adding a **client** is
+  staff too (it's a company name). Adding a **driver** stays `isAdmin` — that one
+  is a real access grant.
 
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)

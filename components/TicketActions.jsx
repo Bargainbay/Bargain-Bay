@@ -13,7 +13,7 @@ const NEXT = {
   cancelled: [['open', 'Reopen']]
 };
 
-export default function TicketActions({ ticket }) {
+export default function TicketActions({ ticket, onChanged }) {
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
 
@@ -29,7 +29,10 @@ export default function TicketActions({ ticket }) {
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Failed'); setBusy(''); return; }
-      window.location.reload();
+      // Inline on the dispatch page — refresh the queue in place rather than
+      // reloading the whole screen out from under whatever else is open.
+      setBusy('');
+      if (onChanged) onChanged(); else window.location.reload();
     } catch {
       setErr('Network error'); setBusy('');
     }
