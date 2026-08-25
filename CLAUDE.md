@@ -261,6 +261,32 @@ the paper run sheet that replaces it.
   this runs on a warehouse touchscreen with no trackpad, where a scroll area
   nobody can see the edge of is a driver's whole day nobody knows exists. Both
   are off under 700px, where the columns stack.
+- **Nothing on the board is a dead end.** A closed stop (done / failed /
+  cancelled) can be **Reopened** (`reopenJob`, PATCH `action: 'reopen'`) — a
+  customer rings back, a driver taps Done on the wrong card, a cancelled
+  delivery is rebooked for Thursday. `assignJob` still refuses to move a closed
+  job, and now names the button that fixes it. Reopening KEEPS the completion
+  evidence (times, signature, photos, money): it says the work isn't finished,
+  not that it never happened.
+- **Cancelled stops stay on the board**, in their own greyed column, because a
+  card that vanishes is indistinguishable from a deleted one — and a cancelled
+  BB job still blocks its order from being pulled in again. `dispatchBoard`
+  returns them as `cancelled[]`; don't filter them back out of the query.
+- **The card can move a stop to another day** (the Day picker → `assignJob`'s
+  `jobDate`). Before that the only route was cancel-and-retype, which is absurd
+  for the most ordinary thing that happens to a delivery.
+- **Somebody is told when a stop finishes.** `emailJobComplete` mails the office
+  every completion and the CLIENT when `clients.notify_on_complete` is set —
+  that column was collected in the form, stored, and read by nothing, so a client
+  company found out by asking. Best-effort and after the write: a mail hiccup
+  must never fail a completion a driver is standing in a doorway waiting on.
+- **Proof of delivery is downloadable**, not just viewable:
+  `/api/admin/pod?...&download=1&name=<label>` sets Content-Disposition, the card
+  has a ⤓ per item and a "save all", and the filename is the job + order, never a
+  blob id. It has to be able to leave the building for a damage claim.
+- **Places autocomplete is per INPUT, not per form** (`attachAutocomplete(e, which)`).
+  The pickup end of a transfer is a real address somebody has to find; it was
+  being typed by hand while the drop-off got autocomplete.
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of

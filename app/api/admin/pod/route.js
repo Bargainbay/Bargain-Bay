@@ -31,10 +31,20 @@ export async function GET(req) {
   try {
     const res = await get(pathname, { access: 'private' });
     if (!res || res.statusCode !== 200 || !res.stream) return new NextResponse('Not found', { status: 404 });
+    // ?download=1 makes the browser SAVE the file instead of rendering it in a
+    // tab. Proof of delivery routinely has to leave the building — attached to a
+    // damage claim, or emailed to the client who is arguing about it — and
+    // "right-click, Save image as" is not a thing on the phone the office is
+    // holding. The name is the job/order it belongs to, not a blob id.
+    const download = url.searchParams.get('download') === '1';
+    const ext = (res.blob?.contentType || '').includes('png') ? 'png' : 'jpg';
+    const label = String(url.searchParams.get('name') || '').replace(/[^\w.-]+/g, '-').slice(0, 60)
+      || `pod-${photoId || sigOrder || jobPhotoId || jobSig}`;
     return new Response(res.stream, {
       headers: {
         'Content-Type': res.blob?.contentType || 'application/octet-stream',
-        'Cache-Control': 'private, max-age=60'
+        'Cache-Control': 'private, max-age=60',
+        ...(download ? { 'Content-Disposition': `attachment; filename="${label}.${ext}"` } : {})
       }
     });
   } catch (e) {

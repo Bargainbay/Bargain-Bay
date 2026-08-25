@@ -126,7 +126,28 @@ function BoardColumn({ title, count, children, bodyKey }) {
   );
 }
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord }) {
+// A filename someone can find again six weeks later: the job, the order it came
+// from, and which photo — never a blob id.
+const podName = (job, what) =>
+  encodeURIComponent([job.jobNumber, job.orderNumber, what].filter(Boolean).join('-'));
+
+// Browsers only honour one programmatic download at a time, so they're spaced.
+function savePod(job) {
+  const items = [
+    ...(job.hasSignature ? [{ q: `jobsig=${job.id}`, what: 'signature' }] : []),
+    ...(job.photoIds || []).map((pid, i) => ({ q: `jobphoto=${pid}`, what: `photo-${i + 1}` }))
+  ];
+  items.forEach((it, i) => setTimeout(() => {
+    const a = document.createElement('a');
+    a.href = `/api/admin/pod?${it.q}&download=1&name=${podName(job, it.what)}`;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }, i * 400));
+}
+
+function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen }) {
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const closed = ['done', 'failed', 'cancelled'].includes(job.status);
@@ -209,13 +230,26 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
         <div className="disp-pod">
           Proof:{' '}
           {job.hasSignature && (
-            <a href={`/api/admin/pod?jobsig=${job.id}`} target="_blank" rel="noopener noreferrer">signature</a>
+            <>
+              <a href={`/api/admin/pod?jobsig=${job.id}`} target="_blank" rel="noopener noreferrer">signature</a>
+              <a className="disp-dl" title="Save the signature"
+                 href={`/api/admin/pod?jobsig=${job.id}&download=1&name=${podName(job, 'signature')}`}>⤓</a>
+            </>
           )}
           {job.photoIds?.map((pid, i) => (
             <span key={pid}>{(job.hasSignature || i > 0) ? ' · ' : ''}
               <a href={`/api/admin/pod?jobphoto=${pid}`} target="_blank" rel="noopener noreferrer">photo {i + 1}</a>
+              {/* ⤓ SAVES it. Proof of delivery has to be able to leave the
+                  building — attached to a damage claim, or sent to the client
+                  arguing about it — and "right-click, Save image as" is not a
+                  thing on the phone the office is holding. */}
+              <a className="disp-dl" title={`Save photo ${i + 1}`}
+                 href={`/api/admin/pod?jobphoto=${pid}&download=1&name=${podName(job, `photo-${i + 1}`)}`}>⤓</a>
             </span>
           ))}
+          {job.photoIds?.length > 1 && (
+            <button type="button" className="disp-dl-all" onClick={() => savePod(job)}>save all</button>
+          )}
         </div>
       )}
 
@@ -227,12 +261,25 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
         <div className="disp-actions">
           <label>
             Driver
-            <select value={job.driverId || ''} disabled={busy}
+            <select value={job.driverId || ''} disabled={busy || closed}
               onChange={(e) => onAssign(job.id, { driverId: e.target.value || null })}>
               <option value="">Unassigned</option>
               {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </label>
+          {/* Moving a stop to another day was only possible by cancelling it and
+              typing it in again. A customer rescheduling is the single most
+              ordinary thing that happens to a delivery. */}
+          <label>
+            Day
+            <input type="date" value={job.jobDate || ''} disabled={busy || closed}
+              onChange={(e) => onAssign(job.id, { jobDate: e.target.value || null })} />
+          </label>
+          {closed && (
+            <span className="disp-closed-note">
+              {STATUS_LABEL[job.status]} — reopen it to change the driver or the day.
+            </span>
+          )}
           {job.phone && <a className="btn" href={`tel:${job.phone}`}>Call</a>}
           <a className="btn" target="_blank" rel="noopener noreferrer"
              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent([job.address, job.city, job.postal].filter(Boolean).join(', '))}`}>
@@ -250,6 +297,11 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
               <button type="button" className="btn" disabled={busy} onClick={() => onStatus(job.id, 'failed')}>Couldn&apos;t complete</button>
               <button type="button" className="btn danger" disabled={busy} onClick={() => onCancel(job.id)}>Cancel</button>
             </>
+          )}
+          {closed && (
+            <button type="button" className="btn" disabled={busy} onClick={() => onReopen(job.id)}>
+              Reopen
+            </button>
           )}
           {job.notes && <p className="disp-notes">{job.notes}</p>}
         </div>
@@ -296,7 +348,11 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     } finally { setBusy(false); }
   }
 
+  // jobDate defaults to the day being looked at, but an explicit one in `patch`
+  // wins — that's what makes the Day picker able to move a stop off this board.
   const onAssign = (jobId, patch) => send('PATCH', { action: 'assign', jobId, jobDate: board.date, ...patch });
+
+  const onReopen = (jobId) => send('PATCH', { action: 'reopen', jobId });
 
   // The pull used to refresh in silence, so an order it declined to take looked
   // exactly like an order it had taken. It now says what it did and, for
@@ -563,7 +619,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
           {unassignedToday.map((j) => (
             <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
               onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-              onRecord={onRecord} />
+              onRecord={onRecord} onReopen={onReopen} />
           ))}
           {board.unscheduled.length > 0 && (
             <>
@@ -582,6 +638,21 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             <h3 className="disp-col-head">No drivers yet</h3>
             <p className="hint">Add a driver under Operations, then they&apos;ll get a column here.</p>
           </section>
+        )}
+
+        {board.cancelled?.length > 0 && (
+          // Cancelled stops used to disappear from the board completely, which
+          // is indistinguishable from being deleted — and a cancelled BB job
+          // still blocks that order from being pulled in again. They stay,
+          // greyed, with the button that undoes it.
+          <BoardColumn title="Cancelled" count={board.cancelled.length}
+            bodyKey={String(board.cancelled.length)}>
+            {board.cancelled.map((j) => (
+              <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
+                onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
+                onRecord={onRecord} onReopen={onReopen} />
+            ))}
+          </BoardColumn>
         )}
 
         {board.drivers.map((d) => {
