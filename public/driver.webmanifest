@@ -6,8 +6,8 @@
   "scope": "/driver",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F5F3EF",
-  "theme_color": "#3A3937",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0E223B",
   "icons": [
     {
       "src": "/driver-icon-192.png",
@@ -22,7 +22,7 @@
       "purpose": "any"
     },
     {
-      "src": "/driver-icon-512.png",
+      "src": "/driver-icon-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
