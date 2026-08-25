@@ -221,6 +221,28 @@ the paper run sheet that replaces it.
   June still gets delivered in August. If the order has no address — every
   **pickup** order has none — it asks for one and puts it on the JOB, not back
   onto the order: the customer still bought it as a pickup, we're just driving it.
+- **The driver's sign-in link takes TWO steps on purpose.** `GET /d/<token>`
+  only ASKS ("Sign in on this phone"); the button POSTs and that is what spends
+  the token. A GET used to redeem it, so the preview card iMessage/WhatsApp
+  builds by fetching the URL was burning the link before the driver's thumb got
+  there — the session went to a crawler and the driver saw "already used".
+  Crawlers don't POST. `peekDriverSignInLink` reads the link without spending it;
+  the POST redirect is **303** (a 307 replays the POST at /driver → 405).
+- **A driver's session belongs to the host the link opened** (`dispatch.rssolutions.ca`)
+  — the cookie is host-only and bargainbay.ca can never see it. `/driver` says so
+  when signed out rather than implying the driver isn't set up.
+- **Photos can be added AFTER close-out.** `POST /api/driver/jobs` with
+  `mode=photos` stores pictures and nothing else — no completion, no signature,
+  no delivered email (re-saying it would email the customer twice). Batches
+  dedupe on `job_photos.ref` (NOT unique — one batch is several rows), checked
+  before anything is written. The pictures are the part of a stop a driver
+  remembers after walking away from it.
+- **Never put `capture` on a photo input.** On iOS it makes the input
+  camera-ONLY — no library, and `multiple` ignored — so a driver who shot the
+  delivery with the normal Camera app cannot attach it. Offer two buttons.
+  Decoding goes through `components/photo-pick.js`: `createImageBitmap` first,
+  an `<img>` fallback (iPhone HEIC), then the original file if the shrink fails,
+  and failures are COUNTED and shown, never swallowed.
 - **The balance is collected from the job card.** PATCH `action: 'record_payment'`
   → `jobInvoiceForPayment` → `recordInvoicePayment` on the ORDER'S invoice, so
   there is one money ledger and not a dispatch copy of one; the job gets a

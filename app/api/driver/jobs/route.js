@@ -4,7 +4,7 @@ import { getSession } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
 import { isDriver, touchDriverSeen } from '../../../../lib/drivers';
 import {
-  driverJobs, jobBelongsToDriver, podAlreadyRecorded,
+  driverJobs, jobBelongsToDriver, podAlreadyRecorded, photoBatchRecorded, jobPhotoCount,
   saveJobSignature, addJobPhoto, markOrderDeliveredForJob
 } from '../../../../lib/driver-jobs';
 import { setJobStatus, completeJob, jobInvoiceForPayment, noteJobEvent } from '../../../../lib/jobs';
@@ -98,11 +98,17 @@ export async function POST(req) {
   if (!(await jobBelongsToDriver(jobId, s.userId))) {
     return NextResponse.json({ error: 'That stop is not assigned to you.' }, { status: 403 });
   }
-  // The offline queue can send the same completion twice. The second one is
-  // answered, not written — otherwise a lost signal costs the customer a
-  // duplicate set of photos and the office a duplicate stop history.
-  if (ref && await podAlreadyRecorded(jobId, ref)) {
-    return NextResponse.json({ ok: true, duplicate: true });
+  // Two shapes come through here: a completion, and photos added to a stop that
+  // is already finished. The second exists because the pictures are the one part
+  // of a stop a driver reliably remembers AFTER walking away from it — and the
+  // alternative is the office asking them to text photos to a phone.
+  const photosOnly = String(form.get('mode') || '') === 'photos';
+
+  // The offline queue can send the same thing twice. The second one is answered,
+  // not written — otherwise a lost signal costs the customer a duplicate set of
+  // photos and the office a duplicate stop history.
+  if (ref && await (photosOnly ? photoBatchRecorded(jobId, ref) : podAlreadyRecorded(jobId, ref))) {
+    return NextResponse.json({ ok: true, duplicate: true, photoCount: await jobPhotoCount(jobId) });
   }
 
   const { rows: j } = await query('SELECT job_number, type FROM jobs WHERE id = $1', [jobId]);
@@ -110,6 +116,28 @@ export async function POST(req) {
 
   const signature = form.get('signature');
   const photos = form.getAll('photos').filter((f) => f && typeof f === 'object' && f.size > 0);
+
+  // Photos onto an already-closed stop: store them and nothing else. No
+  // completion, no signature, no delivered email — the stop already said all of
+  // that, and re-saying it would email the customer twice.
+  if (photosOnly) {
+    if (!photos.length) return NextResponse.json({ error: 'No photos in that.' }, { status: 400 });
+    try {
+      const base = `pod/jobs/${j[0].job_number}`;
+      const already = await jobPhotoCount(jobId);
+      for (let i = 0; i < photos.length && i < 8; i++) {
+        const p = photos[i];
+        const r = await put(`${base}/photo-${already + i}.jpg`, p, {
+          access: 'private', addRandomSuffix: true, contentType: p.type || 'image/jpeg'
+        });
+        await addJobPhoto(jobId, r.url, r.pathname, ref || null);
+      }
+      return NextResponse.json({ ok: true, added: photos.length, photoCount: await jobPhotoCount(jobId) });
+    } catch (e) {
+      console.error('late photo upload failed', e?.message || e);
+      return NextResponse.json({ error: e?.message || 'Could not save those.' }, { status: 500 });
+    }
+  }
 
   try {
     const base = `pod/jobs/${j[0].job_number}`;

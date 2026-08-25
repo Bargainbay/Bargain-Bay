@@ -6,6 +6,10 @@ import DriverStops from '../../components/DriverStops';
 import DriverShell from '../../components/DriverShell';
 
 export const dynamic = 'force-dynamic';
+
+// Where a driver's link lands them, and therefore the only host their sign-in
+// is good for. Same source as the link the office texts.
+const DRIVER_HOST = (process.env.DISPATCH_HOSTS || 'dispatch.rssolutions.ca').split(',')[0].trim();
 export const metadata = {
   title: 'My stops',
   robots: { index: false },
@@ -33,6 +37,14 @@ export default async function DriverPage({ searchParams }) {
             {sp?.link === 'expired'
               ? 'That link has already been used or has expired — ask the office to text you a new one.'
               : 'Ask the office to text you your sign-in link. Tapping it once signs this phone in for good.'}
+          </p>
+          {/* The sign-in cookie belongs to the host the LINK opened, and the link
+              is texted on the RS address. Somebody who reaches this page from
+              bargainbay.ca is signed in — just not here — and without this line
+              the page tells them the opposite. */}
+          <p className="hint" style={{ marginTop: 8 }}>
+            Your link opens <b>{DRIVER_HOST}</b>. If you got here another way, open it from the text
+            message instead — a bookmark to a different address won&apos;t know you.
           </p>
         </div>
       </DriverShell>
