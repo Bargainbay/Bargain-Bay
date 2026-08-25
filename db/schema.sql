@@ -443,3 +443,15 @@ ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS order_id int REFERENCES ord
 -- counts it twice.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pay_amount numeric(10,2);
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pay_note   text;
+
+-- What we CHARGE the client (pay_amount is what the job costs us). invoice_id is
+-- what stops a job being billed twice.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS charge_amount numeric(10,2);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS charge_note   text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS invoice_id    int REFERENCES invoices(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_jobs_invoice ON jobs(invoice_id) WHERE invoice_id IS NOT NULL;
+-- A transfer runs FROM one address TO another — five pieces out of Mississauga
+-- into Burlington is one job with two ends, and the driver needs both.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_address text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_city    text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_postal  text;

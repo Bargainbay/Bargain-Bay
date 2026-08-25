@@ -38,6 +38,13 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
   const [city, setCity] = useState('');
   const [postal, setPostal] = useState('');
   const [coords, setCoords] = useState({ lat: null, lng: null });
+  // A transfer runs from one address to another — five pieces out of Mississauga
+  // into Burlington is one job with two ends, and the driver needs both.
+  const [isTransfer, setIsTransfer] = useState(false);
+  const [pickupAddress, setPickupAddress] = useState('');
+  const [pickupCity, setPickupCity] = useState('');
+  const [pickupPostal, setPickupPostal] = useState('');
+  const [chargeAmount, setChargeAmount] = useState('');
   const [jobDate, setJobDate] = useState(date || '');
   const [windowStart, setWindowStart] = useState('');
   const [windowEnd, setWindowEnd] = useState('');
@@ -165,6 +172,10 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           windowStart: windowStart || null,
           windowEnd: windowEnd || null,
           shipmentType: shipmentType || null, services, appliance, issue,
+          pickupAddress: isTransfer ? pickupAddress : null,
+          pickupCity: isTransfer ? pickupCity : null,
+          pickupPostal: isTransfer ? pickupPostal : null,
+          chargeAmount: chargeAmount === '' ? null : Number(chargeAmount),
           orderId: type === 'service_call' && who === 'bb' && orderId ? orderId : null,
           source: type === 'service_call' && who === 'bb' ? 'bargain_bay' : 'manual',
           driverId: driverId || null,
@@ -281,7 +292,27 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
       </div>
 
       <div className="field">
-        <label>Address *</label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 400, fontSize: 13.5 }}>
+          <input type="checkbox" style={{ width: 'auto' }} checked={isTransfer}
+            onChange={(e) => setIsTransfer(e.target.checked)} />
+          Picking up from one address and dropping at another
+        </label>
+      </div>
+
+      {isTransfer && (
+        <div className="field">
+          <label>Pick up from</label>
+          <input value={pickupAddress} onChange={(e) => setPickupAddress(e.target.value)}
+            placeholder="Street address we're collecting from" autoComplete="off" />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input value={pickupCity} onChange={(e) => setPickupCity(e.target.value)} placeholder="City" />
+            <input style={{ width: 150 }} value={pickupPostal} onChange={(e) => setPickupPostal(e.target.value)} placeholder="Postal code" />
+          </div>
+        </div>
+      )}
+
+      <div className="field">
+        <label>{isTransfer ? 'Deliver to *' : 'Address *'}</label>
         <input required onFocus={attachAutocomplete} autoComplete="off" value={address}
           onChange={(e) => { setAddress(e.target.value); setCoords({ lat: null, lng: null }); }}
           placeholder={hasMaps ? 'Start typing the street address…' : 'Street address'} />
@@ -386,6 +417,15 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
             <option value="">Assign later</option>
             {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
+        </div>
+      </div>
+
+      <div className="field">
+        <label>What we&apos;re charging the client (optional)</label>
+        <input type="number" min="0" step="0.01" inputMode="decimal" style={{ width: 150 }}
+          value={chargeAmount} onChange={(e) => setChargeAmount(e.target.value)} placeholder="150.00" />
+        <div className="hint">
+          Leave it blank and set it later on the Billing tab. It only bills once the job is finished.
         </div>
       </div>
 

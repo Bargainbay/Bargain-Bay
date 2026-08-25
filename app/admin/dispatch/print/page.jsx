@@ -103,7 +103,10 @@ export default async function RunSheetPage({ searchParams }) {
                   <td>
                     <strong>{j.customerName || '(no name)'}</strong>
                     {j.phone ? ` · ${j.phone}` : ''}<br />
-                    {[j.address, j.city, j.postal].filter(Boolean).join(', ')}
+                    {j.pickupAddress
+                      ? <><b>FROM</b> {[j.pickupAddress, j.pickupCity].filter(Boolean).join(', ')}<br />
+                          <b>TO</b> {[j.address, j.city, j.postal].filter(Boolean).join(', ')}</>
+                      : [j.address, j.city, j.postal].filter(Boolean).join(', ')}
                     {j.notes ? <><br /><span className="note">{j.notes}</span></> : null}
                   </td>
                   <td>
