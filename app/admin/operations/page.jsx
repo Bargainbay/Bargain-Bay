@@ -10,6 +10,7 @@ import { podPhotosForOrders } from '../../../lib/pod';
 import { listSalvage } from '../../../lib/salvage';
 import { listReps } from '../../../lib/reps';
 import AdminNav from '../../../components/AdminNav';
+import OpsSection from '../../../components/OpsSection';
 import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
 import AdminClearance from '../AdminClearance';
@@ -121,24 +122,49 @@ export default async function OperationsPage() {
           Could not read all tables — if you just deployed a new feature, run the schema migration below.
         </div>
       )}
-      <AdminOrders initialOrders={orders} drivers={drivers} reps={reps} />
-      <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
-          Items waiting to be added{pendingIntake.length ? ` (${pendingIntake.length})` : ''}
-        </h2>
+      {/* Nine tools stacked end to end, and on most days you want one of them.
+          Each fold remembers itself; orders start open because that is what the
+          page is for. */}
+      <OpsSection id="orders" title="Orders" count={orders.length} defaultOpen>
+        <AdminOrders initialOrders={orders} drivers={drivers} reps={reps} />
+      </OpsSection>
+
+      <OpsSection id="intake-queue" title="Items waiting to be added" count={pendingIntake.length}>
         <IntakeQueue initialPending={pendingIntake} />
-      </div>
-      <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Add stock from a purchase invoice</h2>
+      </OpsSection>
+
+      <OpsSection id="purchase-intake" title="Add stock from a purchase invoice">
         <PurchaseIntake />
-      </div>
-      <AdminIntake />
-      <AdminReconcile initialItems={sold} />
-      <AdminSalvage initial={salvage} />
-      <AdminDrivers initialDrivers={drivers} />
-      <AdminMembers initialMembers={members} />
-      <AdminClearance initialItems={clearance} />
-      <AdminTools initialReservations={reservations} />
+      </OpsSection>
+
+      <OpsSection id="intake" title="Inventory intake">
+        <AdminIntake />
+      </OpsSection>
+
+      <OpsSection id="reconcile" title="Tracker reconciliation" count={sold.length}>
+        <AdminReconcile initialItems={sold} />
+      </OpsSection>
+
+      <OpsSection id="salvage" title="Salvage / parts units" count={salvage?.stats?.availableCount}>
+        <AdminSalvage initial={salvage} />
+      </OpsSection>
+
+      <OpsSection id="drivers" title="Delivery drivers" count={drivers.length}>
+        <AdminDrivers initialDrivers={drivers} />
+      </OpsSection>
+
+      <OpsSection id="members" title="Member applications"
+        count={members.filter((m) => m.member_status === 'pending').length}>
+        <AdminMembers initialMembers={members} />
+      </OpsSection>
+
+      <OpsSection id="clearance" title="Clearance" count={clearance.filter((c) => c.active).length}>
+        <AdminClearance initialItems={clearance} />
+      </OpsSection>
+
+      <OpsSection id="tools" title="Reservations & tools" count={reservations.length}>
+        <AdminTools initialReservations={reservations} />
+      </OpsSection>
     </div>
   );
 }
