@@ -4,6 +4,7 @@ import { isDriver, touchDriverSeen } from '../../lib/drivers';
 import { driverJobs } from '../../lib/driver-jobs';
 import DriverStops from '../../components/DriverStops';
 import DriverShell from '../../components/DriverShell';
+import AddToHome from '../../components/AddToHome';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,11 +57,10 @@ export default async function DriverPage({ searchParams }) {
 
   return (
     <DriverShell>
-      {sp?.welcome === '1' && (
-        <div className="drv-welcome">
-          You&apos;re signed in. Tap <b>Share → Add to Home Screen</b> to keep this a tap away.
-        </div>
-      )}
+      {/* Which phone this is decides the instructions — see AddToHome. Naming
+          iPhone Safari's Share button to an Android driver just tells them the
+          app is broken. */}
+      <AddToHome welcome={sp?.welcome === '1'} />
       <DriverStops initial={initial} driverName={session.name || ''} />
     </DriverShell>
   );

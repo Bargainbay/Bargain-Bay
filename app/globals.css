@@ -948,7 +948,13 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .drv-welcome, .drv-offline, .drv-sending {
   border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 15px; line-height: 1.35;
 }
-.drv-welcome { background: var(--okbg); color: var(--ok); font-weight: 600; }
+.drv-welcome { background: var(--okbg); color: var(--ok); font-weight: 600; position: relative; padding-right: 34px; }
+.drv-welcome .drv-btn { margin-top: 8px; }
+.drv-welcome-x {
+  position: absolute; top: 4px; right: 6px; background: none; border: none;
+  font: inherit; font-size: 16px; line-height: 1; padding: 4px 6px; cursor: pointer;
+  color: inherit; opacity: .7;
+}
 /* Losing signal is normal, not an error — say what happens next, don't alarm. */
 .drv-offline { background: var(--warnbg); color: var(--warn); font-weight: 700; }
 .drv-sending { background: var(--tint); color: var(--charcoal); font-weight: 600; }

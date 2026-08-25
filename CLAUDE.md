@@ -350,6 +350,15 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
 - PWA: `public/driver.webmanifest` + `public/driver-sw.js` (shell only —
   network-first for the page, never caches `/api`). Installed via **Add to Home
   Screen**; there is no app store and no native build.
+- **Never hard-code "Share → Add to Home Screen".** That is the iPhone-Safari
+  answer to a question four phones answer four ways, and a driver who cannot find
+  the button we named concludes the app is broken (it happened). `AddToHome.jsx`
+  asks the phone: Android Chrome gets a real **Install** button off
+  `beforeinstallprompt` (⋮ → Add to Home screen as the fallback), iPhone Safari
+  gets the Share icon plus "no bar at the bottom? tap the bottom edge" (it hides
+  on scroll), an in-app browser (WhatsApp/Facebook/Instagram, or Chrome/Firefox
+  on iOS) is told to reopen in the real browser and offered a copy-link button,
+  and an already-installed app is told nothing at all.
 
 ## Two businesses, one codebase — BRANDS
 Bargain Bay is the consumer storefront. **RS Solutions is the delivery/service

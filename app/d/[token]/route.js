@@ -49,7 +49,7 @@ export async function GET(req, { params }) {
     `<h1>Hi ${name}</h1>
      <p>Tap below to sign this phone in. You will stay signed in — no password, ever.</p>
      <form method="POST"><button type="submit">Sign in on this phone</button></form>
-     <p class="hint">Then use Share → Add to Home Screen, and it opens like an app.</p>`
+     <p class="hint">It will show you how to keep it on your home screen.</p>`
   );
 }
 
