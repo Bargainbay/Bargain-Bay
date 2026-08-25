@@ -393,3 +393,39 @@ CREATE INDEX IF NOT EXISTS idx_jobs_status      ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_order       ON jobs(order_id) WHERE order_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_job_items_job    ON job_items(job_id);
 CREATE INDEX IF NOT EXISTS idx_job_events_job   ON job_events(job_id);
+
+-- ── Service tickets ─────────────────────────────────────────────────────────
+-- A ticket is the CUSTOMER'S PROBLEM; a job is one visit against it. They are
+-- separate because a service call routinely takes more than one trip — diagnose,
+-- order the part, come back — and "how many open service calls do we have" has
+-- to count problems, not visits, or every revisit inflates the number.
+CREATE TABLE IF NOT EXISTS service_tickets (
+  id            serial PRIMARY KEY,
+  ticket_number text UNIQUE,                      -- 'SC-' || (1000 + id)
+  client_id     int REFERENCES clients(id) ON DELETE SET NULL,
+  customer_name text, phone text, email text,
+  address text, city text, postal text,
+  appliance     text,                             -- what it is
+  issue         text,                             -- what's wrong, as reported
+  status        text NOT NULL DEFAULT 'open'
+                CHECK (status IN ('open','awaiting_parts','scheduled','resolved','closed','cancelled')),
+  priority      text NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal','urgent')),
+  opened_at     timestamptz NOT NULL DEFAULT now(),
+  closed_at     timestamptz,
+  created_by    text, created_by_name text
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON service_tickets(status);
+
+-- A visit belongs to a ticket; deliveries have none.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ticket_id     int REFERENCES service_tickets(id) ON DELETE SET NULL;
+-- What kind of run it is — free text with suggestions rather than a fixed list,
+-- because each client company words this differently.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS shipment_type text;
+-- Service visit record.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS time_in       timestamptz;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS time_out      timestamptz;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS outcome       text;   -- fixed | not_fixed | parts_needed | pending | no_fault
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS parts_used    text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS parts_needed  text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS signed_by     text;
+CREATE INDEX IF NOT EXISTS idx_jobs_ticket ON jobs(ticket_id) WHERE ticket_id IS NOT NULL;

@@ -5,12 +5,17 @@ import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
 // Putting a job on the board, usually while the customer is still on the phone.
 // Address is the only required field — everything else can be filled in later,
 // and forcing it up front is how you end up back on paper.
-const WINDOWS = [
-  { key: 'am', label: 'Morning · 8–12' },
-  { key: 'pm', label: 'Afternoon · 12–4' },
-  { key: 'eve', label: 'Evening · 4–8' },
-  { key: 'allday', label: 'Any time · 8–8' },
-  { key: 'custom', label: 'Custom…' }
+// The team sets the window per job and it can start at any hour, so the real
+// input is two clocks. These are just one-tap fills for the common ones.
+const QUICK_WINDOWS = [
+  { label: '8–12', start: '08:00', end: '12:00' },
+  { label: '12–4', start: '12:00', end: '16:00' },
+  { label: '4–8', start: '16:00', end: '20:00' },
+  { label: 'All day', start: '08:00', end: '20:00' }
+];
+const SHIPMENT_TYPES = [
+  'Delivery only', 'Delivery + install', 'Delivery + haul away',
+  'Exchange / swap', 'Return pickup', 'Parts drop-off', 'Warranty call'
 ];
 
 export default function JobForm({ date, clients = [], drivers = [], canManageClients, onDone }) {
@@ -24,9 +29,11 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
   const [postal, setPostal] = useState('');
   const [coords, setCoords] = useState({ lat: null, lng: null });
   const [jobDate, setJobDate] = useState(date || '');
-  const [windowKey, setWindowKey] = useState('allday');
-  const [windowStart, setWindowStart] = useState('09:00');
-  const [windowEnd, setWindowEnd] = useState('12:00');
+  const [windowStart, setWindowStart] = useState('');
+  const [windowEnd, setWindowEnd] = useState('');
+  const [shipmentType, setShipmentType] = useState('');
+  const [appliance, setAppliance] = useState('');
+  const [issue, setIssue] = useState('');
   const [driverId, setDriverId] = useState('');
   const [what, setWhat] = useState('');
   const [notes, setNotes] = useState('');
@@ -77,9 +84,9 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           type, clientId: clientId || null, customerName, phone, email,
           address, city, postal, lat: coords.lat, lng: coords.lng,
           jobDate: jobDate || null,
-          windowKey: windowKey === 'custom' ? null : windowKey,
-          windowStart: windowKey === 'custom' ? windowStart : null,
-          windowEnd: windowKey === 'custom' ? windowEnd : null,
+          windowStart: windowStart || null,
+          windowEnd: windowEnd || null,
+          shipmentType, appliance, issue,
           driverId: driverId || null,
           notes,
           items: what.split(',').map((s) => s.trim()).filter(Boolean).map((d) => ({ description: d }))
@@ -147,11 +154,44 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
         </div>
       </div>
 
-      <div className="field">
-        <label>What&apos;s going / what&apos;s the call</label>
-        <input value={what} onChange={(e) => setWhat(e.target.value)}
-          placeholder="Whirlpool fridge, Maytag washer — separate with commas" />
-      </div>
+      {type === 'service_call' ? (
+        <>
+          <div className="form-2col">
+            <div className="field">
+              <label>Appliance</label>
+              <input value={appliance} onChange={(e) => setAppliance(e.target.value)}
+                placeholder="Whirlpool WRS321SDHZ fridge" />
+            </div>
+            <div className="field">
+              <label>Shipment / call type</label>
+              <input list="shipment-types" value={shipmentType} onChange={(e) => setShipmentType(e.target.value)}
+                placeholder="Warranty call" />
+            </div>
+          </div>
+          <div className="field">
+            <label>Reported problem</label>
+            <input value={issue} onChange={(e) => setIssue(e.target.value)}
+              placeholder="Not cooling, fan noise from the back" />
+            <div className="hint">Opens a service ticket. It stays open across as many visits as it takes.</div>
+          </div>
+        </>
+      ) : (
+        <div className="form-2col">
+          <div className="field">
+            <label>What&apos;s going</label>
+            <input value={what} onChange={(e) => setWhat(e.target.value)}
+              placeholder="Whirlpool fridge, Maytag washer — separate with commas" />
+          </div>
+          <div className="field">
+            <label>Shipment type</label>
+            <input list="shipment-types" value={shipmentType} onChange={(e) => setShipmentType(e.target.value)}
+              placeholder="Delivery + install" />
+          </div>
+        </div>
+      )}
+      <datalist id="shipment-types">
+        {SHIPMENT_TYPES.map((t) => <option key={t} value={t} />)}
+      </datalist>
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
         <div className="field" style={{ marginBottom: 0 }}>
@@ -159,20 +199,25 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           <input style={{ width: 165 }} type="date" value={jobDate} onChange={(e) => setJobDate(e.target.value)} />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label>Delivery window</label>
-          <select style={{ width: 190 }} value={windowKey} onChange={(e) => setWindowKey(e.target.value)}>
-            {WINDOWS.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
-          </select>
-        </div>
-        {windowKey === 'custom' && (
-          <div className="field" style={{ marginBottom: 0 }}>
-            <label>From / to</label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input style={{ width: 110 }} type="time" value={windowStart} onChange={(e) => setWindowStart(e.target.value)} />
-              <input style={{ width: 110 }} type="time" value={windowEnd} onChange={(e) => setWindowEnd(e.target.value)} />
-            </div>
+          <label>Window we promised</label>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <input style={{ width: 118 }} type="time" value={windowStart} aria-label="Window start"
+              onChange={(e) => setWindowStart(e.target.value)} />
+            <span style={{ color: 'var(--muted)' }}>to</span>
+            <input style={{ width: 118 }} type="time" value={windowEnd} aria-label="Window end"
+              onChange={(e) => setWindowEnd(e.target.value)} />
           </div>
-        )}
+          <div style={{ display: 'flex', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
+            {QUICK_WINDOWS.map((w) => (
+              <button key={w.label} type="button" className="btn" style={{ padding: '3px 9px', fontSize: 11.5 }}
+                onClick={() => { setWindowStart(w.start); setWindowEnd(w.end); }}>{w.label}</button>
+            ))}
+            {(windowStart || windowEnd) && (
+              <button type="button" className="btn" style={{ padding: '3px 9px', fontSize: 11.5 }}
+                onClick={() => { setWindowStart(''); setWindowEnd(''); }}>Clear</button>
+            )}
+          </div>
+        </div>
         <div className="field" style={{ marginBottom: 0 }}>
           <label>Driver (optional)</label>
           <select style={{ width: 175 }} value={driverId} onChange={(e) => setDriverId(e.target.value)}>

@@ -803,3 +803,11 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
   .disp-col { width: 100%; flex: none; margin-bottom: 12px; }
   .disp-bar-actions { width: 100%; }
 }
+
+/* Service visit close-out */
+.svc-form .svc-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.svc-form label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 10px; }
+.svc-form .svc-row label { margin-bottom: 0; }
+.svc-form .svc-row input { width: 130px; }
+.svc-form .svc-block { display: block; }
+.svc-form .hint { display: block; margin-top: 3px; }

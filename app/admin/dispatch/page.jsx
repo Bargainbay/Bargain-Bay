@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
-import { dispatchBoard, torontoToday } from '../../../lib/jobs';
+import { dispatchBoard, torontoToday, openTicketCount } from '../../../lib/jobs';
 import AdminNav from '../../../components/AdminNav';
 import DispatchBoard from '../../../components/DispatchBoard';
 
@@ -22,10 +22,12 @@ export default async function DispatchPage({ searchParams }) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(sp?.date || '')) ? String(sp.date) : torontoToday();
 
   let board = { date, jobs: [], unscheduled: [], drivers: [], clients: [] };
+  let openTickets = 0;
   let loadError = '';
   if (hasDb()) {
-    try { board = await dispatchBoard(date); }
-    catch (e) { loadError = e?.message || 'Could not load the board.'; }
+    try {
+      [board, openTickets] = await Promise.all([dispatchBoard(date), openTicketCount()]);
+    } catch (e) { loadError = e?.message || 'Could not load the board.'; }
   }
 
   return (
@@ -42,7 +44,7 @@ export default async function DispatchPage({ searchParams }) {
       )}
       {loadError && <div className="error-box">{loadError}</div>}
 
-      <DispatchBoard initial={board} canManageClients={isAdmin(session)} />
+      <DispatchBoard initial={board} canManageClients={isAdmin(session)} openTickets={openTickets} />
     </div>
   );
 }

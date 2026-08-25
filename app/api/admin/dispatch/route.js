@@ -3,7 +3,8 @@ import { getSession, isAdmin, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
-  upsertClient, importReadyBargainBayOrders, dispatchBoard
+  upsertClient, importReadyBargainBayOrders, dispatchBoard,
+  completeServiceVisit, setTicketStatus, listTickets
 } from '../../../../lib/jobs';
 
 export const dynamic = 'force-dynamic';
@@ -25,9 +26,12 @@ export async function GET(req) {
   const s = await staff();
   if (!s) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return noDb();
-  const date = new URL(req.url).searchParams.get('date') || '';
+  const sp = new URL(req.url).searchParams;
   try {
-    return NextResponse.json(await dispatchBoard(date));
+    if (sp.get('view') === 'tickets') {
+      return NextResponse.json(await listTickets({ status: sp.get('status') || 'open_states' }));
+    }
+    return NextResponse.json(await dispatchBoard(sp.get('date') || ''));
   } catch (e) {
     return fail(e);
   }
@@ -65,6 +69,9 @@ export async function PATCH(req) {
   const jobId = Number(body.jobId);
 
   try {
+    if (body.action === 'ticket_status') {
+      return NextResponse.json({ ok: true, ticket: await setTicketStatus(body.ticketId, body.status, who(s)) });
+    }
     if (body.action === 'resequence') {
       return NextResponse.json({ ok: true, ...(await resequence(body.driverId, body.date, body.jobIds, who(s))) });
     }
@@ -74,6 +81,9 @@ export async function PATCH(req) {
     }
     if (body.action === 'status') {
       return NextResponse.json({ ok: true, job: await setJobStatus(jobId, body.status, body, who(s)) });
+    }
+    if (body.action === 'service_complete') {
+      return NextResponse.json({ ok: true, job: await completeServiceVisit(jobId, body, who(s)) });
     }
     if (body.action === 'cancel') {
       return NextResponse.json({ ok: true, job: await cancelJob(jobId, body.reason, who(s)) });

@@ -165,10 +165,21 @@ the paper run sheet that replaces it.
   it in `orders` would pollute every revenue query. A Bargain Bay delivery is a
   job that links back via `jobs.order_id`. See `lib/jobs.js`, tables `jobs` /
   `job_items` / `job_events` / `clients`.
-- **Delivery windows are promised to customers**, so they're first-class
-  (`window_start` / `window_end`, presets in `WINDOW_PRESETS`). This is why
-  routing (phase 3) must group stops by window and only optimise WITHIN a group —
-  a route may never be reordered across a promise.
+- **Delivery windows are promised to customers and set per job by the team —
+  they can start at ANY hour.** So an arbitrary `window_start` / `window_end` is
+  the real input; `WINDOW_PRESETS` are only one-tap shortcuts. Routing (phase 3)
+  therefore sorts by `window_start` and may only reorder stops whose windows
+  OVERLAP — a route can never be resequenced across a promise, which is what
+  keeps the cheap Directions API sufficient instead of the fleet solver.
+- **A service ticket is the customer's PROBLEM; a job is one visit against it**
+  (`service_tickets`, `jobs.ticket_id`). They're separate because a repair
+  routinely takes several trips, and "how many open service calls?" has to count
+  problems or every revisit inflates the number. `completeServiceVisit` records
+  time in/out, outcome, parts used/needed and who signed, and the OUTCOME is what
+  moves the ticket (`OUTCOME_TO_TICKET`): fixed/no-fault resolve it, parts_needed
+  parks it on `awaiting_parts`, not_fixed/pending leave it open.
+- `shipment_type` is **free text with suggestions**, not an enum — each client
+  company words it differently.
 - **Lat/lng is captured from the address autocomplete at entry time**, so routing
   never pays to geocode the same address twice. Keep that in any new job form.
 - **A failed stop is a real outcome** with a reason code (`FAIL_REASONS`), not an

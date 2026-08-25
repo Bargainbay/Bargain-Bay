@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import JobForm from './JobForm';
+import ServiceVisitForm from './ServiceVisitForm';
 
 // The day's run sheet, on screen. One unassigned pile plus a column per driver.
 // Assignment is by tap, not drag: drag is pleasant on a desktop and miserable on
@@ -29,7 +30,7 @@ const prettyDate = (iso) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' });
 const windowLabel = (j) => (j.windowStart && j.windowEnd ? `${j.windowStart}–${j.windowEnd}` : 'Any time');
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel }) {
+function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone }) {
   const [open, setOpen] = useState(false);
   const closed = ['done', 'failed', 'cancelled'].includes(job.status);
   return (
@@ -42,12 +43,20 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel }) {
       <div className="disp-addr">{[job.address, job.city].filter(Boolean).join(', ')}</div>
       <div className="disp-meta">
         <span className="disp-tag">{TYPE_LABEL[job.type] || job.type}</span>
+        {job.shipmentType && <span className="disp-tag">{job.shipmentType}</span>}
         {job.clientName && <span className="disp-tag">{job.clientName}</span>}
-        <span className="disp-num">{job.jobNumber}</span>
+        <span className="disp-num">{job.ticketNumber || job.jobNumber}</span>
       </div>
-      {job.items?.length > 0 && (
-        <div className="disp-items">{job.items.map((i) => i.description).join(' · ')}</div>
-      )}
+      {job.type === 'service_call'
+        ? (job.appliance || job.issue) && (
+            <div className="disp-items">
+              {job.appliance}{job.appliance && job.issue ? ' — ' : ''}{job.issue}
+            </div>
+          )
+        : job.items?.length > 0 && (
+            <div className="disp-items">{job.items.map((i) => i.description).join(' · ')}</div>
+          )}
+      {job.partsNeeded && <div className="disp-fail">Waiting on: {job.partsNeeded}</div>}
       {job.failReason && <div className="disp-fail">{FAIL_REASONS[job.failReason] || job.failReason}</div>}
 
       <button type="button" className="disp-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
@@ -71,7 +80,10 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel }) {
           </a>
           {!closed && (
             <>
-              <button type="button" className="btn" disabled={busy} onClick={() => onStatus(job.id, 'done')}>Mark done</button>
+              <button type="button" className="btn" disabled={busy}
+                onClick={() => (job.type === 'service_call' ? onServiceDone(job) : onStatus(job.id, 'done'))}>
+                {job.type === 'service_call' ? 'Close out visit' : 'Mark done'}
+              </button>
               <button type="button" className="btn" disabled={busy} onClick={() => onStatus(job.id, 'failed')}>Couldn&apos;t complete</button>
               <button type="button" className="btn danger" disabled={busy} onClick={() => onCancel(job.id)}>Cancel</button>
             </>
@@ -83,11 +95,12 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel }) {
   );
 }
 
-export default function DispatchBoard({ initial, canManageClients }) {
+export default function DispatchBoard({ initial, canManageClients, openTickets }) {
   const [board, setBoard] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [adding, setAdding] = useState(false);
+  const [closing, setClosing] = useState(null);   // the service visit being closed out
 
   async function refresh(date = board.date) {
     setErr('');
@@ -115,6 +128,11 @@ export default function DispatchBoard({ initial, canManageClients }) {
   }
 
   const onAssign = (jobId, patch) => send('PATCH', { action: 'assign', jobId, jobDate: board.date, ...patch });
+
+  async function onServiceComplete(payload) {
+    const ok = await send('PATCH', { action: 'service_complete', jobId: closing.id, ...payload });
+    if (ok) setClosing(null);
+  }
 
   function onStatus(jobId, status) {
     if (status !== 'failed') return send('PATCH', { action: 'status', jobId, status });
@@ -150,6 +168,9 @@ export default function DispatchBoard({ initial, canManageClients }) {
         </div>
         <div className="disp-bar-actions">
           <span className="hint" style={{ margin: 0 }}>{openCount} still to do</span>
+          <a className="btn" href="/admin/dispatch/tickets">
+            Service calls{typeof openTickets === 'number' ? ` (${openTickets})` : ''}
+          </a>
           <button type="button" className="btn" disabled={busy}
             title="Pull in Bargain Bay delivery orders that aren't on the board yet"
             onClick={() => send('POST', { action: 'import_bb' })}>Pull Bargain Bay orders</button>
@@ -161,6 +182,13 @@ export default function DispatchBoard({ initial, canManageClients }) {
       </div>
 
       {err && <div className="error-box">{err}</div>}
+
+      {closing && (
+        <div className="panel">
+          <ServiceVisitForm job={closing} busy={busy}
+            onSubmit={onServiceComplete} onCancel={() => setClosing(null)} />
+        </div>
+      )}
 
       {adding && (
         <div className="panel">
@@ -181,14 +209,14 @@ export default function DispatchBoard({ initial, canManageClients }) {
           )}
           {unassignedToday.map((j) => (
             <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
-              onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} />
+              onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing} />
           ))}
           {board.unscheduled.length > 0 && (
             <>
               <h4 className="disp-sub">No date yet</h4>
               {board.unscheduled.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
-                  onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} />
+                  onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing} />
               ))}
             </>
           )}
@@ -213,7 +241,7 @@ export default function DispatchBoard({ initial, canManageClients }) {
               {stops.length === 0 && <p className="hint">No stops on this day.</p>}
               {stops.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
-                  onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} />
+                  onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing} />
               ))}
             </section>
           );
