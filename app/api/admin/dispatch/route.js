@@ -11,7 +11,7 @@ import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
   upsertClient, importReadyBargainBayOrders, importOneBargainBayOrder, dispatchBoard,
   jobInvoiceForPayment, noteJobEvent,
-  setTicketStatus, listTickets,
+  setTicketStatus, listTickets, reopenJob,
   findServiceCustomers, ordersForServiceCall,
   completeJob, setJobPay, payReport, bookRevisit,
   setJobCharge, billingSummary, invoiceClientJobs
@@ -193,6 +193,11 @@ export async function PATCH(req) {
       // Money, so admin only — same line the rest of the app draws.
       if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set what a job pays.' }, { status: 403 });
       return NextResponse.json({ ok: true, job: await setJobPay(jobId, body, who(s)) });
+    }
+    // Putting a closed stop back on the board — the counterpart to Cancel and
+    // to a driver tapping Done on the wrong card.
+    if (body.action === 'reopen') {
+      return NextResponse.json({ ok: true, job: await reopenJob(jobId, who(s)) });
     }
     if (body.action === 'cancel') {
       return NextResponse.json({ ok: true, job: await cancelJob(jobId, body.reason, who(s)) });

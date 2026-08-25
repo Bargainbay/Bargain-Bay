@@ -857,6 +857,15 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .disp-pull-list li { margin: 2px 0; }
 .disp-notes { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; }
 .disp-pod { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+/* ⤓ saves the file instead of opening it. */
+.disp-dl { margin-left: 4px; text-decoration: none; font-weight: 700; }
+.disp-dl-all {
+  margin-left: 8px; background: none; border: none; padding: 0; cursor: pointer;
+  font: inherit; font-size: 12px; text-decoration: underline; color: inherit;
+}
+.disp-closed-note { font-size: 12px; color: var(--muted); flex: 1 1 100%; }
+.disp-actions input[type="date"] { width: auto; padding: 5px 7px; font-size: 12.5px; }
+
 .disp-pod a { text-decoration: underline; color: var(--charcoal); }
 .disp-toggle {
   background: none; border: none; padding: 4px 0 0; cursor: pointer;

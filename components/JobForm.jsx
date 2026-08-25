@@ -67,18 +67,22 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const acDone = useRef(false);
+  const acDone = useRef(new Set());
   const hasMaps = !!mapsKey();
 
   // Attach Places on first focus, and keep the coordinates it hands us — that's
   // what lets routing work later without paying to geocode the address again.
-  async function attachAutocomplete(e) {
-    if (acDone.current) return;
+  //
+  // Per INPUT, not once per form: the pickup end of a transfer is a real address
+  // somebody has to find, and it was being typed by hand while the drop-off got
+  // autocomplete. `acDone` is a Set of the fields already wired.
+  async function attachAutocomplete(e, which = 'drop') {
     const input = e.currentTarget;
+    if (acDone.current.has(which)) return;
     await loadGoogleMaps();
     const places = await placesReady();
-    if (acDone.current || !places || !input) return;
-    acDone.current = true;
+    if (acDone.current.has(which) || !places || !input) return;
+    acDone.current.add(which);
     try {
       const ac = new places.Autocomplete(input, {
         componentRestrictions: { country: 'ca' },
@@ -92,13 +96,19 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
         const street = [get('street_number'), get('route')].filter(Boolean).join(' ');
         const town = get('locality') || get('postal_town') || get('sublocality_level_1') || '';
         const code = get('postal_code', true);
+        if (which === 'pickup') {
+          if (street) setPickupAddress(street);
+          if (town) setPickupCity(town);
+          if (code) setPickupPostal(code);
+          return;                       // routing geocodes from the drop-off
+        }
         if (street) setAddress(street);
         if (town) setCity(town);
         if (code) setPostal(code);
         const loc = place?.geometry?.location;
         if (loc) setCoords({ lat: loc.lat(), lng: loc.lng() });
       });
-    } catch { acDone.current = false; }
+    } catch { acDone.current.delete(which); }
   }
 
   // Add a client without leaving the job you're in the middle of typing.
@@ -302,8 +312,10 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
       {isTransfer && (
         <div className="field">
           <label>Pick up from</label>
-          <input value={pickupAddress} onChange={(e) => setPickupAddress(e.target.value)}
-            placeholder="Street address we're collecting from" autoComplete="off" />
+          <input value={pickupAddress} onFocus={(e) => attachAutocomplete(e, 'pickup')}
+            onChange={(e) => setPickupAddress(e.target.value)}
+            placeholder={hasMaps ? 'Start typing the address we collect from…' : "Street address we're collecting from"}
+            autoComplete="off" />
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <input value={pickupCity} onChange={(e) => setPickupCity(e.target.value)} placeholder="City" />
             <input style={{ width: 150 }} value={pickupPostal} onChange={(e) => setPickupPostal(e.target.value)} placeholder="Postal code" />
@@ -313,7 +325,7 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
 
       <div className="field">
         <label>{isTransfer ? 'Deliver to *' : 'Address *'}</label>
-        <input required onFocus={attachAutocomplete} autoComplete="off" value={address}
+        <input required onFocus={(e) => attachAutocomplete(e, 'drop')} autoComplete="off" value={address}
           onChange={(e) => { setAddress(e.target.value); setCoords({ lat: null, lng: null }); }}
           placeholder={hasMaps ? 'Start typing the street address…' : 'Street address'} />
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
