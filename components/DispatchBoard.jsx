@@ -203,6 +203,22 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
       )}
       {job.failReason && <div className="disp-fail">{FAIL_REASONS[job.failReason] || job.failReason}</div>}
 
+      {/* What the driver captured at the door. Links, not thumbnails: the office
+          opens one when a customer disputes something, not on every card. */}
+      {(job.hasSignature || job.photoIds?.length > 0) && (
+        <div className="disp-pod">
+          Proof:{' '}
+          {job.hasSignature && (
+            <a href={`/api/admin/pod?jobsig=${job.id}`} target="_blank" rel="noopener noreferrer">signature</a>
+          )}
+          {job.photoIds?.map((pid, i) => (
+            <span key={pid}>{(job.hasSignature || i > 0) ? ' · ' : ''}
+              <a href={`/api/admin/pod?jobphoto=${pid}`} target="_blank" rel="noopener noreferrer">photo {i + 1}</a>
+            </span>
+          ))}
+        </div>
+      )}
+
       <button type="button" className="disp-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         {open ? 'Hide' : 'Actions'}
       </button>

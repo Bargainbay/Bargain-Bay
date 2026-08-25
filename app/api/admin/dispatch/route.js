@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
-import { setDriverByEmail } from '../../../../lib/drivers';
+import {
+  setDriverByEmail, addDriverByPhone, createDriverSignInLink,
+  listDriversForOffice, driverSmsNumber
+} from '../../../../lib/drivers';
+import { sendSms, smsConfigured } from '../../../../lib/sms';
+import { SITE_URL } from '../../../../lib/site';
 import { hasDb } from '../../../../lib/db';
 import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
@@ -48,6 +53,9 @@ export async function GET(req) {
     if (sp.get('view') === 'pay') {
       return NextResponse.json(await payReport({ from: sp.get('from'), to: sp.get('to') }));
     }
+    if (sp.get('view') === 'drivers') {
+      return NextResponse.json({ drivers: await listDriversForOffice() });
+    }
     if (sp.get('view') === 'tickets') {
       return NextResponse.json(await listTickets({ status: sp.get('status') || 'open_states' }));
     }
@@ -85,6 +93,36 @@ export async function POST(req) {
       // behind an admin is the exact friction that sends someone back to paper
       // when a new company calls mid-shift.
       return NextResponse.json({ ok: true, client: await upsertClient(body) });
+    }
+    // Add a driver from a name and a mobile number, and text them the link that
+    // signs their phone in. No account for them to create, no password for them
+    // to forget — that friction is exactly what kept drivers on paper.
+    if (body.action === 'driver_phone' || body.action === 'driver_link') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can add or remove a driver.' }, { status: 403 });
+      const d = body.action === 'driver_phone'
+        ? await addDriverByPhone({ name: body.name, phone: body.phone })
+        : (await listDriversForOffice()).find((x) => x.id === Number(body.driverId));
+      if (!d) return NextResponse.json({ error: 'No such driver.' }, { status: 400 });
+
+      const { token } = await createDriverSignInLink(d.id);
+      // The link must point at the dispatch host, not the storefront: an RS
+      // Solutions driver following a bargainbay.ca link is the brand leak the
+      // separate domain exists to prevent.
+      const base = process.env.RS_SITE_URL || `https://${(process.env.DISPATCH_HOSTS || 'dispatch.rssolutions.ca').split(',')[0].trim()}` || SITE_URL;
+      const url = `${base.replace(/\/$/, '')}/d/${token}`;
+      const text = `RS Solutions — your stops for the day: ${url}\nTap it once on this phone, then add it to your home screen.`;
+
+      let sms = { ok: false, skipped: true };
+      if (d.phone) sms = await sendSms({ to: driverSmsNumber(d.phone), body: text });
+      // The link is ALWAYS returned so the office can read it out or paste it
+      // into WhatsApp when Twilio is unconfigured or a send fails — a driver
+      // must never be stuck because a text didn't land.
+      return NextResponse.json({
+        ok: true, driver: d, url,
+        texted: !!sms.ok,
+        smsConfigured: smsConfigured(),
+        smsError: sms.ok ? null : (sms.error || sms.reason || null)
+      });
     }
     if (body.action === 'driver') {
       // Making someone a driver IS a permission, so this one stays admin-only.

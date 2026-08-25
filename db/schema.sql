@@ -459,3 +459,38 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_postal  text;
 -- 'rs_solutions' (the delivery/service company billing its own clients).
 -- Identity only — sender, letterhead and contact details; the logic is identical.
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS brand text;
+
+-- ---------------------------------------------------------------------------
+-- The driver app (phase 2, 2026-08-25)
+-- ---------------------------------------------------------------------------
+-- A driver signs in by tapping a link texted to their phone: no signup, no
+-- password. The account is still a users row (jobs.driver_id points at it), it
+-- just gets there without a form. Only the HASH of the link token is stored, so
+-- a leaked row is not a key.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_driver        boolean NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS driver_last_seen timestamptz;
+CREATE TABLE IF NOT EXISTS driver_links (
+  id         serial PRIMARY KEY,
+  user_id    int NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE,
+  sent_to    text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  used_at    timestamptz                       -- single use
+);
+CREATE INDEX IF NOT EXISTS idx_driver_links_user ON driver_links(user_id);
+
+-- Proof of delivery captured against a JOB (the order-based pod_photos table
+-- can't hold a service call — it has no order). pod_ref is the completion that
+-- produced it: a phone that finishes a stop with no signal replays the upload
+-- later, and the ref is what stops the replay writing a second set of photos.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS signature_path text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pod_ref        text;
+CREATE TABLE IF NOT EXISTS job_photos (
+  id         serial PRIMARY KEY,
+  job_id     int NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  url        text,
+  pathname   text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_job_photos_job ON job_photos(job_id);
