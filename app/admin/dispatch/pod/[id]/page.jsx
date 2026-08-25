@@ -25,12 +25,11 @@ export default async function PodPage({ params }) {
   const { rows } = await query(
     `SELECT j.id, j.job_number, j.customer_name, j.address, j.city, j.postal, j.phone,
             j.job_date, j.completed_at, j.signed_by, j.signature_path, j.pod_form, j.notes,
-            o.order_number, c.name AS client_name,
+            o.order_number,
             COALESCE(u.name, u.email) AS driver_name,
             (SELECT COALESCE(json_agg(p.id ORDER BY p.id), '[]'::json) FROM job_photos p WHERE p.job_id = j.id) AS photo_ids
        FROM jobs j
        LEFT JOIN orders  o ON o.id = j.order_id
-       LEFT JOIN clients c ON c.id = j.client_id
        LEFT JOIN users   u ON u.id = j.driver_id
       WHERE j.id = $1`,
     [Number(id)]
@@ -42,9 +41,6 @@ export default async function PodPage({ params }) {
   const items = Array.isArray(f.items) ? f.items : [];
   const photos = Array.isArray(j.photo_ids) ? j.photo_ids : [];
   const when = j.completed_at || j.job_date;
-  // Whose sale it was. The paper form named one client company in the consent
-  // paragraph; on a shared form that has to follow the job.
-  const store = j.client_name || 'Bargain Bay';
 
   return (
     <div className="pod">
@@ -131,10 +127,15 @@ export default async function PodPage({ params }) {
       </table>
 
       <p>
+        {/* The indemnified party is the company that DID the delivery — us — and
+            separately "the stores I/We purchased the items from", which covers
+            the client whose sale it was. The paper form named a client company
+            here; that was a typo carried over from whoever it was drafted for. */}
         <b>Authorized Consent:</b> I/We fully understand that by signing this Proof of Delivery form without
-        indicating any product/property damage, We agree to indemnify and hold entirely harmless {store},
-        their employees, contractors, owner operator(s), representatives as well as the stores I/We purchased
-        the items from, from any claim or remedial action as it arises from any aspect of delivery. I have
+        indicating any product/property damage, We agree to indemnify and hold entirely harmless
+        {' '}{BUSINESS_LEGAL}, their employees, contractors, owner operator(s), representatives as well as the
+        stores I/We purchased the items from, from any claim or remedial action as it arises from any aspect
+        of delivery. I have
         read the above fully and understand that by signing this waiver I am surrendering legal rights to
         which I may be entitled to in the Province of Ontario. I certify that I am the purchaser of the
         merchandise or a duly authorized representative of the purchaser and I am authorized to sign on the
