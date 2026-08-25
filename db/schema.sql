@@ -307,3 +307,89 @@ ALTER TABLE orders ADD CONSTRAINT orders_status_check
 
 -- Customer quote acceptance (hosted quote page "Accept" button).
 ALTER TABLE quotes ADD COLUMN IF NOT EXISTS accepted_at timestamptz;
+
+-- ============================================================================
+-- Dispatch: deliveries and service calls, from any source
+-- ============================================================================
+-- A JOB is not an order. An order carries money, tax, inventory and revenue
+-- meaning; a service call run for another company carries none of that, and
+-- forcing it into `orders` would pollute every revenue query. A Bargain Bay
+-- delivery becomes a job that LINKS BACK to its order (jobs.order_id), so
+-- completing the job can still advance the order.
+CREATE TABLE IF NOT EXISTS clients (
+  id                 serial PRIMARY KEY,
+  name               text NOT NULL UNIQUE,
+  contact_email      text,
+  contact_phone      text,
+  notes              text,
+  notify_on_complete boolean NOT NULL DEFAULT false,
+  active             boolean NOT NULL DEFAULT true,
+  created_at         timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS jobs (
+  id            serial PRIMARY KEY,
+  job_number    text UNIQUE,                      -- 'RS-' || (1000 + id)
+  type          text NOT NULL DEFAULT 'delivery'
+                CHECK (type IN ('delivery','service_call','pickup')),
+  -- unscheduled: on the board, no day yet. scheduled: has a day (+ driver or not).
+  -- failed is a REAL outcome with a reason, not an absence of a completion.
+  status        text NOT NULL DEFAULT 'unscheduled'
+                CHECK (status IN ('unscheduled','scheduled','on_the_way','arrived','done','failed','cancelled')),
+  client_id     int REFERENCES clients(id) ON DELETE SET NULL,
+  source        text NOT NULL DEFAULT 'manual',   -- manual | bargain_bay | email | import
+  order_id      int REFERENCES orders(id) ON DELETE SET NULL,
+
+  customer_name text,
+  phone         text,
+  email         text,
+  address       text,
+  city          text,
+  postal        text,
+  -- Captured from the address autocomplete at entry time, so routing never has
+  -- to pay to geocode the same address later.
+  lat           numeric(9,6),
+  lng           numeric(9,6),
+
+  job_date      date,
+  window_start  time,                             -- the promised window
+  window_end    time,
+
+  driver_id     int REFERENCES users(id) ON DELETE SET NULL,
+  seq           int,                              -- position in that driver's day
+
+  notes         text,                             -- access: stairs, buzzer, dog
+  fail_reason   text,
+  created_by      text,
+  created_by_name text,
+  created_at    timestamptz DEFAULT now(),
+  started_at    timestamptz,
+  arrived_at    timestamptz,
+  completed_at  timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS job_items (
+  id          serial PRIMARY KEY,
+  job_id      int REFERENCES jobs(id) ON DELETE CASCADE,
+  description text NOT NULL,
+  sku         text,                               -- set when it came from Bargain Bay
+  qty         int NOT NULL DEFAULT 1
+);
+
+-- Timestamped audit trail. This is what answers "what actually happened Tuesday".
+CREATE TABLE IF NOT EXISTS job_events (
+  id       serial PRIMARY KEY,
+  job_id   int REFERENCES jobs(id) ON DELETE CASCADE,
+  event    text NOT NULL,
+  detail   text,
+  by_email text,
+  by_name  text,
+  at       timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_jobs_date        ON jobs(job_date);
+CREATE INDEX IF NOT EXISTS idx_jobs_driver_date ON jobs(driver_id, job_date);
+CREATE INDEX IF NOT EXISTS idx_jobs_status      ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_order       ON jobs(order_id) WHERE order_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_job_items_job    ON job_items(job_id);
+CREATE INDEX IF NOT EXISTS idx_job_events_job   ON job_events(job_id);

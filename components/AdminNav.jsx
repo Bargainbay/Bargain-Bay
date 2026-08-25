@@ -8,6 +8,7 @@ export default function AdminNav({ active, salesOnly = false }) {
     { key: 'invoices', label: 'Invoices', href: '/admin/invoices', sales: true },
     { key: 'campaigns', label: 'Campaigns', href: '/admin/campaigns' },
     { key: 'payroll', label: 'Payroll', href: '/admin/payroll' },
+    { key: 'dispatch', label: 'Dispatch', href: '/admin/dispatch', sales: true },
     { key: 'operations', label: 'Operations', href: '/admin/operations' }
   ];
   const items = salesOnly ? all.filter((i) => i.sales) : all;

@@ -154,6 +154,34 @@ record anywhere. Rules that must hold:
   total is reported as `overpaid`; no refund record is invented, because no money
   has physically moved.
 
+## Dispatch — deliveries & service calls (added 2026-08-25)
+The daily run sheet used to be built by hand because the work comes from several
+client companies through several channels (email, spreadsheet, phone) and no one
+system holds it all. `/admin/dispatch` is the board; `/admin/dispatch/print` is
+the paper run sheet that replaces it.
+
+- **A job is NOT an order.** Orders carry money, tax, inventory and revenue
+  meaning; a service call run for another company carries none of it, and putting
+  it in `orders` would pollute every revenue query. A Bargain Bay delivery is a
+  job that links back via `jobs.order_id`. See `lib/jobs.js`, tables `jobs` /
+  `job_items` / `job_events` / `clients`.
+- **Delivery windows are promised to customers**, so they're first-class
+  (`window_start` / `window_end`, presets in `WINDOW_PRESETS`). This is why
+  routing (phase 3) must group stops by window and only optimise WITHIN a group —
+  a route may never be reordered across a promise.
+- **Lat/lng is captured from the address autocomplete at entry time**, so routing
+  never pays to geocode the same address twice. Keep that in any new job form.
+- **A failed stop is a real outcome** with a reason code (`FAIL_REASONS`), not an
+  absence of a completion. `setJobStatus` refuses `failed` without one.
+- Bargain Bay orders enter by **pull, not push** (`importReadyBargainBayOrders`,
+  the "Pull Bargain Bay orders" button). Deliberate: nothing new hangs off the
+  order-status path the storefront depends on, and the dispatcher controls the
+  day. Idempotent — an order that already has a job is skipped.
+- **Gate exception:** dispatch uses `isStaff`, making it a FOURTH staff surface
+  beyond the three named in the gate rule below. Intentional — whoever answers
+  the phone has to be able to put the job on the board. Adding or editing a
+  *client* is still `isAdmin`.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
