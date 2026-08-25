@@ -130,8 +130,13 @@ export default async function RunSheetPage({ searchParams }) {
                       <><br />{j.services.map((k) => SERVICE_LABEL[k] || k).join(' · ')}</>
                     )}
                     <br />
+                    {/* The driver is asked about "the BB-1179 fridge" on the
+                        phone, never about RS-1021 — so both numbers print, and
+                        the company the stop is for prints with them. */}
                     <span className="note">
-                      {j.ticketNumber || j.jobNumber}{j.clientName ? ` · ${j.clientName}` : ''}
+                      {j.ticketNumber || j.jobNumber}
+                      {j.orderNumber ? ` · ${j.orderNumber}` : ''}
+                      {` · ${j.clientName || (j.source === 'bargain_bay' ? 'Bargain Bay' : 'Own job')}`}
                     </span>
                   </td>
                   <td className="coll">
