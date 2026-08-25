@@ -753,7 +753,7 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .disp-strip { position: relative; display: flex; align-items: stretch; gap: 4px; }
 .disp-cols {
   display: flex; gap: 14px; align-items: flex-start;
-  overflow-x: auto; padding-bottom: 10px; flex: 1 1 auto; scroll-behavior: smooth;
+  overflow-x: auto; padding-bottom: 10px; flex: 1 1 auto;
 }
 .disp-page {
   flex: 0 0 30px; align-self: center; height: 78px;
