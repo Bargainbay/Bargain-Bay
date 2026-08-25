@@ -3,11 +3,12 @@ import { hasDb } from '../../../lib/db';
 import { getInvoiceByNumber } from '../../../lib/invoices';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { verifyLinkToken } from '../../../lib/links';
+import { brandFor } from '../../../lib/brands';
 import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel,
          BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Invoice — Bargain Bay' };
+export const metadata = { title: 'Invoice' };
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric' }) : null);
 
@@ -19,6 +20,9 @@ export default async function InvoicePage({ params, searchParams }) {
   }
   const invoice = await getInvoiceByNumber(number).catch(() => null);
   if (!invoice) return notFound();
+  // Which business this invoice belongs to. An RS Solutions client following the
+  // link must land on RS Solutions letterhead, not the storefront's.
+  const B = brandFor(invoice.brand);
 
   // Access: logged-in admin, or anyone with the matching ?email= (as in the
   // confirmation email link). Keeps invoice amounts from being enumerable.
@@ -66,9 +70,9 @@ export default async function InvoicePage({ params, searchParams }) {
       {/* Business letterhead */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--charcoal)', paddingBottom: 10, marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--charcoal)' }}>{BUSINESS_NAME}</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{BUSINESS_LEGAL} · {BUSINESS_ADDRESS}</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{SALES_EMAIL} · HST# {HST_NUMBER}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--charcoal)' }}>{B.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{B.legal} · {B.address}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{B.contactEmail} · HST# {B.hst}</div>
         </div>
         <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>INVOICE</div>
@@ -112,11 +116,11 @@ export default async function InvoicePage({ params, searchParams }) {
       {partialRefund && (
         <div className="notice-box">
           {money(refundTotal)} of this invoice was refunded — the refunded item(s) are shown struck through below.
-          Questions? Email {SALES_EMAIL}.
+          Questions? Email {B.contactEmail}.
         </div>
       )}
-      {refunded && <div className="notice-box">This invoice was refunded{invoice.refunded_at ? ` on ${fmtDate(invoice.refunded_at)}` : ''}. Questions? Email {SALES_EMAIL}.</div>}
-      {voided && <div className="error-box">This invoice was voided. Questions? Email {SALES_EMAIL}.</div>}
+      {refunded && <div className="notice-box">This invoice was refunded{invoice.refunded_at ? ` on ${fmtDate(invoice.refunded_at)}` : ''}. Questions? Email {B.contactEmail}.</div>}
+      {voided && <div className="error-box">This invoice was voided. Questions? Email {B.contactEmail}.</div>}
 
       {(open || partial) && (
         <div className="notice-box" style={{ lineHeight: 1.6 }}>
@@ -165,7 +169,7 @@ export default async function InvoicePage({ params, searchParams }) {
         )}
         {invoice.memo && <p style={{ margin: '10px 0 0', fontSize: 13.5, color: 'var(--muted)' }}>{invoice.memo}</p>}
         <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--muted)' }}>
-          {BUSINESS_LEGAL} — GST/HST # {HST_NUMBER}.
+          {B.legal} — GST/HST # {B.hst}.
         </p>
       </div>
 
@@ -180,7 +184,7 @@ export default async function InvoicePage({ params, searchParams }) {
         </p>
       </div>
 
-      <p className="hint">Questions about this invoice? Email <a href={`mailto:${SALES_EMAIL}`} style={{ textDecoration: 'underline' }}>{SALES_EMAIL}</a> with your invoice number.</p>
+      <p className="hint">Questions about this invoice? Email <a href={`mailto:${B.contactEmail}`} style={{ textDecoration: 'underline' }}>{B.contactEmail}</a> with your invoice number.</p>
     </div>
   );
 }

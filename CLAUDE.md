@@ -238,6 +238,29 @@ the paper run sheet that replaces it.
   staff too (it's a company name). Adding a **driver** stays `isAdmin` — that one
   is a real access grant.
 
+## Two businesses, one codebase — BRANDS
+Bargain Bay is the consumer storefront. **RS Solutions is the delivery/service
+company** whose clients are other businesses (Transource et al). A client must
+never be able to tell they share a codebase — a Transource invoice arriving from
+"Bargain Bay" is wrong in a way they notice immediately.
+
+`lib/brands.js` holds the two identities (name, legal, address, HST, contact
+email, sender). `invoices.brand` = `'bargain_bay'` (default) | `'rs_solutions'`,
+and it drives three things:
+- the **From** and **Reply-To** on every invoice email (`sendEmail({ brand })`),
+- the **letterhead** in the email body,
+- the **hosted invoice page** at `/invoice/[number]`.
+
+Dispatch client invoices (`invoiceClientJobs`) are always `rs_solutions`.
+Everything else defaults to `bargain_bay`, so existing behaviour is untouched.
+
+**It is identity only — it must not fork any logic.** An invoice is an invoice;
+both brands run the same code.
+
+`rssolutions.ca` already carries a Resend DKIM record, so it sends today.
+`RESEND_FROM_RS` overrides the sender if the verified mailbox differs from
+`Service@rssolutions.ca`.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.

@@ -166,7 +166,11 @@ export default async function InvoicesPage({ searchParams }) {
                          title="Fulfilment order for this invoice — searchable above">{inv.orderNumber}</div>
                   )}
                 </td>
-                <td>{inv.name || inv.email || '—'}{inv.name && inv.email && (
+                <td>
+                  {inv.brand === 'rs_solutions' && (
+                    <span className="disp-tag" style={{ marginRight: 5 }} title="Sent as RS Solutions">RS</span>
+                  )}
+                  {inv.name || inv.email || '—'}{inv.name && inv.email && (
                   <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{inv.email}</div>
                 )}</td>
                 <td>
