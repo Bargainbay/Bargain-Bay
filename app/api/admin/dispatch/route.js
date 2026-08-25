@@ -7,7 +7,8 @@ import {
   upsertClient, importReadyBargainBayOrders, dispatchBoard,
   setTicketStatus, listTickets,
   findServiceCustomers, ordersForServiceCall,
-  completeJob, setJobPay, payReport, bookRevisit
+  completeJob, setJobPay, payReport, bookRevisit,
+  setJobCharge, billingSummary, invoiceClientJobs
 } from '../../../../lib/jobs';
 
 export const dynamic = 'force-dynamic';
@@ -39,6 +40,9 @@ export async function GET(req) {
     if (sp.get('view') === 'orders') {
       return NextResponse.json({ orders: await ordersForServiceCall(sp.get('email') || '') });
     }
+    if (sp.get('view') === 'billing') {
+      return NextResponse.json(await billingSummary({ from: sp.get('from'), to: sp.get('to') }));
+    }
     if (sp.get('view') === 'pay') {
       return NextResponse.json(await payReport({ from: sp.get('from'), to: sp.get('to') }));
     }
@@ -61,6 +65,11 @@ export async function POST(req) {
   try {
     if (body.action === 'import_bb') {
       return NextResponse.json({ ok: true, ...(await importReadyBargainBayOrders({ by: who(s) })) });
+    }
+    if (body.action === 'invoice_client') {
+      // Raising an invoice is money leaving the building — admin only.
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can invoice a client.' }, { status: 403 });
+      return NextResponse.json({ ok: true, ...(await invoiceClientJobs(body.clientId, body, who(s))) });
     }
     if (body.action === 'client') {
       // Open to all staff on purpose. A client is a company name — gating it
@@ -111,6 +120,10 @@ export async function PATCH(req) {
     }
     if (body.action === 'service_complete' || body.action === 'complete') {
       return NextResponse.json({ ok: true, job: await completeJob(jobId, body, who(s)) });
+    }
+    if (body.action === 'charge') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set what a job charges.' }, { status: 403 });
+      return NextResponse.json({ ok: true, job: await setJobCharge(jobId, body, who(s)) });
     }
     if (body.action === 'pay') {
       // Money, so admin only — same line the rest of the app draws.

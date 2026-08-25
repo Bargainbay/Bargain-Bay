@@ -5,6 +5,7 @@ import ServiceVisitForm from './ServiceVisitForm';
 import TicketQueue from './TicketQueue';
 import DispatchSetup from './DispatchSetup';
 import PayReport from './PayReport';
+import ClientBilling from './ClientBilling';
 
 // The day's run sheet, on screen. One unassigned pile plus a column per driver.
 // Assignment is by tap, not drag: drag is pleasant on a desktop and miserable on
@@ -49,7 +50,11 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
         <span className={'pill ' + (STATUS_TONE[job.status] || 'warn')}>{STATUS_LABEL[job.status]}</span>
       </div>
       <div className="disp-who">{job.customerName || '(no name)'}</div>
-      <div className="disp-addr">{[job.address, job.city].filter(Boolean).join(', ')}</div>
+      <div className="disp-addr">
+        {job.pickupAddress
+          ? <>{[job.pickupAddress, job.pickupCity].filter(Boolean).join(', ')} <b>→</b> {[job.address, job.city].filter(Boolean).join(', ')}</>
+          : [job.address, job.city].filter(Boolean).join(', ')}
+      </div>
       <div className="disp-meta">
         <span className="disp-tag">{TYPE_LABEL[job.type] || job.type}</span>
         {job.shipmentType && (
@@ -71,13 +76,15 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
             <div className="disp-items">{job.items.map((i) => i.description).join(' · ')}</div>
           )}
       {job.partsNeeded && <div className="disp-fail">Waiting on: {job.partsNeeded}</div>}
-      {(job.timeIn || job.payAmount != null) && (
+      {(job.timeIn || job.payAmount != null || job.chargeAmount != null) && (
         <div className="disp-times">
           {job.timeIn && (
             <>on site {new Date(job.timeIn).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}
               {job.timeOut && `–${new Date(job.timeOut).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}`}</>
           )}
           {job.payAmount != null && <> · pays ${Number(job.payAmount).toFixed(2)}</>}
+          {job.chargeAmount != null && <> · bills ${Number(job.chargeAmount).toFixed(2)}</>}
+          {job.invoiceId && <> · invoiced</>}
         </div>
       )}
       {job.failReason && <div className="disp-fail">{FAIL_REASONS[job.failReason] || job.failReason}</div>}
@@ -206,11 +213,14 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       <div className="disp-tabs">
         <Tab id="board">Board</Tab>
         <Tab id="tickets">Service calls{tickets ? ` (${tickets})` : ''}</Tab>
+        <Tab id="billing">Billing</Tab>
         <Tab id="pay">Pay</Tab>
         <Tab id="setup">Clients &amp; drivers</Tab>
       </div>
 
       {view === 'tickets' && <TicketQueue onChanged={() => refresh()} />}
+
+      {view === 'billing' && <ClientBilling canBill={canManageClients} />}
 
       {view === 'pay' && <PayReport canSetPay={canManageClients} />}
 

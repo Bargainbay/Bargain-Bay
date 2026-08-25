@@ -206,6 +206,18 @@ the paper run sheet that replaces it.
   it to another route: sending someone elsewhere to add a client mid-call is the
   friction that sends a dispatcher back to paper.
   `/admin/dispatch/tickets` is only a redirect kept so older links resolve.
+- **Both sides of the money live on the job.** `pay_amount` is what it costs us
+  (what the driver/tech is owed); `charge_amount` is what the CLIENT pays us.
+  Margin per run is therefore visible while it's fresh. Both admin-only.
+- **Weekly client invoicing.** The Billing tab lists finished, not-yet-billed jobs
+  per client for a period; one button raises a real invoice through
+  `createAndSendInvoice` (a line per job, unsent, lands in Invoices and books
+  revenue on its date like any other). `jobs.invoice_id` is stamped only AFTER
+  the invoice saves, and `setJobCharge` refuses to move a charge once it's set —
+  a job can never appear on two invoices. Needs `clients.contact_email`.
+- **A job can be a transfer** — `pickup_address` / `pickup_city` /
+  `pickup_postal` set means it runs FROM there TO `address`. Shown as "A → B" on
+  the board and as FROM/TO on the run sheet; the driver needs both ends.
 - **Times and pay.** Closing out ANY job (not just a service call) records
   `time_in` / `time_out` — time actually on site — plus who signed. `pay_amount`
   is what the person who did that job is owed, set per job at close-out and
