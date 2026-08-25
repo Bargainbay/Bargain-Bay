@@ -56,6 +56,13 @@ export default function DriverDeliveries({ initialDeliveries = [] }) {
               {o.phone && <div><a href={`tel:${o.phone}`} style={{ textDecoration: 'underline' }}>📞 {o.phone}</a></div>}
             </div>
 
+            {o.balance_due > 0 && (
+              <div className="disp-collect" style={{ fontSize: 15 }}>
+                Collect ${Number(o.balance_due).toFixed(2)} on delivery
+                {o.invoice_number ? <span className="disp-collect-ref"> · {o.invoice_number}</span> : null}
+              </div>
+            )}
+
             <div style={{ marginTop: 10, fontSize: 13.5 }}>
               {o.items.map((it) => (
                 <div key={it.sku}><span style={{ fontFamily: 'monospace', fontSize: 12 }}>{it.sku}</span> {it.title}</div>

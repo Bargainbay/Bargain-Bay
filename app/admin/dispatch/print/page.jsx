@@ -14,6 +14,8 @@ const prettyDate = (iso) =>
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 const win = (j) => (j.windowStart && j.windowEnd ? `${j.windowStart}–${j.windowEnd}` : 'Any time');
+// Cash and e-transfers the driver is expected to come back with, for the day.
+const toCollect = (stops) => stops.reduce((sum, j) => sum + (Number(j.balanceDue) || 0), 0);
 const SHIPMENT_LABEL = { white_glove: 'WHITE GLOVE', threshold: 'THRESHOLD' };
 const SERVICE_LABEL = {
   delivery_only: 'Delivery only', install: 'Install', haul_away: 'Haul away',
@@ -66,7 +68,13 @@ export default async function RunSheetPage({ searchParams }) {
         .runsheet table { width: 100%; border-collapse: collapse; margin-bottom: 26px; font-size: 12.5px; }
         .runsheet th { text-align: left; border-bottom: 2px solid #111; padding: 5px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
         .runsheet td { border-bottom: 1px solid #ccc; padding: 8px 6px; vertical-align: top; }
-        .runsheet .sig { width: 132px; }
+        .runsheet .sig { width: 120px; }
+        /* What's still owed on the order. A driver who doesn't know a balance is
+           outstanding walks away without it — so it prints on every line, and
+           the line says Paid rather than nothing when there's nothing to take. */
+        .runsheet .coll { width: 78px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .runsheet .coll strong { font-size: 14px; }
+        .runsheet .paid { color: #666; font-size: 11.5px; }
         .runsheet .num { width: 26px; color: #666; }
         .runsheet .w { width: 86px; white-space: nowrap; font-variant-numeric: tabular-nums; }
         .runsheet .note { color: #444; font-style: italic; }
@@ -84,6 +92,9 @@ export default async function RunSheetPage({ searchParams }) {
           <p className="sub">
             {prettyDate(date)} · {col.stops.length} stop{col.stops.length === 1 ? '' : 's'}
             {col.sub ? ` · ${col.sub}` : ''}
+            {toCollect(col.stops) > 0 && (
+              <> · <strong>${toCollect(col.stops).toFixed(2)} to collect</strong></>
+            )}
           </p>
           <table>
             <thead>
@@ -92,6 +103,7 @@ export default async function RunSheetPage({ searchParams }) {
                 <th className="w">Window</th>
                 <th>Customer &amp; address</th>
                 <th>What</th>
+                <th className="coll">Collect</th>
                 <th className="sig">Signature / time</th>
               </tr>
             </thead>
@@ -121,6 +133,12 @@ export default async function RunSheetPage({ searchParams }) {
                     <span className="note">
                       {j.ticketNumber || j.jobNumber}{j.clientName ? ` · ${j.clientName}` : ''}
                     </span>
+                  </td>
+                  <td className="coll">
+                    {j.balanceDue > 0
+                      ? <><strong>${Number(j.balanceDue).toFixed(2)}</strong>
+                          {j.invoiceNumber ? <><br /><span className="note">{j.invoiceNumber}</span></> : null}</>
+                      : <span className="paid">{j.orderId ? 'Paid' : '—'}</span>}
                   </td>
                   <td className="sig"></td>
                 </tr>

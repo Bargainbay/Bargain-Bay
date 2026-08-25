@@ -200,6 +200,18 @@ the paper run sheet that replaces it.
   the "Pull Bargain Bay orders" button). Deliberate: nothing new hangs off the
   order-status path the storefront depends on, and the dispatcher controls the
   day. Idempotent — an order that already has a job is skipped.
+  **Eligible = `confirmed` | `ready` | `out_for_delivery`** (`IMPORTABLE_ORDER_STATUSES`)
+  with `delivery_method = 'delivery'` and an address. `out_for_delivery` is in
+  that list because it is what the owner reaches for when an order is loaded and
+  going out today; without it the pull silently did nothing (BB-1179). **The pull
+  reports what it declined and why** — a button that can no-op in silence is how
+  an order ends up delivered from memory. Only orders from the last
+  `SKIP_REPORT_DAYS` are *explained*; anything eligible is imported however old.
+- **What's still owed prints on the stop.** `balancesForOrders` reads the live
+  invoice ledger (`total − payments` on an `open`/`partial` invoice) and the board,
+  the run sheet and `/driver` all show "Collect $X". Read live on every load,
+  never stamped on the job: the shop's flow is deposit now / balance on delivery,
+  so a payment taken at 11am has to change what the driver is told at 3pm.
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of

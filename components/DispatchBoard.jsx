@@ -55,6 +55,14 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
           ? <>{[job.pickupAddress, job.pickupCity].filter(Boolean).join(', ')} <b>→</b> {[job.address, job.city].filter(Boolean).join(', ')}</>
           : [job.address, job.city].filter(Boolean).join(', ')}
       </div>
+      {job.balanceDue > 0 && (
+        // Once the stop is done and the money still isn't recorded, this stops
+        // being an instruction to the driver and becomes a nudge to the office.
+        <div className="disp-collect">
+          {job.status === 'done' ? 'Still owing' : 'Collect'} ${Number(job.balanceDue).toFixed(2)}
+          {job.invoiceNumber ? <span className="disp-collect-ref"> · {job.invoiceNumber}</span> : null}
+        </div>
+      )}
       <div className="disp-meta">
         <span className="disp-tag">{TYPE_LABEL[job.type] || job.type}</span>
         {job.shipmentType && (
@@ -138,6 +146,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   // client or chase a service call mid-shift.
   const [view, setView] = useState(['board', 'tickets', 'setup'].includes(initialView) ? initialView : 'board');
   const [tickets, setTickets] = useState(openTickets);
+  const [pull, setPull] = useState(null);        // what the last Bargain Bay pull did
 
   async function refresh(date = board.date) {
     setErr('');
@@ -165,6 +174,25 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   }
 
   const onAssign = (jobId, patch) => send('PATCH', { action: 'assign', jobId, jobDate: board.date, ...patch });
+
+  // The pull used to refresh in silence, so an order it declined to take looked
+  // exactly like an order it had taken. It now says what it did and, for
+  // anything it left behind, what to do about it.
+  async function pullBargainBay() {
+    setBusy(true); setErr(''); setPull(null);
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'import_bb' })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not pull the orders.'); return; }
+      setPull(d);
+      await refresh();
+    } catch {
+      setErr('Network error — nothing was pulled.');
+    } finally { setBusy(false); }
+  }
 
   async function onServiceComplete({ pay, payNote, ...payload }) {
     const ok = await send('PATCH', { action: 'complete', jobId: closing.id, ...payload });
@@ -243,7 +271,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
 
           <button type="button" className="btn" disabled={busy}
             title="Pull in Bargain Bay delivery orders that aren't on the board yet"
-            onClick={() => send('POST', { action: 'import_bb' })}>Pull Bargain Bay orders</button>
+            onClick={pullBargainBay}>Pull Bargain Bay orders</button>
           <a className="btn" href={`/admin/dispatch/print?date=${board.date}`} target="_blank" rel="noopener noreferrer">Print run sheet</a>
           <button type="button" className="btn accent" onClick={() => setAdding((v) => !v)}>
             {adding ? 'Close' : '+ Add job'}
@@ -252,6 +280,32 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       </div>
 
       {err && <div className="error-box">{err}</div>}
+
+      {pull && (
+        <div className="disp-pull">
+          <button type="button" className="disp-pull-x" onClick={() => setPull(null)} aria-label="Dismiss">×</button>
+          <b>
+            {pull.imported
+              ? `Added ${pull.imported} order${pull.imported === 1 ? '' : 's'} to the board: ${pull.created.map((c) => `${c.order} → ${c.job}`).join(', ')}.`
+              : 'Nothing new to add.'}
+          </b>
+          {pull.alreadyOnBoard > 0 && (
+            <div className="hint" style={{ margin: '4px 0 0' }}>
+              {pull.alreadyOnBoard} already on the board.
+            </div>
+          )}
+          {pull.skipped?.length > 0 && (
+            <>
+              <div className="hint" style={{ margin: '6px 0 2px' }}>Not pulled in:</div>
+              <ul className="disp-pull-list">
+                {pull.skipped.map((sk) => (
+                  <li key={sk.order}><b>{sk.order}</b> — {sk.reason}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
 
       {closing && (
         <div className="panel">
