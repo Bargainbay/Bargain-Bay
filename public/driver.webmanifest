@@ -1,5 +1,5 @@
 {
-  "name": "My stops — RS Solutions",
+  "name": "My stops \u2014 RS Solutions",
   "short_name": "My stops",
   "description": "Today's deliveries and service calls.",
   "start_url": "/driver",
@@ -9,7 +9,23 @@
   "background_color": "#F5F3EF",
   "theme_color": "#3A3937",
   "icons": [
-    { "src": "/favicon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    {
+      "src": "/driver-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/driver-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/driver-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
