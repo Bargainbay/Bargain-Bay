@@ -40,8 +40,42 @@ const prettyDate = (iso) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' });
 const windowLabel = (j) => (j.windowStart && j.windowEnd ? `${j.windowStart}–${j.windowEnd}` : 'Any time');
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone }) {
+const PAY_METHODS = { cash: 'Cash', etransfer: 'E-transfer', card: 'Card (manual)', cheque: 'Cheque', other: 'Other' };
+
+// Taking the balance at the door. Deliberately on the card and not behind a trip
+// to the Invoices page: the money is counted while the driver is still on the
+// phone, and anything else means it gets logged tomorrow from a note in a pocket.
+function CollectForm({ job, busy, onRecord }) {
+  const [amount, setAmount] = useState(Number(job.balanceDue).toFixed(2));
+  const [method, setMethod] = useState('cash');
+  const [note, setNote] = useState('');
+  return (
+    <form
+      className="disp-collect-form"
+      onSubmit={(e) => { e.preventDefault(); onRecord(job.id, { amount: Number(amount), method, note }); }}
+    >
+      <label>
+        Amount
+        <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      </label>
+      <label>
+        How
+        <select value={method} onChange={(e) => setMethod(e.target.value)}>
+          {Object.entries(PAY_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+      </label>
+      <input className="disp-collect-note" value={note} placeholder="Note (optional)"
+        onChange={(e) => setNote(e.target.value)} />
+      <button type="submit" className="btn accent" disabled={busy || !(Number(amount) > 0)}>
+        Record ${Number(amount || 0).toFixed(2)}
+      </button>
+    </form>
+  );
+}
+
+function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord }) {
   const [open, setOpen] = useState(false);
+  const [collecting, setCollecting] = useState(false);
   const closed = ['done', 'failed', 'cancelled'].includes(job.status);
   return (
     <div className={'disp-card' + (closed ? ' is-closed' : '')}>
@@ -59,8 +93,19 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
         // Once the stop is done and the money still isn't recorded, this stops
         // being an instruction to the driver and becomes a nudge to the office.
         <div className="disp-collect">
-          {job.status === 'done' ? 'Still owing' : 'Collect'} ${Number(job.balanceDue).toFixed(2)}
-          {job.invoiceNumber ? <span className="disp-collect-ref"> · {job.invoiceNumber}</span> : null}
+          <div className="disp-collect-head">
+            <span>
+              {job.status === 'done' ? 'Still owing' : 'Collect'} ${Number(job.balanceDue).toFixed(2)}
+              {job.invoiceNumber ? <span className="disp-collect-ref"> · {job.invoiceNumber}</span> : null}
+            </span>
+            <button type="button" className="disp-collect-btn" onClick={() => setCollecting((v) => !v)}>
+              {collecting ? 'Cancel' : 'Record payment'}
+            </button>
+          </div>
+          {collecting && (
+            <CollectForm job={job} busy={busy}
+              onRecord={async (id, payload) => { const ok = await onRecord(id, payload); if (ok) setCollecting(false); }} />
+          )}
         </div>
       )}
       <div className="disp-meta">
@@ -194,6 +239,32 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     } finally { setBusy(false); }
   }
 
+  // Recording the balance the driver came back with. It lands on the ORDER'S
+  // INVOICE — the same ledger the Invoices page writes to — so there is one
+  // record of the money, not a dispatch copy of it.
+  async function onRecord(jobId, payload) {
+    const ok = await send('PATCH', { action: 'record_payment', jobId, ...payload });
+    if (ok) setPull(null);
+    return ok;
+  }
+
+  // The escape hatch on the report: put this one order on the board regardless.
+  async function addOrderAnyway(orderNumber) {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'import_order', orderNumber })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not add that order.'); return; }
+      setPull((p) => (p ? { ...p, skipped: p.skipped.filter((sk) => sk.order !== orderNumber) } : p));
+      await refresh();
+    } catch {
+      setErr('Network error — nothing was added.');
+    } finally { setBusy(false); }
+  }
+
   async function onServiceComplete({ pay, payNote, ...payload }) {
     const ok = await send('PATCH', { action: 'complete', jobId: closing.id, ...payload });
     // Pay is a separate, admin-only call — a failure there must not undo the
@@ -299,7 +370,13 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
               <div className="hint" style={{ margin: '6px 0 2px' }}>Not pulled in:</div>
               <ul className="disp-pull-list">
                 {pull.skipped.map((sk) => (
-                  <li key={sk.order}><b>{sk.order}</b> — {sk.reason}</li>
+                  <li key={sk.order}>
+                    <b>{sk.order}</b> — {sk.reason}
+                    {sk.canForce && (
+                      <button type="button" className="disp-pull-add" disabled={busy}
+                        onClick={() => addOrderAnyway(sk.order)}>Add anyway</button>
+                    )}
+                  </li>
                 ))}
               </ul>
             </>
@@ -334,14 +411,16 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
           )}
           {unassignedToday.map((j) => (
             <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
-              onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing} />
+              onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
+              onRecord={onRecord} />
           ))}
           {board.unscheduled.length > 0 && (
             <>
               <h4 className="disp-sub">No date yet</h4>
               {board.unscheduled.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
-                  onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing} />
+                  onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
+              onRecord={onRecord} />
               ))}
             </>
           )}
@@ -366,7 +445,8 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
               {stops.length === 0 && <p className="hint">No stops on this day.</p>}
               {stops.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
-                  onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing} />
+                  onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
+              onRecord={onRecord} />
               ))}
             </section>
           );
