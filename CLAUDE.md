@@ -212,6 +212,15 @@ the paper run sheet that replaces it.
   every reason except a missing address carries **"Add anyway"**
   (`importOneBargainBayOrder`, POST `action: 'import_order'`) so the dispatcher
   is never sent off to edit an order to fix a board they're looking at.
+- **Every card says whose job it is and which order.** `dispatchBoard` joins
+  `orders` for `order_number`; the card and the run sheet print
+  `RS-1021 · BB-1179 · Bargain Bay` (or the client's name). The driver is asked
+  about "the BB-1179 fridge" on the phone, never about RS-1021.
+- **Any order can be put on the board by number** (the `BB-1078` box next to the
+  pull button). The pull only scans the recent weeks; a special order sold in
+  June still gets delivered in August. If the order has no address — every
+  **pickup** order has none — it asks for one and puts it on the JOB, not back
+  onto the order: the customer still bought it as a pickup, we're just driving it.
 - **The balance is collected from the job card.** PATCH `action: 'record_payment'`
   → `jobInvoiceForPayment` → `recordInvoicePayment` on the ORDER'S invoice, so
   there is one money ledger and not a dispatch copy of one; the job gets a
@@ -224,6 +233,12 @@ the paper run sheet that replaces it.
   the run sheet and `/driver` all show "Collect $X". Read live on every load,
   never stamped on the job: the shop's flow is deposit now / balance on delivery,
   so a payment taken at 11am has to change what the driver is told at 3pm.
+- **The board pages sideways and each column scrolls itself** (`BoardColumn`,
+  `.disp-page` / `.disp-scroll`). Columns are a fixed width so one page is one
+  column, and the arrows are rendered only when there is something off-screen —
+  this runs on a warehouse touchscreen with no trackpad, where a scroll area
+  nobody can see the edge of is a driver's whole day nobody knows exists. Both
+  are off under 700px, where the columns stack.
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of

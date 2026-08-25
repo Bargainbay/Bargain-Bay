@@ -71,7 +71,9 @@ export async function POST(req) {
     // "Add anyway": one order the pull declined — a pickup that does need a
     // driver, a cancelled job coming back, an order still at Pending payment.
     if (body.action === 'import_order') {
-      return NextResponse.json({ ok: true, ...(await importOneBargainBayOrder(body.orderNumber, { by: who(s) })) });
+      return NextResponse.json({ ok: true, ...(await importOneBargainBayOrder(body.orderNumber, {
+        by: who(s), address: body.address, city: body.city, postal: body.postal
+      })) });
     }
     if (body.action === 'invoice_client') {
       // Raising an invoice is money leaving the building — admin only.

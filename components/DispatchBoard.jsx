@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import JobForm from './JobForm';
 import ServiceVisitForm from './ServiceVisitForm';
 import TicketQueue from './TicketQueue';
@@ -73,6 +73,50 @@ function CollectForm({ job, busy, onRecord }) {
   );
 }
 
+// One driver's column. The stop list scrolls inside the column rather than
+// stretching the page, so every driver's column starts at the same height and
+// you can compare the day across them — and the arrows exist because a warehouse
+// touchscreen has no trackpad and a nested scroll area is invisible without them.
+function BoardColumn({ title, count, children, bodyKey }) {
+  const body = useRef(null);
+  const [over, setOver] = useState(false);
+  const [at, setAt] = useState({ top: true, bottom: false });
+
+  const measure = useCallback(() => {
+    const el = body.current;
+    if (!el) return;
+    const room = el.scrollHeight - el.clientHeight;
+    setOver(room > 4);
+    setAt({ top: el.scrollTop <= 2, bottom: el.scrollTop >= room - 2 });
+  }, []);
+
+  useEffect(() => {
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure, bodyKey]);
+
+  const nudge = (dir) => body.current?.scrollBy({ top: dir * 260, behavior: 'smooth' });
+
+  return (
+    <section className="disp-col">
+      <h3 className="disp-col-head">
+        {title}
+        <span className="disp-count">{count}</span>
+      </h3>
+      {over && (
+        <button type="button" className="disp-scroll up" disabled={at.top}
+          onClick={() => nudge(-1)} aria-label={`Scroll ${title} up`}>▲</button>
+      )}
+      <div className="disp-col-body" ref={body} onScroll={measure}>{children}</div>
+      {over && (
+        <button type="button" className="disp-scroll down" disabled={at.bottom}
+          onClick={() => nudge(1)} aria-label={`Scroll ${title} down`}>▼</button>
+      )}
+    </section>
+  );
+}
+
 function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord }) {
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
@@ -116,8 +160,16 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
           </span>
         )}
         {job.services?.map((k) => <span key={k} className="disp-tag">{SERVICE_LABEL[k] || k}</span>)}
-        {job.clientName && <span className="disp-tag">{job.clientName}</span>}
-        <span className="disp-num">{job.ticketNumber || job.jobNumber}</span>
+        {/* Who the work is FOR. A board that mixes Bargain Bay deliveries with
+            three other companies' service calls is unreadable if the cards don't
+            say which is which. */}
+        <span className={'disp-tag is-src' + (job.source === 'bargain_bay' ? ' is-bb' : '')}>
+          {job.clientName || (job.source === 'bargain_bay' ? 'Bargain Bay' : 'Own job')}
+        </span>
+        <span className="disp-num">
+          {job.ticketNumber || job.jobNumber}
+          {job.orderNumber && <b className="disp-order"> · {job.orderNumber}</b>}
+        </span>
       </div>
       {job.type === 'service_call'
         ? (job.appliance || job.issue) && (
@@ -192,6 +244,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   const [view, setView] = useState(['board', 'tickets', 'setup'].includes(initialView) ? initialView : 'board');
   const [tickets, setTickets] = useState(openTickets);
   const [pull, setPull] = useState(null);        // what the last Bargain Bay pull did
+  const [addNum, setAddNum] = useState('');      // order number typed into "add by number"
 
   async function refresh(date = board.date) {
     setErr('');
@@ -248,17 +301,53 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     return ok;
   }
 
-  // The escape hatch on the report: put this one order on the board regardless.
-  async function addOrderAnyway(orderNumber) {
+  // The escape hatch: put this one order on the board regardless of what the
+  // pull thought of it. A pickup order carries no delivery address, so ask for
+  // one rather than refusing — it goes on the job, not back onto the order.
+  async function addOrderAnyway(orderNumber, needsAddress) {
+    const num = String(orderNumber || '').trim();
+    if (!num) return;
+    let address;
+    if (needsAddress) {
+      address = window.prompt(`${num} has no delivery address on it. Where is it going?`);
+      if (!address?.trim()) return;
+    }
     setBusy(true); setErr('');
     try {
       const res = await fetch('/api/admin/dispatch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'import_order', orderNumber })
+        body: JSON.stringify({ action: 'import_order', orderNumber: num, address })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not add that order.'); return; }
-      setPull((p) => (p ? { ...p, skipped: p.skipped.filter((sk) => sk.order !== orderNumber) } : p));
+      setPull((p) => (p ? { ...p, skipped: p.skipped.filter((sk) => sk.order !== num) } : p));
+      setAddNum('');
+      await refresh();
+    } catch {
+      setErr('Network error — nothing was added.');
+    } finally { setBusy(false); }
+  }
+
+  // Typing a number is the way in for an order the pull never looked at — it
+  // only scans the recent weeks, and a special order sold in June still gets
+  // delivered in August.
+  async function addByNumber(e) {
+    e.preventDefault();
+    const num = addNum.trim();
+    if (!num) return;
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'import_order', orderNumber: num })
+      });
+      const d = await res.json();
+      // The one failure worth handling here rather than reporting: no address on
+      // the order. Ask for it and go again.
+      if (!res.ok && /no address/i.test(d.error || '')) { setBusy(false); return addOrderAnyway(num, true); }
+      if (!res.ok) { setErr(d.error || 'Could not add that order.'); return; }
+      setAddNum('');
+      setPull({ imported: 1, created: d.created, alreadyOnBoard: 0, skipped: [] });
       await refresh();
     } catch {
       setErr('Network error — nothing was added.');
@@ -296,6 +385,34 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     if (reason === null) return;
     return send('PATCH', { action: 'cancel', jobId, reason });
   }
+
+  // Paging the columns sideways. Columns are a fixed width, so one page IS one
+  // column — the board never stops half way across a driver's day.
+  const strip = useRef(null);
+  const [stripOver, setStripOver] = useState(false);
+  const [stripAt, setStripAt] = useState({ start: true, end: false });
+
+  const measureStrip = useCallback(() => {
+    const el = strip.current;
+    if (!el) return;
+    const room = el.scrollWidth - el.clientWidth;
+    setStripOver(room > 4);
+    setStripAt({ start: el.scrollLeft <= 2, end: el.scrollLeft >= room - 2 });
+  }, []);
+
+  useEffect(() => {
+    measureStrip();
+    window.addEventListener('resize', measureStrip);
+    return () => window.removeEventListener('resize', measureStrip);
+  }, [measureStrip, board.drivers.length, board.jobs.length]);
+
+  const pageColumns = (dir) => {
+    const el = strip.current;
+    if (!el) return;
+    const col = el.querySelector('.disp-col');
+    const step = (col?.getBoundingClientRect().width || 300) + 14;   // + the gap
+    el.scrollBy({ left: dir * step, behavior: 'smooth' });
+  };
 
   const byDriver = (id) => board.jobs.filter((j) => j.driverId === id)
     .sort((a, b) => (a.seq ?? 99) - (b.seq ?? 99) || String(a.windowStart).localeCompare(String(b.windowStart)));
@@ -343,6 +460,12 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
           <button type="button" className="btn" disabled={busy}
             title="Pull in Bargain Bay delivery orders that aren't on the board yet"
             onClick={pullBargainBay}>Pull Bargain Bay orders</button>
+          <form className="disp-addnum" onSubmit={addByNumber}>
+            <input value={addNum} onChange={(e) => setAddNum(e.target.value)}
+              placeholder="BB-1078" aria-label="Add a Bargain Bay order by number"
+              title="Put one order on the board by number — works for orders older than the pull looks back" />
+            <button type="submit" className="btn" disabled={busy || !addNum.trim()}>Add order</button>
+          </form>
           <a className="btn" href={`/admin/dispatch/print?date=${board.date}`} target="_blank" rel="noopener noreferrer">Print run sheet</a>
           <button type="button" className="btn accent" onClick={() => setAdding((v) => !v)}>
             {adding ? 'Close' : '+ Add job'}
@@ -374,7 +497,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
                     <b>{sk.order}</b> — {sk.reason}
                     {sk.canForce && (
                       <button type="button" className="disp-pull-add" disabled={busy}
-                        onClick={() => addOrderAnyway(sk.order)}>Add anyway</button>
+                        onClick={() => addOrderAnyway(sk.order, sk.needsAddress)}>Add anyway</button>
                     )}
                   </li>
                 ))}
@@ -400,12 +523,14 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
         </div>
       )}
 
-      <div className="disp-cols">
-        <section className="disp-col">
-          <h3 className="disp-col-head">
-            To assign
-            <span className="disp-count">{unassignedToday.length + board.unscheduled.length}</span>
-          </h3>
+      <div className="disp-strip">
+        {stripOver && (
+          <button type="button" className="disp-page left" disabled={stripAt.start}
+            onClick={() => pageColumns(-1)} aria-label="Previous column">‹</button>
+        )}
+        <div className="disp-cols" ref={strip} onScroll={measureStrip}>
+        <BoardColumn title="To assign" bodyKey={`${unassignedToday.length}-${board.unscheduled.length}`}
+          count={unassignedToday.length + board.unscheduled.length}>
           {unassignedToday.length === 0 && board.unscheduled.length === 0 && (
             <p className="hint">Nothing waiting. Everything on {prettyDate(board.date)} has a driver.</p>
           )}
@@ -420,11 +545,11 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
               {board.unscheduled.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                   onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-              onRecord={onRecord} />
+                  onRecord={onRecord} />
               ))}
             </>
           )}
-        </section>
+        </BoardColumn>
 
         {board.drivers.length === 0 && (
           <section className="disp-col">
@@ -437,20 +562,22 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
           const stops = byDriver(d.id);
           const left = stops.filter((j) => !['done', 'failed', 'cancelled'].includes(j.status)).length;
           return (
-            <section key={d.id} className="disp-col">
-              <h3 className="disp-col-head">
-                {d.name}
-                <span className="disp-count">{stops.length ? `${left}/${stops.length}` : '0'}</span>
-              </h3>
+            <BoardColumn key={d.id} title={d.name} bodyKey={String(stops.length)}
+              count={stops.length ? `${left}/${stops.length}` : '0'}>
               {stops.length === 0 && <p className="hint">No stops on this day.</p>}
               {stops.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                   onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-              onRecord={onRecord} />
+                  onRecord={onRecord} />
               ))}
-            </section>
+            </BoardColumn>
           );
         })}
+        </div>
+        {stripOver && (
+          <button type="button" className="disp-page right" disabled={stripAt.end}
+            onClick={() => pageColumns(1)} aria-label="Next column">›</button>
+        )}
       </div>
       </div>
       )}

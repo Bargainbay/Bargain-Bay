@@ -746,10 +746,40 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .disp-daylabel { font-weight: 600; color: var(--charcoal); }
 .disp-bar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* The board strip: columns side by side, with a page arrow at each end. The
+   arrows only appear when the columns actually run off the screen — this gets
+   used on a warehouse touchscreen with no trackpad, where a horizontal scroll
+   area nobody can see the edge of is a column nobody knows exists. */
+.disp-strip { position: relative; display: flex; align-items: stretch; gap: 4px; }
 .disp-cols {
   display: flex; gap: 14px; align-items: flex-start;
-  overflow-x: auto; padding-bottom: 10px;
+  overflow-x: auto; padding-bottom: 10px; flex: 1 1 auto; scroll-behavior: smooth;
 }
+.disp-page {
+  flex: 0 0 30px; align-self: center; height: 78px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--charcoal); font-size: 20px; line-height: 1; cursor: pointer; padding: 0;
+}
+.disp-page:disabled { opacity: .3; cursor: default; }
+/* Each column scrolls its own stops, so the columns stay level with each other
+   and one busy driver doesn't push the rest of the board off the screen. */
+.disp-col-body { max-height: 68vh; overflow-y: auto; overscroll-behavior: contain; }
+.disp-scroll {
+  display: block; width: 100%; padding: 2px 0; margin: 0 0 4px;
+  background: var(--tint); border: 1px solid var(--line-soft); border-radius: 6px;
+  color: var(--charcoal); font-size: 11px; line-height: 1.4; cursor: pointer;
+}
+.disp-scroll.down { margin: 4px 0 0; }
+.disp-scroll:disabled { opacity: .3; cursor: default; }
+/* Which company the stop is for, and its order number — a board that mixes
+   Bargain Bay deliveries with other companies' service calls has to say so. */
+.disp-tag.is-src { background: transparent; border: 1px solid var(--line); color: var(--charcoal); }
+.disp-tag.is-src.is-bb { border-color: var(--charcoal); font-weight: 800; }
+.disp-order { color: var(--charcoal); }
+/* Put one order on the board by number — the way in for anything the pull
+   didn't look at. */
+.disp-addnum { display: flex; gap: 4px; align-items: center; }
+.disp-addnum input { width: 104px; padding: 6px 8px; font-size: 13px; }
 .disp-col {
   flex: 0 0 300px; min-width: 0;
   background: var(--card); border: 1px solid var(--line);
@@ -840,6 +870,11 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
      is unusable one-handed in a warehouse. */
   .disp-cols { display: block; overflow-x: visible; }
   .disp-col { width: 100%; flex: none; margin-bottom: 12px; }
+  /* Stacked columns on a phone: no sideways paging to do, and a scroll area
+     inside a scroll area is misery on a touchscreen. */
+  .disp-page { display: none; }
+  .disp-col-body { max-height: none; overflow-y: visible; }
+  .disp-scroll { display: none; }
   .disp-bar-actions { width: 100%; }
 }
 
