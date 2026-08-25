@@ -171,6 +171,12 @@ the paper run sheet that replaces it.
   therefore sorts by `window_start` and may only reorder stops whose windows
   OVERLAP — a route can never be resequenced across a promise, which is what
   keeps the cheap Directions API sufficient instead of the fleet solver.
+- **A service call is raised against one of OUR sales or an external client.**
+  The form asks which first: "Something we sold" searches past buyers (name /
+  email / phone / BB- number), then lists their orders — picking one fills the
+  address, names the unit, and stores `service_tickets.order_id` so a warranty
+  call always points back at the sale. "External client" skips all of it and is
+  typed by hand. Lookups: `findServiceCustomers` / `ordersForServiceCall`.
 - **A service ticket is the customer's PROBLEM; a job is one visit against it**
   (`service_tickets`, `jobs.ticket_id`). They're separate because a repair
   routinely takes several trips, and "how many open service calls?" has to count

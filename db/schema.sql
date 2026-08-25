@@ -434,3 +434,5 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS parts_used    text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS parts_needed  text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS signed_by     text;
 CREATE INDEX IF NOT EXISTS idx_jobs_ticket ON jobs(ticket_id) WHERE ticket_id IS NOT NULL;
+-- A warranty call on something we sold points back at the sale.
+ALTER TABLE service_tickets ADD COLUMN IF NOT EXISTS order_id int REFERENCES orders(id) ON DELETE SET NULL;

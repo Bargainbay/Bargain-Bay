@@ -45,6 +45,15 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
   const [services, setServices] = useState([]);
   const toggleService = (k) => setServices((xs) => (xs.includes(k) ? xs.filter((v) => v !== k) : [...xs, k]));
   const [appliance, setAppliance] = useState('');
+  // Service calls are either against something WE sold — in which case the
+  // order tells us the customer, the address and the unit — or for an outside
+  // client, where it's all typed. Defaults to ours; that's the common case.
+  const [who, setWho] = useState('bb');
+  const [custQ, setCustQ] = useState('');
+  const [custHits, setCustHits] = useState([]);
+  const [picked, setPicked] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [orderId, setOrderId] = useState('');
   const [issue, setIssue] = useState('');
   const [driverId, setDriverId] = useState('');
   const [what, setWhat] = useState('');
@@ -105,6 +114,43 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
     finally { setBusy(false); }
   }
 
+  // Find a past buyer by name, email, phone or BB number.
+  async function searchCustomers(q) {
+    setCustQ(q);
+    if (q.trim().length < 2) { setCustHits([]); return; }
+    try {
+      const d = await fetch(`/api/admin/dispatch?view=customers&q=${encodeURIComponent(q)}`).then((r) => r.json());
+      setCustHits(d.customers || []);
+    } catch { setCustHits([]); }
+  }
+
+  // Picking the buyer loads their purchases to choose from.
+  async function pickCustomer(c) {
+    setPicked(c); setCustHits([]); setCustQ('');
+    setCustomerName(c.name || ''); setPhone(c.phone || '');
+    setEmail(c.email || '');
+    if (c.address) setAddress(c.address);
+    if (c.city) setCity(c.city);
+    if (c.postal) setPostal(c.postal);
+    try {
+      const d = await fetch(`/api/admin/dispatch?view=orders&email=${encodeURIComponent(c.email)}`).then((r) => r.json());
+      setOrders(d.orders || []);
+    } catch { setOrders([]); }
+  }
+
+  // Picking the order fills the address it went to and names the unit.
+  function pickOrder(id) {
+    setOrderId(id);
+    const o = orders.find((x) => String(x.id) === String(id));
+    if (!o) return;
+    if (o.address) setAddress(o.address);
+    if (o.city) setCity(o.city);
+    if (o.postal) setPostal(o.postal);
+    if (o.phone) setPhone(o.phone);
+    if (o.name) setCustomerName(o.name);
+    if (!appliance && o.items?.length) setAppliance(o.items.map((i) => i.title).join(', '));
+  }
+
   async function submit(e) {
     e.preventDefault();
     setBusy(true); setErr('');
@@ -119,6 +165,8 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           windowStart: windowStart || null,
           windowEnd: windowEnd || null,
           shipmentType: shipmentType || null, services, appliance, issue,
+          orderId: type === 'service_call' && who === 'bb' && orderId ? orderId : null,
+          source: type === 'service_call' && who === 'bb' ? 'bargain_bay' : 'manual',
           driverId: driverId || null,
           notes,
           items: what.split(',').map((s) => s.trim()).filter(Boolean).map((d) => ({ description: d }))
@@ -137,6 +185,65 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
       <h3 style={{ marginTop: 0 }}>New job</h3>
       {err && <div className="error-box">{err}</div>}
 
+      {type === 'service_call' && (
+        <div className="field">
+          <label>Who is this for</label>
+          <div className="svc-chips">
+            <button type="button" className={'svc-chip' + (who === 'bb' ? ' is-on' : '')}
+              onClick={() => setWho('bb')}>Something we sold</button>
+            <button type="button" className={'svc-chip' + (who === 'ext' ? ' is-on' : '')}
+              onClick={() => { setWho('ext'); setPicked(null); setOrders([]); setOrderId(''); }}>
+              External client
+            </button>
+          </div>
+
+          {who === 'bb' && !picked && (
+            <div style={{ marginTop: 8 }}>
+              <input value={custQ} onChange={(e) => searchCustomers(e.target.value)} autoComplete="off"
+                placeholder="Find the customer — name, email, phone, or BB- number…" />
+              {custHits.length > 0 && (
+                <div className="disp-hits">
+                  {custHits.map((c) => (
+                    <button type="button" key={c.email} onClick={() => pickCustomer(c)}>
+                      <span><strong>{c.name}</strong> <span className="hint" style={{ margin: 0 }}>· {c.email}</span></span>
+                      <span className="hint" style={{ margin: 0 }}>{c.orders} order{c.orders === 1 ? '' : 's'}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {custQ.trim().length >= 2 && custHits.length === 0 && (
+                <div className="hint">Nobody matches. If they didn&apos;t buy from us, switch to External client.</div>
+              )}
+            </div>
+          )}
+
+          {who === 'bb' && picked && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                <strong>{picked.name}</strong>
+                <span className="hint" style={{ margin: 0 }}>{picked.email}</span>
+                <button type="button" className="disp-toggle"
+                  onClick={() => { setPicked(null); setOrders([]); setOrderId(''); }}>change</button>
+              </div>
+              <label style={{ fontSize: 13, fontWeight: 500 }}>Which order needs the visit</label>
+              <select value={orderId} onChange={(e) => pickOrder(e.target.value)}>
+                <option value="">Not tied to an order</option>
+                {orders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.orderNumber} · {o.date} · {o.items.map((i) => i.title).join(', ').slice(0, 60) || 'no items'}
+                  </option>
+                ))}
+              </select>
+              <div className="hint">
+                {orders.length === 0
+                  ? 'No orders found for them.'
+                  : 'Picking one fills the address and names the unit, and ties the ticket to that sale.'}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="form-2col">
         <div className="field">
           <label>Job type</label>
@@ -146,7 +253,7 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
             <option value="pickup">Pickup</option>
           </select>
         </div>
-        <div className="field">
+        <div className="field" style={{ display: type === 'service_call' && who === 'bb' ? 'none' : undefined }}>
           <label>For which client</label>
           {addingClient ? (
             <div style={{ display: 'flex', gap: 6 }}>
