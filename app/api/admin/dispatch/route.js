@@ -4,12 +4,14 @@ import { setDriverByEmail } from '../../../../lib/drivers';
 import { hasDb } from '../../../../lib/db';
 import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
-  upsertClient, importReadyBargainBayOrders, dispatchBoard,
+  upsertClient, importReadyBargainBayOrders, importOneBargainBayOrder, dispatchBoard,
+  jobInvoiceForPayment, noteJobEvent,
   setTicketStatus, listTickets,
   findServiceCustomers, ordersForServiceCall,
   completeJob, setJobPay, payReport, bookRevisit,
   setJobCharge, billingSummary, invoiceClientJobs
 } from '../../../../lib/jobs';
+import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -66,6 +68,11 @@ export async function POST(req) {
     if (body.action === 'import_bb') {
       return NextResponse.json({ ok: true, ...(await importReadyBargainBayOrders({ by: who(s) })) });
     }
+    // "Add anyway": one order the pull declined — a pickup that does need a
+    // driver, a cancelled job coming back, an order still at Pending payment.
+    if (body.action === 'import_order') {
+      return NextResponse.json({ ok: true, ...(await importOneBargainBayOrder(body.orderNumber, { by: who(s) })) });
+    }
     if (body.action === 'invoice_client') {
       // Raising an invoice is money leaving the building — admin only.
       if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can invoice a client.' }, { status: 403 });
@@ -117,6 +124,23 @@ export async function PATCH(req) {
     }
     if (body.action === 'status') {
       return NextResponse.json({ ok: true, job: await setJobStatus(jobId, body.status, body, who(s)) });
+    }
+    // The balance collected at the door, recorded against the order's invoice
+    // from the board. Staff-level, like recording a payment on the Invoices page
+    // — the person who takes the money has to be the person who can log it, or
+    // it gets logged tomorrow from a note in someone's pocket.
+    if (body.action === 'record_payment') {
+      const target = await jobInvoiceForPayment(jobId);
+      const r = await recordInvoicePayment(target.invoiceId, {
+        amount: body.amount, method: String(body.method || '').trim(), note: body.note
+      });
+      await noteJobEvent(
+        jobId, 'payment',
+        `${PAYMENT_METHODS[String(body.method || '').trim()] || 'Payment'} $${Number(body.amount).toFixed(2)} on ${target.invoiceNumber}`
+        + (r.fullyPaid ? ' — paid in full' : ` — $${Number(r.balance).toFixed(2)} still owing`),
+        who(s)
+      );
+      return NextResponse.json({ ok: true, invoice: r, invoiceNumber: target.invoiceNumber });
     }
     if (body.action === 'service_complete' || body.action === 'complete') {
       return NextResponse.json({ ok: true, job: await completeJob(jobId, body, who(s)) });

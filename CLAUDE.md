@@ -200,6 +200,30 @@ the paper run sheet that replaces it.
   the "Pull Bargain Bay orders" button). Deliberate: nothing new hangs off the
   order-status path the storefront depends on, and the dispatcher controls the
   day. Idempotent — an order that already has a job is skipped.
+  **Eligible = `confirmed` | `ready` | `out_for_delivery`** (`IMPORTABLE_ORDER_STATUSES`)
+  with `delivery_method = 'delivery'`, an address, and no job already against the
+  order. `out_for_delivery` is in that list because it is what the owner reaches
+  for when an order is loaded and going out today; without it the pull silently
+  did nothing (BB-1179). A job that was **cancelled** still blocks the automatic
+  re-import — cancelling is how a stop comes OFF the board, and a pull that undid
+  that every morning would be worse.
+  **The pull reports what it declined and why** (`skipped[]`), because a button
+  that can no-op in silence is how an order ends up delivered from memory, and
+  every reason except a missing address carries **"Add anyway"**
+  (`importOneBargainBayOrder`, POST `action: 'import_order'`) so the dispatcher
+  is never sent off to edit an order to fix a board they're looking at.
+- **The balance is collected from the job card.** PATCH `action: 'record_payment'`
+  → `jobInvoiceForPayment` → `recordInvoicePayment` on the ORDER'S invoice, so
+  there is one money ledger and not a dispatch copy of one; the job gets a
+  `job_events` line. Staff-level, matching the Invoices page — the person who
+  takes the cash has to be the one who can log it, or it gets logged tomorrow
+  from a note in a pocket. Paying off the balance settles the invoice through
+  the normal `markInvoicePaid` path (receipt, order → `confirmed`).
+- **What's still owed prints on the stop.** `balancesForOrders` reads the live
+  invoice ledger (`total − payments` on an `open`/`partial` invoice) and the board,
+  the run sheet and `/driver` all show "Collect $X". Read live on every load,
+  never stamped on the job: the shop's flow is deposit now / balance on delivery,
+  so a payment taken at 11am has to change what the driver is told at 3pm.
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of
