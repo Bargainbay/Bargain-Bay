@@ -1,41 +1,55 @@
-import { redirect } from 'next/navigation';
 import { getSession } from '../../lib/auth';
 import { hasDb } from '../../lib/db';
-import { isDriver, driverDeliveries } from '../../lib/drivers';
-import { SALES_EMAIL } from '../../lib/constants';
-import DriverDeliveries from '../../components/DriverDeliveries';
+import { isDriver, touchDriverSeen } from '../../lib/drivers';
+import { driverJobs } from '../../lib/driver-jobs';
+import DriverStops from '../../components/DriverStops';
+import DriverShell from '../../components/DriverShell';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Driver — Bargain Bay', robots: { index: false } };
+export const metadata = {
+  title: 'My stops',
+  robots: { index: false },
+  manifest: '/driver.webmanifest',
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'My stops' }
+};
+export const viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#3A3937' };
 
-export default async function DriverPage() {
+// The driver app. Its own screen, its own session, and nothing on it that isn't
+// a stop — no site chrome, no admin, no navigation to get lost in.
+//
+// Drivers reach it by tapping a texted link (see /d/[token]) and then adding it
+// to the home screen; from then on this page IS the app.
+export default async function DriverPage({ searchParams }) {
+  const sp = await searchParams;
   const session = await getSession();
-  if (!session) redirect('/login?next=/driver');
-  if (!hasDb()) {
-    return <div className="narrow"><div className="panel">Database not configured.</div></div>;
-  }
-  if (!(await isDriver(session))) {
+  const driver = session && hasDb() ? await isDriver(session) : false;
+
+  if (!driver) {
     return (
-      <div className="narrow">
-        <div className="panel">
-          <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Driver access only</h1>
-          <p style={{ fontSize: 14 }}>
-            Your account ({session.email}) isn&apos;t set up as a delivery driver. Ask the office to add you, or email {SALES_EMAIL}.
+      <DriverShell>
+        <div className="drv-card">
+          <h1 className="drv-hello" style={{ marginTop: 0 }}>Not signed in on this phone</h1>
+          <p className="hint">
+            {sp?.link === 'expired'
+              ? 'That link has already been used or has expired — ask the office to text you a new one.'
+              : 'Ask the office to text you your sign-in link. Tapping it once signs this phone in for good.'}
           </p>
         </div>
-      </div>
+      </DriverShell>
     );
   }
 
-  const deliveries = await driverDeliveries(session.userId);
+  touchDriverSeen(session.userId).catch(() => {});
+  const initial = await driverJobs(session.userId).catch(() => ({ date: null, stops: [] }));
+
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto' }}>
-      <h1 style={{ color: 'var(--charcoal)' }}>Your deliveries</h1>
-      <p className="hint" style={{ marginBottom: 14 }}>
-        Hi {session.name || 'there'} — here are the stops assigned to you. Tap <b>Start delivery</b> when you head out;
-        the customer is notified automatically.
-      </p>
-      <DriverDeliveries initialDeliveries={deliveries} />
-    </div>
+    <DriverShell>
+      {sp?.welcome === '1' && (
+        <div className="drv-welcome">
+          You&apos;re signed in. Tap <b>Share → Add to Home Screen</b> to keep this a tap away.
+        </div>
+      )}
+      <DriverStops initial={initial} driverName={session.name || ''} />
+    </DriverShell>
   );
 }

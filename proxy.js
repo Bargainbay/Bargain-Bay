@@ -14,12 +14,16 @@ const RS_HOSTS = new Set(
 
 // What the RS host is allowed to serve. Everything else lands on the board.
 //   /admin, /driver  — the people using it
+//   /d/<token>       — the link texted to a driver to sign their phone in.
+//                      It is sent on the RS host, so redirecting it here would
+//                      bounce every driver to a board they can't see.
 //   /api             — the board's own calls; blocking these breaks the page
 //   /invoice         — where an RS client lands from their invoice email
 //   /login, /logout  — you can't reach /admin without being able to sign in
 const ALLOWED = [
   /^\/admin(\/|$)/,
   /^\/driver(\/|$)/,
+  /^\/d\/[^/]+$/,
   /^\/api(\/|$)/,
   /^\/invoice(\/|$)/,
   /^\/login$/,

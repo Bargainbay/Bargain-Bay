@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { get } from '@vercel/blob';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { podPhotoPath, orderSignaturePath } from '../../../../lib/pod';
+import { jobPhotoPath, jobSignaturePath } from '../../../../lib/driver-jobs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -15,9 +16,16 @@ export async function GET(req) {
   const url = new URL(req.url);
   const photoId = url.searchParams.get('photo');
   const sigOrder = url.searchParams.get('sig');
+  // The same proof, captured against a dispatch JOB rather than an order — a
+  // service call has no order behind it, and its photos would otherwise be
+  // write-only.
+  const jobPhotoId = url.searchParams.get('jobphoto');
+  const jobSig = url.searchParams.get('jobsig');
   let pathname = null;
   if (photoId) pathname = await podPhotoPath(Number(photoId));
   else if (sigOrder) pathname = await orderSignaturePath(Number(sigOrder));
+  else if (jobPhotoId) pathname = await jobPhotoPath(Number(jobPhotoId));
+  else if (jobSig) pathname = await jobSignaturePath(Number(jobSig));
   if (!pathname) return new NextResponse('Not found', { status: 404 });
 
   try {

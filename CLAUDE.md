@@ -277,6 +277,58 @@ the paper run sheet that replaces it.
   staff too (it's a company name). Adding a **driver** stays `isAdmin` — that one
   is a real access grant.
 
+## The driver app (phase 2, added 2026-08-25)
+`/driver` is the driver's whole world: today's stops, and the three things they
+do to one. It replaced the order-based screen — that one could only ever show
+Bargain Bay deliveries, so a service call for another company was invisible to
+the person doing it. **It is jobs now** (`lib/driver-jobs.js`), and the old
+order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
+`PodCapture` are deleted.
+
+- **Sign-in is a text message.** The office adds a driver by NAME + MOBILE
+  (`addDriverByPhone`); they get an SMS, tap it once, and that phone is signed in
+  for 180 days. No signup, no password — that friction is what kept drivers on
+  paper. The account is still a `users` row (so `jobs.driver_id`, the board's
+  columns and the pay report are unchanged), with a synthetic
+  `driver-<digits>@drivers.bargainbay.ca` email and a deliberately unusable
+  password hash: there is nothing to phish, and the account is on no staff list,
+  so a driver's phone can only ever reach driver surfaces.
+- `driver_links` stores the **hash** of the token, single-use, 14 days. Minting a
+  new one kills the outstanding ones, so there is exactly one live key per
+  driver. The link is ALWAYS shown to the office too — a failed Twilio send must
+  never leave a driver unable to start.
+- **`/d/<token>` must stay in `proxy.js`'s allow-list.** The link is texted on
+  the RS host; without it every driver is bounced to a board they can't see.
+- **Nothing waits on the network.** Every tap is written to IndexedDB
+  (`lib/driver-outbox.js`) and sent afterwards — basements and rural stops lose
+  signal, and a completion that fails and loses the signature sends drivers back
+  to paper. Photos and the signature are BLOBS in the queue, which is why it's
+  IndexedDB and not localStorage. The queue drains on load, on `online`, and on a
+  30s timer (a van drives in and out of signal without firing an event).
+- **Replays must be free.** Each queued item carries a `ref`; `jobs.pod_ref` is
+  the completion already recorded, so a second upload is answered, not written.
+  Status changes are idempotent server-side (a replayed "arrived" on a finished
+  stop returns ok). Refreshing the list is SKIPPED while anything is queued —
+  the queue is the truth until it drains, or the server's older answer would
+  wipe the driver's screen.
+- **A finished BB delivery marks its ORDER delivered** (`markOrderDeliveredForJob`)
+  — customer email, delivered_at, units sold — exactly as the old screen did.
+  A deposit sale still in `pending_payment` IS moved: the goods physically left,
+  and `markInvoicePaid` only promotes `pending_payment`/`confirmed`, so settling
+  the balance later can't drag it backwards.
+- **The balance is collected in the app**: the close-out screen prefills what's
+  owed, and the payment is queued FIRST — if the phone gets one thing out before
+  the signal dies again, it should be the money.
+- **Assigning from Operations reaches the board too** (`assignDelivery` creates
+  and assigns the job). Two assignment screens that don't agree is how a driver
+  ends up with a stop nobody told them about.
+- Proof of delivery lives on the job (`jobs.signature_path`, `job_photos`) and is
+  readable by the office through `/api/admin/pod?jobsig=`/`?jobphoto=`, shown on
+  the board card. Proof nobody can look at is not proof.
+- PWA: `public/driver.webmanifest` + `public/driver-sw.js` (shell only —
+  network-first for the page, never caches `/api`). Installed via **Add to Home
+  Screen**; there is no app store and no native build.
+
 ## Two businesses, one codebase — BRANDS
 Bargain Bay is the consumer storefront. **RS Solutions is the delivery/service
 company** whose clients are other businesses (Transource et al). A client must
