@@ -261,6 +261,25 @@ both brands run the same code.
 `RESEND_FROM_RS` overrides the sender if the verified mailbox differs from
 `Service@rssolutions.ca`.
 
+### dispatch.rssolutions.ca
+`proxy.js` (Next 16's replacement for `middleware.js`) makes the RS host serve
+**only dispatch**: `/admin`, `/driver`, `/api`, `/invoice`, `/login`, `/logout`
+pass through; everything else redirects to `/admin/dispatch`. Without it the RS
+Solutions hostname would happily serve the Bargain Bay storefront — the exact
+confusion the separate domain exists to prevent. `bargainbay.ca` returns from the
+proxy immediately and is unaffected. Hosts come from `DISPATCH_HOSTS`
+(comma-separated, defaults to `dispatch.rssolutions.ca`).
+
+**Do not narrow the allow-list without thinking**: dropping `/api` breaks the
+board's own fetches, and dropping `/invoice` strands every RS client following a
+link from their invoice email.
+
+Invoice links in emails use `brandFor(invoice.brand).url()`, so an RS invoice
+points at dispatch.rssolutions.ca and never at bargainbay.ca (`RS_SITE_URL`
+overrides). DNS: CNAME `dispatch` → `c07d32108fe1e3a0.vercel-dns-017.com.` at
+GoDaddy, plus a `_vercel` TXT that only existed for ownership verification and
+can be deleted.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
