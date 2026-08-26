@@ -144,8 +144,8 @@ export default async function RunSheetPage({ searchParams }) {
                     {j.phone ? ` · ${j.phone}` : ''}<br />
                     {j.pickupAddress
                       ? <><b>FROM</b> {[j.pickupAddress, j.pickupCity].filter(Boolean).join(', ')}
-                          {(j.pickupName || j.pickupPhone) && (
-                            <> · {[j.pickupName, j.pickupPhone].filter(Boolean).join(' · ')}</>
+                          {(j.pickupCompany || j.pickupName || j.pickupPhone) && (
+                            <> · {[j.pickupCompany, j.pickupName, j.pickupPhone].filter(Boolean).join(' · ')}</>
                           )}<br />
                           <b>TO</b> {[j.address, j.city, j.postal].filter(Boolean).join(', ')}</>
                       : [j.address, j.city, j.postal].filter(Boolean).join(', ')}

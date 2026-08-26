@@ -586,7 +586,12 @@ the paper run sheet that replaces it.
   a job can never appear on two invoices. Needs `clients.contact_email`.
 - **A job can be a transfer** — `pickup_address` / `pickup_city` /
   `pickup_postal` set means it runs FROM there TO `address`, and it carries its
-  own contact: `pickup_name` / `pickup_phone`. **Both ends of a transfer are
+  own **company AND contact**: `pickup_company` / `pickup_name` / `pickup_phone`.
+  Both, because they are different things and a BOL names both — "Avron School
+  and Daycare Supplies" is written on the building the driver is looking for,
+  "AMRITA NADAR" is who to ask for inside. The drop end has had this split all
+  along (`customer_name` + `phone`); the pickup end was carrying a person in the
+  field that should hold a business. **Both ends of a transfer are
   somewhere a driver has to be let into**, so both need somebody to ring — a
   locked door with no number on the sheet is how a transfer becomes a wasted
   morning. Shown on the board card, the run sheet and the driver's stop, and the

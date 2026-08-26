@@ -177,8 +177,10 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
         {job.pickupAddress
           ? <>
               {[job.pickupAddress, job.pickupCity].filter(Boolean).join(', ')}
-              {(job.pickupName || job.pickupPhone) && (
-                <span className="disp-pickup-who"> ({[job.pickupName, job.pickupPhone].filter(Boolean).join(' · ')})</span>
+              {(job.pickupCompany || job.pickupName || job.pickupPhone) && (
+                <span className="disp-pickup-who">
+                  {' ('}{[job.pickupCompany, job.pickupName, job.pickupPhone].filter(Boolean).join(' · ')}{')'}
+                </span>
               )}
               {' '}<b>→</b> {[job.address, job.city].filter(Boolean).join(', ')}
             </>

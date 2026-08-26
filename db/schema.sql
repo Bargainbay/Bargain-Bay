@@ -493,6 +493,8 @@ CREATE INDEX IF NOT EXISTS idx_jobs_invoice ON jobs(invoice_id) WHERE invoice_id
 -- A second person on the same stop: one van, one run, two names.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS driver2_id     int;
 CREATE INDEX IF NOT EXISTS idx_jobs_driver2 ON jobs(driver2_id, job_date) WHERE driver2_id IS NOT NULL;
+-- Who we collect FROM (the shipper), as distinct from who to ring there.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_company text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_name    text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_phone   text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_address text;

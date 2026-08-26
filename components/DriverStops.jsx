@@ -213,9 +213,9 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
           <b>FROM</b> {[stop.pickupAddress, stop.pickupCity].filter(Boolean).join(', ')}
           {/* Who to ring at the pickup end. A locked door with nobody to call is
               how a transfer turns into a wasted morning. */}
-          {(stop.pickupName || stop.pickupPhone) && (
+          {(stop.pickupCompany || stop.pickupName || stop.pickupPhone) && (
             <div className="drv-pickup-who">
-              {stop.pickupName}
+              {[stop.pickupCompany, stop.pickupName].filter(Boolean).join(' · ')}
               {stop.pickupPhone && (
                 <> · <a href={`tel:${stop.pickupPhone}`}>{stop.pickupPhone}</a></>
               )}
