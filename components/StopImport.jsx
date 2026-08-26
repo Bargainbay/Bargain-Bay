@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { IMPORT_FIELDS, parseTable, guessMapping, toJobs } from '../lib/stop-import';
+import { IMPORT_FIELDS, parseTable, guessMapping, toJobs, QUEBEC_DROP } from '../lib/stop-import';
 
 // A client's spreadsheet, onto the board.
 //
@@ -20,6 +20,10 @@ export default function StopImport({ clients = [], date, onDone }) {
   const [mapping, setMapping] = useState(null);
   const [clientId, setClientId] = useState('');
   const [jobDate, setJobDate] = useState(date || '');
+  // The owner's standing rule: a load bound for Quebec is our PICKUP and a drop
+  // at the cross-dock, not a drive to Montreal. On by default because that is
+  // the arrangement, and a checkbox because the day it isn't, it isn't.
+  const [quebecRule, setQuebecRule] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [result, setResult] = useState(null);
@@ -28,8 +32,10 @@ export default function StopImport({ clients = [], date, onDone }) {
   const table = book ? { headers: book.headers, rows: book.rows } : pasted;
   const map = mapping || (table.headers.length ? guessMapping(table.headers) : {});
   const parsed = useMemo(
-    () => (table.rows.length ? toJobs(table.rows, map, { clientId: clientId || null, jobDate: jobDate || null }) : []),
-    [table, map, clientId, jobDate]
+    () => (table.rows.length
+      ? toJobs(table.rows, map, { clientId: clientId || null, jobDate: jobDate || null, quebecRule })
+      : []),
+    [table, map, clientId, jobDate, quebecRule]
   );
   const good = parsed.filter((p) => !p.blocking);
 
@@ -151,6 +157,10 @@ export default function StopImport({ clients = [], date, onDone }) {
         <label>
           Day (for rows with no date)
           <input type="date" value={jobDate} onChange={(e) => setJobDate(e.target.value)} />
+        </label>
+        <label className="imp-check" title={`Delivery becomes ${QUEBEC_DROP.address}, ${QUEBEC_DROP.city}; the shipper becomes the pickup.`}>
+          <input type="checkbox" checked={quebecRule} onChange={(e) => setQuebecRule(e.target.checked)} />
+          Quebec loads = pickup only, drop at {QUEBEC_DROP.city}
         </label>
       </div>
 
