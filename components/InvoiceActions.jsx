@@ -97,9 +97,13 @@ export default function InvoiceActions({ invoice }) {
           {busy === 'void' ? '…' : 'Void'}
         </button>
       )}
-      {status === 'paid' && (
+      {(status === 'paid' || status === 'partial') && (
         <a href={`/admin/invoices/${number}/refund`} style={{ ...link, color: 'var(--danger, #c0392b)' }}
-          title="Refund the whole invoice or just the unit(s) coming back">Refund…</a>
+          title={status === 'partial'
+            ? 'Hand back some or all of the deposit taken on this invoice'
+            : 'Refund the whole invoice, just the unit(s) coming back (optionally keeping a restocking fee), or a bare amount'}>
+          Refund…
+        </a>
       )}
       {(status === 'open' || status === 'void') && (
         <button style={danger} disabled={!!busy}

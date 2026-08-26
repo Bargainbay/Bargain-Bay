@@ -12,6 +12,7 @@ import { resolvePrices } from '../../../lib/pricing';
 import { sendOrderEmails } from '../../../lib/email';
 import { readAttribution, ensureAttributionColumns } from '../../../lib/attribution';
 import { createAndSendInvoice } from '../../../lib/invoices';
+import { validateCoupon, redeemCouponWithClient, releaseCouponForOrder, ensureCouponSchema } from '../../../lib/coupons';
 import { upsertCustomer } from '../../../lib/customers';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +38,7 @@ export async function POST(req) {
   // When off, the customer chooses how they'll pay offline: e-transfer or in person.
   const cardOnline = CARD_PAYMENTS_ENABLED && stripeConfigured();
   const paymentMethod = body.paymentMethod === 'in_person' ? 'in_person' : 'etransfer';
+  const couponCode = String(body.couponCode || '').trim();
 
   // ---- validation ----
   if (!skus.length) return NextResponse.json({ error: 'Your cart is empty.' }, { status: 400 });
@@ -76,11 +78,35 @@ export async function POST(req) {
   const priced = await resolvePrices(items, session);
   const priceOf = (u) => Number(priced.get(u.id)?.price ?? u.price);
 
-  // ---- totals (HST applies to goods + delivery) ----
+  // ---- promo code (authoritative — the browser's figure is never used) ----
+  // Re-checked here against the prices just resolved, so a code edited, expired
+  // or exhausted between the Apply button and this request can't get through.
+  // A code that no longer holds is dropped and the order proceeds at full price
+  // rather than failing: losing the sale over a promo is the worse outcome, and
+  // the response says which happened.
+  let coupon = null;
+  let discount = 0;
+  let couponError = null;
+  if (couponCode) {
+    try {
+      const goods = round2(items.reduce((a, u) => a + priceOf(u), 0));
+      const eligible = round2(items.filter((u) => !priced.get(u.id)?.onClearance).reduce((a, u) => a + priceOf(u), 0));
+      const check = await validateCoupon(couponCode, { subtotal: goods, eligibleSubtotal: eligible, email });
+      if (check.ok) { coupon = check.coupon; discount = check.discount; }
+      else couponError = check.error;
+    } catch (e) {
+      console.error('coupon check failed (continuing at full price)', e.message);
+      couponError = 'We couldn’t apply that promo code.';
+    }
+  }
+
+  // ---- totals (the discount comes off the goods; HST applies to what's left,
+  //      plus delivery — a third-party cost we pass through undiscounted) ----
   const subtotal = round2(items.reduce((a, u) => a + priceOf(u), 0));
   const deliveryFee = deliveryMethod === 'delivery' ? DELIVERY_FEE : 0;
-  const hst = round2((subtotal + deliveryFee) * HST_RATE);
-  const total = round2(subtotal + deliveryFee + hst);
+  const discounted = round2(Math.max(0, subtotal - discount));
+  const hst = round2((discounted + deliveryFee) * HST_RATE);
+  const total = round2(discounted + deliveryFee + hst);
 
   // ---- optional account creation ----
   let userId = session?.userId || null;
@@ -112,17 +138,23 @@ export async function POST(req) {
   // First-touch marketing attribution from the bb_attr cookie (best-effort).
   const attr = readAttribution(req);
   try { await ensureAttributionColumns(); } catch (e) { console.error('attribution columns', e.message); }
+  // Unconditional: the INSERT below names coupon_code/discount whether or not a
+  // code was entered, so a database that hasn't run the migration would fail
+  // EVERY checkout, not just the ones with a promo.
+  try { await ensureCouponSchema(); } catch (e) { console.error('coupon columns', e.message); }
   let order;
   try {
     order = await withTransaction(async (client) => {
       const { rows } = await client.query(
         `INSERT INTO orders (user_id, email, name, phone, delivery_method, address, city, postal,
-                             status, subtotal, hst, total, payment_method, source, utm_campaign, referrer)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',$9,$10,$11,$12,$13,$14,$15)
+                             status, subtotal, hst, total, payment_method, source, utm_campaign, referrer,
+                             coupon_code, discount)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',$9,$10,$11,$12,$13,$14,$15,$16,$17)
          RETURNING id`,
         [userId, email, name, phone || null, deliveryMethod,
          address || null, city || null, postal || null, subtotal, hst, total,
-         cardOnline ? null : paymentMethod, attr.source, attr.campaign, attr.referrer]
+         cardOnline ? null : paymentMethod, attr.source, attr.campaign, attr.referrer,
+         coupon ? coupon.code : null, discount]
       );
       const orderId = rows[0].id;
       const { rows: numbered } = await client.query(
@@ -138,6 +170,9 @@ export async function POST(req) {
           [orderId, u.id, u.title || `${u.make} ${u.model}`, priceOf(u)]
         );
       }
+      // Book the redemption in the same transaction as the order it belongs to —
+      // a coupon must never be counted against an order that failed to be created.
+      if (coupon) await redeemCouponWithClient(client, coupon, { orderId, email, subtotal, discount });
       return { id: orderId, orderNumber: numbered[0].order_number };
     });
   } catch (e) {
@@ -168,7 +203,10 @@ export async function POST(req) {
       name, email, phone,
       items: [
         ...items.map((u) => ({ description: u.title || `${u.make} ${u.model}`, amount: priceOf(u), sku: u.id })),
-        ...(deliveryFee ? [{ description: 'Local delivery (Pickering & area)', amount: deliveryFee, kind: 'service' }] : [])
+        ...(deliveryFee ? [{ description: 'Local delivery (Pickering & area)', amount: deliveryFee, kind: 'service' }] : []),
+        // The discount rides as a negative service line, so the invoice totals
+        // what the customer actually pays and the code is on the paperwork.
+        ...(discount ? [{ description: `Promo code ${coupon.code}`, amount: -discount, kind: 'service' }] : [])
       ],
       addHst: hst > 0,
       deliveryMethod, address, city, postal,
@@ -194,6 +232,7 @@ export async function POST(req) {
           priceCents: Math.round(priceOf(u) * 100)
         })),
         ...(deliveryFee ? [{ name: 'Local delivery (Pickering & area)', priceCents: Math.round(deliveryFee * 100) }] : []),
+        ...(discount ? [{ name: `Promo code ${coupon.code}`, priceCents: -Math.round(discount * 100) }] : []),
         { name: 'HST 13% (Ontario)', priceCents: Math.round(hst * 100) }
       ];
       const { url, sessionId } = await createCheckoutSession({
@@ -207,11 +246,13 @@ export async function POST(req) {
       if (sessionId) {
         await query('UPDATE orders SET stripe_session_id = $2 WHERE id = $1', [order.id, sessionId]).catch(() => {});
       }
-      payload = { url, orderNumber: order.orderNumber };
+      payload = { url, orderNumber: order.orderNumber, discount, couponCode: coupon ? coupon.code : null, couponError };
     } catch (e) {
       console.error('Stripe session failed — cancelling order', e);
       await query("UPDATE orders SET status = 'cancelled' WHERE id = $1", [order.id]).catch(() => {});
       await query('DELETE FROM reservations WHERE order_id = $1', [order.id]).catch(() => {});
+      // The order never happened, so the promo code shouldn't have been spent.
+      if (coupon) await releaseCouponForOrder(order.id);
       return NextResponse.json({ error: 'Payment provider is unavailable right now. Please try again in a few minutes.' }, { status: 502 });
     }
   } else {
@@ -220,10 +261,11 @@ export async function POST(req) {
     // marks it Confirmed once the money lands. The long reservation holds the unit.
     // Customer receipt + owner alert (fire-and-forget; never blocks the order).
     sendOrderEmails(
-      { orderNumber: order.orderNumber, name, email, deliveryMethod, address, city, postal, subtotal, hst, total, paymentMethod },
+      { orderNumber: order.orderNumber, name, email, deliveryMethod, address, city, postal,
+        subtotal, hst, total, paymentMethod, discount, couponCode: coupon ? coupon.code : null },
       items.map((u) => ({ title: u.title || `${u.make} ${u.model}`, price: priceOf(u) }))
     ).catch((e) => console.error('order emails failed', e.message));
-    payload = { orderUrl: trackUrl, orderNumber: order.orderNumber };
+    payload = { orderUrl: trackUrl, orderNumber: order.orderNumber, discount, couponCode: coupon ? coupon.code : null, couponError };
   }
 
   const res = NextResponse.json(payload);

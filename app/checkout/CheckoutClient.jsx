@@ -17,6 +17,13 @@ export default function CheckoutClient({ catalog, session, prefill }) {
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // Promo code. `applied` is what the server said the code is worth; it is only
+  // ever a preview — /api/checkout recomputes the discount from its own prices,
+  // so a stale figure here can't turn into a stale figure on the order.
+  const [promo, setPromo] = useState('');
+  const [applied, setApplied] = useState(null);
+  const [promoMsg, setPromoMsg] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
   const acDone = useRef(false);
 
   useEffect(() => {
@@ -65,9 +72,35 @@ export default function CheckoutClient({ catalog, session, prefill }) {
 
   const delivery = form.deliveryMethod === 'delivery' ? DELIVERY_FEE : 0;
   const subtotal = round2(items.reduce((a, u) => a + Number(u.price), 0));
-  const hst = round2((subtotal + delivery) * HST_RATE);
-  const total = round2(subtotal + delivery + hst);
+  const discount = applied ? Math.min(applied.discount, subtotal) : 0;
+  const hst = round2((subtotal - discount + delivery) * HST_RATE);
+  const total = round2(subtotal - discount + delivery + hst);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function applyPromo() {
+    const code = promo.trim();
+    if (!code) { setPromoMsg('Enter a promo code.'); return; }
+    setPromoBusy(true); setPromoMsg('');
+    try {
+      const res = await fetch('/api/coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, skus, email: form.email })
+      });
+      const d = await res.json();
+      if (!d.ok) { setApplied(null); setPromoMsg(d.error || 'That code isn’t valid.'); return; }
+      setApplied({ code: d.code, discount: Number(d.discount) || 0, label: d.label });
+      setPromoMsg('');
+    } catch {
+      setPromoMsg('Couldn’t check that code — please try again.');
+    } finally {
+      setPromoBusy(false);
+    }
+  }
+
+  function clearPromo() {
+    setApplied(null); setPromo(''); setPromoMsg('');
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -76,7 +109,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skus, ...form })
+        body: JSON.stringify({ skus, ...form, couponCode: applied ? applied.code : '' })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -87,6 +120,12 @@ export default function CheckoutClient({ catalog, session, prefill }) {
           setError(data.error || 'Checkout failed. Please try again.');
         }
         return;
+      }
+      // The server has the final say on the code. If it dropped it, the order
+      // still stands — say so rather than sending them on believing otherwise.
+      if (applied && data.couponError) {
+        setApplied(null);
+        setError(`${data.couponError} Your order was placed at full price — check the summary before you send payment.`);
       }
       clearCart();
       window.location.href = data.url || data.orderUrl;
@@ -210,7 +249,33 @@ export default function CheckoutClient({ catalog, session, prefill }) {
             <div className="summary-row" style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 10 }}>
               <span>Subtotal</span><span>{money(subtotal)}</span>
             </div>
+            {discount > 0 && (
+              <div className="summary-row">
+                <span>Promo {applied.code}</span><span>−{money(discount)}</span>
+              </div>
+            )}
             <div className="summary-row"><span>{form.deliveryMethod === 'delivery' ? 'Local delivery' : 'Warehouse pickup'}</span><span>{delivery ? money(delivery) : 'Free'}</span></div>
+            <div style={{ margin: '10px 0 4px' }}>
+              {applied ? (
+                <div className="hint" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <span><b>{applied.code}</b> applied — {applied.label}</span>
+                  <button type="button" className="linkish" onClick={clearPromo}>Remove</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input aria-label="Promo code" placeholder="Promo code" value={promo}
+                      onChange={(e) => setPromo(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyPromo(); } }}
+                      style={{ flex: 1, minWidth: 0, fontSize: 16, textTransform: 'uppercase' }} />
+                    <button type="button" className="btn" disabled={promoBusy || !promo.trim()} onClick={applyPromo}>
+                      {promoBusy ? '…' : 'Apply'}
+                    </button>
+                  </div>
+                  {promoMsg && <div className="hint" style={{ color: 'var(--danger, #c0392b)', marginTop: 6 }}>{promoMsg}</div>}
+                </>
+              )}
+            </div>
             <div className="summary-row"><span>HST (13%)</span><span>{money(hst)}</span></div>
             <div className="summary-row total"><span>Total (CAD)</span><span>{money(total)}</span></div>
             {error && <div className="error-box">{error}</div>}
