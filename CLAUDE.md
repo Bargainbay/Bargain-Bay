@@ -471,6 +471,19 @@ the paper run sheet that replaces it.
   complete row and flagged, rather than failing the upload. The rows carry a
   visible **"read by AI — check every row"** banner in the preview; the model
   proposes and a dispatcher still confirms.
+- **A BOL bound for Quebec is OUR PICKUP, not a drive to Montreal.** The owner's
+  standing arrangement: those loads are collected from the shipper and dropped at
+  the cross-dock (`QUEBEC_DROP`, default 1213 International Boulevard, Burlington
+  — the address already on the board for every one of them, overridable by env).
+  So `toJobs` rewrites the stop: destination becomes the drop, the SHIPPER block
+  becomes the pickup (with its contact and phone), and the real consignee is kept
+  in the notes because that is what the paperwork and the phone call both refer
+  to. `isQuebecBound` trusts the province column when it has one and falls back
+  to city names, since plenty of BOLs leave province blank. It is a **checkbox,
+  on by default**, and the redirect is stated in the row's problems — a stop
+  quietly redirected to another city is exactly the kind of thing that should
+  never happen invisibly. A QC row with no pickup address is BLOCKED: a
+  cross-dock drop with nowhere to collect from is not a job.
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of
