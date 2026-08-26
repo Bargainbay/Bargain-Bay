@@ -2,9 +2,28 @@ import { redirect } from 'next/navigation';
 import { getSession, isStaff } from '../../../../../lib/auth';
 import { hasDb, query } from '../../../../../lib/db';
 import { BUSINESS_LEGAL } from '../../../../../lib/constants';
+import PrintButton from '../../../../../components/PrintButton';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Proof of delivery', robots: { index: false } };
+
+// document.title is the saved PDF's filename — a POD wants to land in the
+// client's folder as the job it belongs to, not as "Proof of delivery (3)".
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  let label = '';
+  try {
+    if (hasDb()) {
+      const { rows } = await query(
+        `SELECT j.job_number, o.order_number, j.customer_name
+           FROM jobs j LEFT JOIN orders o ON o.id = j.order_id WHERE j.id = $1`,
+        [Number(id)]
+      );
+      const j = rows[0];
+      if (j) label = [j.order_number || j.job_number, j.customer_name].filter(Boolean).join(' ');
+    }
+  } catch { /* a title is not worth failing a page over */ }
+  return { title: `POD ${label}`.trim(), robots: { index: false } };
+}
 
 // The signed Proof of Delivery, on paper. Same form the crew used to carry as a
 // pad — the point of capturing it on the phone was never to keep it in a
@@ -45,7 +64,15 @@ export default async function PodPage({ params }) {
   return (
     <div className="pod">
       <style>{`
-        @media print { @page { margin: 14mm; } .pod-noprint { display: none !important; } }
+        @media print {
+          @page { margin: 14mm; }
+          .pod-noprint { display: none !important; }
+          .wrap { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+          .pod { padding: 0; max-width: none; }
+          /* Photos of the damage are the point of printing this — a claim with
+             the pictures dropped is a claim with nothing in it. */
+          .pod .shots img { break-inside: avoid; }
+        }
         .pod { font-family: var(--font-body, system-ui); color: #111; background: #fff; max-width: 840px; margin: 0 auto; padding: 24px; }
         .pod h1 { font-size: 19px; text-align: center; margin: 0 0 18px; }
         .pod h2 { font-size: 15px; text-align: center; margin: 18px 0 6px; }
@@ -65,8 +92,12 @@ export default async function PodPage({ params }) {
         .pod .shots img { width: 150px; height: 150px; object-fit: cover; border: 1px solid #999; }
       `}</style>
 
-      <div className="pod-noprint" style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+      <div className="pod-noprint" style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
         <a className="btn" href="/admin/dispatch">← Back to the board</a>
+        <PrintButton label="Print / Save as PDF" />
+        <span className="hint" style={{ margin: 0 }}>
+          Choose <b>Save as PDF</b> to email it to a client.
+        </span>
       </div>
 
       <h1>Proof of Delivery form</h1>
