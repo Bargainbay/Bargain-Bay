@@ -48,7 +48,10 @@ export default function StopImport({ clients = [], date, onDone }) {
     // the mapping selects say "Column 3" and the dispatcher points them
     // themselves.
     const [head, ...rest] = d.rows;
-    return { name: d.name, sheet: d.sheet, sheets: d.sheets, headers: head, rows: rest, file };
+    return {
+      name: d.name, sheet: d.sheet, sheets: d.sheets || [], headers: head, rows: rest, file,
+      read: d.read, sender: d.sender, warning: d.warning
+    };
   }
 
   async function onFile(e) {
@@ -58,7 +61,7 @@ export default function StopImport({ clients = [], date, onDone }) {
     setErr(''); setMapping(null); setResult(null); setBook(null); setText('');
     setBusy(true);
     try {
-      if (/\.xlsx$/i.test(file.name)) {
+      if (/\.(xlsx|pdf|png|jpe?g|heic)$/i.test(file.name)) {
         setBook(await loadSheet(file));
       } else if (/\.xls$/i.test(file.name)) {
         // The pre-2007 binary format is a different thing entirely.
@@ -104,10 +107,21 @@ export default function StopImport({ clients = [], date, onDone }) {
         heading row; the columns are matched for you.
       </p>
       {book && (
-        <div className="imp-file">
+        <div className={'imp-file' + (book.read === 'ai' ? ' is-ai' : '')}>
           Reading <b>{book.name}</b>
-          {book.sheets.length > 1 ? ` · sheet “${book.sheet}” of ${book.sheets.length}` : ''}
+          {book.sheets?.length > 1 ? ` · sheet “${book.sheet}” of ${book.sheets.length}` : ''}
           {' · '}{book.rows.length} row{book.rows.length === 1 ? '' : 's'}
+          {book.sender ? ` · from ${book.sender}` : ''}
+          {/* A PDF was READ, not parsed. Say so where the rows are, not in a
+              help page nobody opens — a wrong address here is a van at the
+              wrong door. */}
+          {book.read === 'ai' && (
+            <div className="imp-ai-warn">
+              A PDF has no columns, so this was read by AI. <b>Check every row before you add it</b> —
+              especially addresses and postal codes.
+            </div>
+          )}
+          {book.warning && <div className="imp-ai-warn">{book.warning}</div>}
         </div>
       )}
 
@@ -116,10 +130,10 @@ export default function StopImport({ clients = [], date, onDone }) {
 
       <div className="imp-row">
         <label className="btn">
-          {busy && !book ? 'Reading…' : 'Choose a file (.xlsx or .csv)'}
-          <input type="file" accept=".xlsx,.csv,.tsv,.txt" onChange={onFile} style={{ display: 'none' }} />
+          {busy && !book ? 'Reading…' : 'Choose a file (.xlsx, .pdf or .csv)'}
+          <input type="file" accept=".xlsx,.pdf,.csv,.tsv,.txt,image/*" onChange={onFile} style={{ display: 'none' }} />
         </label>
-        {book && (
+        {book?.sheets?.length > 1 && (
           <label>
             Sheet
             <select value={book.sheet} onChange={(e) => switchSheet(e.target.value)} disabled={busy}>

@@ -453,6 +453,24 @@ the paper run sheet that replaces it.
   **Item cells split on `;` and `|` but NEVER on commas** — "One pallet -
   radiator, 175 lbs" is one thing, and splitting it puts a phantom line on a POD
   the customer signs.
+- **A PDF run sheet or BOL is READ, not parsed** (`lib/pdf-stops.js`, same route).
+  A spreadsheet is a table; a bill of lading is a LAYOUT — boxes, per-page
+  headers, consignee in one corner and shipper in another — and a parser guessing
+  at one produces wrong addresses silently, which is worse than reading none. So
+  it goes to Claude as a `document` block exactly as `lib/purchase-intake.js`
+  already does for supplier invoices, and comes back as **the same table shape**
+  the spreadsheet importer produces (`PDF_COLUMNS` is literally a header row the
+  mapper knows), so preview, problems and confirm are one code path. Photos of a
+  paper sheet work too — same block, `image` instead of `document`.
+  The prompt's hard rules are the ones that matter: **never invent an address, a
+  postal code or a phone number** (a missing field is fine, a wrong one sends a
+  van to the wrong door); the delivery address is the CONSIGNEE's, never the
+  shipper's or the carrier's own; a depot NAME with no street number is not a
+  pickup address; and items join with `;` because a comma inside one item makes
+  it look like two. A reply cut off at `max_tokens` is repaired back to the last
+  complete row and flagged, rather than failing the upload. The rows carry a
+  visible **"read by AI — check every row"** banner in the preview; the model
+  proposes and a dispatcher still confirms.
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of
