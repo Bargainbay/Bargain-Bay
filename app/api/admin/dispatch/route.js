@@ -76,6 +76,25 @@ export async function POST(req) {
     if (body.action === 'import_bb') {
       return NextResponse.json({ ok: true, ...(await importReadyBargainBayOrders({ by: who(s) })) });
     }
+    // A client's spreadsheet, as stops. The rows have already been previewed by
+    // whoever pasted them; this re-validates every one anyway, because a payload
+    // is a payload no matter which screen it came from.
+    if (body.action === 'import_stops') {
+      const stops = Array.isArray(body.stops) ? body.stops.slice(0, 300) : [];
+      if (!stops.length) return NextResponse.json({ error: 'Nothing to import.' }, { status: 400 });
+      const created = [];
+      const failed = [];
+      for (const stop of stops) {
+        try {
+          const job = await createJob({ ...stop, source: 'import', createdBy: who(s) });
+          created.push({ job: job.jobNumber, customerName: stop.customerName || null });
+        } catch (e) {
+          // One bad row must not cost the other twenty-nine.
+          failed.push({ customerName: stop.customerName || null, address: stop.address || null, error: e?.message || 'could not be added' });
+        }
+      }
+      return NextResponse.json({ ok: true, added: created.length, created, failed });
+    }
     // "Add anyway": one order the pull declined — a pickup that does need a
     // driver, a cancelled job coming back, an order still at Pending payment.
     if (body.action === 'import_order') {

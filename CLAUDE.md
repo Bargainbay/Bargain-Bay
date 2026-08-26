@@ -342,6 +342,22 @@ the paper run sheet that replaces it.
 - **Places autocomplete is per INPUT, not per form** (`attachAutocomplete(e, which)`).
   The pickup end of a transfer is a real address somebody has to find; it was
   being typed by hand while the drop-off got autocomplete.
+- **A client's sheet becomes stops on the Import tab** (`lib/stop-import.js` +
+  `components/StopImport.jsx`, POST `action: 'import_stops'`). **Paste is the
+  primary input, not upload** — what people do is select the rows in the Excel
+  the client emailed and hit copy, and Excel's clipboard is a TAB-separated
+  table. That one input therefore covers the attachment AND the stops typed into
+  an email body, with nothing to save first. CSV upload too; `.xlsx` is a zip of
+  XML and says so rather than importing gibberish.
+  The parser lives in `lib/stop-import.js` and knows NOTHING about the page —
+  the future email inbox hands it the same rows. It sniffs the delimiter, handles
+  quoted commas (addresses are full of them), decides whether row 1 is a header,
+  guesses the mapping from ~90 header aliases, and normalises dates (incl. Excel
+  serials) and times. **Nothing is written until every row has been previewed**
+  with its problems named; a missing address blocks that row and only that row.
+  **Item cells split on `;` and `|` but NEVER on commas** — "One pallet -
+  radiator, 175 lbs" is one thing, and splitting it puts a phantom line on a POD
+  the customer signs.
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of
