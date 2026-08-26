@@ -353,6 +353,14 @@ the paper run sheet that replaces it.
   NOT editable here — charge goes through `setJobCharge` (which refuses to move
   an invoiced one) and changing a delivery into a service call would orphan its
   ticket. Editing a BB-linked job says so: it changes the STOP, not the order.
+- **`assignJob` only writes `seq` when it is GIVEN.** It used to set it
+  unconditionally, so every other thing that function does — changing the driver,
+  pairing a second one, moving the day — silently wiped the stop's place in the
+  run. That was harmless while nothing was ordered and became a quiet reshuffle
+  of somebody's route the day the board started numbering. The one case that DOES
+  clear it is a stop changing hands: a position only means something inside one
+  person's run, and carrying "4" into another driver's column drops it into the
+  middle of a route it was never part of.
 - **The run is ordered from the card** — a numbered seat plus ▲▼ on every stop in
   a driver's column, calling `resequence` with the WHOLE column in its new order
   (renumbering only the card that moved would leave two stops claiming one
