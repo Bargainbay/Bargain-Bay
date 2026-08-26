@@ -1071,3 +1071,33 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
   margin-top: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12.5px; word-break: break-all; color: var(--charcoal);
 }
+
+/* ── Operations, folded ──────────────────────────────────────────────────────
+   The page is nine tools end to end. Each one gets a header you can shut, and
+   the header is the whole width so it's a target you can hit without aiming. */
+.ops-fold { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); overflow: hidden; }
+.ops-fold-head {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  background: var(--tint); border: none; border-bottom: 1px solid transparent;
+  padding: 12px 14px; cursor: pointer; font: inherit; text-align: left; color: var(--charcoal);
+}
+.ops-fold.is-open .ops-fold-head { border-bottom-color: var(--line); }
+.ops-fold-head:hover { filter: brightness(.98); }
+.ops-fold-caret { font-size: 13px; width: 12px; color: var(--muted); }
+.ops-fold-title { font-weight: 800; font-size: 16px; }
+.ops-fold-count {
+  font-size: 12px; font-weight: 700; background: var(--card); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; font-variant-numeric: tabular-nums;
+}
+.ops-fold-hint { margin-left: auto; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.ops-fold-body { padding: 4px 14px 14px; }
+/* Each tool draws its own <h2> with a live count. The fold header says the same
+   thing, so the inner one goes — and with it the 28px top margin that used to
+   space these apart. */
+.ops-fold-body > * > h2:first-child,
+.ops-fold-body > h2:first-child { display: none; }
+.ops-fold-body > .panel { margin-top: 0; border: none; padding: 0; background: none; box-shadow: none; }
+@media (max-width: 700px) {
+  .ops-fold-body { padding: 4px 8px 12px; }
+  .ops-fold-hint { display: none; }
+}
