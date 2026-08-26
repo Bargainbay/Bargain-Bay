@@ -458,6 +458,15 @@ the paper run sheet that replaces it.
 - **The card can move a stop to another day** (the Day picker → `assignJob`'s
   `jobDate`). Before that the only route was cancel-and-retype, which is absurd
   for the most ordinary thing that happens to a delivery.
+- **Every date or time rendered on the SERVER must name its zone.** Vercel runs
+  as UTC and the business runs on Toronto time, so `toLocaleTimeString` with no
+  `timeZone` emailed the office **8:02 pm** for a stop the driver finished at
+  **4:02** — and would print TOMORROW's date on a POD for anything closed after
+  8pm, on a form a customer had signed. `torontoTime` / `torontoDate` in
+  `lib/constants.js` are the only way these should be formatted server-side. The
+  driver app and the board format in the BROWSER, which is already on Toronto
+  time, which is exactly why the discrepancy showed up as the app and the email
+  disagreeing rather than as one obviously wrong clock.
 - **Dispatch mail goes to the RS inbox** (`DISPATCH_INBOX()` = `DISPATCH_EMAIL`
   env, else `SERVICE_EMAIL` = Service@rssolutions.ca). Left to `sendEmail`'s
   default it falls back to `NOTIFY_EMAIL`, a **Bargain Bay gmail** — the people

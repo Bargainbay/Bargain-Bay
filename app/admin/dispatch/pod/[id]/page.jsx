@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession, isStaff } from '../../../../../lib/auth';
 import { hasDb, query } from '../../../../../lib/db';
-import { BUSINESS_LEGAL } from '../../../../../lib/constants';
+import { BUSINESS_LEGAL, torontoDate } from '../../../../../lib/constants';
 import PrintButton from '../../../../../components/PrintButton';
 
 export const dynamic = 'force-dynamic';
@@ -104,7 +104,7 @@ export default async function PodPage({ params }) {
 
       <div className="meta">
         Customer Name: <b>{j.customer_name || '—'}</b> &nbsp; Order: <b>{j.order_number || j.job_number}</b>
-        &nbsp; Date: <b>{when ? new Date(when).toLocaleDateString('en-CA') : '—'}</b>
+        &nbsp; Date: <b>{torontoDate(when) || '—'}</b>
         <br />
         {[j.address, j.city, j.postal].filter(Boolean).join(', ')}
         {j.driver_name ? <> &nbsp;·&nbsp; Delivered by: <b>{j.driver_name}</b></> : null}
@@ -188,7 +188,7 @@ export default async function PodPage({ params }) {
           <div className="cap">Signature</div>
         </div>
         <div className="sigbox" style={{ flex: '0 0 150px' }}>
-          <div className="sigline">{when ? new Date(when).toLocaleDateString('en-CA') : ' '}</div>
+          <div className="sigline">{torontoDate(when) || ' '}</div>
           <div className="cap">Date</div>
         </div>
       </div>
