@@ -1075,16 +1075,22 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 /* ── Operations, folded ──────────────────────────────────────────────────────
    The page is nine tools end to end. Each one gets a header you can shut, and
    the header is the whole width so it's a target you can hit without aiming. */
-.ops-fold { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); overflow: hidden; }
+.ops-bar { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; }
+.ops-bar-label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; }
+.ops-bar .btn { padding: 5px 12px; font-size: 13px; }
+.ops-fold { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+/* The header stays put while a 139-row section scrolls under it, so the way out
+   is always one click away rather than a scroll back to where you came in. */
 .ops-fold-head {
+  position: sticky; top: 0; z-index: 5; border-radius: 12px 12px 0 0;
   width: 100%; display: flex; align-items: center; gap: 10px;
   background: var(--tint); border: none; border-bottom: 1px solid transparent;
-  padding: 12px 14px; cursor: pointer; font: inherit; text-align: left; color: var(--charcoal);
+  padding: 14px; cursor: pointer; font: inherit; text-align: left; color: var(--charcoal);
 }
 .ops-fold.is-open .ops-fold-head { border-bottom-color: var(--line); }
 .ops-fold-head:hover { filter: brightness(.98); }
 .ops-fold-caret { font-size: 13px; width: 12px; color: var(--muted); }
-.ops-fold-title { font-weight: 800; font-size: 16px; }
+.ops-fold-title { font-weight: 800; font-size: 17px; }
 .ops-fold-count {
   font-size: 12px; font-weight: 700; background: var(--card); color: var(--muted);
   border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; font-variant-numeric: tabular-nums;

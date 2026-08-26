@@ -9,8 +9,12 @@ import { useEffect, useState } from 'react';
 // complaint.
 //
 // Each section remembers its own state per browser, so the shape somebody sets
-// up on Monday is still there on Tuesday. Everything except Orders starts shut:
-// orders are what the page is for, the rest are what you go looking for.
+// up on Monday is still there on Tuesday.
+//
+// EVERYTHING starts shut, Orders included. Leaving orders open sounded helpful
+// and wasn't: 139 rows of table pushed the other nine bars so far down the page
+// that the folds looked like they had never shipped. A page that opens as ten
+// bars is the point.
 const KEY = (id) => `ops-fold:${id}`;
 
 export default function OpsSection({ id, title, count, children, defaultOpen = false }) {
@@ -23,6 +27,10 @@ export default function OpsSection({ id, title, count, children, defaultOpen = f
       const saved = localStorage.getItem(KEY(id));
       if (saved === 'open' || saved === 'shut') setOpen(saved === 'open');
     } catch { /* private window — defaults are fine */ }
+    // Open all / close all, broadcast from the bar at the top of the page.
+    const all = (e) => setOpen(e.detail === 'open');
+    window.addEventListener('ops-fold-all', all);
+    return () => window.removeEventListener('ops-fold-all', all);
   }, [id]);
 
   function toggle() {
