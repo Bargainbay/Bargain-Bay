@@ -45,6 +45,7 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
   // A transfer runs from one address to another — five pieces out of Mississauga
   // into Burlington is one job with two ends, and the driver needs both.
   const [isTransfer, setIsTransfer] = useState(!!job?.pickupAddress);
+  const [pickupCompany, setPickupCompany] = useState(job?.pickupCompany || '');
   const [pickupName, setPickupName] = useState(job?.pickupName || '');
   const [pickupPhone, setPickupPhone] = useState(job?.pickupPhone || '');
   const [pickupAddress, setPickupAddress] = useState(job?.pickupAddress || '');
@@ -190,6 +191,7 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           windowStart: windowStart || null,
           windowEnd: windowEnd || null,
           shipmentType: shipmentType || null, services, appliance, issue,
+          pickupCompany: isTransfer ? pickupCompany : null,
           pickupName: isTransfer ? pickupName : null,
           pickupPhone: isTransfer ? pickupPhone : null,
           pickupAddress: isTransfer ? pickupAddress : null,
@@ -325,9 +327,14 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           <label>Pick up from</label>
           {/* Both ends of a transfer are somewhere a driver has to be let into,
               so both ends need somebody to ring. */}
+          {/* The business we collect from — what's written on the building —
+              then who to ask for. The drop end has had both all along; this end
+              was carrying a person in the field that should hold a company. */}
+          <input value={pickupCompany} onChange={(e) => setPickupCompany(e.target.value)}
+            placeholder="Shipper / who we collect from" autoComplete="off" style={{ marginBottom: 8 }} />
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             <input value={pickupName} onChange={(e) => setPickupName(e.target.value)}
-              placeholder="Contact at pickup" autoComplete="off" />
+              placeholder="Contact there" autoComplete="off" />
             <input style={{ width: 170 }} value={pickupPhone} onChange={(e) => setPickupPhone(e.target.value)}
               placeholder="Their phone" inputMode="tel" autoComplete="off" />
           </div>
