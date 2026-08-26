@@ -180,7 +180,17 @@ export default async function OrderPage({ params, searchParams }) {
         <h2>Items</h2>
         {order.items.map((it) => (
           <div className="summary-row" key={it.id}>
-            <span>{it.title} <span style={{ color: 'var(--muted)', fontSize: 12 }}>({it.sku})</span></span>
+            <span>
+              {it.title}
+              {/* Service, discount and trade-in lines carry no SKU — an empty
+                  pair of brackets after every one of them reads as a bug. */}
+              {it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({it.sku})</span> : null}
+              {it.kind === 'trade_in' && (
+                <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>
+                  We&apos;ll collect this at {order.delivery_method === 'delivery' ? 'delivery' : 'pickup'}.
+                </span>
+              )}
+            </span>
             <span>{money(it.price)}</span>
           </div>
         ))}

@@ -1,10 +1,8 @@
 'use client';
 import { useState, useRef } from 'react';
 import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
+import InvoiceLines, { blankItem, toPayload, subtotalOf } from './InvoiceLines';
 
-// Product lines default to a 1-year warranty (downgrade per item as needed).
-const blankItem = () => ({ description: '', amount: '', kind: 'unit', warrantyMonths: 12, cost: '' });
-const serviceItem = (description) => ({ description, amount: '', kind: 'service', warrantyMonths: null });
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 // Business days run on Toronto time (same as the dashboard's buckets).
 const todayToronto = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
@@ -61,17 +59,6 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
     } catch { acDone.current = false; }
   }
 
-  const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
-  const addRow = () => setItems((xs) => [...xs, blankItem()]);
-  const removeRow = (i) => setItems((xs) => (xs.length > 1 ? xs.filter((_, j) => j !== i) : xs));
-  // Add a service line (Installation/Delivery/Door Removal) — no SKU, no warranty,
-  // never touches inventory. Reuses the first empty row if there is one.
-  const addService = (label) => setItems((xs) => {
-    const empty = xs.findIndex((it) => !it.description && !it.amount);
-    const li = serviceItem(label);
-    return empty >= 0 ? xs.map((it, j) => (j === empty ? li : it)) : [...xs, li];
-  });
-
   // Every query word must appear somewhere in the unit's text, so multi-word
   // searches like "kitchenaid dishwasher" match (brand and type sit far apart
   // in the string; a plain substring match needs the whole phrase contiguous).
@@ -105,7 +92,7 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
     setQ('');
   }
 
-  const subtotal = items.reduce((a, it) => a + (Number(it.amount) || 0), 0);
+  const subtotal = subtotalOf(items);
   const hst = addHst ? subtotal * 0.13 : 0;
   const total = subtotal + hst;
   const fmt = (n) => '$' + n.toFixed(2);
@@ -117,7 +104,7 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
       const res = await fetch('/api/admin/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate })
+        body: JSON.stringify({ name, email, items: toPayload(items), addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not create the invoice.'); return; }
@@ -203,36 +190,7 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
         </div>
       )}
 
-      <label style={{ fontSize: 13, fontWeight: 500, display: 'block', margin: '4px 0 6px' }}>Line items</label>
-      {items.map((it, i) => (
-        <div key={i} className="inv-line">
-          <input className="inv-desc" value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} autoComplete="off" autoCorrect="off" autoCapitalize="sentences" spellCheck={false} placeholder={it.kind === 'service' ? 'Service description' : 'e.g. Whirlpool WRS321SDHZ refrigerator'} />
-          {it.kind === 'service' ? (
-            <span className="pill inv-tag">Service</span>
-          ) : (
-            <select className="inv-warr" value={it.warrantyMonths == null ? '' : it.warrantyMonths} onChange={(e) => setItem(i, 'warrantyMonths', e.target.value === '' ? null : Number(e.target.value))}
-              title="Warranty term shown on the invoice">
-              <option value={24}>2-yr warranty</option>
-              <option value={12}>1-yr warranty</option>
-              <option value={6}>6-mo warranty</option>
-              <option value={3}>3-mo warranty</option>
-              <option value="">No warranty</option>
-            </select>
-          )}
-          {it.kind !== 'service' && !it.sku && !hideCost && (
-            <input className="inv-cost" type="number" inputMode="decimal" min="0" step="0.01" value={it.cost ?? ''} onChange={(e) => setItem(i, 'cost', e.target.value)} placeholder="cost" title="Your cost for this unit (for margin) — fill in for a unit that isn't in inventory" />
-          )}
-          <input className="inv-amt" type="number" inputMode="decimal" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="price" />
-          <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
-        </div>
-      ))}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
-        <button type="button" className="btn" onClick={addRow}>+ Add line</button>
-        <span className="hint" style={{ margin: '0 0 0 4px' }}>Add a service:</span>
-        {SERVICES.map((s) => (
-          <button key={s} type="button" className="btn" style={{ fontSize: 12.5 }} onClick={() => addService(s)}>+ {s}</button>
-        ))}
-      </div>
+      <InvoiceLines items={items} setItems={setItems} services={SERVICES} showCost={!hideCost} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>

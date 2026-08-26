@@ -37,11 +37,18 @@ CREATE TABLE IF NOT EXISTS order_items (
   order_id int REFERENCES orders(id) ON DELETE CASCADE,
   sku      text,                              -- null for service/fee/ad-hoc lines (no unit SKU)
   title    text,
-  price    numeric(10,2)
+  price    numeric(10,2),                     -- negative on a discount / trade-in line
+  kind     text                               -- unit | service | discount | trade_in (null = unit)
 );
 -- Older DBs created sku NOT NULL; service/ad-hoc invoice lines have no SKU and
 -- must still bridge into an order, so relax it (idempotent).
 ALTER TABLE order_items ALTER COLUMN sku DROP NOT NULL;
+-- Mirrors invoice_items.kind: 'unit' | 'service' | 'discount' | 'trade_in'.
+-- Without it an order can't tell an appliance being DELIVERED from a trade-in
+-- being COLLECTED — both are just a title and a price — and the dispatch board,
+-- the run sheet and the driver all have to know the difference. NULL means unit
+-- (every row predating this column is one).
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS kind text;
 
 -- One row per SKU. A unit is "held" while expires_at is in the future.
 CREATE TABLE IF NOT EXISTS reservations (
@@ -387,8 +394,16 @@ CREATE TABLE IF NOT EXISTS jobs (
   created_at    timestamptz DEFAULT now(),
   started_at    timestamptz,
   arrived_at    timestamptz,
-  completed_at  timestamptz
+  completed_at  timestamptz,
+  -- A trade-in is an appliance we have BOUGHT and therefore have to come back
+  -- with. The credit itself lives on the order (order_items.kind='trade_in');
+  -- these record whether the thing actually made it onto the van, because
+  -- "we'll grab it next time" is how a unit we already paid for disappears.
+  trade_in_collected timestamptz,
+  trade_in_note      text
 );
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS trade_in_collected timestamptz;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS trade_in_note      text;
 
 CREATE TABLE IF NOT EXISTS job_items (
   id          serial PRIMARY KEY,

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import InvoiceLines, { fromInvoice, toPayload, subtotalOf } from './InvoiceLines';
 
 // Edit an invoice: the customer's details, the line items (add, remove, reprice,
 // change warranty, add a service or a unit from stock), HST, memo and issue date.
@@ -21,15 +22,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   const [address, setAddress] = useState(invoice.address || '');
   const [city, setCity] = useState(invoice.city || '');
   const [postal, setPostal] = useState(invoice.postal || '');
-  const [items, setItems] = useState(
-    (invoice.items || []).map((it) => ({
-      description: it.description || '',
-      amount: it.amount != null ? String(it.amount) : '',
-      sku: it.sku || null,
-      kind: it.kind === 'service' ? 'service' : 'unit',
-      warrantyMonths: it.kind === 'service' ? null : (it.warranty_months ?? it.warrantyMonths ?? 12)
-    }))
-  );
+  const [items, setItems] = useState(() => fromInvoice(invoice.items));
   const [addHst, setAddHst] = useState(Number(invoice.hst) > 0);
   const [memo, setMemo] = useState(invoice.memo || '');
   const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate || '');
@@ -42,11 +35,6 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   // pre-ticked — while money is still owed.
   const [resend, setResend] = useState(!settled);
 
-  const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
-  const addRow = () => setItems((xs) => [...xs, { description: '', amount: '', kind: 'unit', warrantyMonths: 12 }]);
-  const removeRow = (i) => setItems((xs) => xs.filter((_, j) => j !== i));
-  const addService = (label) => setItems((xs) => [...xs, { description: label, amount: '', kind: 'service', warrantyMonths: null }]);
-
   const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const matches = q.trim().length >= 2 ? inventory.filter((u) => tokens.every((t) => u.search.includes(t))).slice(0, 8) : [];
   function pickInventory(u) {
@@ -54,7 +42,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
     setQ('');
   }
 
-  const subtotal = items.reduce((a, it) => a + (Number(it.amount) || 0), 0);
+  const subtotal = subtotalOf(items);
   const hst = addHst ? subtotal * 0.13 : 0;
   const total = subtotal + hst;
   const fmt = (n) => '$' + n.toFixed(2);
@@ -70,7 +58,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
       const res = await fetch('/api/admin/invoices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items, addHst, memo,
+        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items: toPayload(items), addHst, memo,
           resend: resend && !settled,
           name, email, phone, deliveryMethod, address, city, postal,
           // Only send a date the owner actually changed — sending the original
@@ -162,36 +150,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
         </div>
       )}
 
-      <label style={{ fontSize: 13, fontWeight: 500, display: 'block', margin: '4px 0 6px' }}>Line items</label>
-      {items.map((it, i) => (
-        <div key={i} className="inv-line">
-          <input className="inv-desc" value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} autoComplete="off" autoCorrect="off" autoCapitalize="sentences" spellCheck={false} placeholder={it.kind === 'service' ? 'Service description' : 'e.g. Whirlpool WRS321SDHZ refrigerator'} />
-          {it.kind === 'service' ? (
-            <span className="pill inv-tag">Service</span>
-          ) : (
-            <select className="inv-warr" value={it.warrantyMonths == null ? '' : it.warrantyMonths} onChange={(e) => setItem(i, 'warrantyMonths', e.target.value === '' ? null : Number(e.target.value))}
-              title="Warranty term shown on the invoice">
-              <option value={24}>2-yr warranty</option>
-              <option value={12}>1-yr warranty</option>
-              <option value={6}>6-mo warranty</option>
-              <option value={3}>3-mo warranty</option>
-              <option value="">No warranty</option>
-            </select>
-          )}
-          {/* A service line may be negative — that's how a credit (a storefront
-              promo code, a goodwill knock-off) lives on an invoice. A unit line
-              can't be, and the server rejects it rather than dropping it. */}
-          <input className="inv-amt" type="number" inputMode="decimal" min={it.kind === 'service' ? undefined : 0} step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="0.00" />
-          <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
-        </div>
-      ))}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
-        <button type="button" className="btn" onClick={addRow}>+ Add line</button>
-        <span className="hint" style={{ margin: '0 0 0 4px' }}>Add a service:</span>
-        {SERVICES.map((s) => (
-          <button key={s} type="button" className="btn" style={{ fontSize: 12.5 }} onClick={() => addService(s)}>+ {s}</button>
-        ))}
-      </div>
+      <InvoiceLines items={items} setItems={setItems} services={SERVICES} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>

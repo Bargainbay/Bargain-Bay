@@ -143,6 +143,11 @@ export default async function InvoicePage({ params, searchParams }) {
                 {it.description}{it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({it.sku})</span> : null}
                 {lineRefunded && <span className="pill sold" style={{ fontSize: 11, marginLeft: 6 }}>Refunded</span>}
                 {w && !lineRefunded && <span style={{ display: 'block', fontSize: 12.5, color: 'var(--green, #0f6e56)' }}>✓ {w}</span>}
+                {it.kind === 'trade_in' && (
+                  <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>
+                    Trade-in — we collect this unit from you.
+                  </span>
+                )}
               </span>
               <span style={{ textDecoration: lineRefunded ? 'line-through' : 'none' }}>{money(it.amount)}</span>
             </div>

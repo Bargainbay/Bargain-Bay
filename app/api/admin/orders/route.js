@@ -25,7 +25,7 @@ export async function PATCH(req) {
   try {
     const order = await updateOrderStatus(id, status);
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-    const { rows: its } = await query('SELECT sku, title, price FROM order_items WHERE order_id = $1', [id]);
+    const { rows: its } = await query('SELECT sku, title, price, kind FROM order_items WHERE order_id = $1', [id]);
 
     if (status === 'cancelled') {
       await query('DELETE FROM reservations WHERE order_id = $1', [id]).catch(() => {});

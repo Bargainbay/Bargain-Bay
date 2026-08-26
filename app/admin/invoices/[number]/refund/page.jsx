@@ -2,7 +2,8 @@ import { redirect, notFound } from 'next/navigation';
 import { getSession, isAdmin, isStaff } from '../../../../../lib/auth';
 import { hasDb } from '../../../../../lib/db';
 import { getInvoiceByNumber, listInvoiceRefunds } from '../../../../../lib/invoices';
-import { money, round2 } from '../../../../../lib/constants';
+import { money, round2, normalizeLineKind } from '../../../../../lib/constants';
+import { creditFactorOf } from '../../../../../lib/invoice-lines';
 import AdminNav from '../../../../../components/AdminNav';
 import RefundControl from '../../../../../components/RefundControl';
 
@@ -47,20 +48,28 @@ export default async function RefundInvoicePage({ params }) {
   // payment rows, so it falls back to its total rather than refusing a refund.
   const collected = round2(Math.max(Number(invoice.amountPaid) || 0, invoice.status === 'paid' ? Number(invoice.total) || 0 : 0));
   const refundable = round2(Math.max(0, collected - refunded));
+  // The invoice charged less than its charged lines add up to when it carries a
+  // discount or a trade-in. Same helper the refund itself uses, so the figure
+  // previewed here is the one that will actually be handed back.
+  const creditFactor = creditFactorOf(invoice.items);
   const view = {
     id: invoice.id,
     number: invoice.number,
     status: invoice.status,
     hasHst: Number(invoice.hst) > 0,
     refundable,
+    // Only charged lines can come back — a discount or a trade-in credit isn't
+    // something the customer can return. They're shown for context and can't be
+    // picked, and `creditFactor` is how their value is taken off what IS picked.
     items: (invoice.items || []).map((it) => ({
       id: it.id,
       description: it.description,
       sku: it.sku || null,
-      kind: it.kind === 'service' ? 'service' : 'unit',
+      kind: normalizeLineKind(it.kind),
       amount: Number(it.amount) || 0,
       refunded: !!it.refunded_at
     })),
+    creditFactor,
     refunds: await listInvoiceRefunds(invoice.id).catch(() => [])
   };
 
