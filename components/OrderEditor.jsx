@@ -88,11 +88,15 @@ export default function OrderEditor({ order, initialItems, inventory = [], bridg
     setQ('');
   }
 
-  const fee = Math.max(0, (Number(order.total) - Number(order.subtotal) - Number(order.hst)) || 0);
+  // Mirrors updateOrderItems() in lib/orders.js — the delivery fee is whatever
+  // the total holds beyond goods, promo discount and tax.
+  const discount = Number(order.discount) || 0;
+  const fee = Math.max(0, (Number(order.total) - Number(order.subtotal) + discount - Number(order.hst)) || 0);
   const hasHst = Number(order.hst) > 0;
   const subtotal = items.reduce((a, it) => a + (Number(it.price) || 0), 0);
-  const hst = hasHst ? (subtotal + fee) * 0.13 : 0;
-  const total = subtotal + fee + hst;
+  const discounted = Math.max(0, subtotal - discount);
+  const hst = hasHst ? (discounted + fee) * 0.13 : 0;
+  const total = discounted + fee + hst;
 
   async function saveItems() {
     const d = await post('items', { items: items.map((it) => ({ sku: it.sku || null, title: it.title, price: Number(it.price), cost: it.cost })) }, 'items');

@@ -178,7 +178,10 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
               <option value="">No warranty</option>
             </select>
           )}
-          <input className="inv-amt" type="number" inputMode="decimal" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="0.00" />
+          {/* A service line may be negative — that's how a credit (a storefront
+              promo code, a goodwill knock-off) lives on an invoice. A unit line
+              can't be, and the server rejects it rather than dropping it. */}
+          <input className="inv-amt" type="number" inputMode="decimal" min={it.kind === 'service' ? undefined : 0} step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="0.00" />
           <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
         </div>
       ))}

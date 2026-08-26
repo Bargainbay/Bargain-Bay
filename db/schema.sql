@@ -57,6 +57,11 @@ CREATE INDEX IF NOT EXISTS idx_items_sku      ON order_items(sku);
 
 -- Idempotent upgrades for databases created before these columns existed.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes text;
+-- What the storefront took off with a promo code. Stored on the order so every
+-- downstream reader agrees on it — the delivery fee is otherwise inferred as
+-- total − subtotal − hst, which a discount would silently corrupt.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_code text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount numeric(10,2) NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id text;
 
 -- Clearance overrides. One row per SKU put on clearance. Layered onto the
@@ -536,3 +541,45 @@ CREATE INDEX IF NOT EXISTS idx_job_photos_job ON job_photos(job_id);
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pod_form jsonb;
 ALTER TABLE job_photos ADD COLUMN IF NOT EXISTS ref text;
 CREATE INDEX IF NOT EXISTS idx_job_photos_ref ON job_photos(job_id, ref);
+
+-- ---------------------------------------------------------------------------
+-- Coupon codes, and the affiliates they belong to. One code, one owner: the
+-- affiliate lives on the coupon so "what did Dave's code do for us last month"
+-- is a query. See lib/coupons.js — the discount that reaches an order is always
+-- recomputed server-side from authoritative prices, never taken from the client.
+CREATE TABLE IF NOT EXISTS coupons (
+  id                serial PRIMARY KEY,
+  code              text NOT NULL,
+  affiliate         text,
+  commission_pct    numeric(5,2) NOT NULL DEFAULT 0,  -- what they earn on it (reporting only)
+  kind              text NOT NULL DEFAULT 'percent' CHECK (kind IN ('percent','amount')),
+  value             numeric(10,2) NOT NULL,
+  active            boolean NOT NULL DEFAULT true,
+  starts_at         date,
+  ends_at           date,
+  min_subtotal      numeric(10,2) NOT NULL DEFAULT 0,
+  max_uses          int,               -- null = unlimited
+  per_email_limit   int,               -- null = unlimited per customer
+  exclude_clearance boolean NOT NULL DEFAULT false,
+  note              text,
+  used_count        int NOT NULL DEFAULT 0,
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+-- The code is the identity, case-insensitively, or the affiliate report splits in two.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_coupons_code ON coupons(upper(code));
+
+-- One row per use. The affiliate is snapshotted here rather than joined, so
+-- retiring or reassigning a code later doesn't rewrite history.
+CREATE TABLE IF NOT EXISTS coupon_redemptions (
+  id         serial PRIMARY KEY,
+  coupon_id  int NOT NULL,
+  code       text NOT NULL,
+  affiliate  text,
+  order_id   int,
+  email      text,
+  subtotal   numeric(10,2),
+  discount   numeric(10,2) NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_coupon ON coupon_redemptions(coupon_id);
+CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_order  ON coupon_redemptions(order_id);

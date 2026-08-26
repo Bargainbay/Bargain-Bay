@@ -154,6 +154,87 @@ record anywhere. Rules that must hold:
   total is reported as `overpaid`; no refund record is invented, because no money
   has physically moved.
 
+## Refunds — three shapes, one ledger (added 2026-08-26)
+`/admin/invoices/<INV>/refund` is the whole refund surface (`RefundControl`).
+Every path writes an `invoice_refunds` row, moves `invoices.refund_total`, and
+takes the money **off the bridged order**, which is what makes the correction
+land in the month of the ORIGINAL sale with no second record anywhere.
+
+- `refundInvoiceItems` — the unit(s) came back: relisted, `reverseTrackerSale`,
+  their money off the order.
+- `refundInvoice` — the whole remaining balance. **Cancels the order** (that's
+  what takes a fully reversed sale out of revenue even when the invoice is
+  service-only).
+- `refundInvoiceAmount` — **money only, moves no stock, ever.** A price
+  adjustment after the fact, a goodwill credit, a deposit handed back. Capped at
+  what was actually collected less what has already gone back (a `paid` invoice
+  predating the payment ledger falls back to its total). The figure typed is
+  what leaves the bank, so it is treated as **tax-inclusive** when the invoice
+  charged HST and the order's subtotal/HST both move by their share. It posts to
+  the order as its own negative line. Available on a `partial` invoice too —
+  handing a deposit back used to require voiding the sale.
+
+**The restocking fee (`RESTOCKING_FEE_PCT` = 20, the published policy in
+`/policies/returns`) is money we KEEP, so it must stay booked as revenue.** The
+returned line comes off the order and a `Restocking fee (20%)` line goes on in
+its place; the order still totals what we actually earned. HST follows the money
+on both halves — a restocking fee is itself a taxable supply in Ontario.
+
+**LANDMINE — why the full and per-line paths cross over each other.** A full
+refund *without* a fee cancels the order. A full refund *with* one cannot: that
+would erase the fee. So `refundInvoice` with a `restockingPct` hands off to
+`refundInvoiceItems` over every un-refunded line, and that path closes the
+invoice out itself (`isFull`). They do not recurse — `refundInvoiceItems` only
+calls back when **no** fee is kept. Keep the split: the per-line arithmetic works
+off the LINES, and that is the only thing that stops a fee kept on an earlier
+partial return from being refunded back out on a later one (totals-based maths
+treats the retained fee as refundable and gives 80% of it away).
+
+Refunds are **not** exposed to Sarah with a fee — `refund_invoice` still calls
+both functions with the default 0%. Keeping a fifth of a customer's money is the
+owner's call, not the phone agent's.
+
+## Coupons & affiliates (added 2026-08-26)
+`/admin/coupons` (ADMIN only — a coupon changes what the storefront charges,
+which is not a selling-surface permission). `lib/coupons.js`, tables `coupons` /
+`coupon_redemptions`, plus `orders.coupon_code` / `orders.discount`.
+
+- **The affiliate lives ON the coupon.** An affiliate with no code has nothing to
+  report on, and one with three codes is still one line in the report. The name
+  is snapshotted onto `coupon_redemptions` rather than joined, so retiring or
+  reassigning a code later never rewrites history. `commission_pct` is
+  **reporting only** — nothing is paid out automatically.
+- **The discount that reaches an order is always recomputed server-side.**
+  `/api/coupon` prices the cart itself (never a subtotal from the browser) so the
+  Apply button shows the same figure `/api/checkout` will apply — and checkout
+  re-validates anyway. Same rule as `lib/pricing.js`.
+- **A code that stops holding between Apply and Place order does not fail the
+  sale.** Checkout drops it, charges full price, and returns `couponError` so the
+  page can say so. Losing the order over a promo is the worse outcome.
+- The discount comes off the **goods**, never the delivery fee (a third-party
+  cost we pass through). HST is charged on what's left plus delivery.
+- `exclude_clearance` narrows the eligible base to non-clearance units;
+  `resolvePrices` now returns `onClearance` for exactly this.
+- **The web invoice carries the discount as a negative `service` line**, so the
+  paperwork totals what the customer pays. `createAndSendInvoice` /
+  `updateInvoice` therefore accept a negative amount **on a service line only**
+  (a negative unit line is a typo and would confuse the order bridge), and still
+  require at least one positive line and a positive subtotal.
+- **LANDMINE — one representation at a time.** The delivery fee is nowhere
+  stored; every reader infers it as `total − subtotal − hst`, which a discount
+  silently corrupts. So `orders.discount` is added back in wherever that
+  inference is made (`updateOrderItems`, `OrderEditor`, the order page) — and
+  when `updateInvoice` re-syncs an order it **zeroes `orders.discount`**, because
+  the discount is by then a line item on the order and counting both would
+  double it.
+- Redemption is booked **inside the checkout transaction**, so a coupon can never
+  be counted against an order that failed to be created. The 24h abandoned-
+  checkout sweep calls `releaseCouponForOrder` — a checkout nobody finished must
+  not burn a use of a limited-run code. An order a **human** cancels keeps its
+  redemption (it was a real order) and simply reports no revenue.
+- Deleting a coupon that has been redeemed **turns it off instead**, so nobody
+  erases an affiliate's numbers by tidying up.
+
 ## Dispatch — deliveries & service calls (added 2026-08-25)
 The daily run sheet used to be built by hand because the work comes from several
 client companies through several channels (email, spreadsheet, phone) and no one

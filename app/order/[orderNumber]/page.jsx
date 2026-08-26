@@ -187,9 +187,19 @@ export default async function OrderPage({ params, searchParams }) {
         <div className="summary-row" style={{ borderTop: '1px solid var(--line)', marginTop: 6, paddingTop: 10 }}>
           <span>Subtotal</span><span>{money(order.subtotal)}</span>
         </div>
+        {Number(order.discount) > 0 && (
+          <div className="summary-row">
+            <span>Promo {order.coupon_code || 'code'}</span><span>−{money(order.discount)}</span>
+          </div>
+        )}
         <div className="summary-row">
           <span>{order.delivery_method === 'delivery' ? 'Local delivery' : 'Warehouse pickup'}</span>
-          <span>{order.delivery_method === 'delivery' ? money(Number(order.total) - Number(order.subtotal) - Number(order.hst)) : 'Free'}</span>
+          {/* The fee isn't stored, so it's what's left once goods, discount and
+              tax are accounted for — the discount has to be added back in or a
+              discounted delivery order reads as a cheaper delivery. */}
+          <span>{order.delivery_method === 'delivery'
+            ? money(Number(order.total) - Number(order.subtotal) + Number(order.discount || 0) - Number(order.hst))
+            : 'Free'}</span>
         </div>
         <div className="summary-row"><span>HST (13%)</span><span>{money(order.hst)}</span></div>
         <div className="summary-row total"><span>Total</span><span>{money(order.total)}</span></div>
