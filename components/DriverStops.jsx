@@ -180,7 +180,19 @@ function StopCard({ stop, n, done, onStart, onArrive, onFinish, onFail, onAddPho
 
       <div className="drv-who">{stop.customerName || '(no name)'}</div>
       {stop.pickupAddress && (
-        <div className="drv-addr"><b>FROM</b> {[stop.pickupAddress, stop.pickupCity].filter(Boolean).join(', ')}</div>
+        <div className="drv-addr">
+          <b>FROM</b> {[stop.pickupAddress, stop.pickupCity].filter(Boolean).join(', ')}
+          {/* Who to ring at the pickup end. A locked door with nobody to call is
+              how a transfer turns into a wasted morning. */}
+          {(stop.pickupName || stop.pickupPhone) && (
+            <div className="drv-pickup-who">
+              {stop.pickupName}
+              {stop.pickupPhone && (
+                <> · <a href={`tel:${stop.pickupPhone}`}>{stop.pickupPhone}</a></>
+              )}
+            </div>
+          )}
+        </div>
       )}
       <div className="drv-addr">{stop.pickupAddress ? <b>TO </b> : null}{addr}</div>
 
@@ -225,7 +237,10 @@ function StopCard({ stop, n, done, onStart, onArrive, onFinish, onFail, onAddPho
         <>
           <div className="drv-row">
             <a className="drv-btn" href={mapsUrl(addr)} target="_blank" rel="noopener noreferrer">🧭 Navigate</a>
-            {stop.phone && <a className="drv-btn" href={`tel:${stop.phone}`}>📞 Call</a>}
+            {stop.phone && (
+              <a className="drv-btn" href={`tel:${stop.phone}`}>📞 Call{stop.pickupPhone ? ' drop-off' : ''}</a>
+            )}
+            {stop.pickupPhone && <a className="drv-btn" href={`tel:${stop.pickupPhone}`}>📞 Call pickup</a>}
           </div>
           <div className="drv-row">
             {stop.status === 'scheduled' || stop.status === 'unscheduled' ? (

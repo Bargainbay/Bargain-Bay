@@ -173,7 +173,13 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
       <div className="disp-who">{job.customerName || '(no name)'}</div>
       <div className="disp-addr">
         {job.pickupAddress
-          ? <>{[job.pickupAddress, job.pickupCity].filter(Boolean).join(', ')} <b>→</b> {[job.address, job.city].filter(Boolean).join(', ')}</>
+          ? <>
+              {[job.pickupAddress, job.pickupCity].filter(Boolean).join(', ')}
+              {(job.pickupName || job.pickupPhone) && (
+                <span className="disp-pickup-who"> ({[job.pickupName, job.pickupPhone].filter(Boolean).join(' · ')})</span>
+              )}
+              {' '}<b>→</b> {[job.address, job.city].filter(Boolean).join(', ')}
+            </>
           : [job.address, job.city].filter(Boolean).join(', ')}
       </div>
       {job.balanceDue > 0 && (
@@ -298,7 +304,8 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
               {STATUS_LABEL[job.status]} — reopen it to change the driver or the day.
             </span>
           )}
-          {job.phone && <a className="btn" href={`tel:${job.phone}`}>Call</a>}
+          {job.phone && <a className="btn" href={`tel:${job.phone}`}>Call{job.pickupPhone ? ' drop-off' : ''}</a>}
+          {job.pickupPhone && <a className="btn" href={`tel:${job.pickupPhone}`}>Call pickup</a>}
           <a className="btn" target="_blank" rel="noopener noreferrer"
              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent([job.address, job.city, job.postal].filter(Boolean).join(', '))}`}>
             Map

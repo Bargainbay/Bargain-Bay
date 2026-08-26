@@ -818,6 +818,7 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .disp-win { font-size: 12.5px; font-weight: 700; color: var(--charcoal); font-variant-numeric: tabular-nums; }
 .disp-who { font-weight: 600; font-size: 14px; }
 .disp-addr { font-size: 13px; color: var(--muted); }
+.disp-pickup-who { color: var(--charcoal); font-weight: 600; }
 .disp-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
 .disp-tag {
   font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
@@ -1058,6 +1059,8 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
   width: 100%; font-size: 16px; padding: 12px; border-radius: 10px;
   border: 1px solid var(--line); font-family: inherit;
 }
+.drv-pickup-who { font-size: 14px; font-weight: 700; color: var(--charcoal); margin-top: 2px; }
+.drv-pickup-who a { text-decoration: underline; }
 .drv-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .drv-thumbs img { width: 74px; height: 74px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; }
 .drv-thumbs button { background: none; border: none; padding: 0; cursor: pointer; }
