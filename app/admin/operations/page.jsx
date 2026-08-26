@@ -11,6 +11,7 @@ import { listSalvage } from '../../../lib/salvage';
 import { listReps } from '../../../lib/reps';
 import AdminNav from '../../../components/AdminNav';
 import OpsSection from '../../../components/OpsSection';
+import OpsFoldBar from '../../../components/OpsFoldBar';
 import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
 import AdminClearance from '../AdminClearance';
@@ -122,10 +123,11 @@ export default async function OperationsPage() {
           Could not read all tables — if you just deployed a new feature, run the schema migration below.
         </div>
       )}
-      {/* Nine tools stacked end to end, and on most days you want one of them.
-          Each fold remembers itself; orders start open because that is what the
-          page is for. */}
-      <OpsSection id="orders" title="Orders" count={orders.length} defaultOpen>
+      {/* Ten tools stacked end to end, and on most days you want one of them.
+          Each fold remembers itself, and all of them start shut — a page that
+          opens as ten bars is the point. */}
+      <OpsFoldBar />
+      <OpsSection id="orders" title="Orders" count={orders.length}>
         <AdminOrders initialOrders={orders} drivers={drivers} reps={reps} />
       </OpsSection>
 
