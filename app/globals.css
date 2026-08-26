@@ -1137,6 +1137,7 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
   width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
   padding: 10px; border: 1px solid var(--line); border-radius: 10px; white-space: pre; overflow-x: auto;
 }
+.imp-file { background: var(--tint); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin: 8px 0; }
 .imp-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 10px 0; }
 .imp-row label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 700; color: var(--charcoal); margin: 0; }
 .imp-row select, .imp-row input { width: auto; padding: 6px 8px; font-size: 13px; }

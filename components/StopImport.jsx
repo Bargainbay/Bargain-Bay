@@ -13,6 +13,10 @@ import { IMPORT_FIELDS, parseTable, guessMapping, toJobs } from '../lib/stop-imp
 // columns, every row previewed, every problem named next to the row it's on.
 export default function StopImport({ clients = [], date, onDone }) {
   const [text, setText] = useState('');
+  // A workbook read by the server, held apart from the paste box: an xlsx has
+  // sheets and the paste box has none, and mixing them would mean one of the two
+  // silently winning.
+  const [book, setBook] = useState(null);      // { name, sheet, sheets, headers, rows }
   const [mapping, setMapping] = useState(null);
   const [clientId, setClientId] = useState('');
   const [jobDate, setJobDate] = useState(date || '');
@@ -20,7 +24,8 @@ export default function StopImport({ clients = [], date, onDone }) {
   const [err, setErr] = useState('');
   const [result, setResult] = useState(null);
 
-  const table = useMemo(() => parseTable(text), [text]);
+  const pasted = useMemo(() => parseTable(text), [text]);
+  const table = book ? { headers: book.headers, rows: book.rows } : pasted;
   const map = mapping || (table.headers.length ? guessMapping(table.headers) : {});
   const parsed = useMemo(
     () => (table.rows.length ? toJobs(table.rows, map, { clientId: clientId || null, jobDate: jobDate || null }) : []),
@@ -32,19 +37,47 @@ export default function StopImport({ clients = [], date, onDone }) {
     setMapping({ ...map, [key]: idx === '' ? null : Number(idx) });
   }
 
+  async function loadSheet(file, sheetName) {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (sheetName) fd.append('sheet', sheetName);
+    const res = await fetch('/api/admin/dispatch/sheet', { method: 'POST', body: fd });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Could not read that file.');
+    // Row 1 is the heading row on every client sheet I've seen; if it isn't,
+    // the mapping selects say "Column 3" and the dispatcher points them
+    // themselves.
+    const [head, ...rest] = d.rows;
+    return { name: d.name, sheet: d.sheet, sheets: d.sheets, headers: head, rows: rest, file };
+  }
+
   async function onFile(e) {
     const file = e.target.files?.[0];
-    if (!file) return;
-    setErr(''); setMapping(null);
-    // .xlsx is a zip of XML — it can't be read as text, and the honest answer
-    // is to say so rather than import gibberish.
-    if (/\.xlsx?$/i.test(file.name) && !/\.csv$/i.test(file.name)) {
-      setErr('Save it as CSV first, or just select the rows in Excel and paste them below — that works as-is.');
-      e.target.value = '';
-      return;
-    }
-    setText(await file.text());
     e.target.value = '';
+    if (!file) return;
+    setErr(''); setMapping(null); setResult(null); setBook(null); setText('');
+    setBusy(true);
+    try {
+      if (/\.xlsx$/i.test(file.name)) {
+        setBook(await loadSheet(file));
+      } else if (/\.xls$/i.test(file.name)) {
+        // The pre-2007 binary format is a different thing entirely.
+        setErr('That is the old .xls format — open it and Save As .xlsx or .csv.');
+      } else {
+        setText(await file.text());
+      }
+    } catch (e2) {
+      setErr(e2.message);
+    } finally { setBusy(false); }
+  }
+
+  // A workbook with more than one tab: read the one they name.
+  async function switchSheet(name) {
+    if (!book?.file) return;
+    setBusy(true); setErr(''); setMapping(null);
+    try { setBook(await loadSheet(book.file, name)); }
+    catch (e2) { setErr(e2.message); }
+    finally { setBusy(false); }
   }
 
   async function submit() {
@@ -57,7 +90,7 @@ export default function StopImport({ clients = [], date, onDone }) {
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not add those.'); return; }
       setResult(d);
-      if (d.added > 0) { setText(''); setMapping(null); onDone?.(); }
+      if (d.added > 0) { setText(''); setBook(null); setMapping(null); onDone?.(); }
     } catch {
       setErr('Network error — nothing was added.');
     } finally { setBusy(false); }
@@ -67,18 +100,33 @@ export default function StopImport({ clients = [], date, onDone }) {
     <div className="panel imp">
       <h3 style={{ marginTop: 0 }}>Import stops from a sheet</h3>
       <p className="hint" style={{ marginTop: 0 }}>
-        Select the rows in the client&apos;s spreadsheet and paste them here — or drop in a CSV. Include the
-        heading row if it has one; the columns are matched for you.
+        Choose the client&apos;s <b>.xlsx</b> or .csv below — or paste the rows straight out of Excel. Keep the
+        heading row; the columns are matched for you.
       </p>
+      {book && (
+        <div className="imp-file">
+          Reading <b>{book.name}</b>
+          {book.sheets.length > 1 ? ` · sheet “${book.sheet}” of ${book.sheets.length}` : ''}
+          {' · '}{book.rows.length} row{book.rows.length === 1 ? '' : 's'}
+        </div>
+      )}
 
       <textarea className="imp-paste" rows={6} value={text} placeholder={'Customer\tAddress\tCity\tDate\tItems\nGARDERIE MAISON…\t1213 International Blvd\tBurlington\t2026-08-27\tMisc pallet'}
-        onChange={(e) => { setText(e.target.value); setMapping(null); setResult(null); }} />
+        onChange={(e) => { setText(e.target.value); setBook(null); setMapping(null); setResult(null); }} />
 
       <div className="imp-row">
         <label className="btn">
-          Choose a CSV
-          <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={onFile} style={{ display: 'none' }} />
+          {busy && !book ? 'Reading…' : 'Choose a file (.xlsx or .csv)'}
+          <input type="file" accept=".xlsx,.csv,.tsv,.txt" onChange={onFile} style={{ display: 'none' }} />
         </label>
+        {book && (
+          <label>
+            Sheet
+            <select value={book.sheet} onChange={(e) => switchSheet(e.target.value)} disabled={busy}>
+              {book.sheets.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        )}
         <label>
           For which client
           <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
@@ -145,7 +193,7 @@ export default function StopImport({ clients = [], date, onDone }) {
           </div>
 
           <div className="imp-row" style={{ justifyContent: 'flex-end' }}>
-            <button type="button" className="btn" onClick={() => { setText(''); setMapping(null); setResult(null); }}>
+            <button type="button" className="btn" onClick={() => { setText(''); setBook(null); setMapping(null); setResult(null); }}>
               Clear
             </button>
             <button type="button" className="btn accent" disabled={busy || good.length === 0} onClick={submit}>
