@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getMany } from '../../../lib/inventory';
 import { hasDb, query, withTransaction } from '../../../lib/db';
 import { unavailableSkus, reserveWithClient, expireReservations, RESERVATION_MINUTES, OFFLINE_HOLD_MINUTES } from '../../../lib/reservations';
+import { ensureOrderLineKind } from '../../../lib/orders';
 import { stripeConfigured, createCheckoutSession } from '../../../lib/stripe';
 import {
   getSession, hashPassword, createSessionToken,
@@ -142,6 +143,7 @@ export async function POST(req) {
   // code was entered, so a database that hasn't run the migration would fail
   // EVERY checkout, not just the ones with a promo.
   try { await ensureCouponSchema(); } catch (e) { console.error('coupon columns', e.message); }
+  try { await ensureOrderLineKind(); } catch (e) { console.error('order line kind column', e.message); }
   let order;
   try {
     order = await withTransaction(async (client) => {
@@ -166,7 +168,7 @@ export async function POST(req) {
       await reserveWithClient(client, skus, orderId, cardOnline ? RESERVATION_MINUTES : OFFLINE_HOLD_MINUTES);
       for (const u of items) {
         await client.query(
-          'INSERT INTO order_items (order_id, sku, title, price) VALUES ($1,$2,$3,$4)',
+          "INSERT INTO order_items (order_id, sku, title, price, kind) VALUES ($1,$2,$3,$4,'unit')",
           [orderId, u.id, u.title || `${u.make} ${u.model}`, priceOf(u)]
         );
       }
@@ -206,7 +208,7 @@ export async function POST(req) {
         ...(deliveryFee ? [{ description: 'Local delivery (Pickering & area)', amount: deliveryFee, kind: 'service' }] : []),
         // The discount rides as a negative service line, so the invoice totals
         // what the customer actually pays and the code is on the paperwork.
-        ...(discount ? [{ description: `Promo code ${coupon.code}`, amount: -discount, kind: 'service' }] : [])
+        ...(discount ? [{ description: `Promo code ${coupon.code}`, amount: -discount, kind: 'discount' }] : [])
       ],
       addHst: hst > 0,
       deliveryMethod, address, city, postal,

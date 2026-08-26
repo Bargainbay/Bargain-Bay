@@ -1,5 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
+import { isCreditLine } from '../lib/constants';
+import { subtotalOf } from '../lib/invoice-lines';
 import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
 
 // Post-payment order editing: contact/fulfilment, line items, and refunds.
@@ -8,6 +10,8 @@ import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
 // items and refund panels are replaced with a pointer there.
 const fmt = (n) => '$' + (Number(n) || 0).toFixed(2);
 const PAID = ['confirmed', 'ready', 'out_for_delivery', 'delivered'];
+
+const LINE_TAG = { discount: '− Discount', trade_in: '− Trade-in', service: 'Service' };
 
 export default function OrderEditor({ order, initialItems, inventory = [], bridgedInvoice = null }) {
   // ---- contact card ----
@@ -19,9 +23,16 @@ export default function OrderEditor({ order, initialItems, inventory = [], bridg
   const setContact = (k) => (e) => setC((x) => ({ ...x, [k]: e.target.value }));
 
   // ---- items card ----
-  const [items, setItems] = useState(initialItems.map((it) => ({
-    sku: it.sku || '', title: it.title || '', price: String(it.price ?? ''), cost: it.cost ?? null
-  })));
+  // Credits come back as the positive number they were typed as, so re-saving an
+  // untouched order changes nothing.
+  const [items, setItems] = useState(initialItems.map((it) => {
+    const kind = it.kind || 'unit';
+    const credit = kind === 'discount' || kind === 'trade_in';
+    return {
+      sku: it.sku || '', title: it.title || '', kind, cost: it.cost ?? null,
+      price: String(it.price == null ? '' : (credit ? Math.abs(Number(it.price)) : it.price))
+    };
+  }));
   const [q, setQ] = useState('');
 
   // ---- refund card ----
@@ -78,13 +89,16 @@ export default function OrderEditor({ order, initialItems, inventory = [], bridg
 
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const removeRow = (i) => setItems((xs) => xs.filter((_, j) => j !== i));
-  const addRow = () => setItems((xs) => [...xs, { sku: '', title: '', price: '' }]);
+  const addRow = () => setItems((xs) => [...xs, { sku: '', title: '', price: '', kind: 'unit' }]);
+  // Money off the order, typed as a plain positive number and stored negative —
+  // same convention as the invoice line editor, flipped only at the boundary.
+  const addCredit = (kind, title) => setItems((xs) => [...xs, { sku: '', title, price: '', kind }]);
   const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const matches = q.trim().length >= 2
     ? inventory.filter((u) => tokens.every((t) => u.search.includes(t)) && !items.some((it) => it.sku === u.id)).slice(0, 8)
     : [];
   function pickInventory(u) {
-    setItems((xs) => [...xs, { sku: u.id, title: u.description, price: String(u.price) }]);
+    setItems((xs) => [...xs, { sku: u.id, title: u.description, price: String(u.price), kind: 'unit' }]);
     setQ('');
   }
 
@@ -93,13 +107,20 @@ export default function OrderEditor({ order, initialItems, inventory = [], bridg
   const discount = Number(order.discount) || 0;
   const fee = Math.max(0, (Number(order.total) - Number(order.subtotal) + discount - Number(order.hst)) || 0);
   const hasHst = Number(order.hst) > 0;
-  const subtotal = items.reduce((a, it) => a + (Number(it.price) || 0), 0);
+  const isCredit = isCreditLine;
+  // Order lines call the money column `price`; the shared helper reads `amount`.
+  const subtotal = subtotalOf(items.map((it) => ({ kind: it.kind, amount: it.price })));
   const discounted = Math.max(0, subtotal - discount);
   const hst = hasHst ? (discounted + fee) * 0.13 : 0;
   const total = discounted + fee + hst;
 
   async function saveItems() {
-    const d = await post('items', { items: items.map((it) => ({ sku: it.sku || null, title: it.title, price: Number(it.price), cost: it.cost })) }, 'items');
+    const d = await post('items', {
+      items: items.map((it) => ({
+        sku: it.sku || null, title: it.title, cost: it.cost, kind: it.kind || 'unit',
+        price: isCredit(it.kind) ? -Math.abs(Number(it.price) || 0) : Number(it.price)
+      }))
+    }, 'items');
     if (d) {
       setNotice(`Items saved — new total ${fmt(d.total)}.` +
         (d.relisted ? ` ${d.relisted} removed unit(s) are back on the site.` : '') +
@@ -201,13 +222,27 @@ export default function OrderEditor({ order, initialItems, inventory = [], bridg
             </div>
             {items.map((it, i) => (
               <div key={i} className="inv-line">
-                {it.sku ? <span className="pill inv-tag" style={{ fontFamily: 'monospace' }}>{it.sku}</span> : <span className="pill inv-tag">ad-hoc</span>}
-                <input className="inv-desc" value={it.title} onChange={(e) => setItem(i, 'title', e.target.value)} autoComplete="off" autoCorrect="off" spellCheck={false} placeholder="Line description" />
-                <input className="inv-amt" type="number" inputMode="decimal" min="0" step="0.01" value={it.price} onChange={(e) => setItem(i, 'price', e.target.value)} placeholder="price" />
+                {it.sku
+                  ? <span className="pill inv-tag" style={{ fontFamily: 'monospace' }}>{it.sku}</span>
+                  : <span className={'pill inv-tag' + (isCredit(it.kind) ? ' is-credit' : '')}>{LINE_TAG[it.kind] || 'ad-hoc'}</span>}
+                <input className="inv-desc" value={it.title} onChange={(e) => setItem(i, 'title', e.target.value)} autoComplete="off" autoCorrect="off" spellCheck={false} placeholder={it.kind === 'trade_in' ? 'Their old unit — make, model, condition' : 'Line description'} />
+                <input className="inv-amt" type="number" inputMode="decimal" min="0" step="0.01" value={it.price} onChange={(e) => setItem(i, 'price', e.target.value)} placeholder={isCredit(it.kind) ? 'amount off' : 'price'} />
                 <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
               </div>
             ))}
-            <button type="button" className="btn" onClick={addRow}>+ Add ad-hoc line</button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="btn" onClick={addRow}>+ Add ad-hoc line</button>
+              <button type="button" className="btn" onClick={() => addCredit('discount', 'Discount')}>+ Discount</button>
+              <button type="button" className="btn"
+                title="We're taking their old appliance in part-exchange — the delivery team is told to collect it"
+                onClick={() => addCredit('trade_in', '')}>+ Trade-in</button>
+            </div>
+            {items.some((it) => it.kind === 'trade_in') && (
+              <div className="hint" style={{ marginTop: 6 }}>
+                The delivery team is told to bring the trade-in unit back to the warehouse — it shows on the
+                dispatch board, the run sheet and the driver&apos;s stop, and the driver has to confirm it&apos;s on the van.
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
               <div style={{ fontSize: 14, color: 'var(--muted)' }}>
                 Subtotal {fmt(subtotal)}{fee > 0 ? ` · Delivery ${fmt(fee)}` : ''}{hasHst ? ` · HST ${fmt(hst)}` : ''} · <b style={{ color: 'var(--charcoal)' }}>New total {fmt(total)}</b>

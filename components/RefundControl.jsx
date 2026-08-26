@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { RESTOCKING_FEE_PCT, MAX_RESTOCKING_FEE_PCT } from '../lib/constants';
+import { RESTOCKING_FEE_PCT, MAX_RESTOCKING_FEE_PCT, isCreditLine } from '../lib/constants';
 
 // The refund console for one invoice. Two ways money goes back, because they are
 // genuinely different events and conflating them is how stock goes wrong:
@@ -12,7 +12,7 @@ import { RESTOCKING_FEE_PCT, MAX_RESTOCKING_FEE_PCT } from '../lib/constants';
 //  * "Refund an amount" — a price adjustment, a goodwill credit, a deposit handed
 //    back. Money only: nothing is relisted, because nothing came back.
 export default function RefundControl({ invoice }) {
-  const { id, number, hasHst, items, refundable, status, refunds = [] } = invoice;
+  const { id, number, hasHst, items, refundable, status, refunds = [], creditFactor = 1 } = invoice;
   const canReturnItems = status === 'paid';
 
   const [tab, setTab] = useState(canReturnItems ? 'items' : 'amount');
@@ -28,7 +28,9 @@ export default function RefundControl({ invoice }) {
   const fmt = (n) => '$' + (Number(n) || 0).toFixed(2);
   const r2 = (n) => Math.round(n * 100) / 100;
 
-  const refundableItems = items.filter((it) => !it.refunded);
+  // A discount or trade-in credit can't be returned — it's money the customer
+  // never paid. Listed for context, never tickable.
+  const refundableItems = items.filter((it) => !it.refunded && !isCreditLine(it.kind));
   const toggle = (itemId) => setPicked((s) => {
     const n = new Set(s);
     if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
@@ -40,7 +42,11 @@ export default function RefundControl({ invoice }) {
   // Mirrors splitRestocking() in lib/invoices.js — HST follows the money on both
   // halves, because a restocking fee is itself a taxable supply in Ontario.
   const feePct = restock ? Math.min(MAX_RESTOCKING_FEE_PCT, Math.max(0, Number(pct) || 0)) : 0;
-  const base = r2(refundableItems.filter((it) => picked.has(it.id)).reduce((a, it) => a + it.amount, 0));
+  // Face value of what's ticked, less the share of the invoice's credits that
+  // belonged to it — mirrors refundInvoiceItems in lib/invoices.js, so what's
+  // previewed here is what the refund actually hands back.
+  const faceValue = r2(refundableItems.filter((it) => picked.has(it.id)).reduce((a, it) => a + it.amount, 0));
+  const base = r2(faceValue * creditFactor);
   const keptBase = r2(base * (feePct / 100));
   const refundBase = r2(base - keptBase);
   const refundHst = hasHst ? r2(refundBase * 0.13) : 0;
@@ -136,14 +142,15 @@ export default function RefundControl({ invoice }) {
               <label key={it.id} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
                 border: '1px solid var(--line)', borderRadius: 8, marginBottom: 6, fontSize: 14,
-                opacity: it.refunded ? 0.55 : 1, cursor: it.refunded ? 'default' : 'pointer'
+                opacity: (it.refunded || isCreditLine(it.kind)) ? 0.55 : 1,
+                cursor: (it.refunded || isCreditLine(it.kind)) ? 'default' : 'pointer'
               }}>
-                <input type="checkbox" style={{ width: 'auto' }} disabled={it.refunded}
+                <input type="checkbox" style={{ width: 'auto' }} disabled={it.refunded || isCreditLine(it.kind)}
                   checked={picked.has(it.id)} onChange={() => toggle(it.id)} />
                 <span style={{ flex: 1, textDecoration: it.refunded ? 'line-through' : 'none' }}>
                   {it.description}
                   {it.sku && <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({it.sku})</span>}
-                  {it.kind === 'service' && <span className="pill" style={{ fontSize: 11, marginLeft: 6 }}>Service</span>}
+                  {KIND_PILL[it.kind] && <span className="pill" style={{ fontSize: 11, marginLeft: 6 }}>{KIND_PILL[it.kind]}</span>}
                   {it.refunded && <span className="pill sold" style={{ fontSize: 11, marginLeft: 6 }}>Refunded</span>}
                 </span>
                 <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{fmt(it.amount)}</span>
@@ -170,7 +177,8 @@ export default function RefundControl({ invoice }) {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
               <div style={{ fontSize: 14, color: 'var(--muted)' }}>
-                Returned {fmt(base)}
+                Returned {fmt(faceValue)}
+                {creditFactor < 1 ? <> − credits {fmt(faceValue - base)}</> : null}
                 {feeKept ? <> − fee {fmt(keptBase)}</> : null}
                 {hasHst ? ` + HST ${fmt(refundHst)}` : ''} · refund <b style={{ color: 'var(--charcoal)' }}>{fmt(itemsRefund)}</b>
                 {allPicked && <span> — this refunds everything left on the invoice</span>}
@@ -237,3 +245,4 @@ export default function RefundControl({ invoice }) {
 }
 
 const KIND_LABELS = { items: 'Items returned', amount: 'Amount refunded', full: 'Full refund' };
+const KIND_PILL = { service: 'Service', discount: 'Discount', trade_in: 'Trade-in' };

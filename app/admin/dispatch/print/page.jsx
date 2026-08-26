@@ -94,6 +94,12 @@ export default async function RunSheetPage({ searchParams }) {
         .runsheet .num { width: 26px; color: #666; }
         .runsheet .w { width: 86px; white-space: nowrap; font-variant-numeric: tabular-nums; }
         .runsheet .note { color: #444; font-style: italic; }
+        /* A trade-in has to survive being photocopied and read in a van, so it
+           is boxed rather than merely bolded. */
+        .runsheet .tradein {
+          margin-top: 3px; padding: 2px 5px; border: 1.5px solid #000;
+          font-weight: bold; font-size: 11.5px; display: inline-block;
+        }
       `}</style>
 
       <div className="runsheet-noprint" style={{ marginBottom: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -150,6 +156,19 @@ export default async function RunSheetPage({ searchParams }) {
                       ? [j.appliance, j.issue].filter(Boolean).join(' — ') || 'Service call'
                       : (j.items?.length ? j.items.map((it) => it.description).join(', ') : '—')}
                     {j.shipmentType && <><br /><strong>{SHIPMENT_LABEL[j.shipmentType]}</strong></>}
+                    {/* Printed in the WHAT column, not the notes: the crew reads
+                        this column to load the van, and the trade-in is the one
+                        thing on the stop that has to come back on it. */}
+                    {j.tradeIns?.length
+                      ? j.tradeIns.map((t, i) => (
+                          <div key={i} className="tradein">
+                            ⬅ BRING BACK: {t.description}
+                            {t.allowance > 0 ? ` ($${t.allowance.toFixed(2)})` : ''}
+                          </div>
+                        ))
+                      : (j.services?.includes('trade_in')
+                        ? <div className="tradein">⬅ BRING BACK: see notes</div>
+                        : null)}
                     {j.services?.length > 0 && (
                       <><br />{j.services.map((k) => SERVICE_LABEL[k] || k).join(' · ')}</>
                     )}

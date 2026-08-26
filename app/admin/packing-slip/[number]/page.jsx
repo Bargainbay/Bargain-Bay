@@ -3,8 +3,7 @@ import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { getPackingSlip } from '../../../../lib/invoices';
 import {
-  BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, PICKUP_ADDRESS, DISPATCH_EMAIL
-} from '../../../../lib/constants';
+  BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, PICKUP_ADDRESS, DISPATCH_EMAIL, isUnitLine } from '../../../../lib/constants';
 import PackingSlipActions from '../../../../components/PackingSlipActions';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +30,10 @@ export default async function PackingSlipPage({ params }) {
   const ship = delivery
     ? [slip.name, slip.address, [slip.city, slip.postal].filter(Boolean).join(' '), slip.phone].filter(Boolean)
     : [slip.name, 'Pickup by appointment', PICKUP_ADDRESS, slip.phone].filter(Boolean);
-  const units = (slip.items || []).filter((it) => it.kind !== 'service');
+  const units = (slip.items || []).filter((it) => isUnitLine(it.kind));
+  // What we're taking away, not bringing. The slip travels with the delivery, so
+  // it is the last piece of paper anyone reads before the van leaves.
+  const tradeIns = (slip.items || []).filter((it) => it.kind === 'trade_in');
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto', padding: '16px' }}>
@@ -106,6 +108,19 @@ export default async function PackingSlipPage({ params }) {
             )}
           </tbody>
         </table>
+
+        {tradeIns.length > 0 && (
+          <div style={{ marginTop: 16, border: '2px solid #2e2d2b', borderRadius: 6, padding: '10px 12px' }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>
+              Bring back to the warehouse — trade-in
+            </div>
+            {tradeIns.map((it) => (
+              <div key={it.id} style={{ fontSize: 14, marginTop: 4 }}>
+                {it.description} &nbsp;·&nbsp; Collected ☐
+              </div>
+            ))}
+          </div>
+        )}
 
         <p style={{ fontSize: 12.5, color: '#666', marginTop: 12 }}>
           {units.length} unit{units.length === 1 ? '' : 's'} to pick{slip.memo ? <> · Note: {slip.memo}</> : ''}
