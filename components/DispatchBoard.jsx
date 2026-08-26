@@ -147,13 +147,26 @@ function savePod(job) {
   }, i * 400));
 }
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen }) {
+function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onEdit, onMove, seat }) {
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const closed = ['done', 'failed', 'cancelled'].includes(job.status);
   return (
     <div className={'disp-card' + (closed ? ' is-closed' : '')}>
       <div className="disp-card-top">
+        {/* The run order, and the two buttons that change it. Numbered because
+            "third stop" is how a driver and a dispatcher talk about it on the
+            phone; arrows rather than drag because this is used one-handed on a
+            warehouse touchscreen. */}
+        {seat && (
+          <span className="disp-seat">
+            <b>{seat.n}</b>
+            <button type="button" disabled={busy || seat.first} title="Earlier in the run"
+              onClick={() => onMove(job, -1)}>▲</button>
+            <button type="button" disabled={busy || seat.last} title="Later in the run"
+              onClick={() => onMove(job, 1)}>▼</button>
+          </span>
+        )}
         <span className="disp-win">{windowLabel(job)}</span>
         <span className={'pill ' + (STATUS_TONE[job.status] || 'warn')}>{STATUS_LABEL[job.status]}</span>
       </div>
@@ -308,6 +321,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
               Reopen
             </button>
           )}
+          <button type="button" className="btn" disabled={busy} onClick={() => onEdit(job)}>Edit</button>
           {job.notes && <p className="disp-notes">{job.notes}</p>}
         </div>
       )}
@@ -320,6 +334,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(null);      // the job being corrected
   const [closing, setClosing] = useState(null);   // the service visit being closed out
   // Everything dispatch does happens on this page — no tab-hopping to add a
   // client or chase a service call mid-shift.
@@ -358,6 +373,19 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   const onAssign = (jobId, patch) => send('PATCH', { action: 'assign', jobId, jobDate: board.date, ...patch });
 
   const onReopen = (jobId) => send('PATCH', { action: 'reopen', jobId });
+
+  // Moving a stop up or down its driver's run. The whole column is sent back in
+  // its new order — seq is a position, and renumbering the one card that moved
+  // would leave two stops claiming the same place.
+  function onMove(job, delta) {
+    const run = byDriver(job.driverId);
+    const from = run.findIndex((j) => j.id === job.id);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= run.length) return;
+    const ids = run.map((j) => j.id);
+    [ids[from], ids[to]] = [ids[to], ids[from]];
+    return send('PATCH', { action: 'resequence', driverId: job.driverId, date: board.date, jobIds: ids });
+  }
 
   // The pull used to refresh in silence, so an order it declined to take looked
   // exactly like an order it had taken. It now says what it did and, for
@@ -610,6 +638,17 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
         </div>
       )}
 
+      {/* Correcting a stop that exists — same form, prefilled. A wrong number or
+          a customer who moved shouldn't mean cancel-and-retype. */}
+      {editing && (
+        <div className="panel">
+          <JobForm job={editing} date={editing.jobDate || board.date}
+            clients={board.clients} drivers={board.drivers} canManageClients={canManageClients}
+            onClientAdded={(c) => setBoard((b) => ({ ...b, clients: [...b.clients, c].sort((x, y) => x.name.localeCompare(y.name)) }))}
+            onDone={() => { setEditing(null); refresh(); }} />
+        </div>
+      )}
+
       <div className="disp-strip">
         {stripOver && (
           <button type="button" className="disp-page left" disabled={stripAt.start}
@@ -624,7 +663,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
           {unassignedToday.map((j) => (
             <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
               onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-              onRecord={onRecord} onReopen={onReopen} />
+              onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} />
           ))}
           {board.unscheduled.length > 0 && (
             <>
@@ -632,7 +671,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
               {board.unscheduled.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                   onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                  onRecord={onRecord} />
+                  onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} />
               ))}
             </>
           )}
@@ -655,7 +694,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             {board.cancelled.map((j) => (
               <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                 onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                onRecord={onRecord} onReopen={onReopen} />
+                onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} />
             ))}
           </BoardColumn>
         )}
@@ -667,10 +706,11 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             <BoardColumn key={d.id} title={d.name} bodyKey={String(stops.length)}
               count={stops.length ? `${left}/${stops.length}` : '0'}>
               {stops.length === 0 && <p className="hint">No stops on this day.</p>}
-              {stops.map((j) => (
+              {stops.map((j, i) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                   onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                  onRecord={onRecord} />
+                  onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onMove={onMove}
+                  seat={{ n: i + 1, first: i === 0, last: i === stops.length - 1 }} />
               ))}
             </BoardColumn>
           );
