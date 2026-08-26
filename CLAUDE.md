@@ -306,6 +306,15 @@ the paper run sheet that replaces it.
   that column was collected in the form, stored, and read by nothing, so a client
   company found out by asking. Best-effort and after the write: a mail hiccup
   must never fail a completion a driver is standing in a doorway waiting on.
+- **Anything meant to be printed carries a Print button** (`components/PrintButton.jsx`
+  → `window.print()`): the run sheet and the POD form. "Press ⌘P" is not a
+  feature, and on the warehouse tablet there is no ⌘P at all — Save as PDF is a
+  destination in that same dialog, so one button covers both. Each page's
+  `generateMetadata` puts the date / order number in the title, because the
+  browser names the saved PDF after `document.title` — "Run sheet 2026-08-26.pdf"
+  in a folder of thirty beats "Run sheet.pdf". Their print CSS also unwinds the
+  portal's `.wrap` (its max-width would print as a narrow column) and keeps a
+  stop from splitting across two pages.
 - **The signed POD form is the paper form.** `jobs.pod_form` (jsonb) holds the
   two damage answers, the explanation, the per-item table and the printed name;
   `/admin/dispatch/pod/<id>` renders it for printing or emailing to a client.

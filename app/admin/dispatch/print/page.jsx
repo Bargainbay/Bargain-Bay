@@ -2,9 +2,18 @@ import { redirect } from 'next/navigation';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { dispatchBoard, torontoToday } from '../../../../lib/jobs';
+import PrintButton from '../../../../components/PrintButton';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Run sheet', robots: { index: false } };
+
+// The browser names a saved PDF after document.title, so the title IS the
+// filename: "Run sheet 2026-08-26.pdf" beats "Run sheet.pdf" in a folder of
+// thirty of them.
+export async function generateMetadata({ searchParams }) {
+  const sp = await searchParams;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(sp?.date || '')) ? String(sp.date) : torontoToday();
+  return { title: `Run sheet ${date}`, robots: { index: false } };
+}
 
 // The paper run sheet — the direct replacement for the one built by hand each
 // morning. One page per driver, because they get handed out separately, and a
@@ -58,6 +67,13 @@ export default async function RunSheetPage({ searchParams }) {
         @media print {
           @page { margin: 14mm; }
           .runsheet-noprint { display: none !important; }
+          /* The portal wrapper is screen furniture — its max-width and padding
+             would print as a narrow column with a wasted inch each side. */
+          .wrap { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+          .runsheet { padding: 0; max-width: none; }
+          /* Keep a stop from being split across two pages — half a delivery on
+             each sheet is how the second half gets missed. */
+          .runsheet tbody tr { break-inside: avoid; }
           .runsheet-driver { break-after: page; }
           .runsheet-driver:last-child { break-after: auto; }
         }
@@ -80,8 +96,12 @@ export default async function RunSheetPage({ searchParams }) {
         .runsheet .note { color: #444; font-style: italic; }
       `}</style>
 
-      <div className="runsheet-noprint" style={{ marginBottom: 16, display: 'flex', gap: 10 }}>
+      <div className="runsheet-noprint" style={{ marginBottom: 16, display: 'flex', gap: 10, alignItems: 'center' }}>
         <a className="btn" href={`/admin/dispatch?date=${date}`}>← Back to the board</a>
+        <PrintButton />
+        <span className="hint" style={{ margin: 0 }}>
+          Choose <b>Save as PDF</b> as the destination to keep a copy.
+        </span>
       </div>
 
       {columns.length === 0 && <p>Nothing scheduled for {prettyDate(date)}.</p>}
