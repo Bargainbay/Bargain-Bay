@@ -475,6 +475,9 @@ CREATE INDEX IF NOT EXISTS idx_jobs_invoice ON jobs(invoice_id) WHERE invoice_id
 -- A transfer runs FROM one address TO another — five pieces out of Mississauga
 -- into Burlington is one job with two ends, and the driver needs both.
 -- A transfer has two ends, and both are somewhere a driver has to be let into.
+-- A second person on the same stop: one van, one run, two names.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS driver2_id     int;
+CREATE INDEX IF NOT EXISTS idx_jobs_driver2 ON jobs(driver2_id, job_date) WHERE driver2_id IS NOT NULL;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_name    text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_phone   text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_address text;
