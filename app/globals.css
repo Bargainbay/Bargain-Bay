@@ -1059,6 +1059,14 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
   width: 100%; font-size: 16px; padding: 12px; border-radius: 10px;
   border: 1px solid var(--line); font-family: inherit;
 }
+/* Tomorrow: visibly not today's work, so nobody sets off a day early. */
+.drv-next-head {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  margin: 18px 0 8px; padding: 12px 14px; border: 1px dashed var(--line); border-radius: 12px;
+  background: none; font: inherit; font-size: 15px; font-weight: 800; color: var(--charcoal); cursor: pointer;
+}
+.drv-next-head span:last-child { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.drv-card.is-preview { border-style: dashed; opacity: .88; }
 .drv-pickup-who { font-size: 14px; font-weight: 700; color: var(--charcoal); margin-top: 2px; }
 .drv-pickup-who a { text-decoration: underline; }
 .drv-thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }

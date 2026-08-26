@@ -400,6 +400,12 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
   never leave a driver unable to start.
 - **`/d/<token>` must stay in `proxy.js`'s allow-list.** The link is texted on
   the RS host; without it every driver is bounced to a board they can't see.
+- **Tomorrow is visible today**, in its own collapsed list under the day's work
+  (`driverJobs` returns `tomorrow[]`). Drivers asked for it: you plan the night
+  before — what's loaded, which end of the region you start at, whether the 8am
+  is white glove. It is a SEPARATE array rather than more rows in `stops`, and
+  its cards carry Navigate/Call and nothing else, so nothing on the phone can
+  start, finish or fail a stop that isn't today's.
 - **Nothing waits on the network.** Every tap is written to IndexedDB
   (`lib/driver-outbox.js`) and sent afterwards — basements and rural stops lose
   signal, and a completion that fails and loses the signature sends drivers back
