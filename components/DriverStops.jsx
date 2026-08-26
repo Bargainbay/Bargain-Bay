@@ -29,6 +29,10 @@ const windowLabel = (s) => (s.windowStart && s.windowEnd ? `${s.windowStart}–$
 
 export default function DriverStops({ initial, driverName }) {
   const [stops, setStops] = useState(initial.stops || []);
+  // Tomorrow's work, so the night before is plannable. Kept apart from `stops`
+  // on purpose: nothing here can be started, finished or failed today.
+  const [tomorrow, setTomorrow] = useState(initial.tomorrow || []);
+  const [showNext, setShowNext] = useState(false);
   const [date] = useState(initial.date);
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState(0);
@@ -48,6 +52,7 @@ export default function DriverStops({ initial, driverName }) {
       if (!res.ok) return;
       const d = await res.json();
       if (Array.isArray(d.stops)) setStops(d.stops);
+      if (Array.isArray(d.tomorrow)) setTomorrow(d.tomorrow);
     } catch { /* offline: keep what's on screen */ }
   }, []);
 
@@ -152,6 +157,23 @@ export default function DriverStops({ initial, driverName }) {
         />
       )}
 
+      {tomorrow.length > 0 && (
+        <>
+          <button type="button" className="drv-next-head" onClick={() => setShowNext((v) => !v)} aria-expanded={showNext}>
+            <span>Tomorrow · {tomorrow.length} stop{tomorrow.length === 1 ? '' : 's'}</span>
+            <span>{showNext ? 'hide' : 'show'}</span>
+          </button>
+          {showNext && (
+            <>
+              <p className="hint" style={{ margin: '0 0 8px' }}>
+                For planning tonight. You can&apos;t start these until tomorrow.
+              </p>
+              {tomorrow.map((s, i) => <StopCard key={s.id} stop={s} n={i + 1} preview />)}
+            </>
+          )}
+        </>
+      )}
+
       {finishing && (
         <DriverFinish
           stop={finishing}
@@ -167,11 +189,11 @@ export default function DriverStops({ initial, driverName }) {
   );
 }
 
-function StopCard({ stop, n, done, onStart, onArrive, onFinish, onFail, onAddPhotos }) {
+function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail, onAddPhotos }) {
   const addr = fullAddress(stop);
   const isService = stop.type === 'service_call';
   return (
-    <div className={'drv-card' + (done ? ' is-done' : '')}>
+    <div className={'drv-card' + (done ? ' is-done' : '') + (preview ? ' is-preview' : '')}>
       <div className="drv-card-top">
         <span className="drv-n">{done ? (stop.status === 'failed' ? '✕' : '✓') : n}</span>
         <span className="drv-win">{windowLabel(stop)}</span>
@@ -218,7 +240,15 @@ function StopCard({ stop, n, done, onStart, onArrive, onFinish, onFail, onAddPho
         {stop.clientName ? ` · ${stop.clientName}` : ''}
       </div>
 
-      {done ? (
+      {preview ? (
+        // Look, plan, ring ahead — but not start. The buttons that change a
+        // stop's state are deliberately absent until it's actually today.
+        <div className="drv-row">
+          <a className="drv-btn" href={mapsUrl(addr)} target="_blank" rel="noopener noreferrer">🧭 Navigate</a>
+          {stop.phone && <a className="drv-btn" href={`tel:${stop.phone}`}>📞 Call</a>}
+          {stop.pickupPhone && <a className="drv-btn" href={`tel:${stop.pickupPhone}`}>📞 Call pickup</a>}
+        </div>
+      ) : done ? (
         <>
           <div className="drv-doneline">
             {stop.status === 'failed'
