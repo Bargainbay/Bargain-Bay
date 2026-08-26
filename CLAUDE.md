@@ -261,6 +261,23 @@ the paper run sheet that replaces it.
   this runs on a warehouse touchscreen with no trackpad, where a scroll area
   nobody can see the edge of is a driver's whole day nobody knows exists. Both
   are off under 700px, where the columns stack.
+- **Any job can be corrected after the fact** (`updateJob`, PATCH `action: 'edit'`)
+  — name, phone, email, address, the transfer's pickup end, what's on it, window,
+  day, shipment type, services, notes. The **same `JobForm`** does it, prefilled:
+  a second form would drift from the first. Only what's PASSED is written, so a
+  caller that doesn't know a field can never blank it; a changed address clears
+  the old lat/lng with it (stale coordinates route the driver to where the
+  customer used to live); `appliance`/`issue` are written to the TICKET, not the
+  visit, or the next revisit still carries the wrong fault. Money and `type` are
+  NOT editable here — charge goes through `setJobCharge` (which refuses to move
+  an invoiced one) and changing a delivery into a service call would orphan its
+  ticket. Editing a BB-linked job says so: it changes the STOP, not the order.
+- **The run is ordered from the card** — a numbered seat plus ▲▼ on every stop in
+  a driver's column, calling `resequence` with the WHOLE column in its new order
+  (renumbering only the card that moved would leave two stops claiming one
+  place). Numbered because "third stop" is how a dispatcher and a driver talk on
+  the phone; arrows and not drag for the same reason assignment is a tap — this
+  is used one-handed on a warehouse touchscreen.
 - **Nothing on the board is a dead end.** A closed stop (done / failed /
   cancelled) can be **Reopened** (`reopenJob`, PATCH `action: 'reopen'`) — a
   customer rings back, a driver taps Done on the wrong card, a cancelled

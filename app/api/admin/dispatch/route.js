@@ -11,7 +11,7 @@ import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
   upsertClient, importReadyBargainBayOrders, importOneBargainBayOrder, dispatchBoard,
   jobInvoiceForPayment, noteJobEvent,
-  setTicketStatus, listTickets, reopenJob,
+  setTicketStatus, listTickets, reopenJob, updateJob,
   findServiceCustomers, ordersForServiceCall,
   completeJob, setJobPay, payReport, bookRevisit,
   setJobCharge, billingSummary, invoiceClientJobs
@@ -196,6 +196,12 @@ export async function PATCH(req) {
     }
     // Putting a closed stop back on the board — the counterpart to Cancel and
     // to a driver tapping Done on the wrong card.
+    // Correcting a job that already exists — name, phone, address, what's on it.
+    // Staff, like creating one: whoever takes the call that says "actually we've
+    // moved" has to be able to fix it while the customer is still talking.
+    if (body.action === 'edit') {
+      return NextResponse.json({ ok: true, job: await updateJob(jobId, body, who(s)) });
+    }
     if (body.action === 'reopen') {
       return NextResponse.json({ ok: true, job: await reopenJob(jobId, who(s)) });
     }

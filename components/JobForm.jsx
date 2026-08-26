@@ -26,32 +26,36 @@ const SERVICES = [
   ['parts_drop', 'Parts drop-off'], ['warranty', 'Warranty call']
 ];
 
-export default function JobForm({ date, clients = [], drivers = [], canManageClients, onDone, onClientAdded }) {
-  const [type, setType] = useState('delivery');
-  const [clientId, setClientId] = useState('');
+export default function JobForm({ date, clients = [], drivers = [], canManageClients, onDone, onClientAdded, job = null }) {
+  // Same form, two jobs: adding a stop, and correcting one that exists. Editing
+  // reuses this rather than growing a second form that drifts — the fields, the
+  // address autocomplete and the client picker are all already here.
+  const editing = !!job;
+  const [type, setType] = useState(job?.type || 'delivery');
+  const [clientId, setClientId] = useState(job?.clientId ? String(job.clientId) : '');
   const [newClient, setNewClient] = useState('');
   const [addingClient, setAddingClient] = useState(false);
-  const [customerName, setCustomerName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [postal, setPostal] = useState('');
+  const [customerName, setCustomerName] = useState(job?.customerName || '');
+  const [phone, setPhone] = useState(job?.phone || '');
+  const [email, setEmail] = useState(job?.email || '');
+  const [address, setAddress] = useState(job?.address || '');
+  const [city, setCity] = useState(job?.city || '');
+  const [postal, setPostal] = useState(job?.postal || '');
   const [coords, setCoords] = useState({ lat: null, lng: null });
   // A transfer runs from one address to another — five pieces out of Mississauga
   // into Burlington is one job with two ends, and the driver needs both.
-  const [isTransfer, setIsTransfer] = useState(false);
-  const [pickupAddress, setPickupAddress] = useState('');
-  const [pickupCity, setPickupCity] = useState('');
-  const [pickupPostal, setPickupPostal] = useState('');
-  const [chargeAmount, setChargeAmount] = useState('');
-  const [jobDate, setJobDate] = useState(date || '');
-  const [windowStart, setWindowStart] = useState('');
-  const [windowEnd, setWindowEnd] = useState('');
-  const [shipmentType, setShipmentType] = useState('');
-  const [services, setServices] = useState([]);
+  const [isTransfer, setIsTransfer] = useState(!!job?.pickupAddress);
+  const [pickupAddress, setPickupAddress] = useState(job?.pickupAddress || '');
+  const [pickupCity, setPickupCity] = useState(job?.pickupCity || '');
+  const [pickupPostal, setPickupPostal] = useState(job?.pickupPostal || '');
+  const [chargeAmount, setChargeAmount] = useState(job?.chargeAmount == null ? '' : String(job.chargeAmount));
+  const [jobDate, setJobDate] = useState((editing ? job.jobDate : date) || '');
+  const [windowStart, setWindowStart] = useState(job?.windowStart || '');
+  const [windowEnd, setWindowEnd] = useState(job?.windowEnd || '');
+  const [shipmentType, setShipmentType] = useState(job?.shipmentType || '');
+  const [services, setServices] = useState(job?.services || []);
   const toggleService = (k) => setServices((xs) => (xs.includes(k) ? xs.filter((v) => v !== k) : [...xs, k]));
-  const [appliance, setAppliance] = useState('');
+  const [appliance, setAppliance] = useState(job?.appliance || '');
   // Service calls are either against something WE sold — in which case the
   // order tells us the customer, the address and the unit — or for an outside
   // client, where it's all typed. Defaults to ours; that's the common case.
@@ -61,10 +65,10 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
   const [picked, setPicked] = useState(null);
   const [orders, setOrders] = useState([]);
   const [orderId, setOrderId] = useState('');
-  const [issue, setIssue] = useState('');
-  const [driverId, setDriverId] = useState('');
-  const [what, setWhat] = useState('');
-  const [notes, setNotes] = useState('');
+  const [issue, setIssue] = useState(job?.issue || '');
+  const [driverId, setDriverId] = useState(job?.driverId ? String(job.driverId) : '');
+  const [what, setWhat] = useState((job?.items || []).map((i) => i.description).join(', '));
+  const [notes, setNotes] = useState(job?.notes || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const acDone = useRef(new Set());
@@ -173,9 +177,10 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
     setBusy(true); setErr('');
     try {
       const res = await fetch('/api/admin/dispatch', {
-        method: 'POST',
+        method: editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          ...(editing ? { action: 'edit', jobId: job.id } : {}),
           type, clientId: clientId || null, customerName, phone, email,
           address, city, postal, lat: coords.lat, lng: coords.lng,
           jobDate: jobDate || null,
@@ -194,7 +199,7 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
         })
       });
       const d = await res.json();
-      if (!res.ok) { setErr(d.error || 'Could not add the job.'); return; }
+      if (!res.ok) { setErr(d.error || (editing ? 'Could not save that.' : 'Could not add the job.')); return; }
       onDone?.(d.job);
     } catch {
       setErr('Network error — please try again.');
@@ -203,7 +208,7 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
 
   return (
     <form onSubmit={submit}>
-      <h3 style={{ marginTop: 0 }}>New job</h3>
+      <h3 style={{ marginTop: 0 }}>{editing ? `Edit ${job.jobNumber}` : 'New job'}</h3>
       {err && <div className="error-box">{err}</div>}
 
       {type === 'service_call' && (
@@ -449,10 +454,18 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
 
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         <button type="button" className="btn" onClick={() => onDone?.(null)}>Cancel</button>
-        <button className="btn accent" disabled={busy}>{busy ? 'Adding…' : 'Add to board'}</button>
+        <button className="btn accent" disabled={busy}>
+          {busy ? 'Saving…' : (editing ? 'Save changes' : 'Add to board')}
+        </button>
       </div>
       <p className="hint" style={{ textAlign: 'right' }}>
-        Only the address is required. Leave the day blank and it waits in &ldquo;To assign&rdquo;.
+        {editing
+          ? (job.orderNumber
+            // Editing the JOB, not the sale. Saying so stops somebody "fixing"
+            // an address here and wondering why the invoice still has the old one.
+            ? `Changes here apply to this stop only — ${job.orderNumber} keeps its own details.`
+            : 'Only the address is required.')
+          : 'Only the address is required. Leave the day blank and it waits in “To assign”.'}
       </p>
     </form>
   );

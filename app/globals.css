@@ -804,6 +804,17 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 }
 .disp-card.is-closed { opacity: .62; }
 .disp-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 5px; }
+/* Position in the run, and the two buttons that change it. */
+.disp-seat { display: inline-flex; align-items: center; gap: 2px; margin-right: auto; }
+.disp-seat b {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--charcoal); color: #fff; font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.disp-seat button {
+  background: none; border: 1px solid var(--line); border-radius: 5px; cursor: pointer;
+  color: var(--charcoal); font-size: 10px; line-height: 1; padding: 3px 4px;
+}
+.disp-seat button:disabled { opacity: .3; cursor: default; }
 .disp-win { font-size: 12.5px; font-weight: 700; color: var(--charcoal); font-variant-numeric: tabular-nums; }
 .disp-who { font-weight: 600; font-size: 14px; }
 .disp-addr { font-size: 13px; color: var(--muted); }
