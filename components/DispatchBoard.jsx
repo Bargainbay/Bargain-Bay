@@ -4,6 +4,7 @@ import JobForm from './JobForm';
 import ServiceVisitForm from './ServiceVisitForm';
 import TicketQueue from './TicketQueue';
 import DispatchSetup from './DispatchSetup';
+import StopImport from './StopImport';
 import PayReport from './PayReport';
 import ClientBilling from './ClientBilling';
 
@@ -345,7 +346,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   const [closing, setClosing] = useState(null);   // the service visit being closed out
   // Everything dispatch does happens on this page — no tab-hopping to add a
   // client or chase a service call mid-shift.
-  const [view, setView] = useState(['board', 'tickets', 'setup'].includes(initialView) ? initialView : 'board');
+  const [view, setView] = useState(['board', 'tickets', 'setup', 'import'].includes(initialView) ? initialView : 'board');
   const [tickets, setTickets] = useState(openTickets);
   const [pull, setPull] = useState(null);        // what the last Bargain Bay pull did
   const [addNum, setAddNum] = useState('');      // order number typed into "add by number"
@@ -551,12 +552,17 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       <div className="disp-tabs">
         <Tab id="board">Board</Tab>
         <Tab id="tickets">Service calls{tickets ? ` (${tickets})` : ''}</Tab>
+        <Tab id="import">Import</Tab>
         <Tab id="billing">Billing</Tab>
         <Tab id="pay">Pay</Tab>
         <Tab id="setup">Clients &amp; drivers</Tab>
       </div>
 
       {view === 'tickets' && <TicketQueue onChanged={() => refresh()} />}
+
+      {view === 'import' && (
+        <StopImport clients={board.clients} date={board.date} onDone={() => refresh()} />
+      )}
 
       {view === 'billing' && <ClientBilling canBill={canManageClients} />}
 

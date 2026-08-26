@@ -1129,3 +1129,26 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
   .ops-fold-body { padding: 4px 8px 12px; }
   .ops-fold-hint { display: none; }
 }
+
+/* ── Importing a client's sheet ──────────────────────────────────────────────
+   Paste-first, because what people do is select the rows in the Excel they were
+   emailed and hit copy. */
+.imp-paste {
+  width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
+  padding: 10px; border: 1px solid var(--line); border-radius: 10px; white-space: pre; overflow-x: auto;
+}
+.imp-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 10px 0; }
+.imp-row label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; font-weight: 700; color: var(--charcoal); margin: 0; }
+.imp-row select, .imp-row input { width: auto; padding: 6px 8px; font-size: 13px; }
+.imp-h4 { margin: 16px 0 6px; font-size: 14px; color: var(--charcoal); }
+.imp-map { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.imp-map label { display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; font-weight: 700; color: var(--muted); margin: 0; }
+.imp-map select { width: 100%; padding: 5px 6px; font-size: 12.5px; }
+.imp-preview { max-height: 46vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.imp-preview table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.imp-preview th { position: sticky; top: 0; background: var(--tint); text-align: left; padding: 6px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.imp-preview td { padding: 6px 8px; border-top: 1px solid var(--line-soft); vertical-align: top; }
+.imp-preview tr.is-bad td { background: var(--dangerbg); }
+.imp-prob { color: var(--danger); font-weight: 600; }
+.imp-done { background: var(--okbg); color: var(--ok); border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-weight: 600; }
+.imp-problems { margin: 6px 0 0; padding-left: 18px; font-weight: 400; font-size: 12.5px; }
