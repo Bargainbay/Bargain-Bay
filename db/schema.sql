@@ -191,6 +191,23 @@ CREATE TABLE IF NOT EXISTS invoice_payments (
   paid_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_invoice_payments_invoice ON invoice_payments(invoice_id);
+-- One row per refund event, so "already refunded $840" can always be explained.
+-- invoices.refund_total is the running sum of `amount` here. kind: 'items' (units
+-- came back) | 'amount' (money-only adjustment) | 'full'. restocking_fee is money
+-- KEPT on a change-of-mind return (incl. its HST share) — it stays booked as
+-- revenue on the order, so refunds + fees kept equal what the customer was charged.
+CREATE TABLE IF NOT EXISTS invoice_refunds (
+  id             serial PRIMARY KEY,
+  invoice_id     int NOT NULL,
+  amount         numeric(10,2) NOT NULL,
+  restocking_fee numeric(10,2) NOT NULL DEFAULT 0,
+  restocking_pct numeric(5,2)  NOT NULL DEFAULT 0,
+  kind           text NOT NULL,
+  reason         text,
+  created_by     text,
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_invoice_refunds_invoice ON invoice_refunds(invoice_id);
 -- Fulfilment intent captured on the invoice; when it's marked paid, a matching
 -- order is created (delivery_method/address flow into the order). order_id links
 -- the created fulfilment order back (and guards against double-creation).

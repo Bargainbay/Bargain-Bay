@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { createAndSendInvoice, listInvoices, listInvoiceAuthors, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, deleteInvoice,
+import { createAndSendInvoice, listInvoices, listInvoiceAuthors, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, refundInvoiceAmount, deleteInvoice,
          updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, voidInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
@@ -175,14 +175,30 @@ export async function PATCH(req) {
       if (!voided) return NextResponse.json({ error: 'Only an open invoice can be voided.' }, { status: 409 });
       return NextResponse.json({ ok: true, invoice: { id: voided.id, number: voided.number, status: 'void' } });
     }
+    // Whoever is signed in owns the refund, same rule as invoice creation: taken
+    // from the session, never from the body.
+    const actor = (await getSession())?.email || null;
     if (body.action === 'refund') {
-      const refunded = await refundInvoice(invoiceId);
+      const refunded = await refundInvoice(invoiceId, {
+        restockingPct: body.restockingPct, reason: body.reason, by: actor
+      });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     // Per-unit refund: refund only the selected line items (invoice_items.id).
+    // `restockingPct` keeps that share of their value as a fee.
     if (body.action === 'refund_items') {
       const itemIds = Array.isArray(body.itemIds) ? body.itemIds : [];
-      const refunded = await refundInvoiceItems(invoiceId, { itemIds });
+      const refunded = await refundInvoiceItems(invoiceId, {
+        itemIds, restockingPct: body.restockingPct, reason: body.reason, by: actor
+      });
+      return NextResponse.json({ ok: true, invoice: refunded });
+    }
+    // Money-only refund of an arbitrary amount (price adjustment / goodwill /
+    // deposit handed back). Moves no stock — the per-line refund does that.
+    if (body.action === 'refund_amount') {
+      const refunded = await refundInvoiceAmount(invoiceId, {
+        amount: body.amount, reason: body.reason, by: actor
+      });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     const method = String(body.method || '').trim();

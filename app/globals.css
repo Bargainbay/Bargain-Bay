@@ -924,16 +924,20 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 /* White glove is the one the crew must not miss on a glance. */
 .disp-tag.is-glove { background: var(--charcoal); color: #fff; }
 
-/* Dispatch tabs — board / service calls / setup, all on the one page */
-.disp-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
-.disp-tab {
+/* Underline tabs — several views on the one page. Born on the dispatch board
+   (.disp-tab); .tab-row/.tab-btn are the neutral names for everywhere else. */
+.disp-tabs, .tab-row { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
+.disp-tab, .tab-btn {
   background: none; border: none; border-bottom: 2px solid transparent;
   padding: 8px 14px; margin-bottom: -1px; font: inherit; font-size: 14px;
   color: var(--muted); cursor: pointer;
 }
-.disp-tab:hover { color: var(--charcoal); }
-.disp-tab.is-on { color: var(--charcoal); font-weight: 600; border-bottom-color: var(--charcoal); }
-.disp-tab:focus-visible { outline: 2px solid var(--taupe); outline-offset: -2px; }
+.disp-tab:hover, .tab-btn:hover { color: var(--charcoal); }
+.disp-tab.is-on, .tab-btn.is-on { color: var(--charcoal); font-weight: 600; border-bottom-color: var(--charcoal); }
+.disp-tab:focus-visible, .tab-btn:focus-visible { outline: 2px solid var(--taupe); outline-offset: -2px; }
+.tab-btn:disabled { opacity: .45; cursor: not-allowed; }
+/* An inline button that reads as a link (used inside hints). */
+.linkish { background: none; border: none; padding: 0; font: inherit; color: var(--charcoal); text-decoration: underline; cursor: pointer; }
 
 .disp-setup { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start; }
 .disp-setup-list { list-style: none; padding: 0; margin: 0 0 12px; font-size: 14px; }
