@@ -347,14 +347,28 @@ the paper run sheet that replaces it.
   primary input, not upload** — what people do is select the rows in the Excel
   the client emailed and hit copy, and Excel's clipboard is a TAB-separated
   table. That one input therefore covers the attachment AND the stops typed into
-  an email body, with nothing to save first. CSV upload too; `.xlsx` is a zip of
-  XML and says so rather than importing gibberish.
+  an email body, with nothing to save first. **`.xlsx` is read directly** —
+  `lib/xlsx-lite.js` opens the workbook with nothing but Node's own zlib (an xlsx
+  is a ZIP of XML: the sheet is `xl/worksheets/sheet1.xml` and its text lives
+  once in `xl/sharedStrings.xml`), so there is no SheetJS to keep patched. It
+  goes through `POST /api/admin/dispatch/sheet`, which only READS — a
+  spreadsheet that creates stops by being uploaded is a spreadsheet nobody
+  checked. Multi-tab workbooks get a sheet picker; `.xls` is a different format
+  and says so.
   The parser lives in `lib/stop-import.js` and knows NOTHING about the page —
   the future email inbox hands it the same rows. It sniffs the delimiter, handles
   quoted commas (addresses are full of them), decides whether row 1 is a header,
   guesses the mapping from ~90 header aliases, and normalises dates (incl. Excel
   serials) and times. **Nothing is written until every row has been previewed**
   with its problems named; a missing address blocks that row and only that row.
+  Three things a real client sheet taught it: **Excel error literals**
+  (`#VALUE!`, `#N/A`) are blanked, or they print on a run sheet a driver reads in
+  a van; the mapping walks the **FIELDS** and takes the strongest alias, because
+  header order used to decide it and a sheet carrying both `Model` and `Product
+  Description` put the SKU in the item line and threw the description away; and a
+  pickup column must contain a **street number** — freight sheets put a HUB name
+  ("Kitchener") in `Origin`, and reading that as an address turns every stop into
+  a transfer to nowhere, so it goes to the notes instead.
   **Item cells split on `;` and `|` but NEVER on commas** — "One pallet -
   radiator, 175 lbs" is one thing, and splitting it puts a phantom line on a POD
   the customer signs.
