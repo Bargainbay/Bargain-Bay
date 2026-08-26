@@ -110,7 +110,9 @@ export async function POST(req) {
       // separate domain exists to prevent.
       const base = process.env.RS_SITE_URL || `https://${(process.env.DISPATCH_HOSTS || 'dispatch.rssolutions.ca').split(',')[0].trim()}` || SITE_URL;
       const url = `${base.replace(/\/$/, '')}/d/${token}`;
-      const text = `RS Solutions — your stops for the day: ${url}\nTap it once on this phone. It will show you how to keep it on your home screen.`;
+      const host = base.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      const text = `RS Solutions - your stops: ${url}\n`
+        + `Lost this text? Go to ${host}/driver and sign in with your mobile number.`;
 
       let sms = { ok: false, skipped: true };
       if (d.phone) sms = await sendSms({ to: driverSmsNumber(d.phone), body: text });

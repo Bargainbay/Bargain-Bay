@@ -482,6 +482,19 @@ CREATE TABLE IF NOT EXISTS driver_links (
   used_at    timestamptz                       -- single use
 );
 CREATE INDEX IF NOT EXISTS idx_driver_links_user ON driver_links(user_id);
+-- Six digits texted to a driver who signs themselves in. The link is for day
+-- one; this is for every day after it.
+CREATE TABLE IF NOT EXISTS driver_codes (
+  id         serial PRIMARY KEY,
+  user_id    int NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash  text NOT NULL,
+  sent_to    text,
+  attempts   int NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  used_at    timestamptz
+);
+CREATE INDEX IF NOT EXISTS idx_driver_codes_user ON driver_codes(user_id, created_at DESC);
 
 -- Proof of delivery captured against a JOB (the order-based pod_photos table
 -- can't hold a service call — it has no order). pod_ref is the completion that

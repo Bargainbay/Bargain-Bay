@@ -4,6 +4,7 @@ import { isDriver, touchDriverSeen } from '../../lib/drivers';
 import { driverJobs } from '../../lib/driver-jobs';
 import DriverStops from '../../components/DriverStops';
 import DriverShell from '../../components/DriverShell';
+import DriverSignIn from '../../components/DriverSignIn';
 import AddToHome from '../../components/AddToHome';
 
 export const dynamic = 'force-dynamic';
@@ -35,12 +36,15 @@ export default async function DriverPage({ searchParams }) {
   if (!driver) {
     return (
       <DriverShell>
-        <div className="drv-card">
-          <h1 className="drv-hello" style={{ marginTop: 0 }}>Not signed in on this phone</h1>
+        {/* Signing in is a phone number and six digits — no link to lose, and
+            nobody in the office to wait for. */}
+        <DriverSignIn />
+        <div className="drv-card" style={{ marginTop: 14 }}>
+          <h1 className="drv-hello" style={{ marginTop: 0, fontSize: 16 }}>Trouble getting in?</h1>
           <p className="hint">
             {sp?.link === 'expired'
-              ? 'That link has already been used or has expired — ask the office to text you a new one.'
-              : 'Ask the office to text you your sign-in link. Tapping it once signs this phone in for good.'}
+              ? 'That link has expired — put your number in above instead and we\'ll text you a code.'
+              : 'Use your mobile number above. The office can also text you a sign-in link.'}
           </p>
           {/* The sign-in cookie belongs to the host the LINK opened, and the link
               is texted on the RS address. Somebody who reaches this page from

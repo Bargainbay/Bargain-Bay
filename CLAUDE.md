@@ -403,10 +403,24 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
   `driver-<digits>@drivers.bargainbay.ca` email and a deliberately unusable
   password hash: there is nothing to phish, and the account is on no staff list,
   so a driver's phone can only ever reach driver surfaces.
-- `driver_links` stores the **hash** of the token, single-use, 14 days. Minting a
-  new one kills the outstanding ones, so there is exactly one live key per
-  driver. The link is ALWAYS shown to the office too — a failed Twilio send must
-  never leave a driver unable to start.
+- **The everyday door is a phone number and six digits** (`startDriverCode` /
+  `verifyDriverCode`, `POST /api/driver/signin`, the form on a signed-out
+  `/driver`). The driver types the mobile the office already has for them, we
+  text a code, they type it, and that phone is signed in for 180 days. The link
+  is for DAY ONE only: it is one message that gets deleted, tapped on the wrong
+  phone, or lost with the device, and then somebody is standing at a van waiting
+  for the office to open. Both steps answer identically for an unknown number —
+  a form that says "no such driver" tells anyone who drives here. Code lives 15
+  minutes, dies after 5 wrong guesses, 5 sends per driver per hour, hashed at
+  rest, and a new one retires the old.
+- `driver_links` stores the **hash** of the token, 14 days, and is **REUSABLE**
+  inside that window. It was single-use, which drivers reported as "the link
+  expires every fifteen minutes" — they reopen the app the only way they
+  remember, the text, and the second tap said expired. Minting a new link no
+  longer kills the old ones either: killing them silently broke the text a driver
+  still had. `used_at` records the first tap for the roster and never blocks a
+  later one. The link is ALWAYS shown to the office too — a failed Twilio send
+  must never leave a driver unable to start.
 - **`/d/<token>` must stay in `proxy.js`'s allow-list.** The link is texted on
   the RS host; without it every driver is bounced to a board they can't see.
 - **Tomorrow is visible today**, in its own collapsed list under the day's work
