@@ -167,7 +167,13 @@ export async function POST(req) {
       partsNeeded: form.get('partsNeeded') || null,
       signedBy: form.get('signedBy') || null,
       note: form.get('note') || null,
-      podForm: form.get('podForm') || null
+      podForm: form.get('podForm') || null,
+      // Three states, and the difference matters: 'yes' the old unit is on the
+      // van, 'no' it isn't and the office has to chase it, absent because the
+      // stop had no trade-in at all. Only a literal 'yes'/'no' is an answer.
+      tradeInCollected: form.get('tradeInCollected') === 'yes' ? true
+        : (form.get('tradeInCollected') === 'no' ? false : undefined),
+      tradeInNote: form.get('tradeInNote') || null
     }, who(s));
 
     // The customer's side of the same fact: their order is delivered, they get

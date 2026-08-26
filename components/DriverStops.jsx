@@ -223,6 +223,17 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
         <div className="drv-collect">COLLECT ${Number(stop.balanceDue).toFixed(2)}{stop.invoiceNumber ? ` · ${stop.invoiceNumber}` : ''}</div>
       )}
 
+      {(stop.tradeIns?.length > 0 || stop.services?.includes('trade_in')) && (
+        // The other thing on this screen that costs money to miss: an appliance
+        // we have already bought and have to come back with.
+        <div className={'drv-tradein' + (stop.tradeInCollected ? ' is-done' : '')}>
+          {stop.tradeInCollected ? 'TRADE-IN ON THE VAN' : 'BRING BACK'}
+          {stop.tradeIns?.length
+            ? stop.tradeIns.map((t, i) => <div key={i} className="drv-tradein-unit">{t.description}</div>)
+            : <div className="drv-tradein-unit">See the notes</div>}
+        </div>
+      )}
+
       {stop.shipmentType && <div className="drv-glove">{SHIPMENT[stop.shipmentType] || stop.shipmentType}</div>}
 
       <div className="drv-what">

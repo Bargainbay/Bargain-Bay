@@ -235,6 +235,72 @@ which is not a selling-surface permission). `lib/coupons.js`, tables `coupons` /
 - Deleting a coupon that has been redeemed **turns it off instead**, so nobody
   erases an affiliate's numbers by tidying up.
 
+## Line kinds — discounts and trade-ins (added 2026-08-26)
+A line was only ever `unit` or `service`, and every test in the codebase asked
+"is it a service?" with unit as the else. Two more kinds broke that, so the
+question is asked the other way round now: **`isUnitLine` (lib/constants.js) is
+what decides whether a line carries a SKU, a warranty, a cost, and stock
+movement.** `invoice_items.kind` and `order_items.kind` both hold:
+
+| kind | sign | moves stock | on the van |
+|---|---|---|---|
+| `unit` | + | yes | delivered |
+| `service` | + | no | — |
+| `discount` | − | no | — |
+| `trade_in` | − | no | **collected** |
+
+- **Sign is enforced, never trusted.** A credit is TYPED as a plain positive
+  number ("take fifty off") and STORED negative, so a subtotal is always just
+  `SUM(amount)`. The flip happens at exactly two boundaries — `toPayload` /
+  `fromInvoice` in `lib/invoice-lines.js` — which is what stops an edit negating
+  the same line twice. `normalizeLines` in `lib/invoices.js` re-applies it
+  server-side regardless of what arrived.
+- A negative **unit** line is REJECTED with a message, never silently dropped:
+  it's a typo, and deleting the appliance somebody just typed is worse.
+- `components/InvoiceLines.jsx` is the one line editor, used by both
+  `InvoiceForm` (new) and `InvoiceEditor` (edit). They were copy-pasted, which is
+  how they drifted. The `5% / 10% / 15%` buttons snapshot a percentage **to
+  dollars** on the spot — an invoice line is a figure, and re-deriving it later
+  would move a total somebody has already quoted out loud.
+- `order_items.kind` is what makes an order self-describing. Without it a
+  trade-in and an appliance being delivered are both just a title and a price,
+  and dispatch cannot tell them apart. NULL = unit (every pre-existing row).
+
+**LANDMINE — refunding a line off a discounted invoice.** An invoice carrying a
+credit charged LESS than its charged lines add up to, so refunding a line at face
+value hands back money nobody paid. `refundInvoiceItems` therefore spreads the
+credit across the charged lines (`creditFactorOf`): refunding a $1,000 unit off a
+$1,000 sale that had $100 off returns **$900**, and the reclaimed $100 goes back
+on the order as its own line so the order's items still sum to its subtotal.
+Credit lines themselves are **not refundable** — you can't return a discount —
+so they're excluded from the picker and from the "was that the last line?" test.
+
+## Trade-ins — the unit that has to come back (added 2026-08-26)
+We take the customer's old appliance in part-exchange and credit them for it. The
+money is a `trade_in` line; the **logistics are the point** — a van that leaves
+without it has left behind something we have already paid for.
+
+- **Read live, never stamped.** `tradeInsForOrders` (lib/jobs.js) reads
+  `order_items WHERE kind='trade_in'` on every board / run-sheet / driver load,
+  exactly like `balancesForOrders` and for the same reason: a trade-in agreed on
+  the phone at 11am has to be on the run sheet at 3pm.
+- It shows on **five** surfaces, because each is the only one somebody looks at:
+  the board card, the printed run sheet (boxed, so it survives a photocopy), the
+  packing slip (both printed and emailed — the last paper read before the van
+  loads), the driver's stop, and the driver's close-out.
+- **The driver has to answer.** Close-out asks "Is their old unit on the van?"
+  with no default. A `no` demands a reason and is written to `job_events` in
+  capitals — a trade-in that was NOT picked up is what the office most needs to
+  hear today, not next month off a stock count. `jobs.trade_in_collected` only
+  ever moves forward, so a replayed close-out off the offline queue can't
+  un-collect something already loaded.
+- `importReadyBargainBayOrders` auto-tags the job `trade_in` and puts the unit in
+  the job notes; **cargo excludes credit lines**, or the crew goes looking for a
+  box called "Promo code SUMMER10".
+- A job with no Bargain Bay order behind it (an external client) can carry the
+  `trade_in` **service tag** by hand; every surface falls back to "see the notes"
+  rather than showing nothing.
+
 ## Dispatch — deliveries & service calls (added 2026-08-25)
 The daily run sheet used to be built by hand because the work comes from several
 client companies through several channels (email, spreadsheet, phone) and no one

@@ -202,6 +202,22 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
           )}
         </div>
       )}
+      {(job.tradeIns?.length > 0 || job.services?.includes('trade_in')) && (
+        // An appliance we have BOUGHT and have to come back with. It gets the
+        // same weight as the money to collect, because a van that leaves without
+        // it has left behind something already paid for.
+        <div className={'disp-tradein' + (job.tradeInCollected ? ' is-done' : '')}>
+          <b>{job.tradeInCollected ? 'TRADE-IN COLLECTED' : 'TRADE-IN TO COLLECT'}</b>
+          {job.tradeIns?.length
+            ? job.tradeIns.map((t, i) => (
+                <div key={i}>{t.description}{t.allowance > 0 ? ` — $${t.allowance.toFixed(2)} allowed` : ''}</div>
+              ))
+            /* Tagged by hand on a job with no Bargain Bay order behind it — the
+               unit is in the notes, so point at them rather than saying nothing. */
+            : <div>See the notes for what to pick up.</div>}
+          {job.tradeInNote && <div className="disp-tradein-note">{job.tradeInNote}</div>}
+        </div>
+      )}
       <div className="disp-meta">
         <span className="disp-tag">{TYPE_LABEL[job.type] || job.type}</span>
         {job.shipmentType && (

@@ -43,6 +43,12 @@ export default function DriverFinish({ stop, onClose, onDone }) {
   const [partsNeeded, setPartsNeeded] = useState('');
   const [note, setNote] = useState('');
   const [collect, setCollect] = useState(stop.balanceDue > 0);
+  // A trade-in has to be answered, not defaulted: 'yes' it's on the van, 'no' it
+  // isn't. Pre-ticking it would turn the one question that protects a unit we
+  // have already paid for into a box nobody reads.
+  const hasTradeIn = (stop.tradeIns?.length || 0) > 0 || !!stop.services?.includes('trade_in');
+  const [tradeIn, setTradeIn] = useState('');
+  const [tradeInNote, setTradeInNote] = useState('');
   const [amount, setAmount] = useState(Number(stop.balanceDue || 0).toFixed(2));
   const [method, setMethod] = useState('cash');
   const [busy, setBusy] = useState(false);
@@ -115,6 +121,11 @@ export default function DriverFinish({ stop, onClose, onDone }) {
       }
     }
     if (collect && !(Number(amount) > 0)) { setErr('How much did you take?'); return; }
+    if (hasTradeIn && !tradeIn) { setErr('Did you load their old unit? Tap Yes or No.'); return; }
+    if (hasTradeIn && tradeIn === 'no' && !tradeInNote.trim()) {
+      setErr('Say why the trade-in isn’t on the van — the office has to go back for it.');
+      return;
+    }
     setBusy(true);
     try {
       const sig = signed.current
@@ -140,6 +151,8 @@ export default function DriverFinish({ stop, onClose, onDone }) {
           partsUsed: isService ? partsUsed : '',
           partsNeeded: isService ? partsNeeded : '',
           signedBy, note,
+          tradeInCollected: hasTradeIn ? tradeIn : '',
+          tradeInNote: hasTradeIn && tradeIn === 'no' ? tradeInNote : '',
           podForm: isService ? '' : JSON.stringify({
             productDamageFree: productOk,
             propertyDamageFree: propertyOk,
@@ -187,6 +200,35 @@ export default function DriverFinish({ stop, onClose, onDone }) {
             )}
             {!collect && <div className="drv-warn">Leaving without it? The office will chase it.</div>}
           </div>
+        )}
+
+        {hasTradeIn && (
+          <>
+            <div className="drv-tradein">
+              BRING BACK
+              {stop.tradeIns?.length
+                ? stop.tradeIns.map((t, i) => <div key={i} className="drv-tradein-unit">{t.description}</div>)
+                : <div className="drv-tradein-unit">See the notes</div>}
+            </div>
+            <div className="drv-field">
+              <label>Is their old unit on the van?</label>
+              <div className="drv-yesno">
+                {['yes', 'no'].map((v) => (
+                  <button type="button" key={v}
+                    className={'drv-btn' + (tradeIn === v ? ' is-on' : '')}
+                    onClick={() => setTradeIn(v)}>{v === 'yes' ? 'Yes' : 'No'}</button>
+                ))}
+              </div>
+              {tradeIn === 'no' && (
+                <>
+                  <input value={tradeInNote} onChange={(e) => setTradeInNote(e.target.value)}
+                    placeholder="Why not? (wouldn't fit, not disconnected, customer changed their mind…)"
+                    maxLength={300} style={{ marginTop: 8 }} />
+                  <div className="drv-warn">We&apos;ve paid for it — the office will have to send someone back.</div>
+                </>
+              )}
+            </div>
+          </>
         )}
 
         {isService && (
