@@ -359,6 +359,17 @@ the paper run sheet that replaces it.
   place). Numbered because "third stop" is how a dispatcher and a driver talk on
   the phone; arrows and not drag for the same reason assignment is a tap — this
   is used one-handed on a warehouse touchscreen.
+- **A stop can carry TWO drivers** (`jobs.driver2_id`). Two people sent together
+  are ONE van doing ONE run, so it is a second NAME on the job, not a second copy
+  of it — the running order, the money, the POD and the completion all stay
+  single, and there is no way to half-finish a stop from two phones. Both see it
+  (`driverJobs` matches either seat), and `jobBelongsToDriver` lets both through —
+  a second driver who can see a stop but not sign it is worse than one who can't
+  see it. The board lists the card in BOTH columns, but only the primary's column
+  owns the ▲▼ (`seat` is null in the other), and the second reads "Riding with
+  <name>". `assignJob` refuses to seat the same person twice or to fill the
+  second seat with the first empty. **Pay is still one `pay_amount` on the job** —
+  who splits it is a decision nobody has made yet.
 - **Nothing on the board is a dead end.** A closed stop (done / failed /
   cancelled) can be **Reopened** (`reopenJob`, PATCH `action: 'reopen'`) — a
   customer rings back, a driver taps Done on the wrong card, a cancelled

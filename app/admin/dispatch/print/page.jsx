@@ -50,7 +50,7 @@ export default async function RunSheetPage({ searchParams }) {
       title: d.name,
       sub: d.phone || '',
       stops: board.jobs
-        .filter((j) => j.driverId === d.id && live(j))
+        .filter((j) => (j.driverId === d.id || j.driver2Id === d.id) && live(j))
         .sort((a, b) => (a.seq ?? 99) - (b.seq ?? 99) || String(a.windowStart).localeCompare(String(b.windowStart)))
     })),
     {
@@ -134,6 +134,7 @@ export default async function RunSheetPage({ searchParams }) {
                   <td className="w">{win(j)}</td>
                   <td>
                     <strong>{j.customerName || '(no name)'}</strong>
+                    {j.driver2Name ? <> · <em>2 crew: {j.driverName} + {j.driver2Name}</em></> : null}
                     {j.phone ? ` · ${j.phone}` : ''}<br />
                     {j.pickupAddress
                       ? <><b>FROM</b> {[j.pickupAddress, j.pickupCity].filter(Boolean).join(', ')}

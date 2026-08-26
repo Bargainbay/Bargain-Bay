@@ -819,6 +819,10 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .disp-who { font-weight: 600; font-size: 14px; }
 .disp-addr { font-size: 13px; color: var(--muted); }
 .disp-pickup-who { color: var(--charcoal); font-weight: 600; }
+.disp-tag.is-pair { background: var(--charcoal); color: #fff; }
+/* The card in the SECOND driver's column: same stop, not their run to reorder. */
+.disp-helping { font-size: 11.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.drv-mate { font-size: 14px; font-weight: 700; color: var(--charcoal); margin-top: 2px; }
 .disp-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
 .disp-tag {
   font-size: 11px; letter-spacing: .04em; text-transform: uppercase;

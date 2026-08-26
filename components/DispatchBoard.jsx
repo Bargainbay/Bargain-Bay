@@ -148,7 +148,7 @@ function savePod(job) {
   }, i * 400));
 }
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onEdit, onMove, seat }) {
+function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onEdit, onMove, seat, helpingFor }) {
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const closed = ['done', 'failed', 'cancelled'].includes(job.status);
@@ -171,6 +171,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
         <span className="disp-win">{windowLabel(job)}</span>
         <span className={'pill ' + (STATUS_TONE[job.status] || 'warn')}>{STATUS_LABEL[job.status]}</span>
       </div>
+      {helpingFor && <div className="disp-helping">Riding with {helpingFor}</div>}
       <div className="disp-who">{job.customerName || '(no name)'}</div>
       <div className="disp-addr">
         {job.pickupAddress
@@ -216,6 +217,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
         <span className={'disp-tag is-src' + (job.source === 'bargain_bay' ? ' is-bb' : '')}>
           {job.clientName || (job.source === 'bargain_bay' ? 'Bargain Bay' : 'Own job')}
         </span>
+        {job.driver2Name && <span className="disp-tag is-pair">2 crew</span>}
         <span className="disp-num">
           {job.ticketNumber || job.jobNumber}
           {job.orderNumber && <b className="disp-order"> · {job.orderNumber}</b>}
@@ -292,6 +294,20 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
               {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </label>
+          {/* Two sent together are one van on one run, so this is a second name
+              on the stop and not a second copy of it — the running order, the
+              money and the proof of delivery all stay single. */}
+          {job.driverId && (
+            <label>
+              With
+              <select value={job.driver2Id || ''} disabled={busy || closed}
+                onChange={(e) => onAssign(job.id, { driver2Id: e.target.value || null })}>
+                <option value="">Nobody</option>
+                {drivers.filter((d) => d.id !== job.driverId)
+                  .map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </label>
+          )}
           {/* Moving a stop to another day was only possible by cancelling it and
               typing it in again. A customer rescheduling is the single most
               ordinary thing that happens to a delivery. */}
@@ -537,7 +553,9 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     measureStrip();
   };
 
-  const byDriver = (id) => board.jobs.filter((j) => j.driverId === id)
+  // Both people's columns show the stop. A dispatcher looking at Ravi's day has
+  // to see the run he is actually on, even when the card "belongs" to Nicholas.
+  const byDriver = (id) => board.jobs.filter((j) => j.driverId === id || j.driver2Id === id)
     .sort((a, b) => (a.seq ?? 99) - (b.seq ?? 99) || String(a.windowStart).localeCompare(String(b.windowStart)));
   const unassignedToday = board.jobs.filter((j) => !j.driverId);
   const openCount = board.jobs.filter((j) => !['done', 'failed', 'cancelled'].includes(j.status)).length;
@@ -723,7 +741,8 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                   onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
                   onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onMove={onMove}
-                  seat={{ n: i + 1, first: i === 0, last: i === stops.length - 1 }} />
+                  helpingFor={j.driver2Id === d.id ? j.driverName : null}
+                  seat={j.driverId === d.id ? { n: i + 1, first: i === 0, last: i === stops.length - 1 } : null} />
               ))}
             </BoardColumn>
           );

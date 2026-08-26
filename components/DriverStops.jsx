@@ -201,6 +201,13 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
       </div>
 
       <div className="drv-who">{stop.customerName || '(no name)'}</div>
+      {/* Two on one van: both see the stop and either can close it out. Saying
+          who else is on it stops both of them finishing it twice. */}
+      {stop.mateName && (
+        <div className="drv-mate">
+          {stop.helping ? `Riding with ${stop.mateName}` : `With ${stop.mateName}`}
+        </div>
+      )}
       {stop.pickupAddress && (
         <div className="drv-addr">
           <b>FROM</b> {[stop.pickupAddress, stop.pickupCity].filter(Boolean).join(', ')}

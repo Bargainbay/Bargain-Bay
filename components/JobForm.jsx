@@ -69,6 +69,7 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
   const [orderId, setOrderId] = useState('');
   const [issue, setIssue] = useState(job?.issue || '');
   const [driverId, setDriverId] = useState(job?.driverId ? String(job.driverId) : '');
+  const [driver2Id, setDriver2Id] = useState(job?.driver2Id ? String(job.driver2Id) : '');
   const [what, setWhat] = useState((job?.items || []).map((i) => i.description).join(', '));
   const [notes, setNotes] = useState(job?.notes || '');
   const [busy, setBusy] = useState(false);
@@ -198,6 +199,7 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           orderId: type === 'service_call' && who === 'bb' && orderId ? orderId : null,
           source: type === 'service_call' && who === 'bb' ? 'bargain_bay' : 'manual',
           driverId: driverId || null,
+          driver2Id: driverId ? (driver2Id || null) : null,
           notes,
           items: what.split(',').map((s) => s.trim()).filter(Boolean).map((d) => ({ description: d }))
         })
@@ -447,6 +449,18 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
             {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </div>
+        {/* A two-man stop is one van on one run — a second name, not a second
+            job. Only offered once there is somebody to pair with. */}
+        {driverId && (
+          <div>
+            <label>Second driver (optional)</label>
+            <select style={{ width: 175 }} value={driver2Id} onChange={(e) => setDriver2Id(e.target.value)}>
+              <option value="">Nobody</option>
+              {drivers.filter((d) => String(d.id) !== String(driverId))
+                .map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="field">
