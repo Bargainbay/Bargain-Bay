@@ -349,7 +349,14 @@ the paper run sheet that replaces it.
   the invoice saves, and `setJobCharge` refuses to move a charge once it's set —
   a job can never appear on two invoices. Needs `clients.contact_email`.
 - **A job can be a transfer** — `pickup_address` / `pickup_city` /
-  `pickup_postal` set means it runs FROM there TO `address`. Shown as "A → B" on
+  `pickup_postal` set means it runs FROM there TO `address`, and it carries its
+  own contact: `pickup_name` / `pickup_phone`. **Both ends of a transfer are
+  somewhere a driver has to be let into**, so both need somebody to ring — a
+  locked door with no number on the sheet is how a transfer becomes a wasted
+  morning. Shown on the board card, the run sheet and the driver's stop, and the
+  driver gets a second Call button (the two are labelled "Call pickup" and
+  "Call drop-off" only when there are two, so an ordinary delivery still just
+  says Call). Shown as "A → B" on
   the board and as FROM/TO on the run sheet; the driver needs both ends.
 - **Times and pay.** Closing out ANY job (not just a service call) records
   `time_in` / `time_out` — time actually on site — plus who signed. `pay_amount`

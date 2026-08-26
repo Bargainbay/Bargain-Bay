@@ -452,6 +452,9 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS invoice_id    int REFERENCES invoices(
 CREATE INDEX IF NOT EXISTS idx_jobs_invoice ON jobs(invoice_id) WHERE invoice_id IS NOT NULL;
 -- A transfer runs FROM one address TO another — five pieces out of Mississauga
 -- into Burlington is one job with two ends, and the driver needs both.
+-- A transfer has two ends, and both are somewhere a driver has to be let into.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_name    text;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_phone   text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_address text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_city    text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_postal  text;

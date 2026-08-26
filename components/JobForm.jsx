@@ -45,6 +45,8 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
   // A transfer runs from one address to another — five pieces out of Mississauga
   // into Burlington is one job with two ends, and the driver needs both.
   const [isTransfer, setIsTransfer] = useState(!!job?.pickupAddress);
+  const [pickupName, setPickupName] = useState(job?.pickupName || '');
+  const [pickupPhone, setPickupPhone] = useState(job?.pickupPhone || '');
   const [pickupAddress, setPickupAddress] = useState(job?.pickupAddress || '');
   const [pickupCity, setPickupCity] = useState(job?.pickupCity || '');
   const [pickupPostal, setPickupPostal] = useState(job?.pickupPostal || '');
@@ -187,6 +189,8 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           windowStart: windowStart || null,
           windowEnd: windowEnd || null,
           shipmentType: shipmentType || null, services, appliance, issue,
+          pickupName: isTransfer ? pickupName : null,
+          pickupPhone: isTransfer ? pickupPhone : null,
           pickupAddress: isTransfer ? pickupAddress : null,
           pickupCity: isTransfer ? pickupCity : null,
           pickupPostal: isTransfer ? pickupPostal : null,
@@ -317,6 +321,14 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
       {isTransfer && (
         <div className="field">
           <label>Pick up from</label>
+          {/* Both ends of a transfer are somewhere a driver has to be let into,
+              so both ends need somebody to ring. */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input value={pickupName} onChange={(e) => setPickupName(e.target.value)}
+              placeholder="Contact at pickup" autoComplete="off" />
+            <input style={{ width: 170 }} value={pickupPhone} onChange={(e) => setPickupPhone(e.target.value)}
+              placeholder="Their phone" inputMode="tel" autoComplete="off" />
+          </div>
           <input value={pickupAddress} onFocus={(e) => attachAutocomplete(e, 'pickup')}
             onChange={(e) => setPickupAddress(e.target.value)}
             placeholder={hasMaps ? 'Start typing the address we collect from…' : "Street address we're collecting from"}
