@@ -375,6 +375,57 @@ try/log/carry-on scaffolding.
 - **`syncInventoryFromTracker` is the one step allowed to fail the response.**
   The rest is best-effort housekeeping; stale stock is what customers see.
 
+## Expense sorting, the ledger floor, and the P&L (added 2026-08-27)
+
+### Where the books start
+`getLedgerStart()` (`lib/finance.js`, setting `ledger_start`, default
+`LEDGER_START_DEFAULT` = **2026-08-01**). **Both automatic feeds refuse anything
+older**: QBO narrows its query to it, Plaid drops the transaction in
+`mapTransaction`. The shop only started running on this system in August 2026 and
+everything before that lives in whatever they used previously — importing it
+gives a P&L stitched from two systems. Manual entry and uploaded purchase
+invoices are deliberately **not** capped: those are a person recording something
+on purpose.
+
+### Sorting rules
+`expense_rules` — a substring of a vendor name → a category, and optionally a tax
+treatment. Both feeds run every incoming row through them, and
+`applyRulesToExisting` sorts what's already in the ledger (a rule that only
+helped future transactions would leave the pile that prompted it untouched).
+
+- **Longest match wins**, so `canadian tire gas` beats `canadian tire`. Substring,
+  not regex — these get typed by a shop owner between deliveries.
+- **QBO's own account name beats a rule** when it has one: if the books already
+  say Fuel, the books are more specific than a substring. A rule only fills in
+  where QBO says nothing or "Uncategorised". For Plaid it's the reverse — a rule
+  beats Plaid's guessed category, because the owner knows their own suppliers and
+  Plaid has never heard of the wholesaler down the road.
+- **The tax column is opt-in, and that is the point.** A rule saying "Esso carries
+  13%" is the owner's judgement about a supplier they know. With no rule the row
+  keeps `tax = NULL` and goes to the review queue. Never default it —
+  auto-applying 13% is how invented input tax credits get onto a tax return.
+- **Rule tax applies to Plaid only.** A bank line is gross, so `hst` splits it. A
+  QBO line already carries its own tax figure from `TxnTaxDetail`, and overriding
+  what the books say with a substring guess would be worse than the gap.
+- `applyRulesToExisting` **only fills blanks** — a category set by hand, or a tax
+  already answered, is never overwritten by a rule written afterwards.
+
+### The P&L statement
+`lib/pnl.js` → `/admin/reports/pnl`, printable, CSV at `/api/admin/pnl`.
+Revenue → COGS → gross profit → operating expenses itemised by category → net
+profit, with the previous comparable period beside it.
+
+- **Same basis as the Sales dashboard** — its `SALE` predicate is deliberately a
+  copy. A statement that disagreed with the revenue dashboard would be worse than
+  no statement; if one changes, change both.
+- **HST is excluded throughout.** Revenue is ex-HST because the tax is collected
+  for the CRA, not earned; expenses are pre-tax because the recoverable part
+  comes back as an input tax credit.
+- **It states its own two failure modes** rather than leaving them to be
+  discovered: cost coverage below 95% (gross profit is flattering by whatever the
+  uncosted units cost) and any expense rows with no HST answered (counted at the
+  full charge, so both expenses and the remittance are overstated).
+
 ## Bank feed (Plaid) + QuickBooks — where expenses come from (added 2026-08-27)
 Two independent feeds into the same `expenses` ledger, both dormant until their
 env vars are set, both idempotent via `expenses.ext_id`.
