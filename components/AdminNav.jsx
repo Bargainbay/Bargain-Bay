@@ -19,6 +19,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false 
   const items = booksOnly
     ? [{ key: 'books', label: 'The books', href: '/admin/reports/books' },
        { key: 'pnl', label: 'Profit & loss', href: '/admin/reports/pnl' },
+       { key: 'ledger', label: 'Trial balance', href: '/admin/reports/ledger' },
        { key: 'financial', label: 'Expenses', href: '/admin/financial' }]
     : (salesOnly ? all.filter((i) => i.sales) : all);
   return (

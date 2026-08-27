@@ -94,6 +94,7 @@ export default async function BooksPage({ searchParams }) {
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           <a className="btn accent" href={`/admin/reports/pnl?period=${period}`}>Profit &amp; loss statement →</a>
           <a className="btn" href={`/api/admin/pnl?period=${period}`}>P&amp;L as CSV</a>
+          <a className="btn" href="/admin/reports/ledger">Trial balance &amp; balance sheet →</a>
           <a className="btn" href="/admin/financial">Expense ledger →</a>
         </div>
       </div>
@@ -105,11 +106,11 @@ export default async function BooksPage({ searchParams }) {
         payment, refund, expense and stock purchase in the period, each traceable to its document, plus a P&amp;L
         built from them.
         <div style={{ marginTop: 6 }}>
-          It is <b>not</b> a general ledger with double entry, a trial balance, or a balance sheet. Those need a
-          chart of accounts, opening balances and owner equity, none of which this system tracks — so cash on
-          hand, loans, owner draws and retained earnings are not here. An accountant can build them from these
-          records; they can&apos;t be produced from this system alone, and a balance sheet that quietly left out
-          equity would be worse than none.
+          A double-entry <b>general ledger, trial balance and balance sheet</b> are built from these same records
+          — see <a href="/admin/reports/ledger" style={{ textDecoration: 'underline' }}>Trial balance</a>, once
+          opening balances are entered. What is still <b>not</b> here: accounts payable, so anything bought on
+          terms is treated as paid on its date, and the bank figure is derived from documents rather than read
+          from the account. That page says so, and shows what to compare it against.
         </div>
       </div>
 

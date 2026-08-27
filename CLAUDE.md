@@ -375,6 +375,32 @@ try/log/carry-on scaffolding.
 - **`syncInventoryFromTracker` is the one step allowed to fail the response.**
   The rest is best-effort housekeeping; stale stock is what customers see.
 
+## The general ledger (added 2026-08-27)
+`lib/ledger.js` → `/admin/reports/ledger`. Double-entry, trial balance, balance
+sheet, GL detail as CSV.
+
+- **The journal is DERIVED, never typed.** Nobody here keys journal entries, but
+  every document already implies its own: an invoice is Dr receivable / Cr sales
+  / Cr HST, a payment Dr bank / Cr receivable, a stock invoice Dr inventory / Dr
+  HST recoverable / Cr bank, a sale's COGS Dr cost / Cr inventory. `journal()`
+  recomputes them on every read. Nothing to post, nothing to keep in sync, and
+  the ledger cannot drift from the documents it describes. Do NOT add a stored
+  journal table "for speed" without solving that drift.
+- **Every entry is written as a balanced pair**, so the trial balance balances by
+  construction rather than by luck. `outOfBalance` is displayed: if it is ever
+  non-zero the bug is in `journal()`, not in the data.
+- **Opening equity is computed, not asked for.** Assets − liabilities at the
+  opening date. Asking an owner for "owner's equity" is asking the one question
+  they can't answer, and a guessed figure would be silently absorbed.
+- **LANDMINE — the bank balance is derived, not observed.** There is no accounts
+  payable, so every entry assumes payment from the bank on the document's date;
+  something bought on terms is treated as paid immediately. The consequence is
+  specific and checkable rather than vague: `bankDrift()` compares the derived
+  figure to a real balance, and the gap IS the measure of what the records are
+  missing (unrecorded cash, credit purchases, owner draws). The page says this.
+  When Plaid is live, wire the real balance in and make the comparison automatic.
+- `SALE` now exists in four files. Still deliberate, still: change one, change all.
+
 ## The books, and accountant access (added 2026-08-27)
 `/admin/reports/books` — every source record for a period, each section
 downloadable, plus the P&L built from them. `lib/books.js`.
