@@ -2,13 +2,14 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
-import { revenueDashboard, DASH_PERIODS } from '../../../lib/analytics';
+import { revenueDashboard, hstRemittance, DASH_PERIODS } from '../../../lib/analytics';
 import { getSetting } from '../../../lib/settings';
 import { listReps } from '../../../lib/reps';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
 import GoalEditor from '../../../components/GoalEditor';
 import RepsEditor from '../../../components/RepsEditor';
+import TaxOwed from '../../../components/TaxOwed';
 import { Kpi, Donut, Funnel, TrendChart } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
@@ -43,9 +44,13 @@ export default async function SalesDashboardPage({ searchParams }) {
 
   const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
 
-  let data = null, goal = 0, repList = [], error = '';
+  let data = null, goal = 0, repList = [], tax = null, error = '';
   try {
-    [data, goal, repList] = await Promise.all([revenueDashboard(period), getSetting('revenue_goal_monthly', 0), listReps()]);
+    // The tax panel is owner-only, so a sales associate's page never pays for it.
+    [data, goal, repList, tax] = await Promise.all([
+      revenueDashboard(period), getSetting('revenue_goal_monthly', 0), listReps(),
+      salesOnly ? null : hstRemittance(period).catch(() => null)
+    ]);
   } catch (e) {
     console.error('sales dashboard load failed', e.message);
     error = 'Could not load dashboard data — if you just deployed, run the schema migration under Operations.';
@@ -87,6 +92,10 @@ export default async function SalesDashboardPage({ searchParams }) {
         <Kpi label="Units sold" value={k.units} />
         <Kpi label="Avg order" value={money(k.avgOrder)} delta={k.avgDelta} />
       </div>
+
+      {/* Directly under the revenue KPIs: the part of that money that was never
+          the shop's. Owner-only — a sales associate sees selling performance. */}
+      {!salesOnly && <TaxOwed data={tax} />}
 
       {period === 'month' && (
         <div className="panel" style={{ marginTop: 18 }}>

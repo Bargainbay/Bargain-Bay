@@ -349,6 +349,122 @@ changes no arithmetic.
 - Sarah can raise a tax-in invoice (`taxInclusive` on `create_invoice`); a phone
   quote is exactly where "out the door" pricing gets used.
 
+## Bank feed (Plaid) + QuickBooks — where expenses come from (added 2026-08-27)
+Two independent feeds into the same `expenses` ledger, both dormant until their
+env vars are set, both idempotent via `expenses.ext_id`.
+
+- **Plaid** (`lib/plaid.js`) is the bank. `/transactions/sync` is a CURSOR
+  endpoint — the cursor is persisted **after every page**, because a first pull
+  of two years across several accounts will hit the function time limit and a
+  cursor written only at the end would restart from scratch every night and
+  never catch up.
+- **The webhook is what makes it live** (`/api/plaid/webhook`). It carries no
+  data we trust — it only triggers a pull with our own credentials — so the
+  guard is "is this one of our items" plus a 60s throttle, not signature
+  verification. Full JWT verification would be reasonable hardening; it is not
+  what stands between this and bad data.
+- **The nightly pull is folded into `/api/cron/sync-inventory`**, beside the QBO
+  sync, rather than getting its own `vercel.json` entry — the plan's cron
+  allowance is small and these are one finance pass.
+  `/api/cron/sync-bank` exists for triggering it by hand.
+- **What is deliberately NOT imported:** pending rows (they're replaced when they
+  post), money IN, and `TRANSFER_IN`/`TRANSFER_OUT`/`LOAN_PAYMENTS`/`INCOME`. A
+  credit-card payment is the same money as the purchases it settles — importing
+  both counts every charge twice. A `BANK_FEES` row IS a cost and is kept.
+- **An imported amount is GROSS and its tax is NULL.** The bank never saw the
+  receipt. Guessing 13% on import would invent input tax credits on wages,
+  insurance and US purchases. `listUnreviewedExpenses` + the "HST to confirm"
+  panel is where a person answers them, in batches — one at a time is how
+  thousands of rows never get answered at all.
+- **LANDMINE — two splits, two rules.** `splitGross` (lib/tax.js) divides a known
+  charge so the halves add back to it exactly; `exTaxOf` finds a subtotal that
+  reconstructs a QUOTED total and may land a cent off. Expenses use the first,
+  invoices the second. `bulkSetExpenseTax` does `splitGross`'s arithmetic in SQL
+  so several thousand rows are one statement — keep it in step with the helper
+  or the review screen previews a figure it will not produce.
+- **QuickBooks** (`lib/qbo.js`) was already complete; it only ever needed
+  `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET`. If BOTH feeds are connected to the same
+  bank account the same spend arrives twice under two different `ext_id`s —
+  pick one per account.
+- **LANDMINE — sandbox keys import a DEMO company's spending as if it were real.**
+  Found live on 2026-08-27: the production site had been connected to Intuit's
+  "Sandbox Company US 93dd" for 48 days, and 46 rows of a fictional landscaping
+  firm's car washes and burger receipts were sitting in the expense ledger,
+  marked "edit in QB" so the table offered no way to remove them. The panel said
+  `CONNECTED` in green and nothing else. `qboStatus` now returns `env` and
+  `sandboxCompany` (Intuit's demo companies are all named "Sandbox Company …",
+  so the name is checked as well as the env var — the var can be changed without
+  the stored tokens being redone), the panel says so in red, and the
+  already-existing `purge_synced` action finally has a button. Sandbox and
+  production keys are DIFFERENT keys: switching worlds means replacing both
+  secrets, not just flipping `QBO_ENV`.
+
+## HST remittance — the Sales dashboard panel (added 2026-08-27)
+`hstOwed()` in `lib/analytics.js`, rendered by `components/TaxOwed.jsx` on
+`/admin/dashboard` directly under the revenue KPIs. Owner-only (`!salesOnly`),
+same reasoning as the Profit KPI beside it.
+
+- **Basis: the sale date.** Every figure is dated to `orders.created_at` — the
+  invoice date for an invoice-raised sale — because HST is charged when the sale
+  is made, not when the money lands. That is what an accrual filer reports, and
+  it is the same basis as the Revenue KPI, so the two agree on screen.
+- **The collected / still-to-come split is deliberate.** The liability and the
+  cash position are different questions: on a deposit sale the tax is owed from
+  the day the invoice was written, while most of the money arrives on delivery.
+  The "collected, not yet remitted" card is the one that stops a good year
+  becoming a bad quarter.
+- **Refunds need no line.** A refund shrinks its order's `hst` in place, in the
+  month of the original sale, so every total is already net of anything handed
+  back. Don't add a "refunded" figure — it would double-count.
+- **Quarters are calendar quarters** (most small registrants file quarterly), and
+  a quarter with no sales still prints as zeros so a gap reads as a quiet quarter
+  rather than as missing data. The quarter in progress is flagged; a part-period
+  total read as a finished one is how a remittance comes up short.
+- **LANDMINE — one live invoice per order.** The uncollected-HST expression takes
+  the NEWEST live invoice (`ORDER BY i.id DESC LIMIT 1`), not a SUM over them —
+  same guard as `balancesForOrders` in `lib/jobs.js`. Summing would report the
+  same tax as uncollected twice. (`revenueDashboard`'s own `owing` still JOINs;
+  if that is ever corrected, correct it the same way.)
+### Input tax credits — the other half
+`hstRemittance` nets **credits** off what was charged. They come from three
+places, all dated to the document (accrual, same basis as the sales side):
+
+- **Stock invoices** (`purchase_invoices.tax`) — the biggest one for this
+  business. Captured when a supplier invoice is uploaded at intake: the extractor
+  now reads the invoice's own subtotal/tax/total footer as well as the line
+  items, and the review screen makes the owner CONFIRM the tax before it's
+  claimed. A model reading a scan is not something to file on trust, so the
+  screen also flags a total that doesn't add up or a tax that isn't ~13%.
+- **Operating expenses** (`expenses.tax`) — entered by hand or synced. The form
+  takes either the pre-tax cost or the receipt total and splits it (`lib/tax.js`,
+  the same helper the invoice screens use).
+- **Ad spend** (`ad_spend.tax`).
+
+Rules that must hold:
+- **`amount` stays PRE-TAX.** The P&L is built on it, and folding the recoverable
+  tax into a cost would overstate every expense. `tax` is a separate column.
+- **NULL is not zero.** A NULL `tax` means nobody has looked at that row yet.
+  `coverage` reports how much of the year's recorded spending is still NULL, and
+  when it's under 80% (or there are no credits at all) the panel relabels the
+  total "at most" and says why. A remittance that silently treats unreviewed
+  spending as tax-free overstates what's owed, and nothing would say so.
+- **A stock purchase is NOT an expense row.** Unit cost already reaches the P&L
+  per-unit through the tracker; putting the purchase in `expenses` too would
+  double-count every appliance. `purchase_invoices` exists for the tax alone.
+- **Re-uploading a supplier invoice UPDATES it** (unique on vendor + invoice
+  number). Claiming the same credit twice is the way this feature could cost real
+  money. An invoice with no number can't be de-duped and always inserts — a
+  visible duplicate beats a silently merged pair.
+- The QBO sync **no longer discards the tax**. It pro-rates `TxnTaxDetail.TotalTax`
+  onto the share of lines that survive `EXCLUDE_ACCOUNT`, and a hand-corrected
+  figure is never blanked by a later sync (`COALESCE(EXCLUDED.tax, expenses.tax)`).
+
+**Still not captured:** anything that never becomes a record — cash spends, bank
+and e-transfer activity nobody enters. That is the gap `coverage` is there to
+make visible.
+
+
+
 ## Dispatch — deliveries & service calls (added 2026-08-25)
 The daily run sheet used to be built by hand because the work comes from several
 client companies through several channels (email, spreadsheet, phone) and no one
