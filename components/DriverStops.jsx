@@ -23,6 +23,10 @@ const FAIL_REASONS = {
   rescheduled: 'Customer rescheduled', other: 'Other'
 };
 
+const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' }) : null);
+const minsBetween = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000));
+const asDuration = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`);
+
 const fullAddress = (s) => [s.address, s.city, s.postal].filter(Boolean).join(', ');
 const mapsUrl = (a) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(a)}`;
 const windowLabel = (s) => (s.windowStart && s.windowEnd ? `${s.windowStart}–${s.windowEnd}` : 'Any time');
@@ -98,7 +102,14 @@ export default function DriverStops({ initial, driverName }) {
   }
 
   const start = (s) => act(s, { status: 'on_the_way' }, { action: 'status', status: 'on_the_way' });
-  const arrive = (s) => act(s, { status: 'arrived' }, { action: 'status', status: 'arrived' });
+  // Arriving starts the clock, and the driver has to be able to SEE that it
+  // started — the whole reason the office was retyping these times out of the
+  // group chat is that nothing on either screen ever showed them.
+  const arrive = (s) => act(
+    s,
+    { status: 'arrived', timeIn: s.timeIn || new Date().toISOString() },
+    { action: 'status', status: 'arrived' }
+  );
 
   function couldNot(stop) {
     const keys = Object.keys(FAIL_REASONS);
@@ -113,6 +124,11 @@ export default function DriverStops({ initial, driverName }) {
 
   const left = stops.filter((s) => !['done', 'failed'].includes(s.status));
   const closed = stops.filter((s) => ['done', 'failed'].includes(s.status));
+  // Started on an earlier day and never finished. Forgetting to tap Done is the
+  // single most common thing that happens on this screen, and until now the
+  // driver was the last person to find out — the office noticed instead, days
+  // later, and closed the stop out at whatever time they happened to look.
+  const unfinished = left.filter((s) => s.overdue && s.timeIn);
 
   return (
     <div className="drv">
@@ -131,6 +147,15 @@ export default function DriverStops({ initial, driverName }) {
       )}
       {online && queued > 0 && <div className="drv-sending">Sending {queued} saved {queued === 1 ? 'update' : 'updates'}…</div>}
       {err && <div className="error-box">{err}</div>}
+
+      {unfinished.length > 0 && (
+        <div className="drv-unfinished">
+          You never finished {unfinished.length === 1 ? 'a stop' : `${unfinished.length} stops`} from an earlier day
+          {unfinished[0].timeIn ? ` — still counting since ${hhmm(unfinished[0].timeIn)}` : ''}.
+          Tap <b>Finish</b> on {unfinished.length === 1 ? 'it' : 'them'} below, or tell the office the real time you
+          left and they&apos;ll put it in.
+        </div>
+      )}
 
       {stops.length === 0 && (
         <div className="drv-card"><p className="hint" style={{ margin: 0 }}>No stops today. The office will text you if that changes.</p></div>
@@ -257,6 +282,14 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
         {stop.orderNumber ? ` · ${stop.orderNumber}` : ''}
         {stop.clientName ? ` · ${stop.clientName}` : ''}
       </div>
+      {/* The clock, where the person running it can see it. */}
+      {stop.timeIn && (
+        <div className="drv-clock">
+          {stop.timeOut
+            ? `⏱ ${hhmm(stop.timeIn)}–${hhmm(stop.timeOut)} · ${asDuration(minsBetween(stop.timeIn, stop.timeOut))}`
+            : `⏱ on site since ${hhmm(stop.timeIn)} · ${asDuration(minsBetween(stop.timeIn, Date.now()))}`}
+        </div>
+      )}
 
       {preview ? (
         // Look, plan, ring ahead — but not start. The buttons that change a

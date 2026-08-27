@@ -427,12 +427,22 @@ the paper run sheet that replaces it.
   clear it is a stop changing hands: a position only means something inside one
   person's run, and carrying "4" into another driver's column drops it into the
   middle of a route it was never part of.
-- **The run is ordered from the card** — a numbered seat plus ▲▼ on every stop in
-  a driver's column, calling `resequence` with the WHOLE column in its new order
+- **The run is ordered from the card** — a numbered seat plus ▲▼ on every stop a
+  driver OWNS, calling `resequence` with that whole run in its new order
   (renumbering only the card that moved would leave two stops claiming one
   place). Numbered because "third stop" is how a dispatcher and a driver talk on
   the phone; arrows and not drag for the same reason assignment is a tap — this
   is used one-handed on a warehouse touchscreen.
+  **`resequence` writes `seq` and NOTHING else.** It used to write `driver_id`
+  and `job_date` on every id it was handed, which turned a reorder into a
+  reassignment — and a driver's column also shows the stops they are riding on as
+  somebody's SECOND man, so nudging one card up in Ruban's column quietly made
+  Ruban the primary driver of every paired stop in it, and those stops vanished
+  out of the column of the driver actually running them. A stop the caller
+  doesn't own is skipped, not stolen. The board mirrors that split: `byDriver`
+  (what the column shows, either seat) is now separate from `ownedBy` (the run —
+  what numbers, reorders and counts), and a column carrying both says so
+  ("3 own stops · riding on 2 of someone else's").
 - **A stop can carry TWO drivers** (`jobs.driver2_id`). Two people sent together
   are ONE van doing ONE run, so it is a second NAME on the job, not a second copy
   of it — the running order, the money, the POD and the completion all stay
@@ -448,9 +458,12 @@ the paper run sheet that replaces it.
   cancelled) can be **Reopened** (`reopenJob`, PATCH `action: 'reopen'`) — a
   customer rings back, a driver taps Done on the wrong card, a cancelled
   delivery is rebooked for Thursday. `assignJob` still refuses to move a closed
-  job, and now names the button that fixes it. Reopening KEEPS the completion
-  evidence (times, signature, photos, money): it says the work isn't finished,
-  not that it never happened.
+  job, and now names the button that fixes it. Reopening KEEPS the signature, the
+  photos and the money: it says the work isn't finished, not that it never
+  happened. It DOES clear `time_in`/`time_out` (writing what they were into
+  `job_events` first) — those are stamped once and only once now, so leaving them
+  behind would mean a stop reopened at 2pm and genuinely finished at 4pm still
+  reported 2pm, and that number is what the profit report bills an hour against.
 - **Cancelled stops stay on the board**, in their own greyed column, because a
   card that vanishes is indistinguishable from a deleted one — and a cancelled
   BB job still blocks its order from being pulled in again. `dispatchBoard`
@@ -708,6 +721,112 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
   on scroll), an in-app browser (WhatsApp/Facebook/Instagram, or Chrome/Firefox
   on iOS) is told to reopen in the real browser and offered a copy-link button,
   and an already-installed app is told nothing at all.
+
+## The clock, and what a delivery makes (added 2026-08-26)
+Three things arrived together because they are the same thing: dispatch could not
+say when a stop happened, so it could not say what a stop cost, so it could not
+say whether the delivery side made money.
+
+### The times are stamped by the taps, not by the close-out form
+`time_in` / `time_out` are what everything downstream reads — hours on the pay
+report, minutes per stop, cost against revenue. They used to be written **only**
+when somebody filled in the finish form, which meant a driver who tapped Arrived
+and then forgot to close out left NO time at all, and a stop closed out an hour
+later at the depot recorded that hour as time on site.
+
+- `setJobStatus` now stamps `time_in` on **arrived** and `time_out` on
+  **done/failed**, both `COALESCE`d so a replayed tap off the offline queue can
+  never move a time already recorded. `completeJob` corrects them; it no longer
+  overwrites `time_out` with `now()` when the close-out doesn't state one (a
+  completion replayed when the van found signal used to move the finish time).
+- **The clock is visible to both people.** The board card shows a live
+  "on site 42m" that ticks (`useTicking`, 30s) and turns red past 2½ hours; the
+  driver's own stop shows "on site since 2:14pm". A driver who can see minutes
+  ticking is a driver who taps Done; nothing on either screen showed them before,
+  which is the whole reason the office was retyping times out of WhatsApp.
+- **A driver who never closed out an earlier day is told so** — a banner on
+  `/driver` over the stops it means.
+
+### The times can be typed in
+`setJobTimes` (PATCH `action: 'times'`) — "Set times" / "Fix times" on the job
+card, and a `fix` on every row of the **Times** tab. This exists because the real
+times ARE known: the drivers post them in the WhatsApp group as they go.
+
+- Times are given as a driver would say them — `08:42`, Toronto local, on the
+  stop's own day — and converted in Postgres
+  (`($1::date + $2::time) AT TIME ZONE 'America/Toronto'`) so DST is never
+  something anyone has to reason about. `''` clears a time; a field left out
+  leaves it alone.
+- A finish before the start rolls to the **next day** (a 22:40 stop that finished
+  at 00:15 finished tomorrow); more than eighteen hours is refused.
+- "and mark the stop done" closes it out at the time typed, not at the time the
+  office noticed — which is exactly what was wrong with the old workaround.
+- Every correction is a `job_events` row with the editor's name on it.
+- **The office marking a stop Done now does what the driver's Done does**:
+  `markOrderDeliveredForJob` runs from the board too. Only the phone ever called
+  it, so a delivery closed out from the office left its Bargain Bay order sitting
+  at "out for delivery" — no delivered email, no units in the sold ledger.
+
+### `lib/dispatch-money.js` — the P&L
+The **Profit** tab (admin only): daily / weekly / monthly, revenue against cost,
+with the stops behind every number.
+
+- **Revenue is what the client pays, whoever the client is.** For an RS Solutions
+  job that's `charge_amount`; for a Bargain Bay delivery it's the **delivery fee
+  on the order**, because Bargain Bay is just another client whose paperwork
+  happens to live in the same database. A charge typed onto a BB job overrides
+  the fee — explicit beats inferred.
+- **That fee is derived, not stored**:
+  `GREATEST(0, total − subtotal + discount − hst)`. The discount term is the
+  landmine already documented under Coupons — leave it out and every order with a
+  promo on it reports a fee short by the discount.
+- **A stop that couldn't be completed earns nothing and is still counted**
+  (`COUNTED = status IN ('done','failed')`), because it cost the same driver and
+  the same fuel. Leaving failures out was the tidier query and the wrong number.
+- **Nothing is invented.** A completed stop with neither a charge nor an order
+  counts as zero AND is reported as unpriced, so a short total can never be
+  mistaken for a finished one. Same for unset pay.
+- `stopTimes` is the **Times** tab: every stop with its clock, plus the two flags
+  worth chasing — finished with no times at all, and clocked in with the day over.
+
+### `dispatch_expenses` — gas
+Gas is the third number, and it was recorded nowhere. One dated row per cost
+(`gas | tolls | parking | maintenance | rental | helper | other`), enterable from
+the **board bar** on the day (⛽ Gas → dated to the board's day, not to `now()`)
+and from the Profit tab for any date, because a receipt comes out of the glovebox
+on Friday as often as it goes in at the pump.
+
+**It is never split across the day's stops.** A tank goes into a van, not into a
+delivery, and dividing it per stop would be a guess dressed up as a figure — so
+it lands on the DAY, and the per-driver table says out loud that it is before
+fuel.
+
+## A driver's phone number changes (fixed 2026-08-26)
+This was a known gap with a written "don't do it" attached to it. Everything
+about a driver hangs off `users.id` — their stops, their board column, their pay,
+their signed PODs — but everything about SIGNING IN is looked up by phone number.
+So re-adding somebody on a new number built a **second account**, and from that
+moment the same human had two columns on the board, two rows on the pay report,
+and half a history in each.
+
+- **`changeDriverPhone` moves the number on the account they already have**
+  ("change number" on the roster line). The person, their work and their history
+  stay put; only the way in changes. The synthetic
+  `driver-<digits>@drivers.bargainbay.ca` email follows the number — unless it is
+  already taken, or unless the account has a real address of its own.
+- **The old number's keys are torn down**: unused codes retired, live links
+  expired. The number usually changes because the PHONE changed, and a link in a
+  text on a lost phone is a working key to that driver's stop list. Their own
+  signed-in session is deliberately NOT touched — a new SIM in the same hand is
+  the ordinary case, and signing somebody out mid-run helps nobody.
+- **Adding a name we already have is refused**, with the change-number button
+  offered in its place (`DRIVER_NAME_TAKEN`, 409). `force: true` is how the
+  office says "genuinely a different person with the same name".
+- **`mergeDrivers` is the repair** for a duplicate that already happened: every
+  stop (both seats), order and payment moves onto the account being kept, and the
+  duplicate is switched off rather than deleted (a `users` row is referenced from
+  places that have nothing to do with driving). Offered automatically when a
+  number change collides with another driver.
 
 ## Two businesses, one codebase — BRANDS
 Bargain Bay is the consumer storefront. **RS Solutions is the delivery/service

@@ -2,8 +2,12 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import {
   setDriverByEmail, addDriverByPhone, createDriverSignInLink,
-  listDriversForOffice, driverSmsNumber
+  listDriversForOffice, driverSmsNumber, changeDriverPhone, mergeDrivers
 } from '../../../../lib/drivers';
+import { markOrderDeliveredForJob } from '../../../../lib/driver-jobs';
+import {
+  profitReport, stopTimes, addExpense, listExpenses, deleteExpense, EXPENSE_KINDS
+} from '../../../../lib/dispatch-money';
 import { sendSms, smsConfigured } from '../../../../lib/sms';
 import { SITE_URL } from '../../../../lib/site';
 import { hasDb } from '../../../../lib/db';
@@ -13,7 +17,7 @@ import {
   jobInvoiceForPayment, noteJobEvent,
   setTicketStatus, listTickets, reopenJob, updateJob,
   findServiceCustomers, ordersForServiceCall,
-  completeJob, setJobPay, payReport, bookRevisit,
+  completeJob, setJobPay, payReport, bookRevisit, setJobTimes,
   setJobCharge, billingSummary, invoiceClientJobs
 } from '../../../../lib/jobs';
 import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
@@ -52,6 +56,28 @@ export async function GET(req) {
     }
     if (sp.get('view') === 'pay') {
       return NextResponse.json(await payReport({ from: sp.get('from'), to: sp.get('to') }));
+    }
+    // What the delivery side made, against what it cost. Admin only — it is the
+    // one screen that puts what we charge and what we pay side by side.
+    if (sp.get('view') === 'profit') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see the delivery P&L.' }, { status: 403 });
+      return NextResponse.json({
+        ...(await profitReport({ from: sp.get('from'), to: sp.get('to'), group: sp.get('group') })),
+        kinds: EXPENSE_KINDS
+      });
+    }
+    // The clock on every stop: when they got there, when they finished, and the
+    // two things worth chasing — no times at all, and never clocked out.
+    if (sp.get('view') === 'times') {
+      return NextResponse.json(await stopTimes({
+        from: sp.get('from'), to: sp.get('to'), driverId: sp.get('driverId')
+      }));
+    }
+    if (sp.get('view') === 'expenses') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see costs.' }, { status: 403 });
+      return NextResponse.json({
+        expenses: await listExpenses({ from: sp.get('from'), to: sp.get('to') }), kinds: EXPENSE_KINDS
+      });
     }
     if (sp.get('view') === 'drivers') {
       return NextResponse.json({ drivers: await listDriversForOffice() });
@@ -118,9 +144,19 @@ export async function POST(req) {
     // to forget — that friction is exactly what kept drivers on paper.
     if (body.action === 'driver_phone' || body.action === 'driver_link') {
       if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can add or remove a driver.' }, { status: 403 });
-      const d = body.action === 'driver_phone'
-        ? await addDriverByPhone({ name: body.name, phone: body.phone })
-        : (await listDriversForOffice()).find((x) => x.id === Number(body.driverId));
+      let d;
+      try {
+        d = body.action === 'driver_phone'
+          ? await addDriverByPhone({ name: body.name, phone: body.phone, force: body.force === true })
+          : (await listDriversForOffice()).find((x) => x.id === Number(body.driverId));
+      } catch (e) {
+        // A name we already have is not an error to shrug at: the page has to be
+        // able to offer the change-number button instead of the add button.
+        if (e?.code === 'DRIVER_NAME_TAKEN') {
+          return NextResponse.json({ error: e.message, code: e.code, driver: e.driver }, { status: 409 });
+        }
+        throw e;
+      }
       if (!d) return NextResponse.json({ error: 'No such driver.' }, { status: 400 });
 
       const { token } = await createDriverSignInLink(d.id);
@@ -144,6 +180,33 @@ export async function POST(req) {
         smsConfigured: smsConfigured(),
         smsError: sms.ok ? null : (sms.error || sms.reason || null)
       });
+    }
+    // A driver's new phone. The account, and everything hanging off it, stays.
+    if (body.action === 'driver_rephone') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can change a driver’s number.' }, { status: 403 });
+      try {
+        const driver = await changeDriverPhone(body.driverId, body.phone);
+        return NextResponse.json({ ok: true, driver });
+      } catch (e) {
+        if (e?.code === 'PHONE_TAKEN') {
+          return NextResponse.json({ error: e.message, code: e.code, driver: e.driver }, { status: 409 });
+        }
+        throw e;
+      }
+    }
+    // The repair for a driver who was already added twice.
+    if (body.action === 'driver_merge') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can merge driver accounts.' }, { status: 403 });
+      return NextResponse.json({ ok: true, ...(await mergeDrivers(body.keepId, body.dropId)) });
+    }
+    // Gas, and anything else the day cost that isn't attached to one stop.
+    if (body.action === 'expense') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can record costs.' }, { status: 403 });
+      return NextResponse.json({ ok: true, expense: await addExpense(body, who(s)) });
+    }
+    if (body.action === 'delete_expense') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can remove a cost.' }, { status: 403 });
+      return NextResponse.json({ ok: true, ...(await deleteExpense(body.id)) });
     }
     if (body.action === 'driver') {
       // Making someone a driver IS a permission, so this one stays admin-only.
@@ -184,7 +247,23 @@ export async function PATCH(req) {
       return NextResponse.json({ ok: true, job: await assignJob(jobId, body, who(s)) });
     }
     if (body.action === 'status') {
-      return NextResponse.json({ ok: true, job: await setJobStatus(jobId, body.status, body, who(s)) });
+      const job = await setJobStatus(jobId, body.status, body, who(s));
+      // The office finishing a stop has to mean what the driver's Done means.
+      // It didn't: the board could mark a delivery done and the Bargain Bay
+      // order behind it stayed 'out for delivery' — no delivered email, no
+      // units in the sold ledger — because only the phone ever called this.
+      // Idempotent, best-effort, and a no-op on a job with no order.
+      if (body.status === 'done') markOrderDeliveredForJob(jobId).catch(() => {});
+      return NextResponse.json({ ok: true, job });
+    }
+    // The times, typed in. A driver who forgets to tap Done leaves a stop with
+    // no finish time, and the office has been closing those out at whatever
+    // moment they noticed — which recorded a two-hour delivery as a five-hour
+    // one. The real times are in the WhatsApp group; this is where they land.
+    if (body.action === 'times') {
+      const job = await setJobTimes(jobId, body, who(s));
+      if (job.status === 'done' && body.markDone === true) markOrderDeliveredForJob(jobId).catch(() => {});
+      return NextResponse.json({ ok: true, job });
     }
     // The balance collected at the door, recorded against the order's invoice
     // from the board. Staff-level, like recording a payment on the Invoices page

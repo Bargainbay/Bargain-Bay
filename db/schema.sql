@@ -603,3 +603,22 @@ CREATE TABLE IF NOT EXISTS coupon_redemptions (
 );
 CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_coupon ON coupon_redemptions(coupon_id);
 CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_order  ON coupon_redemptions(order_id);
+
+-- What a delivery day cost that no single stop did: gas, overwhelmingly, plus
+-- tolls, a truck rental, a cash helper. It is DATED rather than timestamped
+-- because that is how a receipt behaves — filled in at the pump if somebody is
+-- quick, and out of the glovebox on Friday if they aren't — and it is never
+-- split across the day's stops, because a tank goes into a van and dividing it
+-- per delivery would be a guess dressed up as a figure.
+CREATE TABLE IF NOT EXISTS dispatch_expenses (
+  id              serial PRIMARY KEY,
+  expense_date    date NOT NULL,
+  kind            text NOT NULL DEFAULT 'gas',   -- gas | tolls | parking | maintenance | rental | helper | other
+  amount          numeric(10,2) NOT NULL,
+  driver_id       int,                           -- which van, when it is known
+  note            text,
+  created_by      text,
+  created_by_name text,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_dispatch_expenses_date ON dispatch_expenses(expense_date);

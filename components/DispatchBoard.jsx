@@ -7,6 +7,8 @@ import DispatchSetup from './DispatchSetup';
 import StopImport from './StopImport';
 import PayReport from './PayReport';
 import ClientBilling from './ClientBilling';
+import StopTimes from './StopTimes';
+import ProfitReport from './ProfitReport';
 
 // The day's run sheet, on screen. One unassigned pile plus a column per driver.
 // Assignment is by tap, not drag: drag is pleasant on a desktop and miserable on
@@ -42,6 +44,101 @@ const prettyDate = (iso) =>
 const windowLabel = (j) => (j.windowStart && j.windowEnd ? `${j.windowStart}–${j.windowEnd}` : 'Any time');
 
 const PAY_METHODS = { cash: 'Cash', etransfer: 'E-transfer', card: 'Card (manual)', cheque: 'Cheque', other: 'Other' };
+
+// ── The clock ────────────────────────────────────────────────────────────────
+// Formatted in the BROWSER, which is already on Toronto time — the same reason
+// the run sheet's server-rendered times have to name their zone and these don't.
+const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' }) : null);
+const minsBetween = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000));
+const asDuration = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`);
+// What a <input type="time"> wants: 24-hour, local.
+const timeField = (iso) =>
+  (iso ? new Date(iso).toLocaleTimeString('en-CA', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '');
+
+// Re-render while a stop is running so "on site 42m" is actually true. Half a
+// minute: the number only moves in minutes, and this board is left open all day
+// on a warehouse screen.
+function useTicking(active) {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    if (!active) return undefined;
+    const t = setInterval(() => bump((n) => n + 1), 30000);
+    return () => clearInterval(t);
+  }, [active]);
+}
+
+// Correcting the clock by hand. A driver who forgets to tap Done is the most
+// common thing that happens to these times, and the real ones are sitting in the
+// WhatsApp group — so the fix has to be four keystrokes on the card, not a
+// close-out that records whatever time the office happened to notice.
+function TimesForm({ job, busy, onTimes, onDone }) {
+  const [timeIn, setTimeIn] = useState(timeField(job.timeIn));
+  const [timeOut, setTimeOut] = useState(timeField(job.timeOut));
+  const [note, setNote] = useState('');
+  const open = !['done', 'failed', 'cancelled'].includes(job.status);
+  const [markDone, setMarkDone] = useState(open);
+  return (
+    <form
+      className="disp-times-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onTimes(job.id, { date: job.jobDate, timeIn, timeOut, note, markDone: open && markDone })
+          .then((ok) => { if (ok) onDone(); });
+      }}
+    >
+      <label>Got there<input type="time" value={timeIn} onChange={(e) => setTimeIn(e.target.value)} /></label>
+      <label>Finished<input type="time" value={timeOut} onChange={(e) => setTimeOut(e.target.value)} /></label>
+      <input className="disp-collect-note" value={note} placeholder="Where the times came from (optional)"
+        onChange={(e) => setNote(e.target.value)} />
+      {open && (
+        <label className="disp-times-close">
+          <input type="checkbox" checked={markDone} onChange={(e) => setMarkDone(e.target.checked)} />
+          and mark the stop done
+        </label>
+      )}
+      <button type="submit" className="btn accent" disabled={busy}>Save times</button>
+    </form>
+  );
+}
+
+// What the day cost, recorded on the day. Gas by default because gas is what it
+// almost always is. Dated to the board's day rather than to "now", so filling in
+// Tuesday's receipt on Thursday puts it on Tuesday where it belongs.
+const DAY_COSTS = {
+  gas: 'Gas', tolls: 'Tolls / 407', parking: 'Parking',
+  maintenance: 'Van / maintenance', rental: 'Truck rental',
+  helper: 'Helper (cash)', other: 'Other'
+};
+function DayCostForm({ date, drivers, busy, onSave }) {
+  const [kind, setKind] = useState('gas');
+  const [amount, setAmount] = useState('');
+  const [driverId, setDriverId] = useState('');
+  const [note, setNote] = useState('');
+  return (
+    <form
+      className="disp-setup-form"
+      style={{ margin: '0 0 12px' }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!(Number(amount) > 0)) return;
+        onSave({ date, kind, amount: Number(amount), driverId: driverId || null, note });
+      }}
+    >
+      <span className="hint" style={{ margin: 0, alignSelf: 'center' }}>{prettyDate(date)}</span>
+      <select value={kind} onChange={(e) => setKind(e.target.value)}>
+        {Object.entries(DAY_COSTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+      </select>
+      <input inputMode="decimal" value={amount} placeholder="Amount *" autoFocus
+        onChange={(e) => setAmount(e.target.value)} />
+      <select value={driverId} onChange={(e) => setDriverId(e.target.value)}>
+        <option value="">Which van (optional)</option>
+        {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+      </select>
+      <input value={note} placeholder="Note (optional)" onChange={(e) => setNote(e.target.value)} />
+      <button className="btn accent" disabled={busy || !(Number(amount) > 0)}>Record</button>
+    </form>
+  );
+}
 
 // Taking the balance at the door. Deliberately on the card and not behind a trip
 // to the Invoices page: the money is counted while the driver is still on the
@@ -148,10 +245,16 @@ function savePod(job) {
   }, i * 400));
 }
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onEdit, onMove, seat, helpingFor }) {
+function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onEdit, onMove, onTimes, seat, helpingFor }) {
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
+  const [timing, setTiming] = useState(false);
   const closed = ['done', 'failed', 'cancelled'].includes(job.status);
+  // Clocked in and not yet out: the stop is live and the card has to say so in
+  // a number that keeps moving.
+  const live = !!job.timeIn && !job.timeOut;
+  useTicking(live);
+  const running = live ? minsBetween(job.timeIn, Date.now()) : 0;
   return (
     <div className={'disp-card' + (closed ? ' is-closed' : '')}>
       <div className="disp-card-top">
@@ -254,9 +357,20 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
       {(job.timeIn || job.payAmount != null || job.chargeAmount != null) && (
         <div className="disp-times">
           {job.timeIn && (
-            <>on site {new Date(job.timeIn).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}
-              {job.timeOut && `–${new Date(job.timeOut).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}`}</>
+            <>
+              {hhmm(job.timeIn)}
+              {job.timeOut
+                ? <>–{hhmm(job.timeOut)} · <b>{asDuration(minsBetween(job.timeIn, job.timeOut))}</b></>
+                /* Running. The number that matters at a glance is how long they
+                   have been standing there — an hour and a half on a threshold
+                   drop is either a problem or a forgotten Done tap, and either
+                   way somebody should be ringing the van. */
+                : <> · <b className={running > 150 ? 'disp-late' : ''}>on site {asDuration(running)}</b></>}
+            </>
           )}
+          {/* Finished with no clock on it: nothing can cost this stop until
+              somebody types the times in. */}
+          {!job.timeIn && closed && job.status === 'done' && <span className="disp-late">no times recorded</span>}
           {job.payAmount != null && <> · pays ${Number(job.payAmount).toFixed(2)}</>}
           {job.chargeAmount != null && <> · bills ${Number(job.chargeAmount).toFixed(2)}</>}
           {job.invoiceId && <> · invoiced</>}
@@ -364,7 +478,18 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
             </button>
           )}
           <button type="button" className="btn" disabled={busy} onClick={() => onEdit(job)}>Edit</button>
+          {/* Fixing the clock is not the same job as closing a stop out, and it
+              happens long after: the times arrive in the WhatsApp group and get
+              typed in that evening, or the next morning. */}
+          {onTimes && (
+            <button type="button" className="btn" disabled={busy} onClick={() => setTiming((v) => !v)}>
+              {timing ? 'Hide times' : (job.timeIn && job.timeOut ? 'Fix times' : 'Set times')}
+            </button>
+          )}
           {job.notes && <p className="disp-notes">{job.notes}</p>}
+          {timing && onTimes && (
+            <TimesForm job={job} busy={busy} onTimes={onTimes} onDone={() => setTiming(false)} />
+          )}
         </div>
       )}
     </div>
@@ -384,6 +509,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   const [tickets, setTickets] = useState(openTickets);
   const [pull, setPull] = useState(null);        // what the last Bargain Bay pull did
   const [addNum, setAddNum] = useState('');      // order number typed into "add by number"
+  const [gassing, setGassing] = useState(false); // the day-cost box, open on the bar
 
   async function refresh(date = board.date) {
     setErr('');
@@ -416,11 +542,16 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
 
   const onReopen = (jobId) => send('PATCH', { action: 'reopen', jobId });
 
-  // Moving a stop up or down its driver's run. The whole column is sent back in
-  // its new order — seq is a position, and renumbering the one card that moved
-  // would leave two stops claiming the same place.
+  // Moving a stop up or down its driver's run. The whole run is sent back in its
+  // new order — seq is a position, and renumbering the one card that moved would
+  // leave two stops claiming the same place.
+  //
+  // The run is the stops that driver OWNS, not everything in their column. A
+  // column also shows the stops they are riding on as somebody's second man, and
+  // those belong to the other driver's running order: including them here made a
+  // reorder hand them over.
   function onMove(job, delta) {
-    const run = byDriver(job.driverId);
+    const run = ownedBy(job.driverId);
     const from = run.findIndex((j) => j.id === job.id);
     const to = from + delta;
     if (from < 0 || to < 0 || to >= run.length) return;
@@ -428,6 +559,9 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     [ids[from], ids[to]] = [ids[to], ids[from]];
     return send('PATCH', { action: 'resequence', driverId: job.driverId, date: board.date, jobIds: ids });
   }
+
+  // The times, corrected from the office.
+  const onTimes = (jobId, patch) => send('PATCH', { action: 'times', jobId, ...patch });
 
   // The pull used to refresh in silence, so an order it declined to take looked
   // exactly like an order it had taken. It now says what it did and, for
@@ -571,10 +705,14 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     measureStrip();
   };
 
+  const inOrder = (list) => [...list]
+    .sort((a, b) => (a.seq ?? 99) - (b.seq ?? 99) || String(a.windowStart).localeCompare(String(b.windowStart)));
   // Both people's columns show the stop. A dispatcher looking at Ravi's day has
   // to see the run he is actually on, even when the card "belongs" to Nicholas.
-  const byDriver = (id) => board.jobs.filter((j) => j.driverId === id || j.driver2Id === id)
-    .sort((a, b) => (a.seq ?? 99) - (b.seq ?? 99) || String(a.windowStart).localeCompare(String(b.windowStart)));
+  const byDriver = (id) => inOrder(board.jobs.filter((j) => j.driverId === id || j.driver2Id === id));
+  // ...but only the stops a driver OWNS are their run. Everything that numbers,
+  // reorders or counts a route has to ask this one, not the column.
+  const ownedBy = (id) => inOrder(board.jobs.filter((j) => j.driverId === id));
   const unassignedToday = board.jobs.filter((j) => !j.driverId);
   const openCount = board.jobs.filter((j) => !['done', 'failed', 'cancelled'].includes(j.status)).length;
 
@@ -589,8 +727,10 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
         <Tab id="board">Board</Tab>
         <Tab id="tickets">Service calls{tickets ? ` (${tickets})` : ''}</Tab>
         <Tab id="import">Import</Tab>
+        <Tab id="times">Times</Tab>
         <Tab id="billing">Billing</Tab>
         <Tab id="pay">Pay</Tab>
+        {canManageClients && <Tab id="profit">Profit</Tab>}
         <Tab id="setup">Clients &amp; drivers</Tab>
       </div>
 
@@ -603,6 +743,12 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       {view === 'billing' && <ClientBilling canBill={canManageClients} />}
 
       {view === 'pay' && <PayReport canSetPay={canManageClients} />}
+
+      {/* The clock, as a history — and the place a forgotten Done tap gets
+          corrected in bulk rather than one card at a time. */}
+      {view === 'times' && <StopTimes drivers={board.drivers} />}
+
+      {view === 'profit' && <ProfitReport drivers={board.drivers} date={board.date} />}
 
       {view === 'setup' && (
         <DispatchSetup clients={board.clients} drivers={board.drivers}
@@ -631,6 +777,16 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             <button type="submit" className="btn" disabled={busy || !addNum.trim()}>Add order</button>
           </form>
           <a className="btn" href={`/admin/dispatch/print?date=${board.date}`} target="_blank" rel="noopener noreferrer">Print run sheet</a>
+          {/* Gas, on the day, from the screen the office is already looking at.
+              It can be entered any time from the Profit tab as well — a receipt
+              comes out of the glovebox on Friday as often as it goes in at the
+              pump — but a cost nobody can record where they are standing is a
+              cost that gets remembered as "about a hundred". */}
+          {canManageClients && (
+            <button type="button" className="btn" disabled={busy}
+              title={`Record gas or another cost against ${board.date}`}
+              onClick={() => setGassing((v) => !v)}>{gassing ? 'Close' : '⛽ Gas'}</button>
+          )}
           <button type="button" className="btn accent" onClick={() => setAdding((v) => !v)}>
             {adding ? 'Close' : '+ Add job'}
           </button>
@@ -638,6 +794,14 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       </div>
 
       {err && <div className="error-box">{err}</div>}
+
+      {gassing && (
+        <DayCostForm date={board.date} drivers={board.drivers} busy={busy}
+          onSave={async (body) => {
+            const ok = await send('POST', { action: 'expense', ...body });
+            if (ok) setGassing(false);
+          }} />
+      )}
 
       {pull && (
         <div className="disp-pull">
@@ -712,7 +876,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
           {unassignedToday.map((j) => (
             <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
               onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-              onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} />
+              onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes} />
           ))}
           {board.unscheduled.length > 0 && (
             <>
@@ -720,7 +884,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
               {board.unscheduled.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                   onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                  onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} />
+                  onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes} />
               ))}
             </>
           )}
@@ -743,25 +907,40 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             {board.cancelled.map((j) => (
               <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                 onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} />
+                onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes} />
             ))}
           </BoardColumn>
         )}
 
         {board.drivers.map((d) => {
           const stops = byDriver(d.id);
+          const own = ownedBy(d.id);
+          const riding = stops.length - own.length;
           const left = stops.filter((j) => !['done', 'failed', 'cancelled'].includes(j.status)).length;
           return (
             <BoardColumn key={d.id} title={d.name} bodyKey={String(stops.length)}
               count={stops.length ? `${left}/${stops.length}` : '0'}>
               {stops.length === 0 && <p className="hint">No stops on this day.</p>}
-              {stops.map((j, i) => (
-                <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
-                  onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                  onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onMove={onMove}
-                  helpingFor={j.driver2Id === d.id ? j.driverName : null}
-                  seat={j.driverId === d.id ? { n: i + 1, first: i === 0, last: i === stops.length - 1 } : null} />
-              ))}
+              {/* A column that quietly mixes "your run" with "you're the second
+                  man on someone else's" reads as a driver having fewer stops
+                  than they do, or more. Say which is which. */}
+              {riding > 0 && (
+                <p className="hint" style={{ marginTop: 0 }}>
+                  {own.length} own {own.length === 1 ? 'stop' : 'stops'} · riding on {riding} of someone else&apos;s
+                </p>
+              )}
+              {stops.map((j) => {
+                // The number on the card is the position in the run it belongs
+                // to, so ▲▼ move it inside that run and nothing else.
+                const k = own.findIndex((o) => o.id === j.id);
+                return (
+                  <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
+                    onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
+                    onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onMove={onMove} onTimes={onTimes}
+                    helpingFor={j.driver2Id === d.id ? j.driverName : null}
+                    seat={k >= 0 ? { n: k + 1, first: k === 0, last: k === own.length - 1 } : null} />
+                );
+              })}
             </BoardColumn>
           );
         })}
