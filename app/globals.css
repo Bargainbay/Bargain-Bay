@@ -1003,7 +1003,7 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .drv-left { font-size: 14px; font-weight: 700; color: var(--charcoal); white-space: nowrap; }
 .drv-sub { font-size: 15px; color: var(--muted); margin: 22px 0 8px; text-transform: uppercase; letter-spacing: .06em; }
 
-.drv-welcome, .drv-offline, .drv-sending {
+.drv-welcome, .drv-offline, .drv-sending, .drv-stuck {
   border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 15px; line-height: 1.35;
 }
 .drv-welcome { background: var(--okbg); color: var(--ok); font-weight: 600; position: relative; padding-right: 34px; }
@@ -1016,6 +1016,12 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 /* Losing signal is normal, not an error — say what happens next, don't alarm. */
 .drv-offline { background: var(--warnbg); color: var(--warn); font-weight: 700; }
 .drv-sending { background: var(--tint); color: var(--charcoal); font-weight: 600; }
+/* Work that is NOT going to arrive on its own. Louder than "sending" on purpose:
+   the whole failure was that a driver had no way to tell the two apart. */
+.drv-stuck {
+  background: var(--dangerbg); color: var(--danger); font-weight: 700;
+  border: 1px solid currentColor;
+}
 
 .drv-card {
   background: var(--card); border: 1px solid var(--line); border-radius: 14px;
