@@ -34,7 +34,9 @@ export async function POST(req) {
     }
     const days = Math.min(Math.max(parseInt(b.days, 10) || 60, 1), 365);
     const r = await syncQboExpenses({ days });
-    return NextResponse.json({ ok: true, ...r });
+    // Echo the window back: a sync that returns 0 is meaningless without it, and
+    // "0 in the last 90 days" is a different problem from "0, full stop".
+    return NextResponse.json({ ok: true, days, ...r });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Sync failed.' }, { status: 500 });
   }
