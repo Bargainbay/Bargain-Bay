@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
-import { revenueDashboard, hstOwed, DASH_PERIODS } from '../../../lib/analytics';
+import { revenueDashboard, hstRemittance, DASH_PERIODS } from '../../../lib/analytics';
 import { getSetting } from '../../../lib/settings';
 import { listReps } from '../../../lib/reps';
 import DashboardShell from '../../../components/DashboardShell';
@@ -49,7 +49,7 @@ export default async function SalesDashboardPage({ searchParams }) {
     // The tax panel is owner-only, so a sales associate's page never pays for it.
     [data, goal, repList, tax] = await Promise.all([
       revenueDashboard(period), getSetting('revenue_goal_monthly', 0), listReps(),
-      salesOnly ? null : hstOwed(period).catch(() => null)
+      salesOnly ? null : hstRemittance(period).catch(() => null)
     ]);
   } catch (e) {
     console.error('sales dashboard load failed', e.message);

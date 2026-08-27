@@ -349,7 +349,7 @@ changes no arithmetic.
 - Sarah can raise a tax-in invoice (`taxInclusive` on `create_invoice`); a phone
   quote is exactly where "out the door" pricing gets used.
 
-## HST on sales — the Sales dashboard panel (added 2026-08-27)
+## HST remittance — the Sales dashboard panel (added 2026-08-27)
 `hstOwed()` in `lib/analytics.js`, rendered by `components/TaxOwed.jsx` on
 `/admin/dashboard` directly under the revenue KPIs. Owner-only (`!salesOnly`),
 same reasoning as the Profit KPI beside it.
@@ -375,14 +375,45 @@ same reasoning as the Profit KPI beside it.
   same guard as `balancesForOrders` in `lib/jobs.js`. Summing would report the
   same tax as uncollected twice. (`revenueDashboard`'s own `owing` still JOINs;
   if that is ever corrected, correct it the same way.)
-- **THIS IS NOT THE REMITTANCE FIGURE, and the panel says so in as many words.**
-  What gets remitted is HST charged less **input tax credits** — the HST paid out
-  on stock, fuel, rent and everything else — and none of that is captured
-  anywhere: `expenses` and `ad_spend` have an `amount` and no tax column, and
-  whether `products.cost` is tax-in is unknown per purchase. Adding an ITC total
-  would mean adding a tax field to expenses AND deciding the tax treatment of
-  unit costs. Until both exist, naming a number the owner might file would be
-  worse than naming half of one and saying which half.
+### Input tax credits — the other half
+`hstRemittance` nets **credits** off what was charged. They come from three
+places, all dated to the document (accrual, same basis as the sales side):
+
+- **Stock invoices** (`purchase_invoices.tax`) — the biggest one for this
+  business. Captured when a supplier invoice is uploaded at intake: the extractor
+  now reads the invoice's own subtotal/tax/total footer as well as the line
+  items, and the review screen makes the owner CONFIRM the tax before it's
+  claimed. A model reading a scan is not something to file on trust, so the
+  screen also flags a total that doesn't add up or a tax that isn't ~13%.
+- **Operating expenses** (`expenses.tax`) — entered by hand or synced. The form
+  takes either the pre-tax cost or the receipt total and splits it (`lib/tax.js`,
+  the same helper the invoice screens use).
+- **Ad spend** (`ad_spend.tax`).
+
+Rules that must hold:
+- **`amount` stays PRE-TAX.** The P&L is built on it, and folding the recoverable
+  tax into a cost would overstate every expense. `tax` is a separate column.
+- **NULL is not zero.** A NULL `tax` means nobody has looked at that row yet.
+  `coverage` reports how much of the year's recorded spending is still NULL, and
+  when it's under 80% (or there are no credits at all) the panel relabels the
+  total "at most" and says why. A remittance that silently treats unreviewed
+  spending as tax-free overstates what's owed, and nothing would say so.
+- **A stock purchase is NOT an expense row.** Unit cost already reaches the P&L
+  per-unit through the tracker; putting the purchase in `expenses` too would
+  double-count every appliance. `purchase_invoices` exists for the tax alone.
+- **Re-uploading a supplier invoice UPDATES it** (unique on vendor + invoice
+  number). Claiming the same credit twice is the way this feature could cost real
+  money. An invoice with no number can't be de-duped and always inserts — a
+  visible duplicate beats a silently merged pair.
+- The QBO sync **no longer discards the tax**. It pro-rates `TxnTaxDetail.TotalTax`
+  onto the share of lines that survive `EXCLUDE_ACCOUNT`, and a hand-corrected
+  figure is never blanked by a later sync (`COALESCE(EXCLUDED.tax, expenses.tax)`).
+
+**Still not captured:** anything that never becomes a record — cash spends, bank
+and e-transfer activity nobody enters. That is the gap `coverage` is there to
+make visible.
+
+
 
 ## Dispatch — deliveries & service calls (added 2026-08-25)
 The daily run sheet used to be built by hand because the work comes from several

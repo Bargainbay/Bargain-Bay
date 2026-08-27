@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { extractPurchaseInvoice } from '../../../../lib/purchase-intake';
 import { addIntakeLines } from '../../../../lib/intake';
+import { recordPurchaseInvoice } from '../../../../lib/finance';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,8 +15,9 @@ async function admin() {
 
 // POST { action:'extract', fileBase64, mediaType } → AI-read the purchase invoice,
 //   return the line items for the owner to review (writes nothing).
-// POST { action:'commit', vendor, invoice, items:[...] } → write the reviewed units
-//   into the master tracker as "Untested" via the existing intake path.
+// POST { action:'commit', vendor, invoice, date, subtotal, tax, total, items:[...] }
+//   → write the reviewed units into the master tracker as "Untested" via the
+//   existing intake path, AND record the invoice's tax as an input tax credit.
 export async function POST(req) {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   let body;
@@ -37,7 +39,27 @@ export async function POST(req) {
       // One batched tracker write for the whole invoice — per-line writes take a
       // full sheet read each and time out on big (60-line) invoices.
       const r = await addIntakeLines(items, { vendor: body.vendor || null, invoice: body.invoice || null });
-      return NextResponse.json({ ok: true, addedSkus: r.created, count: r.count, failed: [] });
+
+      // The tax half. Recorded AFTER the units are safely in the tracker and
+      // never allowed to fail the intake: getting the stock on the books is the
+      // job, and a tax figure can be fixed afterwards on the Financial tab.
+      let tax = 0, taxUpdated = false, taxError = null;
+      const claimed = Number(body.tax);
+      if (Number.isFinite(claimed) && claimed > 0) {
+        try {
+          const session = await getSession();
+          const saved = await recordPurchaseInvoice({
+            vendor: body.vendor, invoiceNumber: body.invoice, invoiceDate: body.date,
+            subtotal: body.subtotal, tax: claimed, total: body.total,
+            units: r.count, createdBy: session?.email
+          });
+          tax = Math.round(claimed * 100) / 100;
+          taxUpdated = saved.updated;
+        } catch (e) {
+          taxError = e?.message || 'Could not record the tax on that invoice.';
+        }
+      }
+      return NextResponse.json({ ok: true, addedSkus: r.created, count: r.count, failed: [], tax, taxUpdated, taxError });
     } catch (e) {
       return NextResponse.json({ error: e?.message || 'Could not write to the tracker.' }, { status: 400 });
     }
