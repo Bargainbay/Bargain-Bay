@@ -1245,3 +1245,11 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
   font-size: 18px; font-weight: 800; letter-spacing: .01em;
 }
 .drv-cash-src { font-size: 13px; font-weight: 400; font-style: italic; opacity: .85; margin-top: 3px; }
+
+/* The customer's number, readable rather than only dialable — a driver reads it
+   out to whoever answers the door, or to the office. */
+.drv-phone { font-size: 15px; margin-top: 2px; }
+.drv-phone a { color: var(--muted); text-decoration: none; font-variant-numeric: tabular-nums; }
+/* What the day is worth carrying back, both kinds of money together. The run
+   sheet totals this in its header; the phone was making drivers add it up. */
+.drv-owed { font-size: 13px; font-weight: 700; color: var(--charcoal); margin-top: 2px; white-space: nowrap; }

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { TZ } from '../../../../lib/constants';
+import { TZ, formatPhone as phone } from '../../../../lib/constants';
 import { cashAtTheDoor } from '../../../../lib/cash-at-the-door';
 import { dispatchBoard, torontoToday } from '../../../../lib/jobs';
 import PrintButton from '../../../../components/PrintButton';
@@ -32,12 +32,6 @@ const prettyDate = (iso) =>
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 const win = (j) => (j.windowStart && j.windowEnd ? `${j.windowStart}–${j.windowEnd}` : 'Any time');
-// A number somebody has to dial off paper, in a van. 4374888549 is not that.
-const phone = (v) => {
-  const d = String(v || '').replace(/\D+/g, '');
-  const ten = d.length > 10 ? d.slice(-10) : d;
-  return ten.length === 10 ? `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}` : (v || '');
-};
 const hhmm = (iso) => (iso
   ? new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
   : null);
