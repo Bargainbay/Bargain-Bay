@@ -18,7 +18,7 @@ import {
   setTicketStatus, listTickets, reopenJob, updateJob,
   findServiceCustomers, ordersForServiceCall,
   completeJob, setJobPay, payReport, bookRevisit, setJobTimes,
-  setJobCharge, billingSummary, invoiceClientJobs
+  setJobCharge, billingSummary, invoiceClientJobs, crewLost, jobHistory
 } from '../../../../lib/jobs';
 import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 
@@ -78,6 +78,16 @@ export async function GET(req) {
       return NextResponse.json({
         expenses: await listExpenses({ from: sp.get('from'), to: sp.get('to') }), kinds: EXPENSE_KINDS
       });
+    }
+    // Everything that has ever happened to one stop. There was no way to look
+    // this up, which is why "his name got erased and I don't know how" had no
+    // answer — job_events had recorded it all along and nothing rendered it.
+    if (sp.get('view') === 'history') {
+      return NextResponse.json({ events: await jobHistory(sp.get('jobId')) });
+    }
+    // Stops where somebody came off the crew without anyone assigning them off.
+    if (sp.get('view') === 'crew_lost') {
+      return NextResponse.json(await crewLost({ from: sp.get('from'), to: sp.get('to') }));
     }
     if (sp.get('view') === 'drivers') {
       return NextResponse.json({ drivers: await listDriversForOffice() });

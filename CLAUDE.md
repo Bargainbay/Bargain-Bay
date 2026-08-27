@@ -801,6 +801,65 @@ delivery, and dividing it per stop would be a guess dressed up as a figure — s
 it lands on the DAY, and the per-driver table says out loud that it is before
 fuel.
 
+## How a driver's name got erased off a stop (fixed 2026-08-26)
+Ardy's name came off several of Ruban's stops. The stops ended up reading
+"Ruban, second person: nobody", and nothing anywhere said Ardy had ever been on
+them. The chain, in full, because every link is a rule somebody has to keep:
+
+1. The stop was **Ardy primary, Ruban second**.
+2. Ruban's column shows that card — a column holds the stops you own *and* the
+   stops you ride on. Somebody tapped ▲ or ▼ in **Ruban's** column.
+3. `resequence` ran `UPDATE jobs SET seq, driver_id, job_date` over **every id in
+   that column**. The stop's `driver_id` became Ruban — while `driver2_id` was
+   *already* Ruban. **One person in both seats**, a state `assignJob` explicitly
+   forbids and `resequence` never asked about.
+4. From that moment Ardy matched nothing: off the card, off his own column.
+5. The next `assignJob` on that stop — the Day picker, either dropdown, anything
+   — hit its `nextDrv2 === nextDrv` guard and wrote `driver2_id = NULL`. Ruban
+   alone, nobody second, no trace in the columns.
+
+**Three layers now, because one was clearly not enough:**
+- **`normalizeCrew(driverId, driver2Id)` is the only place a crew is decided.**
+  Same person in both seats → second seat empty; a second seat with nobody in the
+  first → nobody. `createJob`, `updateJob` and `assignJob` all call it. Each of
+  those had previously reimplemented some subset of the rule, and `resequence`
+  had bypassed it entirely.
+- **`jobs_crew_distinct`, a CHECK constraint**, is the version that cannot be
+  talked out of it. Applied by `enforceCrewRule()` — deliberately its own
+  best-effort step *after* the schema string, not another statement inside it,
+  because every dispatch surface awaits `ensureJobSchema` and a safety net that
+  fails to hang must not take the board down with it.
+- **`updateJob` writes both seats or neither.** It used to write `driver2_id`
+  alone with no rule attached, so changing the driver on the edit form saved the
+  second seat and silently discarded the first.
+
+**Putting the names back.** The columns lost the evidence; `job_events` never
+did. `crewLost({from,to})` finds stops whose **last `assigned` event names a
+driver the job no longer carries** — an exact test, because a deliberate removal
+writes its own newer `assigned` event and is therefore invisible to it. The board
+shows those stops in a banner, names who is missing, and offers the crew back as
+it was last actually assigned. It **reports and offers; it never repairs by
+itself** — who was in the van on a Tuesday is not something a query gets to
+decide.
+
+Two things that keep that test honest and must not regress: `assignJob` now
+records `#N came off the stop` when it empties a seat, and `mergeDrivers` writes
+an `assigned` event on every stop it touches (without it, a merged account reads
+as a driver who vanished, and the banner offers to restore an account that no
+longer exists).
+
+**Every stop now has a History button** on its card (`jobHistory`, GET
+`view=history&jobId=`). `job_events` had recorded every assignment, status move,
+payment and correction since dispatch was built and **nothing ever rendered it**,
+which is why "his name got erased and I don't know how" had nowhere to look. Ids
+are stored (a name would go stale) and swapped for names on the way out.
+
+**LANDMINE — `mergeDrivers`' three UPDATEs are order-dependent** and the
+constraint is what turns getting it wrong into an error instead of a silent
+duplicate. Clear the second seat on any stop carrying BOTH accounts *first*, then
+move the remaining second seats, then the primary seats. Promoting `driver_id`
+before clearing the pairs writes the same id into both seats on the way past.
+
 ## A driver's phone number changes (fixed 2026-08-26)
 This was a known gap with a written "don't do it" attached to it. Everything
 about a driver hangs off `users.id` — their stops, their board column, their pay,

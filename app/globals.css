@@ -1214,3 +1214,17 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .imp-prob { color: var(--danger); font-weight: 600; }
 .imp-done { background: var(--okbg); color: var(--ok); border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-weight: 600; }
 .imp-problems { margin: 6px 0 0; padding-left: 18px; font-weight: 400; font-size: 12.5px; }
+
+/* A driver came off a stop and nobody assigned them off it — the repair prompt
+   for a bug that ran silently, listing the stops and offering the names back. */
+.disp-crewlost { margin-bottom: 12px; }
+.disp-crewlost .disp-setup-list { margin: 0; }
+
+/* One stop's whole history. job_events has recorded every assignment, status
+   move, payment and correction all along; this is the first thing to show it. */
+.disp-history {
+  margin: 8px 0 0; padding: 0 0 0 18px; width: 100%;
+  font-size: 12px; color: var(--ink); line-height: 1.45;
+}
+.disp-history li { margin-bottom: 3px; }
+.disp-history-when { display: block; color: var(--muted); font-size: 11px; }

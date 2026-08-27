@@ -493,6 +493,19 @@ CREATE INDEX IF NOT EXISTS idx_jobs_invoice ON jobs(invoice_id) WHERE invoice_id
 -- A second person on the same stop: one van, one run, two names.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS driver2_id     int;
 CREATE INDEX IF NOT EXISTS idx_jobs_driver2 ON jobs(driver2_id, job_date) WHERE driver2_id IS NOT NULL;
+-- The same person cannot be both people on a stop. Enforced HERE and not only in
+-- the code that writes a crew, because the way this broke was a function that
+-- wrote driver_id directly and never consulted the rule: resequence set the
+-- column's driver on every card in it, including the stops that were in that
+-- column because the driver was the SECOND man. One person then held both seats,
+-- the next assignment dropped the duplicate second seat, and the driver who was
+-- really riding was gone off the stop with nothing to say so.
+UPDATE jobs SET driver2_id = NULL
+ WHERE driver2_id IS NOT NULL AND (driver2_id = driver_id OR driver_id IS NULL);
+DO $crew$ BEGIN
+  ALTER TABLE jobs ADD CONSTRAINT jobs_crew_distinct
+    CHECK (driver2_id IS NULL OR (driver_id IS NOT NULL AND driver2_id <> driver_id));
+EXCEPTION WHEN duplicate_object THEN NULL; END $crew$;
 -- Who we collect FROM (the shipper), as distinct from who to ring there.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_company text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_name    text;

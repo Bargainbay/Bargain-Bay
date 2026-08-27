@@ -140,6 +140,84 @@ function DayCostForm({ date, drivers, busy, onSave }) {
   );
 }
 
+// Stops where a driver came off the crew and nobody assigned them off it.
+//
+// This is the repair for a bug that ran silently: reordering a run used to write
+// the column's driver onto every card in it, and a column also holds the stops
+// that driver is RIDING on as second man — so one ▲ made one person both people
+// on a stop, and the next assignment dropped the duplicate seat and the other
+// driver's name with it. The stop simply had one fewer name on it and nothing
+// said so.
+//
+// The names are recoverable because every assignment was logged. This offers
+// them back; it never restores anything on its own. Who was actually in the van
+// is a fact about a Tuesday, not something a query gets to decide.
+function CrewLost({ lost, busy, onRestore, onDismiss }) {
+  if (!lost?.rows?.length) return null;
+  return (
+    <div className="error-box disp-crewlost">
+      <b>
+        {lost.rows.length === 1 ? 'A driver came' : `${lost.rows.length} drivers came`} off
+        {lost.rows.length === 1 ? ' a stop' : ' these stops'} without being reassigned.
+      </b>
+      <div className="hint" style={{ margin: '4px 0 8px' }}>
+        Caused by reordering a run, which used to hand paired stops to the column it was reordered in.
+        That is fixed — this is putting the names back. Check each one against who was really in the van.
+      </div>
+      <ul className="disp-setup-list">
+        {lost.rows.map((r) => (
+          <li key={r.id}>
+            <strong>{r.jobNumber}</strong>
+            <span className="hint" style={{ margin: 0 }}>
+              {' '}· {r.date} · {r.customerName || '(no name)'} · now{' '}
+              {r.driverName || 'unassigned'}{r.driver2Name ? ` + ${r.driver2Name}` : ' alone'}
+              {' '}· missing <b>{r.missing.join(', ')}</b>
+            </span>
+            <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={busy}
+              onClick={() => onRestore(r)}>
+              put back {r.wasDriverName}{r.wasDriver2Name ? ` + ${r.wasDriver2Name}` : ''}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button type="button" className="disp-toggle" onClick={onDismiss}>dismiss</button>
+    </div>
+  );
+}
+
+// Everything that has ever happened to one stop, in the words it was logged in.
+// `job_events` has recorded every assignment, status move, payment and
+// correction since dispatch was built, and nothing ever showed it — so when a
+// driver's name came off a stop there was no screen anybody could go and read.
+function JobHistory({ jobId }) {
+  const [events, setEvents] = useState(null);
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/admin/dispatch?view=history&jobId=${jobId}`)
+      .then((r) => r.json())
+      .then((d) => { if (live) setEvents(Array.isArray(d.events) ? d.events : []); })
+      .catch(() => { if (live) setEvents([]); });
+    return () => { live = false; };
+  }, [jobId]);
+
+  if (events === null) return <p className="hint" style={{ margin: '6px 0 0' }}>Loading…</p>;
+  if (!events.length) return <p className="hint" style={{ margin: '6px 0 0' }}>Nothing logged against this stop.</p>;
+  return (
+    <ol className="disp-history">
+      {events.map((e, i) => (
+        <li key={i}>
+          <b>{e.event.replace(/_/g, ' ')}</b>
+          {e.detail ? ` — ${e.detail}` : ''}
+          <span className="disp-history-when">
+            {new Date(e.at).toLocaleString('en-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            {e.byName ? ` · ${e.byName}` : ''}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 // Taking the balance at the door. Deliberately on the card and not behind a trip
 // to the Invoices page: the money is counted while the driver is still on the
 // phone, and anything else means it gets logged tomorrow from a note in a pocket.
@@ -249,6 +327,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [timing, setTiming] = useState(false);
+  const [history, setHistory] = useState(false);
   const closed = ['done', 'failed', 'cancelled'].includes(job.status);
   // Clocked in and not yet out: the stop is live and the card has to say so in
   // a number that keeps moving.
@@ -486,10 +565,14 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
               {timing ? 'Hide times' : (job.timeIn && job.timeOut ? 'Fix times' : 'Set times')}
             </button>
           )}
+          <button type="button" className="btn" onClick={() => setHistory((v) => !v)}>
+            {history ? 'Hide history' : 'History'}
+          </button>
           {job.notes && <p className="disp-notes">{job.notes}</p>}
           {timing && onTimes && (
             <TimesForm job={job} busy={busy} onTimes={onTimes} onDone={() => setTiming(false)} />
           )}
+          {history && <JobHistory jobId={job.id} />}
         </div>
       )}
     </div>
@@ -510,6 +593,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   const [pull, setPull] = useState(null);        // what the last Bargain Bay pull did
   const [addNum, setAddNum] = useState('');      // order number typed into "add by number"
   const [gassing, setGassing] = useState(false); // the day-cost box, open on the bar
+  const [lost, setLost] = useState(null);        // crews a name went missing from
 
   async function refresh(date = board.date) {
     setErr('');
@@ -519,6 +603,14 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       if (!res.ok) { setErr(d.error || 'Could not load the board.'); return; }
       setBoard(d);
     } catch { setErr('Network error — the board may be out of date.'); }
+    // A fortnight either side, not just this day: a name that went missing last
+    // Tuesday is still missing, and nobody is going to page back through the
+    // board looking for it. Its own request, and a failure is silent — this is
+    // a repair prompt, not the day's work.
+    fetch(`/api/admin/dispatch?view=crew_lost&from=${shiftDate(date, -14)}&to=${shiftDate(date, 14)}`)
+      .then((r) => r.json())
+      .then((d) => setLost(d?.rows?.length ? d : null))
+      .catch(() => {});
   }
 
   async function send(method, body) {
@@ -562,6 +654,25 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
 
   // The times, corrected from the office.
   const onTimes = (jobId, patch) => send('PATCH', { action: 'times', jobId, ...patch });
+
+  // The board's first render comes from the server, so the audit has to go and
+  // ask on mount — otherwise a name only turns up missing after somebody happens
+  // to change the day.
+  useEffect(() => {
+    fetch(`/api/admin/dispatch?view=crew_lost&from=${shiftDate(board.date, -14)}&to=${shiftDate(board.date, 14)}`)
+      .then((r) => r.json())
+      .then((d) => setLost(d?.rows?.length ? d : null))
+      .catch(() => {});
+    // Once, for the day the board opened on; refresh() re-asks after that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Putting a lost name back is an ordinary assignment — both seats, as they
+  // were last actually assigned.
+  const onRestoreCrew = (row) => send('PATCH', {
+    action: 'assign', jobId: row.id, jobDate: row.date,
+    driverId: row.wasDriverId, driver2Id: row.wasDriver2Id || null
+  });
 
   // The pull used to refresh in silence, so an order it declined to take looked
   // exactly like an order it had taken. It now says what it did and, for
@@ -794,6 +905,8 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       </div>
 
       {err && <div className="error-box">{err}</div>}
+
+      <CrewLost lost={lost} busy={busy} onRestore={onRestoreCrew} onDismiss={() => setLost(null)} />
 
       {gassing && (
         <DayCostForm date={board.date} drivers={board.drivers} busy={busy}
