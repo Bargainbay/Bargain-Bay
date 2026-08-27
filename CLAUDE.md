@@ -349,6 +349,44 @@ changes no arithmetic.
 - Sarah can raise a tax-in invoice (`taxInclusive` on `create_invoice`); a phone
   quote is exactly where "out the door" pricing gets used.
 
+## Bank feed (Plaid) + QuickBooks — where expenses come from (added 2026-08-27)
+Two independent feeds into the same `expenses` ledger, both dormant until their
+env vars are set, both idempotent via `expenses.ext_id`.
+
+- **Plaid** (`lib/plaid.js`) is the bank. `/transactions/sync` is a CURSOR
+  endpoint — the cursor is persisted **after every page**, because a first pull
+  of two years across several accounts will hit the function time limit and a
+  cursor written only at the end would restart from scratch every night and
+  never catch up.
+- **The webhook is what makes it live** (`/api/plaid/webhook`). It carries no
+  data we trust — it only triggers a pull with our own credentials — so the
+  guard is "is this one of our items" plus a 60s throttle, not signature
+  verification. Full JWT verification would be reasonable hardening; it is not
+  what stands between this and bad data.
+- **The nightly pull is folded into `/api/cron/sync-inventory`**, beside the QBO
+  sync, rather than getting its own `vercel.json` entry — the plan's cron
+  allowance is small and these are one finance pass.
+  `/api/cron/sync-bank` exists for triggering it by hand.
+- **What is deliberately NOT imported:** pending rows (they're replaced when they
+  post), money IN, and `TRANSFER_IN`/`TRANSFER_OUT`/`LOAN_PAYMENTS`/`INCOME`. A
+  credit-card payment is the same money as the purchases it settles — importing
+  both counts every charge twice. A `BANK_FEES` row IS a cost and is kept.
+- **An imported amount is GROSS and its tax is NULL.** The bank never saw the
+  receipt. Guessing 13% on import would invent input tax credits on wages,
+  insurance and US purchases. `listUnreviewedExpenses` + the "HST to confirm"
+  panel is where a person answers them, in batches — one at a time is how
+  thousands of rows never get answered at all.
+- **LANDMINE — two splits, two rules.** `splitGross` (lib/tax.js) divides a known
+  charge so the halves add back to it exactly; `exTaxOf` finds a subtotal that
+  reconstructs a QUOTED total and may land a cent off. Expenses use the first,
+  invoices the second. `bulkSetExpenseTax` does `splitGross`'s arithmetic in SQL
+  so several thousand rows are one statement — keep it in step with the helper
+  or the review screen previews a figure it will not produce.
+- **QuickBooks** (`lib/qbo.js`) was already complete; it only ever needed
+  `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET`. If BOTH feeds are connected to the same
+  bank account the same spend arrives twice under two different `ext_id`s —
+  pick one per account.
+
 ## HST remittance — the Sales dashboard panel (added 2026-08-27)
 `hstOwed()` in `lib/analytics.js`, rendered by `components/TaxOwed.jsx` on
 `/admin/dashboard` directly under the revenue KPIs. Owner-only (`!salesOnly`),

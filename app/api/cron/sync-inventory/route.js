@@ -5,6 +5,7 @@ import { watchInvoiceInbox } from '../../../../lib/intake-watch';
 import { postDueRecurringExpenses } from '../../../../lib/finance';
 import { sendWeeklyFinanceBrief } from '../../../../lib/finance-report';
 import { syncQboExpenses } from '../../../../lib/qbo';
+import { syncPlaidTransactions } from '../../../../lib/plaid';
 import { backfillCustomers } from '../../../../lib/customers';
 import { cronAuthorized } from '../../../../lib/cron-auth';
 
@@ -54,6 +55,19 @@ async function run(req) {
     if (r.errors?.length) console.error('cron qbo sync issues', JSON.stringify(r.errors));
   } catch (e) { console.error('cron qbo sync failed', e?.message || e); }
 
+  // Pull the bank feed (Plaid). The webhook keeps this current through the day;
+  // this is the daily backstop for anything a missed or throttled webhook left
+  // behind, and it is what keeps working if webhooks are never set up. Folded in
+  // here rather than given its own Vercel cron — the plan's cron allowance is
+  // small and these are all the same nightly finance pass. No-ops until Plaid is
+  // configured and a bank is linked.
+  let bank = null;
+  try {
+    const r = await syncPlaidTransactions();
+    if (r.configured && r.connected) bank = { added: r.added, updated: r.updated, removed: r.removed };
+    if (r.errors?.length) console.error('cron bank sync issues', JSON.stringify(r.errors));
+  } catch (e) { console.error('cron bank sync failed', e?.message || e); }
+
   // Keep the client database converged with history (covers any live upsert
   // that failed, plus records created by paths without the hook). Best-effort.
   let crm = null;
@@ -66,7 +80,7 @@ async function run(req) {
 
   try {
     const result = await syncInventoryFromTracker();
-    return NextResponse.json({ ok: true, reconciled: fixed, intake, recurringPosted, qbo, crm, brief, ...result });
+    return NextResponse.json({ ok: true, reconciled: fixed, intake, recurringPosted, qbo, bank, crm, brief, ...result });
   } catch (e) {
     console.error('cron sync-inventory failed', e?.message || e);
     return NextResponse.json({ ok: false, reconciled: fixed, recurringPosted, qbo, crm, brief, error: e?.message || 'sync failed' }, { status: 500 });

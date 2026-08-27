@@ -3,12 +3,15 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { financialDashboard, DASH_PERIODS } from '../../../lib/analytics';
-import { listExpenses, listRecurringExpenses, EXPENSE_CATEGORIES } from '../../../lib/finance';
+import { listExpenses, listRecurringExpenses, listUnreviewedExpenses, EXPENSE_CATEGORIES } from '../../../lib/finance';
 import { qboStatus } from '../../../lib/qbo';
+import { plaidStatus } from '../../../lib/plaid';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
 import ExpenseEditor from '../../../components/ExpenseEditor';
 import QboPanel from '../../../components/QboPanel';
+import PlaidPanel from '../../../components/PlaidPanel';
+import TaxReview from '../../../components/TaxReview';
 import { Kpi, HBars, TrendChart } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
@@ -27,11 +30,17 @@ export default async function FinancialDashboardPage({ searchParams }) {
   if (!hasDb()) return (<DashboardShell active="financial"><div className="panel">Database not configured.</div></DashboardShell>);
 
   const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
-  let d = null, expenses = [], recurring = [], error = '';
-  try { [d, expenses, recurring] = await Promise.all([financialDashboard(period), listExpenses(), listRecurringExpenses()]); }
-  catch (e) { console.error('financial load failed', e.message); error = 'Could not load financial data.'; }
+  let d = null, expenses = [], recurring = [], unreviewed = [], error = '';
+  try {
+    [d, expenses, recurring, unreviewed] = await Promise.all([
+      financialDashboard(period), listExpenses(), listRecurringExpenses(),
+      listUnreviewedExpenses().catch(() => [])
+    ]);
+  } catch (e) { console.error('financial load failed', e.message); error = 'Could not load financial data.'; }
   let qbo = { configured: false, connected: false };
   try { qbo = await qboStatus(); } catch { /* panel shows setup state */ }
+  let plaid = { configured: false, connected: false, institutions: [] };
+  try { plaid = await plaidStatus(); } catch { /* panel shows setup state */ }
   if (error || !d) return (<DashboardShell active="financial"><div className="error-box">{error || 'No data.'}</div></DashboardShell>);
 
   const k = d.kpis;
@@ -80,6 +89,27 @@ export default async function FinancialDashboardPage({ searchParams }) {
 
       <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
+          Bank feed — transactions straight from the account
+          {plaid.connected && <span className="pill ok" style={{ marginLeft: 8, fontSize: 11 }}>connected</span>}
+        </h2>
+        <PlaidPanel status={plaid} />
+      </div>
+
+      {/* The review queue sits directly under the feed that fills it: an
+          imported row claims no input tax credit until somebody says what tax
+          was inside it, and this is where thousands of them get answered. */}
+      {unreviewed.length > 0 && (
+        <div className="panel" style={{ marginTop: 18 }}>
+          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
+            HST to confirm
+            <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>{unreviewed.length}</span>
+          </h2>
+          <TaxReview initial={unreviewed} />
+        </div>
+      )}
+
+      <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
           QuickBooks — automatic expense tracking
           {qbo.connected && <span className="pill ok" style={{ marginLeft: 8, fontSize: 11 }}>connected</span>}
         </h2>
@@ -93,7 +123,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
             <HBars money rows={d.expensesByCategory.map((e, i) => ({ label: e.category, value: e.amount, color: ['var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)'][i % 5] }))} />
           </div>
         )}
-        <p className="hint" style={{ marginTop: 0 }}>Log expenses to turn gross profit into <strong>true net profit</strong>. With QuickBooks connected above, bank + card spends arrive automatically — this manual entry is for cash and anything the bank feed can&apos;t see.</p>
+        <p className="hint" style={{ marginTop: 0 }}>Log expenses to turn gross profit into <strong>true net profit</strong>. With the bank feed or QuickBooks connected above, card and account spends arrive on their own — this manual entry is for cash and anything neither can see.</p>
         <div style={{ marginTop: 10 }}>
           <ExpenseEditor initial={expenses} recurringInitial={recurring} categories={EXPENSE_CATEGORIES} />
         </div>

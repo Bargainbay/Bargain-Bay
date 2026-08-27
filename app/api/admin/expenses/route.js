@@ -1,7 +1,7 @@
 // Operating expenses CRUD (one-off + recurring templates). Admin-only.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { listExpenses, addExpense, updateExpense, deleteExpense,
+import { listExpenses, addExpense, updateExpense, deleteExpense, bulkSetExpenseTax,
          listRecurringExpenses, addRecurringExpense, deleteRecurringExpense } from '../../../../lib/finance';
 
 export const dynamic = 'force-dynamic';
@@ -38,6 +38,19 @@ export async function POST(req) {
 export async function PATCH(req) {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   let b; try { b = await req.json(); } catch { b = {}; }
+  // Settle the HST on a batch at once — the only way a bank feed of several
+  // thousand charges ever gets reviewed.
+  if (b.action === 'bulk_tax') {
+    const ids = Array.isArray(b.ids) ? b.ids : [];
+    if (!ids.length) return NextResponse.json({ error: 'Pick at least one row.' }, { status: 400 });
+    try {
+      const r = await bulkSetExpenseTax(ids, b.mode === 'hst' ? 'hst' : 'none');
+      return NextResponse.json({ ok: true, ...r });
+    } catch (e) {
+      return NextResponse.json({ error: e?.message || 'Could not save.' }, { status: 500 });
+    }
+  }
+
   const id = Number(b.id);
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
   if (Object.prototype.hasOwnProperty.call(b, 'amount') && !(Number(b.amount) > 0)) {
