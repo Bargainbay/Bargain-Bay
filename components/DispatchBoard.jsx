@@ -223,8 +223,10 @@ function CrewLost({ lost, busy, onRestore, onDismiss }) {
       </b>
       <div className="hint" style={{ margin: '4px 0 8px' }}>
         They were on it and they are not on it now. It may have been deliberate — the log records who
-        was assigned, not why — so check each one against who was actually in the van before putting a
-        name back. Reordering a run used to cause this on its own; that is fixed.
+        was assigned, not why — so check each one against who was actually in the van, and use
+        <b> History</b> on the card to see the trail. Putting a name back only ever ADDS them to a free
+        seat; it never takes off whoever is on the stop today. Reordering a run used to cause this on
+        its own; that is fixed.
       </div>
       <ul className="disp-setup-list">
         {lost.rows.map((r) => (
@@ -235,10 +237,18 @@ function CrewLost({ lost, busy, onRestore, onDismiss }) {
               {r.driverName || 'unassigned'}{r.driver2Name ? ` + ${r.driver2Name}` : ' alone'}
               {' '}· missing <b>{r.missing.join(', ')}</b>
             </span>
-            <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={busy}
-              onClick={() => onRestore(r)}>
-              put back {r.wasDriverName}{r.wasDriver2Name ? ` + ${r.wasDriver2Name}` : ''}
-            </button>
+            {r.restore
+              ? (
+                <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={busy}
+                  onClick={() => onRestore(r)}>
+                  add {r.addBackName} back{r.driverName ? ` beside ${r.driverName}` : ''}
+                </button>
+              )
+              : (
+                <span className="hint" style={{ margin: 0 }}>
+                  {' '}· both seats taken — take one off first if {r.missing[0]} should be on it
+                </span>
+              )}
           </li>
         ))}
       </ul>
@@ -748,9 +758,12 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
 
   // Putting a lost name back is an ordinary assignment — both seats, as they
   // were last actually assigned.
+  // Additive: the missing name goes into a free seat beside whoever is on the
+  // stop now. Never the old crew wholesale — that would remove somebody who is
+  // on it today, and most of what this list catches is an ordinary reassignment.
   const onRestoreCrew = (row) => send('PATCH', {
     action: 'assign', jobId: row.id, jobDate: row.date,
-    driverId: row.wasDriverId, driver2Id: row.wasDriver2Id || null
+    driverId: row.restore.driverId, driver2Id: row.restore.driver2Id
   });
 
   // The pull used to refresh in silence, so an order it declined to take looked

@@ -915,8 +915,17 @@ them. The chain, in full, because every link is a rule somebody has to keep:
 **Putting the names back.** The columns lost the evidence; `job_events` never
 did. `crewLost({from,to})` walks the **whole** trail of `assigned` events for
 each stop and reports any driver who appears in it and is not on the job now. The
-board banners those, names who is missing, and offers the crew back as it was
-last actually assigned. It **reports and offers; it never repairs by itself.**
+board banners those, names who is missing, and offers to put them back. It
+**reports and offers; it never repairs by itself.**
+
+**Restoring is ADDITIVE, never the old crew wholesale.** Most of what lands in
+this list is an ordinary reassignment: a stop that moved from Ruban to Saieasan
+reads here as "Ruban came off it", and a one-click "put the old crew back" would
+quietly undo a decision somebody made on purpose — verified on the live board,
+where two of the three rows found were exactly that. So the missing name goes
+into a FREE seat beside whoever is on the stop today, and when both seats are
+taken nothing is offered at all: a stop is one van with two names on it, and
+there is no third seat.
 
 **LANDMINE — do not "optimise" that to look at the last `assigned` event only.**
 That was the first cut, on the reasoning that a deliberate removal writes its own
