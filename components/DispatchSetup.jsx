@@ -12,6 +12,8 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   const [driverPhone, setDriverPhone] = useState('');
   const [roster, setRoster] = useState(drivers);
   const [link, setLink] = useState(null);   // the sign-in link just minted
+  const [merge, setMerge] = useState(null);       // a duplicate account waiting to be folded in
+  const [sameName, setSameName] = useState(null); // the driver an "add" collided with
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
@@ -59,12 +61,19 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         body: JSON.stringify({ action: 'driver_phone', name: driverName, phone: driverPhone })
       });
       const d = await res.json();
-      if (!res.ok) { setErr(d.error || 'Could not add the driver.'); return; }
+      if (!res.ok) {
+        setErr(d.error || 'Could not add the driver.');
+        // Somebody with this name already drives for us. Almost always this is a
+        // driver on a new phone — so put the button that actually fixes it in
+        // front of whoever just tried to add them again.
+        if (d.code === 'DRIVER_NAME_TAKEN' && d.driver?.id) setSameName({ ...d.driver, typed: driverPhone });
+        return;
+      }
       setOk(d.texted
         ? `Texted ${d.driver?.name || driverName} their sign-in link.`
         : `${d.driver?.name || driverName} added — send them the link below.`);
       setLink(d);
-      setDriverName(''); setDriverPhone('');
+      setDriverName(''); setDriverPhone(''); setSameName(null);
       await loadRoster();
       onChanged?.();
     } catch { setErr('Network error — nothing was saved.'); }
@@ -87,6 +96,67 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
       setLink(d);
       await loadRoster();
     } catch { setErr('Network error — nothing was sent.'); }
+    finally { setBusy(''); }
+  }
+
+  // The number changes, the account doesn't. Everything about a driver hangs off
+  // their account id — their stops, their column, their pay, their signed PODs —
+  // so a new phone must never mean a new account. It used to: matching is by
+  // number, so re-adding somebody built a second driver, and from that moment
+  // the same person had two columns on the board and half a history in each.
+  async function changeNumber(driverId, label, current, preset) {
+    const next = preset ?? window.prompt(`New mobile number for ${label}:`, current || '');
+    if (next === null) return;
+    setBusy(`phone${driverId}`); setErr(''); setOk(''); setLink(null); setSameName(null);
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'driver_rephone', driverId, phone: next })
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setErr(d.error || 'Could not change the number.');
+        // The number is already somebody else's — offer the repair rather than
+        // leaving the office with an error and no move.
+        if (d.code === 'PHONE_TAKEN' && d.driver?.isDriver) {
+          setMerge({ keep: { id: driverId, name: label }, drop: d.driver });
+        }
+        return;
+      }
+      setOk(d.driver?.unchanged
+        ? `${label} was already on that number.`
+        : `${label} is on ${d.driver.phone} now. They sign in at /driver with the new number — `
+          + 'we text them a code. Any old link on the old phone has been killed.');
+      await loadRoster();
+      onChanged?.();
+    } catch { setErr('Network error — nothing was changed.'); }
+    finally { setBusy(''); }
+  }
+
+  // Folding a duplicate back into the real account. This is the repair for
+  // somebody who was already added twice, which before there was any way to
+  // change a number was the only way to keep driving after a new phone.
+  async function doMerge() {
+    if (!merge) return;
+    if (!window.confirm(
+      `Move every stop, order and payment from ${merge.drop.name || 'the duplicate'} onto ${merge.keep.name}, `
+      + 'and switch the duplicate off? This cannot be undone from here.'
+    )) return;
+    setBusy('merge'); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'driver_merge', keepId: merge.keep.id, dropId: merge.drop.id })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not merge them.'); return; }
+      setOk(`Merged — ${d.jobs} stop(s) and ${d.orders || 0} order(s) moved onto ${d.keep.name}.`);
+      setMerge(null);
+      await loadRoster();
+      onChanged?.();
+    } catch { setErr('Network error — nothing was merged.'); }
     finally { setBusy(''); }
   }
 
@@ -168,6 +238,13 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                       onClick={() => sendLink(d.id, d.name || d.email)}>
                       {busy === `link${d.id}` ? 'sending…' : (d.lastSeen ? 're-send link' : 'text link')}
                     </button>
+                    {/* The whole point: a new phone changes the number ON this
+                        account. Adding them again makes a second driver. */}
+                    <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
+                      title="They have a new phone — move their number, keep their stops and their history"
+                      onClick={() => changeNumber(d.id, d.name || d.email, d.phone)}>
+                      {busy === `phone${d.id}` ? 'changing…' : 'change number'}
+                    </button>
                     {d.email && (
                       <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
                         onClick={() => removeDriver(d.email, d.name)}>remove</button>
@@ -179,12 +256,48 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
           </ul>
         )}
 
+        {/* An add that collided with a name we already have. The message alone
+            isn't enough — the office is standing there with a new number and
+            needs the thing to press. */}
+        {sameName && (
+          <div className="disp-linkbox">
+            <b>{sameName.name} already drives for us{sameName.phone ? ` on ${sameName.phone}` : ''}.</b>
+            <div className="hint" style={{ margin: '4px 0' }}>
+              If this is the same person on a new phone, move their number — they keep every stop, every
+              signed delivery and their pay history. Adding them again would split all of it in two.
+            </div>
+            <button type="button" className="btn accent" disabled={!!busy}
+              onClick={() => changeNumber(sameName.id, sameName.name, sameName.phone, sameName.typed)}>
+              Move {sameName.name} to {sameName.typed}
+            </button>
+            <button type="button" className="disp-toggle" style={{ marginLeft: 8 }}
+              onClick={() => setSameName(null)}>it&apos;s a different person</button>
+          </div>
+        )}
+
+        {merge && (
+          <div className="disp-linkbox">
+            <b>Two accounts for the same person.</b>
+            <div className="hint" style={{ margin: '4px 0' }}>
+              {merge.drop.name} (the duplicate) already answers on that number. Merging moves every stop,
+              order and payment onto <b>{merge.keep.name}</b> and switches the duplicate off, so there is
+              one column on the board and one row on the pay report again.
+            </div>
+            <button type="button" className="btn accent" disabled={!!busy} onClick={doMerge}>
+              {busy === 'merge' ? 'merging…' : `Merge into ${merge.keep.name}`}
+            </button>
+            <button type="button" className="disp-toggle" style={{ marginLeft: 8 }}
+              onClick={() => setMerge(null)}>not now</button>
+          </div>
+        )}
+
         {link && (
           <div className="disp-linkbox">
             <b>{link.texted ? 'Texted.' : 'Not texted — send this to them yourself:'}</b>
             <div className="disp-linkurl">{link.url}</div>
             <div className="hint" style={{ margin: '4px 0 0' }}>
-              Single use, good for 14 days. {link.smsError ? `Text failed: ${link.smsError}` : 'Tapping it signs that phone in.'}
+              Good for 14 days and re-usable inside that window.{' '}
+              {link.smsError ? `Text failed: ${link.smsError}` : 'Tapping it signs that phone in.'}
             </div>
             <button type="button" className="disp-toggle" onClick={() => setLink(null)}>hide</button>
           </div>

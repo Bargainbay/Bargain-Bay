@@ -498,6 +498,19 @@ CREATE INDEX IF NOT EXISTS idx_jobs_invoice ON jobs(invoice_id) WHERE invoice_id
 -- A second person on the same stop: one van, one run, two names.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS driver2_id     int;
 CREATE INDEX IF NOT EXISTS idx_jobs_driver2 ON jobs(driver2_id, job_date) WHERE driver2_id IS NOT NULL;
+-- The same person cannot be both people on a stop. Enforced HERE and not only in
+-- the code that writes a crew, because the way this broke was a function that
+-- wrote driver_id directly and never consulted the rule: resequence set the
+-- column's driver on every card in it, including the stops that were in that
+-- column because the driver was the SECOND man. One person then held both seats,
+-- the next assignment dropped the duplicate second seat, and the driver who was
+-- really riding was gone off the stop with nothing to say so.
+UPDATE jobs SET driver2_id = NULL
+ WHERE driver2_id IS NOT NULL AND (driver2_id = driver_id OR driver_id IS NULL);
+DO $crew$ BEGIN
+  ALTER TABLE jobs ADD CONSTRAINT jobs_crew_distinct
+    CHECK (driver2_id IS NULL OR (driver_id IS NOT NULL AND driver2_id <> driver_id));
+EXCEPTION WHEN duplicate_object THEN NULL; END $crew$;
 -- Who we collect FROM (the shipper), as distinct from who to ring there.
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_company text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS pickup_name    text;
@@ -608,3 +621,22 @@ CREATE TABLE IF NOT EXISTS coupon_redemptions (
 );
 CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_coupon ON coupon_redemptions(coupon_id);
 CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_order  ON coupon_redemptions(order_id);
+
+-- What a delivery day cost that no single stop did: gas, overwhelmingly, plus
+-- tolls, a truck rental, a cash helper. It is DATED rather than timestamped
+-- because that is how a receipt behaves — filled in at the pump if somebody is
+-- quick, and out of the glovebox on Friday if they aren't — and it is never
+-- split across the day's stops, because a tank goes into a van and dividing it
+-- per delivery would be a guess dressed up as a figure.
+CREATE TABLE IF NOT EXISTS dispatch_expenses (
+  id              serial PRIMARY KEY,
+  expense_date    date NOT NULL,
+  kind            text NOT NULL DEFAULT 'gas',   -- gas | tolls | parking | maintenance | rental | helper | other
+  amount          numeric(10,2) NOT NULL,
+  driver_id       int,                           -- which van, when it is known
+  note            text,
+  created_by      text,
+  created_by_name text,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_dispatch_expenses_date ON dispatch_expenses(expense_date);
