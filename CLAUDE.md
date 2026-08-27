@@ -781,8 +781,18 @@ the paper run sheet that replaces it.
   printed sheet and in the browser for the board and the driver's phone.
   Shown boxed in **black** on the run sheet (louder than the trade-in's outline,
   and the box holds the amount ALONE so it can never wrap), in the Collect
-  column, in the run's header total, on the board card, and shouting on the
-  driver's stop. Set from the job form — staff-level, because it is an
+  column, in the run's header total, on the board card, and on the driver's stop.
+  **The paper and the phone say the same thing the same way** — the loud block is
+  the amount and nothing else, and the qualifier ("read off the note — check it
+  before you ask", or what the office agreed it is for) sits underneath it in
+  quiet type. On the phone it reads "$50.00 CASH AT THE DOOR" rather than a
+  second "COLLECT", so a stop carrying an invoice balance AND cash doesn't show
+  two near-identical blocks. The driver's header totals both kinds of money for
+  the day, exactly as the run sheet's does — the phone used to make drivers add
+  it up stop by stop, or find out at the end of the day that they were short.
+  **`formatPhone` (lib/constants.js) is the one phone formatter**, used by the
+  run sheet and the driver app. Nobody dials 5483335001 off a screen in a van,
+  and a number that can only be tapped can't be read aloud to the office. Set from the job form — staff-level, because it is an
   instruction to collect, not a price we charge.
 - **Anything meant to be printed carries a Print button** (`components/PrintButton.jsx`
   → `window.print()`): the run sheet and the POD form. "Press ⌘P" is not a

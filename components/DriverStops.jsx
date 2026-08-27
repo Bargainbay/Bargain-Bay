@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { queueAction, flush, pending, newRef } from '../lib/driver-outbox';
 import { cashAtTheDoor } from '../lib/cash-at-the-door';
+import { formatPhone } from '../lib/constants';
 import DriverFinish from './DriverFinish';
 import DriverPhotos from './DriverPhotos';
 
@@ -130,6 +131,13 @@ export default function DriverStops({ initial, driverName }) {
   // driver was the last person to find out — the office noticed instead, days
   // later, and closed the stop out at whatever time they happened to look.
   const unfinished = left.filter((s) => s.overdue && s.timeIn);
+  // What the driver should come back with today, both kinds of money together.
+  // The run sheet totals this in its header and the phone did not, so a driver
+  // working off the app had to add it up stop by stop — or find out at the end
+  // of the day that they were short.
+  const owed = left.reduce(
+    (sum, s) => sum + (Number(s.balanceDue) || 0) + (cashAtTheDoor(s)?.amount || 0), 0
+  );
 
   return (
     <div className="drv">
@@ -138,7 +146,10 @@ export default function DriverStops({ initial, driverName }) {
           <div className="drv-hello">{driverName ? `${driverName}` : 'Your stops'}</div>
           <div className="drv-date">{new Date(`${date}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' })}</div>
         </div>
-        <div className="drv-left">{left.length} to go</div>
+        <div className="drv-left">
+          {left.length} to go
+          {owed > 0 && <div className="drv-owed">${owed.toFixed(2)} to collect</div>}
+        </div>
       </div>
 
       {!online && (
@@ -218,6 +229,7 @@ export default function DriverStops({ initial, driverName }) {
 function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail, onAddPhotos }) {
   const addr = fullAddress(stop);
   const isService = stop.type === 'service_call';
+  const cash = cashAtTheDoor(stop);
   return (
     <div className={'drv-card' + (done ? ' is-done' : '') + (preview ? ' is-preview' : '')}>
       <div className="drv-card-top">
@@ -227,6 +239,12 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
       </div>
 
       <div className="drv-who">{stop.customerName || '(no name)'}</div>
+      {/* Readable, not just dialable. A driver reads this number out to whoever
+          answers the door, or to the office — a Call button alone can't be read
+          aloud, and 5483335001 can't be read at all. */}
+      {stop.phone && (
+        <div className="drv-phone"><a href={`tel:${stop.phone}`}>{formatPhone(stop.phone)}</a></div>
+      )}
       {/* Two on one van: both see the stop and either can close it out. Saying
           who else is on it stops both of them finishing it twice. */}
       {stop.mateName && (
@@ -243,7 +261,7 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
             <div className="drv-pickup-who">
               {[stop.pickupCompany, stop.pickupName].filter(Boolean).join(' · ')}
               {stop.pickupPhone && (
-                <> · <a href={`tel:${stop.pickupPhone}`}>{stop.pickupPhone}</a></>
+                <> · <a href={`tel:${stop.pickupPhone}`}>{formatPhone(stop.pickupPhone)}</a></>
               )}
             </div>
           )}
@@ -260,15 +278,20 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
           a haul-away they pay for at the door, a client's own surcharge. The
           driver is the one holding the bag if it is missed, and until now it
           was one clause inside the grey notes paragraph. */}
-      {cashAtTheDoor(stop) && (
-        <div className="drv-cash">
-          COLLECT ${cashAtTheDoor(stop).amount.toFixed(2)} CASH
-          {cashAtTheDoor(stop).note && (
-            <div className="drv-cash-src">
-              {cashAtTheDoor(stop).typed ? cashAtTheDoor(stop).note : `from the notes: “${cashAtTheDoor(stop).note}”`}
-            </div>
-          )}
-        </div>
+      {cash && (
+        <>
+          {/* The loud block holds the AMOUNT and nothing else, exactly as the
+              run sheet's black box does — quoting the client's sentence inside
+              it made the one thing that has to be read at a glance into three
+              lines of dense italic, and that sentence is printed in full lower
+              down this same card anyway. "CASH AT THE DOOR" rather than another
+              "COLLECT", so a stop carrying both an invoice balance and cash
+              doesn't show two near-identical blocks. */}
+          <div className="drv-cash">${cash.amount.toFixed(2)} CASH AT THE DOOR</div>
+          <div className="drv-cash-src">
+            {cash.typed ? (cash.note || 'agreed with the office') : 'read off the note — check it before you ask'}
+          </div>
+        </>
       )}
 
       {(stop.tradeIns?.length > 0 || stop.services?.includes('trade_in')) && (
