@@ -50,7 +50,10 @@ export async function POST(req) {
     if (!items.length) return NextResponse.json({ error: 'Select at least one unit and enter a price.' }, { status: 400 });
     try {
       const invoice = await createAndSendInvoice({
-        name, email, items, addHst: !!body.addHst, daysUntilDue: body.daysUntilDue, memo: String(body.memo || 'Salvage / parts-only sale').slice(0, 500)
+        // Parts-only or not, it's a taxable supply. This used to follow a
+        // checkbox that defaulted to OFF, which is how zero-HST invoices got
+        // into the books in the first place.
+        name, email, items, addHst: true, daysUntilDue: body.daysUntilDue, memo: String(body.memo || 'Salvage / parts-only sale').slice(0, 500)
       });
       const prices = {};
       items.forEach((it) => { prices[it.sku] = it.amount; });

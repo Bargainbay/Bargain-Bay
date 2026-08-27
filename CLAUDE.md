@@ -335,13 +335,17 @@ changes no arithmetic.
   Switching CONVERTS what's already in the boxes, so it reads the numbers rather
   than being a thing you must set first and remember. Credit lines convert too —
   a discount quoted tax-in is tax-in as well.
-- **There is no "no HST" choice, but `none` is still a state an invoice can be
-  IN.** Every sale here carries HST, so a rep is never offered the option — but
-  the salvage screen (`AdminSalvage`) raises parts-only invoices with
-  `addHst: false`, and one of those must not silently gain 13% because somebody
-  reopened it and hit save. The editor therefore renders a third option only when
-  the invoice it loaded already has zero HST, and choosing a real mode retires
-  it. Don't "tidy" that away.
+- **Nothing can be raised without HST any more.** Both invoice screens offer only
+  the two modes, and the salvage screen's "Add 13% HST" checkbox — which
+  defaulted to OFF, and is how zero-HST invoices got into the books at all — is
+  gone; `/api/admin/salvage` now passes `addHst: true` unconditionally. Parts-only
+  or not, it's a taxable supply.
+- **`none` is nonetheless still a state an invoice can BE in**, because the
+  historical ones are still in the database. Reopening one and hitting save must
+  not silently add 13% to a settled sale, so the editor renders a third option
+  *only* when the invoice it loaded already has zero HST; choosing a real mode
+  retires it. Don't "tidy" that away — it's for records that already exist, not
+  a choice anyone is offered.
 - Sarah can raise a tax-in invoice (`taxInclusive` on `create_invoice`); a phone
   quote is exactly where "out the door" pricing gets used.
 
