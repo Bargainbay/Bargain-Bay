@@ -3,7 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { financialDashboard, DASH_PERIODS } from '../../../lib/analytics';
-import { listExpenses, listRecurringExpenses, listUnreviewedExpenses, listExpenseRules, getLedgerStart, EXPENSE_CATEGORIES } from '../../../lib/finance';
+import { listExpenses, listRecurringExpenses, listUnreviewedExpenses, listExpenseRules, suggestExpenseRules, getLedgerStart, EXPENSE_CATEGORIES } from '../../../lib/finance';
 import { qboStatus } from '../../../lib/qbo';
 import { plaidStatus } from '../../../lib/plaid';
 import DashboardShell from '../../../components/DashboardShell';
@@ -13,6 +13,7 @@ import QboPanel from '../../../components/QboPanel';
 import PlaidPanel from '../../../components/PlaidPanel';
 import TaxReview from '../../../components/TaxReview';
 import ExpenseRules from '../../../components/ExpenseRules';
+import RuleSuggestions from '../../../components/RuleSuggestions';
 import { Kpi, HBars, TrendChart } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
@@ -31,13 +32,14 @@ export default async function FinancialDashboardPage({ searchParams }) {
   if (!hasDb()) return (<DashboardShell active="financial"><div className="panel">Database not configured.</div></DashboardShell>);
 
   const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
-  let d = null, expenses = [], recurring = [], unreviewed = [], rules = [], ledgerStart = '', error = '';
+  let d = null, expenses = [], recurring = [], unreviewed = [], rules = [], ledgerStart = '', suggestions = [], error = '';
   try {
-    [d, expenses, recurring, unreviewed, rules, ledgerStart] = await Promise.all([
+    [d, expenses, recurring, unreviewed, rules, ledgerStart, suggestions] = await Promise.all([
       financialDashboard(period), listExpenses(), listRecurringExpenses(),
       listUnreviewedExpenses().catch(() => []),
       listExpenseRules().catch(() => []),
-      getLedgerStart().catch(() => '')
+      getLedgerStart().catch(() => ''),
+      suggestExpenseRules().catch(() => [])
     ]);
   } catch (e) { console.error('financial load failed', e.message); error = 'Could not load financial data.'; }
   let qbo = { configured: false, connected: false };
@@ -102,6 +104,18 @@ export default async function FinancialDashboardPage({ searchParams }) {
 
       {/* Rules sit above the feeds they govern: what arrives tomorrow depends on
           what's set here today. */}
+      {/* Above the rules list: this is where a first bank import gets dealt
+          with, and it's the answer to "why am I still doing this by hand". */}
+      {suggestions.length > 0 && (
+        <div className="panel" style={{ marginTop: 18 }}>
+          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
+            Patterns worth a rule
+            <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>{suggestions.length}</span>
+          </h2>
+          <RuleSuggestions initial={suggestions} categories={EXPENSE_CATEGORIES} />
+        </div>
+      )}
+
       <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
           Sorting rules

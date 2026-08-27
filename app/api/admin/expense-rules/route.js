@@ -19,6 +19,13 @@ export async function POST(req) {
       await saveExpenseRule({ id: b.id, match: b.match, category: b.category, taxMode: b.taxMode });
       return NextResponse.json({ ok: true, rules: await listExpenseRules() });
     }
+    // Save and immediately sort the rows that prompted it — a rule that only
+    // helps future transactions leaves the pile it was written for untouched.
+    if (b.action === 'save_and_apply') {
+      await saveExpenseRule({ match: b.match, category: b.category, taxMode: b.taxMode });
+      const r = await applyRulesToExisting();
+      return NextResponse.json({ ok: true, ...r, rules: await listExpenseRules() });
+    }
     if (b.action === 'delete') {
       await deleteExpenseRule(b.id);
       return NextResponse.json({ ok: true, rules: await listExpenseRules() });

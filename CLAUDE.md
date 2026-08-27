@@ -410,6 +410,26 @@ helped future transactions would leave the pile that prompted it untouched).
 - `applyRulesToExisting` **only fills blanks** — a category set by hand, or a tax
   already answered, is never overwritten by a rule written afterwards.
 
+### Suggesting the rules
+`suggestExpenseRules` + the "Patterns worth a rule" panel. The difference between
+another review queue and actually less work: two thousand transactions are rarely
+two thousand different things, they're thirty patterns repeated.
+
+- **It works on BANK DESCRIPTORS, not merchant names**, because a large share of
+  this shop's spending is e-transfers with no payee: `SEND E-TFR *z27 SUPP`. The
+  only signal is the suffix the owner types (`SUPP`, `EXP`), so `descriptorTokens`
+  tokenises the whole descriptor and throws away what never repeats.
+- **Reference codes are dropped by their `*` marker**, not by looking for digits:
+  `*z27` has one, `*pAz` doesn't, and both are unique per transaction. Missing
+  that makes every e-transfer look like a brand-new pattern.
+- **Ranked by TOTAL, not count.** Ten $2,000 supplier transfers deserve the
+  owner's attention before forty $4 coffees.
+- Single words AND adjacent pairs are offered (`esso`, `esso circle`), and a
+  short token is dropped when a longer phrase already covers ~the same rows —
+  two suggestions for one decision is worse than one.
+- Accepting a suggestion **saves and applies in the same request**; a rule that
+  only helped future transactions would leave the pile that prompted it.
+
 ### The P&L statement
 `lib/pnl.js` → `/admin/reports/pnl`, printable, CSV at `/api/admin/pnl`.
 Revenue → COGS → gross profit → operating expenses itemised by category → net
