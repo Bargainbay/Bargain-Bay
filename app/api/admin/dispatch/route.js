@@ -310,7 +310,12 @@ export async function PATCH(req) {
     // Staff, like creating one: whoever takes the call that says "actually we've
     // moved" has to be able to fix it while the customer is still talking.
     if (body.action === 'edit') {
-      return NextResponse.json({ ok: true, job: await updateJob(jobId, body, who(s)) });
+      // The edit form carries a charge box, and updateJob now honours it — so the
+      // money gate has to be applied HERE, where every other money gate is.
+      // Editing a job is staff-level on purpose; setting what a client is charged
+      // is not, and routing it through a staff action would quietly widen it.
+      const patch = isAdmin(s) ? body : { ...body, chargeAmount: undefined };
+      return NextResponse.json({ ok: true, job: await updateJob(jobId, patch, who(s)) });
     }
     if (body.action === 'reopen') {
       return NextResponse.json({ ok: true, job: await reopenJob(jobId, who(s)) });

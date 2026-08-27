@@ -101,6 +101,66 @@ function TimesForm({ job, busy, onTimes, onDone }) {
   );
 }
 
+// Both sides of a stop's money, on the stop.
+//
+// There was nowhere to do this for the jobs that needed it most. A charge could
+// only be set on the Billing tab, which lists **finished** jobs belonging to a
+// **client company** — so an imported Bargain Bay delivery, which has no client
+// and hasn't happened yet, could never appear there and had no reachable charge
+// at all. Pay was worse: it was only offered inside the close-out form, so a
+// stop that was already done couldn't be priced either.
+//
+// Both still go through their own guarded functions, one call each — setJobCharge
+// refuses to move a charge that is already on an invoice, and both are admin.
+function MoneyForm({ job, busy, onCharge, onPay, onDone }) {
+  const [charge, setCharge] = useState(job.chargeAmount == null ? '' : String(job.chargeAmount));
+  const [pay, setPay] = useState(job.payAmount == null ? '' : String(job.payAmount));
+  const [note, setNote] = useState('');
+  const was = (v) => (v == null ? '' : String(v));
+
+  async function submit(e) {
+    e.preventDefault();
+    let ok = true;
+    // Only what actually moved is sent: re-posting an unchanged charge on an
+    // invoiced job would be refused, and refused for something nobody asked for.
+    if (charge !== was(job.chargeAmount)) ok = await onCharge(job.id, charge, note) && ok;
+    if (ok && pay !== was(job.payAmount)) ok = await onPay(job.id, pay, note) && ok;
+    if (ok) onDone();
+  }
+
+  return (
+    <form className="disp-times-form" onSubmit={submit}>
+      <label>
+        Client pays
+        {job.invoiceId
+          ? <input value={charge} disabled title="Already on an invoice — credit the invoice instead" />
+          : <input inputMode="decimal" value={charge} placeholder="150.00"
+              onChange={(e) => setCharge(e.target.value)} />}
+      </label>
+      <label>
+        Driver paid
+        <input inputMode="decimal" value={pay} placeholder="60.00"
+          onChange={(e) => setPay(e.target.value)} />
+      </label>
+      <input className="disp-collect-note" value={note} placeholder="What for (optional)"
+        onChange={(e) => setNote(e.target.value)} />
+      <button type="submit" className="btn accent" disabled={busy}>Save</button>
+      {job.invoiceId && (
+        <span className="hint" style={{ margin: 0, flexBasis: '100%' }}>
+          This stop is already on an invoice, so its charge is the customer&apos;s now — credit the
+          invoice rather than moving the number.
+        </span>
+      )}
+      {!job.orderId && !job.clientName && (
+        <span className="hint" style={{ margin: 0, flexBasis: '100%' }}>
+          No client on this stop, so it won&apos;t appear on the Billing tab — but what you type here
+          still counts on the Profit tab.
+        </span>
+      )}
+    </form>
+  );
+}
+
 // What the day cost, recorded on the day. Gas by default because gas is what it
 // almost always is. Dated to the board's day rather than to "now", so filling in
 // Tuesday's receipt on Thursday puts it on Tuesday where it belongs.
@@ -140,29 +200,31 @@ function DayCostForm({ date, drivers, busy, onSave }) {
   );
 }
 
-// Stops where a driver came off the crew and nobody assigned them off it.
+// Stops where a driver was on the crew and is no longer on it.
 //
-// This is the repair for a bug that ran silently: reordering a run used to write
-// the column's driver onto every card in it, and a column also holds the stops
-// that driver is RIDING on as second man — so one ▲ made one person both people
-// on a stop, and the next assignment dropped the duplicate seat and the other
-// driver's name with it. The stop simply had one fewer name on it and nothing
-// said so.
+// The repair half of a bug that ran silently: reordering a run used to write the
+// column's driver onto every card in it, and a column also holds the stops that
+// driver is RIDING on as second man — so one ▲ made one person both people on a
+// stop, and the next assignment dropped the duplicate seat and the other driver
+// with it. The stop simply had one fewer name and nothing said so.
 //
-// The names are recoverable because every assignment was logged. This offers
-// them back; it never restores anything on its own. Who was actually in the van
-// is a fact about a Tuesday, not something a query gets to decide.
+// The names are recoverable because every assignment was logged. What is NOT
+// recoverable is intent: the accidental drop happens inside assignJob, so it
+// writes the same kind of event a deliberate one does. So this reports the fact
+// and offers the crew back — it never restores anything on its own, and it never
+// claims the removal was a mistake. Who was in the van on a Tuesday is a fact
+// about a Tuesday, not something a query gets to decide.
 function CrewLost({ lost, busy, onRestore, onDismiss }) {
   if (!lost?.rows?.length) return null;
   return (
     <div className="error-box disp-crewlost">
       <b>
-        {lost.rows.length === 1 ? 'A driver came' : `${lost.rows.length} drivers came`} off
-        {lost.rows.length === 1 ? ' a stop' : ' these stops'} without being reassigned.
+        A driver came off {lost.rows.length === 1 ? 'this stop' : `${lost.rows.length} stops`}.
       </b>
       <div className="hint" style={{ margin: '4px 0 8px' }}>
-        Caused by reordering a run, which used to hand paired stops to the column it was reordered in.
-        That is fixed — this is putting the names back. Check each one against who was really in the van.
+        They were on it and they are not on it now. It may have been deliberate — the log records who
+        was assigned, not why — so check each one against who was actually in the van before putting a
+        name back. Reordering a run used to cause this on its own; that is fixed.
       </div>
       <ul className="disp-setup-list">
         {lost.rows.map((r) => (
@@ -323,11 +385,12 @@ function savePod(job) {
   }, i * 400));
 }
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onEdit, onMove, onTimes, seat, helpingFor }) {
+function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onEdit, onMove, onTimes, onCharge, onPay, seat, helpingFor }) {
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [timing, setTiming] = useState(false);
   const [history, setHistory] = useState(false);
+  const [money, setMoney] = useState(false);
   const closed = ['done', 'failed', 'cancelled'].includes(job.status);
   // Clocked in and not yet out: the stop is live and the card has to say so in
   // a number that keeps moving.
@@ -565,12 +628,22 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
               {timing ? 'Hide times' : (job.timeIn && job.timeOut ? 'Fix times' : 'Set times')}
             </button>
           )}
+          {/* The charge, on the stop. It used to be reachable only from the
+              Billing tab, which a job with no client company never reaches. */}
+          {onCharge && (
+            <button type="button" className="btn" disabled={busy} onClick={() => setMoney((v) => !v)}>
+              {money ? 'Hide money' : (job.chargeAmount == null ? 'Set charge' : 'Charge / pay')}
+            </button>
+          )}
           <button type="button" className="btn" onClick={() => setHistory((v) => !v)}>
             {history ? 'Hide history' : 'History'}
           </button>
           {job.notes && <p className="disp-notes">{job.notes}</p>}
           {timing && onTimes && (
             <TimesForm job={job} busy={busy} onTimes={onTimes} onDone={() => setTiming(false)} />
+          )}
+          {money && onCharge && (
+            <MoneyForm job={job} busy={busy} onCharge={onCharge} onPay={onPay} onDone={() => setMoney(false)} />
           )}
           {history && <JobHistory jobId={job.id} />}
         </div>
@@ -654,6 +727,12 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
 
   // The times, corrected from the office.
   const onTimes = (jobId, patch) => send('PATCH', { action: 'times', jobId, ...patch });
+
+  // Both halves of a stop's money, each through its own guarded action. '' means
+  // clear it, which is why the amount is passed through rather than Number()'d
+  // here — setJobCharge and setJobPay both read '' as "no figure".
+  const onCharge = (jobId, amount, note) => send('PATCH', { action: 'charge', jobId, amount, note });
+  const onPay = (jobId, amount, note) => send('PATCH', { action: 'pay', jobId, amount, note });
 
   // The board's first render comes from the server, so the audit has to go and
   // ask on mount — otherwise a name only turns up missing after somebody happens
@@ -989,7 +1068,8 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
           {unassignedToday.map((j) => (
             <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
               onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-              onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes} />
+              onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes}
+              onCharge={canManageClients ? onCharge : null} onPay={onPay} />
           ))}
           {board.unscheduled.length > 0 && (
             <>
@@ -997,7 +1077,8 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
               {board.unscheduled.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                   onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                  onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes} />
+                  onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes}
+              onCharge={canManageClients ? onCharge : null} onPay={onPay} />
               ))}
             </>
           )}
@@ -1020,7 +1101,8 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             {board.cancelled.map((j) => (
               <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                 onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes} />
+                onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes}
+              onCharge={canManageClients ? onCharge : null} onPay={onPay} />
             ))}
           </BoardColumn>
         )}
@@ -1050,6 +1132,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
                   <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                     onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
                     onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onMove={onMove} onTimes={onTimes}
+                    onCharge={canManageClients ? onCharge : null} onPay={onPay}
                     helpingFor={j.driver2Id === d.id ? j.driverName : null}
                     seat={k >= 0 ? { n: k + 1, first: k === 0, last: k === own.length - 1 } : null} />
                 );
