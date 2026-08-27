@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
+import { TZ } from '../../../../lib/constants';
 import { dispatchBoard, torontoToday } from '../../../../lib/jobs';
 import PrintButton from '../../../../components/PrintButton';
 
@@ -16,13 +17,29 @@ export async function generateMetadata({ searchParams }) {
 }
 
 // The paper run sheet — the direct replacement for the one built by hand each
-// morning. One page per driver, because they get handed out separately, and a
-// phone battery dies where a sheet of paper doesn't.
+// morning. A phone battery dies where a sheet of paper doesn't.
+//
+// **One page per RUN, not per driver.** Two drivers sent together are one van
+// doing one route, and this used to print that route twice — once under each
+// name, identical, seven stops each — because it grouped by driver and a driver's
+// list included the stops they were only riding on. Two sheets for one van is
+// two sheets to keep in step, and the crew reading them has no way to tell they
+// are the same run. The page belongs to whoever OWNS the stops (the primary
+// driver holds the running order), and the header carries both names.
 const prettyDate = (iso) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('en-CA', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 const win = (j) => (j.windowStart && j.windowEnd ? `${j.windowStart}–${j.windowEnd}` : 'Any time');
+// A number somebody has to dial off paper, in a van. 4374888549 is not that.
+const phone = (v) => {
+  const d = String(v || '').replace(/\D+/g, '');
+  const ten = d.length > 10 ? d.slice(-10) : d;
+  return ten.length === 10 ? `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}` : (v || '');
+};
+const hhmm = (iso) => (iso
+  ? new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
+  : null);
 // Cash and e-transfers the driver is expected to come back with, for the day.
 const toCollect = (stops) => stops.reduce((sum, j) => sum + (Number(j.balanceDue) || 0), 0);
 const SHIPMENT_LABEL = { white_glove: 'WHITE GLOVE', threshold: 'THRESHOLD' };
@@ -45,18 +62,35 @@ export default async function RunSheetPage({ searchParams }) {
 
   const live = (j) => !['cancelled'].includes(j.status);
   const columns = [
-    ...board.drivers.map((d) => ({
-      key: `d${d.id}`,
-      title: d.name,
-      sub: d.phone || '',
-      stops: board.jobs
-        .filter((j) => (j.driverId === d.id || j.driver2Id === d.id) && live(j))
-        .sort((a, b) => (a.seq ?? 99) - (b.seq ?? 99) || String(a.windowStart).localeCompare(String(b.windowStart)))
-    })),
+    ...board.drivers.map((d) => {
+      // A run is the stops this driver OWNS. The ones they are riding on belong
+      // to somebody else's run and print there — printing them here as well is
+      // what produced two identical sheets for one van.
+      const stops = board.jobs
+        .filter((j) => j.driverId === d.id && live(j))
+        .sort((a, b) => (a.seq ?? 99) - (b.seq ?? 99) || String(a.windowStart).localeCompare(String(b.windowStart)));
+      // Who else is out on this run. When it is the same person all day — the
+      // ordinary two-man crew — their name goes in the HEADER and comes off
+      // every single row, where it was repeated seven times and read as noise.
+      const mates = [...new Set(stops.map((j) => j.driver2Name).filter(Boolean))];
+      const wholeRun = mates.length === 1 && stops.every((j) => j.driver2Name);
+      return {
+        key: `d${d.id}`,
+        title: wholeRun ? `${d.name} + ${mates[0]}` : d.name,
+        sub: phone(d.phone),
+        crew: wholeRun ? 2 : 1,
+        // A whole column of "—" is a column of nothing. It only earns its width
+        // on a run that actually has money to bring back.
+        collects: stops.some((j) => Number(j.balanceDue) > 0),
+        stops
+      };
+    }),
     {
       key: 'unassigned',
       title: 'Not yet assigned',
       sub: '',
+      crew: 1,
+      collects: board.jobs.some((j) => !j.driverId && live(j) && Number(j.balanceDue) > 0),
       stops: board.jobs.filter((j) => !j.driverId && live(j))
     }
   ].filter((c) => c.stops.length > 0);
@@ -84,7 +118,18 @@ export default async function RunSheetPage({ searchParams }) {
         .runsheet table { width: 100%; border-collapse: collapse; margin-bottom: 26px; font-size: 12.5px; }
         .runsheet th { text-align: left; border-bottom: 2px solid #111; padding: 5px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
         .runsheet td { border-bottom: 1px solid #ccc; padding: 8px 6px; vertical-align: top; }
-        .runsheet .sig { width: 120px; }
+        .runsheet .sig { width: 132px; }
+        /* Without widths these two split whatever is left, and WHAT — the column
+           the crew reads to load the van — lost every time to an address block
+           that is three lines whatever you do to it. */
+        .runsheet .cust { width: 40%; }
+        .runsheet .what { width: 27%; }
+        .runsheet .tbox {
+          display: flex; align-items: baseline; gap: 5px;
+          border-bottom: 1px solid #999; padding: 1px 0 3px; margin-bottom: 6px; min-height: 15px;
+        }
+        .runsheet .tbox span { font-size: 9.5px; color: #666; text-transform: uppercase; letter-spacing: .05em; }
+        .runsheet .tbox b { font-variant-numeric: tabular-nums; font-size: 12px; }
         /* What's still owed on the order. A driver who doesn't know a balance is
            outstanding walks away without it — so it prints on every line, and
            the line says Paid rather than nothing when there's nothing to take. */
@@ -118,6 +163,7 @@ export default async function RunSheetPage({ searchParams }) {
           <p className="sub">
             {prettyDate(date)} · {col.stops.length} stop{col.stops.length === 1 ? '' : 's'}
             {col.sub ? ` · ${col.sub}` : ''}
+            {col.crew === 2 && ' · one van, one run — this is the sheet for both of you'}
             {toCollect(col.stops) > 0 && (
               <> · <strong>${toCollect(col.stops).toFixed(2)} to collect</strong></>
             )}
@@ -127,10 +173,10 @@ export default async function RunSheetPage({ searchParams }) {
               <tr>
                 <th className="num">#</th>
                 <th className="w">Window</th>
-                <th>Customer &amp; address</th>
-                <th>What</th>
-                <th className="coll">Collect</th>
-                <th className="sig">Signature / time</th>
+                <th className="cust">Customer &amp; address</th>
+                <th className="what">What</th>
+                {col.collects && <th className="coll">Collect</th>}
+                <th className="sig">In / out &amp; signature</th>
               </tr>
             </thead>
             <tbody>
@@ -138,20 +184,23 @@ export default async function RunSheetPage({ searchParams }) {
                 <tr key={j.id}>
                   <td className="num">{i + 1}</td>
                   <td className="w">{win(j)}</td>
-                  <td>
+                  <td className="cust">
                     <strong>{j.customerName || '(no name)'}</strong>
-                    {j.driver2Name ? <> · <em>2 crew: {j.driverName} + {j.driver2Name}</em></> : null}
-                    {j.phone ? ` · ${j.phone}` : ''}<br />
+                    {/* Only when it is NOT already in the header. On a two-man
+                        day this was printed on every row and read as noise. */}
+                    {j.driver2Name && col.crew !== 2
+                      ? <> · <em>with {j.driver2Name}</em></> : null}
+                    {j.phone ? ` · ${phone(j.phone)}` : ''}<br />
                     {j.pickupAddress
                       ? <><b>FROM</b> {[j.pickupAddress, j.pickupCity].filter(Boolean).join(', ')}
                           {(j.pickupCompany || j.pickupName || j.pickupPhone) && (
-                            <> · {[j.pickupCompany, j.pickupName, j.pickupPhone].filter(Boolean).join(' · ')}</>
+                            <> · {[j.pickupCompany, j.pickupName, phone(j.pickupPhone)].filter(Boolean).join(' · ')}</>
                           )}<br />
                           <b>TO</b> {[j.address, j.city, j.postal].filter(Boolean).join(', ')}</>
                       : [j.address, j.city, j.postal].filter(Boolean).join(', ')}
                     {j.notes ? <><br /><span className="note">{j.notes}</span></> : null}
                   </td>
-                  <td>
+                  <td className="what">
                     {j.type === 'service_call'
                       ? [j.appliance, j.issue].filter(Boolean).join(' — ') || 'Service call'
                       : (j.items?.length ? j.items.map((it) => it.description).join(', ') : '—')}
@@ -179,16 +228,27 @@ export default async function RunSheetPage({ searchParams }) {
                     <span className="note">
                       {j.ticketNumber || j.jobNumber}
                       {j.orderNumber ? ` · ${j.orderNumber}` : ''}
-                      {` · ${j.clientName || (j.source === 'bargain_bay' ? 'Bargain Bay' : 'Own job')}`}
+                      {/* "Own job" printed on every stop that simply had no
+                          client company — a label for the absence of a fact. */}
+                      {j.clientName ? ` · ${j.clientName}` : (j.source === 'bargain_bay' ? ' · Bargain Bay' : '')}
                     </span>
                   </td>
-                  <td className="coll">
-                    {j.balanceDue > 0
-                      ? <><strong>${Number(j.balanceDue).toFixed(2)}</strong>
-                          {j.invoiceNumber ? <><br /><span className="note">{j.invoiceNumber}</span></> : null}</>
-                      : <span className="paid">{j.orderId ? 'Paid' : '—'}</span>}
+                  {col.collects && (
+                    <td className="coll">
+                      {j.balanceDue > 0
+                        ? <><strong>${Number(j.balanceDue).toFixed(2)}</strong>
+                            {j.invoiceNumber ? <><br /><span className="note">{j.invoiceNumber}</span></> : null}</>
+                        : <span className="paid">{j.orderId ? 'Paid' : '—'}</span>}
+                    </td>
+                  )}
+                  {/* The clock, on paper. The office now costs a delivery by the
+                      time it took, so the times have to survive a dead phone —
+                      written here and typed in later from the sheet. Anything
+                      already recorded prints instead of an empty rule. */}
+                  <td className="sig">
+                    <div className="tbox"><span>In</span><b>{hhmm(j.timeIn) || ''}</b></div>
+                    <div className="tbox"><span>Out</span><b>{hhmm(j.timeOut) || ''}</b></div>
                   </td>
-                  <td className="sig"></td>
                 </tr>
               ))}
             </tbody>
