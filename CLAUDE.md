@@ -386,6 +386,14 @@ env vars are set, both idempotent via `expenses.ext_id`.
   `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET`. If BOTH feeds are connected to the same
   bank account the same spend arrives twice under two different `ext_id`s —
   pick one per account.
+- **LANDMINE — the sync window silently hides everything.** `syncQboExpenses`
+  asks QBO for `TxnDate >= today - days`: 35 on the nightly cron, 90 from "Sync
+  now". Books that haven't been posted to for a few months return NOTHING, which
+  looks exactly like a broken integration. Found live on 2026-08-27: RS Solutions
+  Inc. has **744** expenses in QuickBooks and the most recent is dated
+  **27/04/2026** — four months before the sync ran, so a 90-day window matched
+  zero of them. Hence "Import last 12 months" (365 is the route's cap), and a
+  zero result that names the window instead of just saying "Synced 0".
 - **LANDMINE — sandbox keys import a DEMO company's spending as if it were real.**
   Found live on 2026-08-27: the production site had been connected to Intuit's
   "Sandbox Company US 93dd" for 48 days, and 46 rows of a fictional landscaping

@@ -28,7 +28,12 @@ export default function QboPanel({ status }) {
         ? 'Disconnected.'
         : d.purged !== undefined
           ? `Removed ${d.purged} imported row(s) from the expense ledger.`
-          : `Synced ${d.synced} transaction(s) from QuickBooks${d.errors?.length ? ` (${d.errors.length} issue(s) — see logs)` : ''}.`);
+          : d.synced === 0
+            // "Synced 0" reads like a failure and tells you nothing. The usual
+            // cause is real and fixable: the books have expenses, they're just
+            // older than the window we asked for.
+            ? `No Purchases or Bills dated in the last ${d.days || '?'} days. If QuickBooks has older expenses than that, use "Import last 12 months".`
+            : `Synced ${d.synced} transaction(s) from the last ${d.days} days${d.errors?.length ? ` (${d.errors.length} issue(s) — see logs)` : ''}.`);
       router.refresh();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
@@ -90,7 +95,15 @@ export default function QboPanel({ status }) {
         and there&apos;s nothing else to do.
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button className="dash-filter active" disabled={busy} onClick={() => act({ days: 90 }, 'Sync')}>{busy ? '…' : 'Sync now'}</button>
+        <button className="dash-filter active" disabled={busy} onClick={() => act({ days: 90 }, 'Sync')}
+          title="Pulls the last 90 days — the everyday catch-up.">{busy ? '…' : 'Sync now'}</button>
+        {/* The backfill. A first connection needs this: the 90-day window finds
+            nothing at all if the books haven't been touched since the spring,
+            which looks identical to a broken integration. */}
+        <button className="dash-filter" disabled={busy} onClick={() => act({ days: 365 }, 'Import')}
+          title="Pulls a full year. Use this on a first connection, or after a gap.">
+          {busy ? '…' : 'Import last 12 months'}
+        </button>
         {imported > 0 && (
           <button className="dash-filter" disabled={busy}
             title="Deletes every expense row QuickBooks imported. Hand-entered and recurring expenses are untouched."
