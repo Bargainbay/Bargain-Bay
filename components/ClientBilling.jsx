@@ -92,7 +92,9 @@ export default function ClientBilling({ canBill }) {
       {!loading && data && data.clients.length === 0 && (
         <div className="panel" style={{ color: 'var(--muted)' }}>
           Nothing to bill between {data.from} and {data.to}. Only <b>finished</b> jobs that belong to a
-          client show up here — jobs for us, and anything still on the board, don&apos;t.
+          client show up here — jobs for us, and anything still on the board, don&apos;t. To put a charge
+          on one of those, open the stop on the board and use <b>Set charge</b>; it still counts on the
+          Profit tab even though nobody will be invoiced for it.
         </div>
       )}
 

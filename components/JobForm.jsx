@@ -475,7 +475,9 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
         <input type="number" min="0" step="0.01" inputMode="decimal" style={{ width: 150 }}
           value={chargeAmount} onChange={(e) => setChargeAmount(e.target.value)} placeholder="150.00" />
         <div className="hint">
-          Leave it blank and set it later on the Billing tab. It only bills once the job is finished.
+          Or set it later from the stop&apos;s own card — <b>Set charge</b>. The Billing tab only lists
+          finished jobs that belong to a client company, so a Bargain Bay delivery never reaches it.
+          Either way it only bills once the job is finished.
         </div>
       </div>
 

@@ -648,6 +648,23 @@ the paper run sheet that replaces it.
 - **Both sides of the money live on the job.** `pay_amount` is what it costs us
   (what the driver/tech is owed); `charge_amount` is what the CLIENT pays us.
   Margin per run is therefore visible while it's fresh. Both admin-only.
+  **Both are set from the STOP's own card** (`MoneyForm`, "Set charge"), on any
+  job, at any status, client company or not. They were previously reachable only
+  from places that excluded exactly the jobs that needed them: a charge only from
+  the Billing tab, which lists **finished** jobs belonging to a **client**, so an
+  imported Bargain Bay delivery (no client, not yet delivered) had no reachable
+  charge at all; and pay only from inside the close-out form, so a stop already
+  done could not be priced. The card still calls `setJobCharge`/`setJobPay`, so
+  the invoice guard and the admin gate are unchanged, and it sends only the half
+  that actually moved — re-posting an unchanged charge on an invoiced job would
+  be refused over a number nobody touched.
+  **The edit form's charge box used to write nowhere.** `JobForm` renders it,
+  prefills it and sends it on every save; `updateJob` had no column for it and
+  silently dropped it. It now hands off to `setJobCharge` (not a second write
+  path — the invoice rule has to hold), and only when the value changed. Because
+  `action: 'edit'` is STAFF-level while a charge is admin-only, the route strips
+  `chargeAmount` from the patch for a non-admin: routing money through a staff
+  action would quietly widen the gate.
 - **Weekly client invoicing.** The Billing tab lists finished, not-yet-billed jobs
   per client for a period; one button raises a real invoice through
   `createAndSendInvoice` (a line per job, unsent, lands in Invoices and books
