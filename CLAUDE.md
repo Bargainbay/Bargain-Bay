@@ -392,6 +392,21 @@ sheet, GL detail as CSV.
 - **Opening equity is computed, not asked for.** Assets − liabilities at the
   opening date. Asking an owner for "owner's equity" is asking the one question
   they can't answer, and a guessed figure would be silently absorbed.
+- **Accounts payable is real** (`2100`, `purchase_invoices.paid_at`). Most of
+  this shop's stock is bought on terms, so a supplier invoice credits PAYABLES on
+  its date and the bank only when it's marked paid — often a different month.
+  Booking it straight to the bank would understate cash and hide a live
+  liability. `/admin/reports/ledger` lists what's owed and marks it paid.
+- **Three expense categories are not expenses.** `Loan repayment` debits the loan
+  account, `Owner draw` debits equity, and wages route to their own account.
+  All three arrive in a bank feed looking like an ordinary withdrawal; booking a
+  draw or a repayment as a cost understates profit by the whole amount.
+- **`inventoryAtCost()` is the balance-sheet number, NOT the dashboard's
+  "inventory capital".** That one counts `products WHERE active = true` — live
+  sellable stock only. A balance sheet wants everything owned: sellable, bought
+  but not yet listed (`active = false` and unsold), and salvage still on hand.
+  Reaching for the dashboard figure understates assets, which is why the opening
+  page computes and breaks out the right one.
 - **LANDMINE — the bank balance is derived, not observed.** There is no accounts
   payable, so every entry assumes payment from the bank on the document's date;
   something bought on terms is treated as paid immediately. The consequence is
