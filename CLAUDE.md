@@ -658,6 +658,23 @@ the paper run sheet that replaces it.
   that column was collected in the form, stored, and read by nothing, so a client
   company found out by asking. Best-effort and after the write: a mail hiccup
   must never fail a completion a driver is standing in a doorway waiting on.
+- **The run sheet is ONE PAGE PER RUN, not per driver.** Two drivers sent
+  together are one van doing one route, and it used to print that route TWICE —
+  once under each name, identical, because it grouped by driver and a driver's
+  list included the stops they were only riding on. Two sheets for one van is two
+  sheets to keep in step, and nothing on either said they were the same run. The
+  page belongs to whoever OWNS the stops (the primary holds the running order),
+  the header carries both names ("RUBAN + ARDY"), and a driver who is only ever a
+  second seat gets no page of their own. Same `byDriver` / `ownedBy` split the
+  board draws — see the resequence landmine above.
+  When the whole run shares one second driver, the name goes in the HEADER and
+  comes off every row, where it printed seven times over and read as noise; a
+  mixed day still notes "with X" per stop. The Collect column only renders when
+  the run actually has money to bring back (it was a column of "—"), phone
+  numbers print as `(437) 488-8549` rather than `4374888549`, "Own job" no longer
+  prints as a label for the absence of a client, and every stop carries **In /
+  Out** rules — the office costs a delivery by the time it took, so the times
+  have to survive a dead phone and get typed in off the sheet.
 - **Anything meant to be printed carries a Print button** (`components/PrintButton.jsx`
   → `window.print()`): the run sheet and the POD form. "Press ⌘P" is not a
   feature, and on the warehouse tablet there is no ⌘P at all — Save as PDF is a
