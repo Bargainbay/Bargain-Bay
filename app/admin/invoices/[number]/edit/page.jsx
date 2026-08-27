@@ -59,6 +59,9 @@ export default async function EditInvoicePage({ params }) {
     // (money still owing, or money that now needs handing back).
     amountPaid: invoice.amountPaid || 0,
     total: Number(invoice.total) || 0,
+    // How the prices were TYPED. Stored amounts are always pre-tax; this only
+    // decides whether the editor shows them back tax-in.
+    taxInclusive: !!invoice.tax_inclusive,
     // Customer + fulfilment details — editable here for the first time; this is
     // the parity the BB order editor already had.
     name: invoice.name || '', phone: invoice.phone || '',

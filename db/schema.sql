@@ -180,6 +180,10 @@ CREATE TABLE IF NOT EXISTS invoices (
   paid_at        timestamptz,
   refunded_at    timestamptz,                 -- set when a paid invoice is FULLY refunded
   refund_total   numeric(10,2) NOT NULL DEFAULT 0, -- money returned so far, incl. HST share (partial/per-unit refunds)
+  -- How the prices were TYPED, not how they're stored: line amounts are always
+  -- pre-tax. This exists only so reopening an invoice quoted tax-in shows the rep
+  -- the figures they keyed, rather than $884.96 where they typed $1,000.
+  tax_inclusive  boolean NOT NULL DEFAULT false,
   created_at     timestamptz DEFAULT now()    -- issued date; backdatable for late-recorded sales
 );
 CREATE TABLE IF NOT EXISTS invoice_items (
@@ -190,6 +194,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
   amount      numeric(10,2),
   refunded_at timestamptz                     -- set per line on a partial (per-unit) refund
 );
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS tax_inclusive boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
 -- Individual payments against an invoice (deposits / instalments / the closing

@@ -301,6 +301,43 @@ without it has left behind something we have already paid for.
   `trade_in` **service tag** by hand; every surface falls back to "see the notes"
   rather than showing nothing.
 
+## Tax-inclusive pricing (added 2026-08-26)
+The shop quotes both ways. "Twelve hundred out the door" is a tax-INCLUSIVE
+figure, and the invoice still has to show it as $1,061.95 + $138.05 HST — an HST
+registrant must state the tax separately. `lib/tax.js` does that split.
+
+**The stored invoice is identical either way: line amounts are ALWAYS pre-tax.**
+Tax-in is a way of *typing*, not a second way of storing money — nothing
+downstream (the order bridge, refunds, dashboards, credit lines) knows or cares.
+`invoices.tax_inclusive` records only how it was keyed, so reopening shows the
+rep the figures they typed instead of $884.96 where they entered $1,000. It
+changes no arithmetic.
+
+- **The split is server-side.** `normalizeLines(items, { addHst, taxInclusive })`
+  in `lib/invoices.js` converts, so create and edit can't drift and the browser's
+  preview is never taken as read. The forms call the same helper only to preview.
+- **The subtotal comes off the quoted TOTAL, not from dividing each line.**
+  Dividing line by line and adding up drifts; the total is the number the
+  customer was actually told, so that is the one that gets honoured. The rounding
+  residue is then pushed onto the largest lines so the parts still add to the whole.
+- **Roughly one cent-value in eight has no exact 13% split.** $100 tax-in is the
+  standard example: $88.50 + $11.51 is a cent over, $88.49 + $11.50 a cent under.
+  `exTaxOf` picks the closest and prefers to be UNDER rather than over, and the
+  form says so out loud rather than letting a rep find an unexplainable penny in
+  front of a customer.
+- **Per-line cents are not recoverable, and that's fine.** [100, 100] tax-in and
+  [100.01, 99.99] tax-in back out to the same pre-tax subtotal, so reopening may
+  shuffle a cent between lines. The TOTAL is stable, re-saving an untouched
+  invoice moves nothing, and the total is what was quoted out loud. Storing the
+  typed figures as well would be a second representation of the same money —
+  see the coupon landmine for how that ends.
+- The mode is a three-way (`components/TaxMode.jsx`): before-tax / tax-in / no
+  HST. Switching between the first two CONVERTS what's already in the boxes, so
+  it reads the numbers rather than being a thing you must set first and remember.
+  Credit lines convert too — a discount quoted tax-in is tax-in as well.
+- Sarah can raise a tax-in invoice (`taxInclusive` on `create_invoice`); a phone
+  quote is exactly where "out the door" pricing gets used.
+
 ## Dispatch — deliveries & service calls (added 2026-08-25)
 The daily run sheet used to be built by hand because the work comes from several
 client companies through several channels (email, spreadsheet, phone) and no one

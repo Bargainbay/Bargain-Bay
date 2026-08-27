@@ -1,7 +1,9 @@
 'use client';
 import { useState, useRef } from 'react';
 import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
-import InvoiceLines, { blankItem, toPayload, subtotalOf } from './InvoiceLines';
+import InvoiceLines, { blankItem, toPayload } from './InvoiceLines';
+import TaxMode, { previewTotals } from './TaxMode';
+import { toInclusiveLines, exTaxOf, inclusiveOf } from '../lib/tax';
 
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 // Business days run on Toronto time (same as the dashboard's buckets).
@@ -13,7 +15,9 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
   const [items, setItems] = useState([blankItem()]);
   const [q, setQ] = useState('');
   const [custOpen, setCustOpen] = useState(false);
-  const [addHst, setAddHst] = useState(true);
+  // 'exclusive' | 'inclusive' | 'none' — how to read the amounts in the boxes.
+  const [taxMode, setTaxMode] = useState('exclusive');
+  const addHst = taxMode !== 'none';
   const [sendEmail, setSendEmail] = useState(true);
   const [daysUntilDue, setDaysUntilDue] = useState(14);
   const [invoiceDate, setInvoiceDate] = useState(todayToronto());
@@ -92,9 +96,31 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
     setQ('');
   }
 
-  const subtotal = subtotalOf(items);
-  const hst = addHst ? subtotal * 0.13 : 0;
-  const total = subtotal + hst;
+  // Signed amounts, exactly as the lines are stored (a credit line is negative).
+  const signed = toPayload(items).map((it) => Number(it.amount) || 0);
+  const preview = previewTotals(signed, taxMode);
+  const { subtotal, hst, total } = preview;
+
+  // Switching between before-tax and tax-in re-reads the numbers already typed,
+  // so it's a way of reading the boxes rather than something you have to set
+  // first and remember. Credit lines are converted too — a discount quoted
+  // tax-in is tax-in as well.
+  function changeTaxMode(next) {
+    // Read the current mode straight from state, not from inside a setTaxMode
+    // updater: an updater has to be pure, and React runs it twice in dev —
+    // which would convert the amounts twice.
+    const prev = taxMode;
+    if (next !== prev && prev !== 'none' && next !== 'none') {
+      setItems((xs) => {
+        const amounts = xs.map((it) => Number(it.amount) || 0);
+        const converted = next === 'inclusive'
+          ? toInclusiveLines(amounts)
+          : amounts.map((n) => exTaxOf(n));
+        return xs.map((it, i) => (it.amount === '' ? it : { ...it, amount: converted[i].toFixed(2) }));
+      });
+    }
+    setTaxMode(next);
+  }
   const fmt = (n) => '$' + n.toFixed(2);
 
   async function submit(e) {
@@ -104,7 +130,8 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
       const res = await fetch('/api/admin/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, items: toPayload(items), addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate })
+        body: JSON.stringify({ name, email, items: toPayload(items), addHst, taxInclusive: taxMode === 'inclusive',
+          daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not create the invoice.'); return; }
@@ -193,9 +220,7 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
       <InvoiceLines items={items} setItems={setItems} services={SERVICES} showCost={!hideCost} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
-          <input type="checkbox" style={{ width: 'auto' }} checked={addHst} onChange={(e) => setAddHst(e.target.checked)} /> Add 13% HST
-        </label>
+        <TaxMode mode={taxMode} onChange={changeTaxMode} preview={preview} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
           title="Backdate for a sale you rang up late. Revenue counts on THIS date — the day the sale was made — not the day the money clears.">
           Invoice date
@@ -242,6 +267,9 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
         <div style={{ fontSize: 14, color: 'var(--muted)' }}>
           Subtotal {fmt(subtotal)}{addHst ? ` · HST ${fmt(hst)}` : ''} · <b style={{ color: 'var(--charcoal)' }}>Total {fmt(total)}</b>
+          {/* In tax-in mode the rep typed the total, so show it back to them —
+              the subtotal beside it is the part they never keyed. */}
+          {taxMode === 'inclusive' && <span> — the {fmt(preview.quoted)} you typed</span>}
         </div>
         <button className="btn accent" disabled={busy}>{busy ? 'Creating…' : (sendEmail ? 'Create & send invoice' : 'Create invoice')}</button>
       </div>
