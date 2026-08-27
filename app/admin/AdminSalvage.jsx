@@ -11,7 +11,6 @@ export default function AdminSalvage({ initial }) {
   const [sel, setSel] = useState({}); // sku -> price string
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [addHst, setAddHst] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
 
@@ -39,7 +38,7 @@ export default function AdminSalvage({ initial }) {
     if (!items.length || items.some((it) => !(it.amount > 0))) { setMsg('✗ Select units and enter a price for each.'); return; }
     setBusy(true); setMsg('');
     try {
-      const res = await fetch('/api/admin/salvage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'invoice', name, email, addHst, items }) });
+      const res = await fetch('/api/admin/salvage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'invoice', name, email, items }) });
       const d = await res.json();
       if (!res.ok) { setMsg('✗ ' + (d.error || 'Invoice failed')); return; }
       apply(d); setSel({}); setName(''); setEmail('');
@@ -88,12 +87,9 @@ export default function AdminSalvage({ initial }) {
                 </tbody>
               </table>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
-              <label style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input type="checkbox" style={{ width: 'auto' }} checked={addHst} onChange={(e) => setAddHst(e.target.checked)} /> Add 13% HST
-              </label>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 10 }}>
               <div style={{ fontSize: 14 }}>
-                {chosen.length} selected · <b>{money(total)}</b>{addHst ? ' + HST' : ''}
+                {chosen.length} selected · <b>{money(total)}</b> + HST
                 <button className="btn accent" style={{ marginLeft: 12 }} disabled={busy || !chosen.length} onClick={invoice}>
                   {busy ? 'Sending…' : 'Create salvage invoice'}
                 </button>

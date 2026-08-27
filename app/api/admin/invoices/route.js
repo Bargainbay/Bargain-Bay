@@ -53,6 +53,9 @@ export async function POST(req) {
   const name = String(body.name || '').trim();
   const items = Array.isArray(body.items) ? body.items : [];
   const addHst = !!body.addHst;
+  // The rep typed prices with the tax already in them. The split happens in the
+  // lib, from these same amounts — the browser's preview is never taken as read.
+  const taxInclusive = !!body.taxInclusive;
   const daysUntilDue = Math.min(Math.max(parseInt(body.daysUntilDue, 10) || 14, 1), 90);
   const memo = String(body.memo || '').trim();
   const deliveryMethod = body.deliveryMethod === 'delivery' ? 'delivery' : 'pickup';
@@ -77,7 +80,7 @@ export async function POST(req) {
   const session = await getSession();
   try {
     const invoice = await createAndSendInvoice({
-      name, email, items, addHst, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate,
+      name, email, items, addHst, taxInclusive, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate,
       createdBy: { email: session?.email, name: session?.name }
     });
     return NextResponse.json({ ok: true, invoice });
@@ -128,6 +131,7 @@ export async function PATCH(req) {
       const updated = await updateInvoice(invoiceId, {
         items: Array.isArray(body.items) ? body.items : [],
         addHst: !!body.addHst,
+        taxInclusive: !!body.taxInclusive,
         memo: body.memo,
         invoiceDate: String(body.invoiceDate || '').trim(),
         ...(has('name') ? { name: body.name } : {}),

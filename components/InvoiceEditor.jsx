@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
-import InvoiceLines, { fromInvoice, toPayload, subtotalOf } from './InvoiceLines';
+import InvoiceLines, { fromInvoice, toPayload } from './InvoiceLines';
+import TaxMode, { previewTotals, modeOf, NO_TAX } from './TaxMode';
+import { toInclusiveLines, exTaxOf } from '../lib/tax';
 
 // Edit an invoice: the customer's details, the line items (add, remove, reprice,
 // change warranty, add a service or a unit from stock), HST, memo and issue date.
@@ -22,8 +24,19 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   const [address, setAddress] = useState(invoice.address || '');
   const [city, setCity] = useState(invoice.city || '');
   const [postal, setPostal] = useState(invoice.postal || '');
-  const [items, setItems] = useState(() => fromInvoice(invoice.items));
-  const [addHst, setAddHst] = useState(Number(invoice.hst) > 0);
+  // Reopen in the terms it was quoted in. Stored line amounts are ALWAYS pre-tax;
+  // an invoice keyed tax-in is shown back as the figures the rep typed, or they
+  // open a $1,000 sale and find $884.96 in the box.
+  const [taxMode, setTaxMode] = useState(() => modeOf(Number(invoice.hst) > 0, invoice.taxInclusive));
+  const [items, setItems] = useState(() => {
+    const rows = fromInvoice(invoice.items);
+    if (!invoice.taxInclusive || !(Number(invoice.hst) > 0)) return rows;
+    const shown = toInclusiveLines(rows.map((r) => Number(r.amount) || 0), Number(invoice.total) || null);
+    return rows.map((r, i) => ({ ...r, amount: shown[i].toFixed(2) }));
+  });
+  // A salvage / parts-only invoice was raised with no HST on it. Re-saving one
+  // must not quietly add 13% to a sale that's already been settled.
+  const addHst = taxMode !== NO_TAX;
   const [memo, setMemo] = useState(invoice.memo || '');
   const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate || '');
   const todayToronto = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
@@ -42,9 +55,27 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
     setQ('');
   }
 
-  const subtotal = subtotalOf(items);
-  const hst = addHst ? subtotal * 0.13 : 0;
-  const total = subtotal + hst;
+  const signed = toPayload(items).map((it) => Number(it.amount) || 0);
+  const preview = previewTotals(signed, taxMode);
+  const { subtotal, hst, total } = preview;
+
+  // Same as the new-invoice form: switching re-reads what's already in the boxes.
+  function changeTaxMode(next) {
+    // Read the current mode straight from state, not from inside a setTaxMode
+    // updater: an updater has to be pure, and React runs it twice in dev —
+    // which would convert the amounts twice.
+    const prev = taxMode;
+    if (next !== prev && prev !== NO_TAX && next !== NO_TAX) {
+      setItems((xs) => {
+        const amounts = xs.map((it) => Number(it.amount) || 0);
+        const converted = next === 'inclusive'
+          ? toInclusiveLines(amounts)
+          : amounts.map((n) => exTaxOf(n));
+        return xs.map((it, i) => (it.amount === '' ? it : { ...it, amount: converted[i].toFixed(2) }));
+      });
+    }
+    setTaxMode(next);
+  }
   const fmt = (n) => '$' + n.toFixed(2);
   // How this edit lands: which way the sale moves, and where that leaves the
   // customer against what they've already handed over.
@@ -58,7 +89,8 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
       const res = await fetch('/api/admin/invoices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items: toPayload(items), addHst, memo,
+        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items: toPayload(items), addHst,
+          taxInclusive: taxMode === 'inclusive', memo,
           resend: resend && !settled,
           name, email, phone, deliveryMethod, address, city, postal,
           // Only send a date the owner actually changed — sending the original
@@ -153,9 +185,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
       <InvoiceLines items={items} setItems={setItems} services={SERVICES} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
-          <input type="checkbox" style={{ width: 'auto' }} checked={addHst} onChange={(e) => setAddHst(e.target.checked)} /> Add 13% HST
-        </label>
+        <TaxMode mode={taxMode} onChange={changeTaxMode} preview={preview} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
           title="Backdate for a sale rung up late — the invoice shows this date. Revenue counts on the PAID date, set when you mark it paid.">
           Invoice date
@@ -200,6 +230,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
         <div style={{ fontSize: 14, color: 'var(--muted)' }}>
           Subtotal {fmt(subtotal)}{addHst ? ` · HST ${fmt(hst)}` : ''} · <b style={{ color: 'var(--charcoal)' }}>Total {fmt(total)}</b>
+          {taxMode === 'inclusive' && <span> — the {fmt(preview.quoted)} you typed</span>}
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           {!settled && (
