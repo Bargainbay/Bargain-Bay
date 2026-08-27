@@ -349,6 +349,32 @@ changes no arithmetic.
 - Sarah can raise a tax-in invoice (`taxInclusive` on `create_invoice`); a phone
   quote is exactly where "out the door" pricing gets used.
 
+## Scheduled jobs (added 2026-08-27)
+`lib/cron-jobs.js` holds what the scheduled work DOES; the `/api/cron/*` routes
+are thin triggers over it. The orchestration used to live inline in the routes,
+where it couldn't be composed and each one re-implemented the same
+try/log/carry-on scaffolding.
+
+- **The three jobs stay SEPARATELY scheduled** in `vercel.json`
+  (`expire-reservations`, `sync-inventory`, `sync-ads`). Do not merge them into
+  one entry: each scheduled invocation gets its own function time budget, so one
+  combined pass would give all three what one of them gets alone — and the
+  finance pass is already the long one. Checked on the live project 2026-08-27:
+  all three are registered and enabled on **Hobby**, so the cron *count* is not
+  a constraint. What Hobby does impose is a **1-hour flexible window** — a job
+  scheduled for 06:00 UTC may run any time in that hour, which is why nothing
+  here may depend on one job finishing before another starts.
+- **`/api/cron/nightly` runs all three back to back** in one request. It is NOT
+  scheduled — it's the catch-up path after an outage.
+- **Order and timeouts are deliberate.** Cheapest and most time-sensitive first
+  (a held unit is off the storefront until it's freed), and every call to
+  somebody else's API is capped — a hanging request to Meta or Intuit must not
+  eat the invocation and starve the finance pass behind it. Every step is
+  independently caught: a cron pass is a sequence of unrelated chores, and one
+  failing is a log line, not a reason to skip the rest.
+- **`syncInventoryFromTracker` is the one step allowed to fail the response.**
+  The rest is best-effort housekeeping; stale stock is what customers see.
+
 ## Bank feed (Plaid) + QuickBooks — where expenses come from (added 2026-08-27)
 Two independent feeds into the same `expenses` ledger, both dormant until their
 env vars are set, both idempotent via `expenses.ext_id`.
@@ -363,10 +389,8 @@ env vars are set, both idempotent via `expenses.ext_id`.
   guard is "is this one of our items" plus a 60s throttle, not signature
   verification. Full JWT verification would be reasonable hardening; it is not
   what stands between this and bad data.
-- **The nightly pull is folded into `/api/cron/sync-inventory`**, beside the QBO
-  sync, rather than getting its own `vercel.json` entry — the plan's cron
-  allowance is small and these are one finance pass.
-  `/api/cron/sync-bank` exists for triggering it by hand.
+- **The nightly pull runs inside `runNightlyOps`**, beside the QBO sync — see the
+  cron section below. "Pull now" on the Financial tab is the by-hand trigger.
 - **What is deliberately NOT imported:** pending rows (they're replaced when they
   post), money IN, and `TRANSFER_IN`/`TRANSFER_OUT`/`LOAN_PAYMENTS`/`INCOME`. A
   credit-card payment is the same money as the purchases it settles — importing

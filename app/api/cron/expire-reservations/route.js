@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
-import { expireReservations } from '../../../../lib/reservations';
+import { runExpireReservations } from '../../../../lib/cron-jobs';
 import { cronAuthorized } from '../../../../lib/cron-auth';
 
 export const dynamic = 'force-dynamic';
 
-// Reservation/abandoned-order cleanup. Hit it from Vercel Cron (vercel.json)
-// or any scheduler; /api/checkout also calls the same helper opportunistically.
+// Reservation / abandoned-order cleanup, on its own. No longer scheduled by
+// itself — /api/cron/nightly runs it — but kept for triggering by hand.
+// /api/checkout also calls the same helper opportunistically.
 async function run(req) {
   if (!cronAuthorized(req)) return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
   try {
-    const result = await expireReservations();
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, ...(await runExpireReservations()) });
   } catch (e) {
     console.error('expire-reservations failed', e);
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
