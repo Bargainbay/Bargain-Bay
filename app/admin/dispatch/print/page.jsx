@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { TZ } from '../../../../lib/constants';
+import { cashAtTheDoor } from '../../../../lib/cash-at-the-door';
 import { dispatchBoard, torontoToday } from '../../../../lib/jobs';
 import PrintButton from '../../../../components/PrintButton';
 
@@ -41,7 +42,9 @@ const hhmm = (iso) => (iso
   ? new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
   : null);
 // Cash and e-transfers the driver is expected to come back with, for the day.
-const toCollect = (stops) => stops.reduce((sum, j) => sum + (Number(j.balanceDue) || 0), 0);
+const toCollect = (stops) => stops.reduce(
+  (sum, j) => sum + (Number(j.balanceDue) || 0) + (cashAtTheDoor(j)?.amount || 0), 0
+);
 const SHIPMENT_LABEL = { white_glove: 'WHITE GLOVE', threshold: 'THRESHOLD' };
 const SERVICE_LABEL = {
   delivery_only: 'Delivery only', install: 'Install', haul_away: 'Haul away',
@@ -81,7 +84,7 @@ export default async function RunSheetPage({ searchParams }) {
         crew: wholeRun ? 2 : 1,
         // A whole column of "—" is a column of nothing. It only earns its width
         // on a run that actually has money to bring back.
-        collects: stops.some((j) => Number(j.balanceDue) > 0),
+        collects: stops.some((j) => Number(j.balanceDue) > 0 || cashAtTheDoor(j)),
         stops
       };
     }),
@@ -90,7 +93,8 @@ export default async function RunSheetPage({ searchParams }) {
       title: 'Not yet assigned',
       sub: '',
       crew: 1,
-      collects: board.jobs.some((j) => !j.driverId && live(j) && Number(j.balanceDue) > 0),
+      collects: board.jobs.some((j) => !j.driverId && live(j)
+        && (Number(j.balanceDue) > 0 || cashAtTheDoor(j))),
       stops: board.jobs.filter((j) => !j.driverId && live(j))
     }
   ].filter((c) => c.stops.length > 0);
@@ -141,6 +145,14 @@ export default async function RunSheetPage({ searchParams }) {
         .runsheet .note { color: #444; font-style: italic; }
         /* A trade-in has to survive being photocopied and read in a van, so it
            is boxed rather than merely bolded. */
+        /* Louder than the trade-in box: this one is cash, and the driver is
+           the person who does not get it back if it is missed. */
+        .runsheet .cash {
+          margin-top: 4px; padding: 3px 6px; border: 2px solid #000; background: #000; color: #fff;
+          font-weight: bold; font-size: 12px; display: inline-block; white-space: nowrap;
+        }
+
+        .runsheet .cash-src { font-size: 10px; font-style: italic; color: #555; margin-top: 2px; }
         .runsheet .tradein {
           margin-top: 3px; padding: 2px 5px; border: 1.5px solid #000;
           font-weight: bold; font-size: 11.5px; display: inline-block;
@@ -218,6 +230,35 @@ export default async function RunSheetPage({ searchParams }) {
                       : (j.services?.includes('trade_in')
                         ? <div className="tradein">⬅ BRING BACK: see notes</div>
                         : null)}
+                    {/* Money the customer hands over at the door, boxed like
+                        the trade-in and for the same reason: it is the other
+                        thing on this stop that costs real cash to miss, and it
+                        was printing as one clause of an italic note. A figure
+                        somebody TYPED is stated flat; one lifted out of the
+                        client's own prose says so and quotes the sentence, so
+                        the driver can see where it came from before asking a
+                        customer for fifty dollars. */}
+                    {(() => {
+                      const cash = cashAtTheDoor(j);
+                      if (!cash) return null;
+                      return (
+                        <>
+                          {/* The box holds the AMOUNT and nothing else, so it
+                              is one unbreakable line at a glance. Everything
+                              qualifying it goes underneath in quiet grey —
+                              quoting the client's sentence inside the box made
+                              the loud thing three lines of dense white italic,
+                              and that sentence already prints in full in the
+                              column beside this one. */}
+                          <div className="cash">💵 COLLECT ${cash.amount.toFixed(2)} CASH</div>
+                          <div className="cash-src">
+                            {cash.typed
+                              ? (cash.note || 'agreed with the office')
+                              : 'read off the note — check it before you ask'}
+                          </div>
+                        </>
+                      );
+                    })()}
                     {j.services?.length > 0 && (
                       <><br />{j.services.map((k) => SERVICE_LABEL[k] || k).join(' · ')}</>
                     )}
@@ -235,10 +276,19 @@ export default async function RunSheetPage({ searchParams }) {
                   </td>
                   {col.collects && (
                     <td className="coll">
-                      {j.balanceDue > 0
-                        ? <><strong>${Number(j.balanceDue).toFixed(2)}</strong>
-                            {j.invoiceNumber ? <><br /><span className="note">{j.invoiceNumber}</span></> : null}</>
-                        : <span className="paid">{j.orderId ? 'Paid' : '—'}</span>}
+                      {j.balanceDue > 0 && (
+                        <><strong>${Number(j.balanceDue).toFixed(2)}</strong>
+                          {j.invoiceNumber ? <><br /><span className="note">{j.invoiceNumber}</span></> : null}</>
+                      )}
+                      {cashAtTheDoor(j) && (
+                        <div>
+                          <strong>${cashAtTheDoor(j).amount.toFixed(2)}</strong>
+                          <br /><span className="note">cash</span>
+                        </div>
+                      )}
+                      {!(j.balanceDue > 0) && !cashAtTheDoor(j) && (
+                        <span className="paid">{j.orderId ? 'Paid' : '—'}</span>
+                      )}
                     </td>
                   )}
                   {/* The clock, on paper. The office now costs a delivery by the

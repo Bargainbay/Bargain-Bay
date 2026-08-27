@@ -8,6 +8,7 @@ import StopImport from './StopImport';
 import PayReport from './PayReport';
 import ClientBilling from './ClientBilling';
 import StopTimes from './StopTimes';
+import { cashAtTheDoor } from '../lib/cash-at-the-door';
 import ProfitReport from './ProfitReport';
 
 // The day's run sheet, on screen. One unassigned pile plus a column per driver.
@@ -526,6 +527,14 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
           {job.payAmount != null && <> · pays ${Number(job.payAmount).toFixed(2)}</>}
           {job.chargeAmount != null && <> · bills ${Number(job.chargeAmount).toFixed(2)}</>}
           {job.invoiceId && <> · invoiced</>}
+        </div>
+      )}
+      {/* Cash at the door — not the invoice balance below it, and not a price
+          we charge. It reads off the client's own note when nobody typed one. */}
+      {cashAtTheDoor(job) && (
+        <div className="disp-cash">
+          💵 Collect ${cashAtTheDoor(job).amount.toFixed(2)} cash
+          {!cashAtTheDoor(job).typed && <span className="disp-cash-src"> — read from the notes, check it</span>}
         </div>
       )}
       {job.failReason && <div className="disp-fail">{FAIL_REASONS[job.failReason] || job.failReason}</div>}

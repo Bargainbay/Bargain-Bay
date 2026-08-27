@@ -496,6 +496,13 @@ CREATE INDEX IF NOT EXISTS idx_jobs_invoice ON jobs(invoice_id) WHERE invoice_id
 -- into Burlington is one job with two ends, and the driver needs both.
 -- A transfer has two ends, and both are somewhere a driver has to be let into.
 -- A second person on the same stop: one van, one run, two names.
+-- Cash the driver comes back with that is NOT an invoice balance: a haul-away
+-- the customer pays for at the door, a client's own surcharge. It used to arrive
+-- only as a sentence inside a client's notes and printed at the same weight as a
+-- reference number; lib/cash-at-the-door.js reads those, this holds the ones
+-- somebody actually typed.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS collect_cash      numeric(10,2);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS collect_cash_note text;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS driver2_id     int;
 CREATE INDEX IF NOT EXISTS idx_jobs_driver2 ON jobs(driver2_id, job_date) WHERE driver2_id IS NOT NULL;
 -- The same person cannot be both people on a stop. Enforced HERE and not only in

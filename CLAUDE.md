@@ -675,6 +675,32 @@ the paper run sheet that replaces it.
   prints as a label for the absence of a client, and every stop carries **In /
   Out** rules — the office costs a delivery by the time it took, so the times
   have to survive a dead phone and get typed in off the sheet.
+- **Cash at the door is not the invoice balance** (`jobs.collect_cash` +
+  `collect_cash_note`, `lib/cash-at-the-door.js`). A haul-away the customer pays
+  for on the spot, a client's own surcharge — money the driver has to come back
+  with that no invoice knows about. It surfaced as a sentence buried in a
+  client's imported notes ("CUSTOMER OWERS DRIVERS $50"), printed in italics at
+  the same weight as a reference number, on a sheet somebody reads in a van.
+  **Two sources, deliberately different.** A typed `collect_cash` is
+  authoritative — stated flat, totalled into the run's "to collect". Anything
+  `cashOwedInNotes` reads out of the client's prose is FLAGGED as read, never
+  presented as fact: the run sheet prints "read off the note — check it before
+  you ask" under the box, and the board card says the same. The reader exists
+  because those notes are already in the database and arrive that way with every
+  import; a structured field alone would be correct and would do nothing for the
+  stops on the board today.
+  It is deliberately conservative — an amount needs an owed/collect/cash/driver
+  word in the SAME clause, and any clause carrying paid/prepaid/deposit/credit is
+  skipped, so "customer already paid the driver $50" prints nothing. A miss keeps
+  the status quo; a false positive has a driver asking a customer for fifty
+  dollars they don't owe.
+  `lib/cash-at-the-door.js` imports NOTHING — it runs on the server for the
+  printed sheet and in the browser for the board and the driver's phone.
+  Shown boxed in **black** on the run sheet (louder than the trade-in's outline,
+  and the box holds the amount ALONE so it can never wrap), in the Collect
+  column, in the run's header total, on the board card, and shouting on the
+  driver's stop. Set from the job form — staff-level, because it is an
+  instruction to collect, not a price we charge.
 - **Anything meant to be printed carries a Print button** (`components/PrintButton.jsx`
   → `window.print()`): the run sheet and the POD form. "Press ⌘P" is not a
   feature, and on the warehouse tablet there is no ⌘P at all — Save as PDF is a

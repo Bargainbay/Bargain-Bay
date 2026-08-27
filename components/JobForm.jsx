@@ -52,6 +52,8 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
   const [pickupCity, setPickupCity] = useState(job?.pickupCity || '');
   const [pickupPostal, setPickupPostal] = useState(job?.pickupPostal || '');
   const [chargeAmount, setChargeAmount] = useState(job?.chargeAmount == null ? '' : String(job.chargeAmount));
+  const [collectCash, setCollectCash] = useState(job?.collectCash == null ? '' : String(job.collectCash));
+  const [collectCashNote, setCollectCashNote] = useState(job?.collectCashNote || '');
   const [jobDate, setJobDate] = useState((editing ? job.jobDate : date) || '');
   const [windowStart, setWindowStart] = useState(job?.windowStart || '');
   const [windowEnd, setWindowEnd] = useState(job?.windowEnd || '');
@@ -198,6 +200,8 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           pickupCity: isTransfer ? pickupCity : null,
           pickupPostal: isTransfer ? pickupPostal : null,
           chargeAmount: chargeAmount === '' ? null : Number(chargeAmount),
+          collectCash: collectCash === '' ? null : Number(collectCash),
+          collectCashNote: collectCashNote || null,
           orderId: type === 'service_call' && who === 'bb' && orderId ? orderId : null,
           source: type === 'service_call' && who === 'bb' ? 'bargain_bay' : 'manual',
           driverId: driverId || null,
@@ -478,6 +482,24 @@ export default function JobForm({ date, clients = [], drivers = [], canManageCli
           Or set it later from the stop&apos;s own card — <b>Set charge</b>. The Billing tab only lists
           finished jobs that belong to a client company, so a Bargain Bay delivery never reaches it.
           Either way it only bills once the job is finished.
+        </div>
+      </div>
+
+      {/* Not what we charge the client — what the CUSTOMER hands the driver at
+          the door: a haul-away they pay for on the spot, a client's surcharge.
+          It prints boxed in black on the run sheet and shouts on the driver's
+          phone, because the driver is who loses if it is missed. */}
+      <div className="field">
+        <label>Cash the driver collects at the door (optional)</label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input type="number" min="0" step="0.01" inputMode="decimal" style={{ width: 130 }}
+            value={collectCash} onChange={(e) => setCollectCash(e.target.value)} placeholder="50.00" />
+          <input style={{ flex: 1, minWidth: 200 }} value={collectCashNote}
+            onChange={(e) => setCollectCashNote(e.target.value)} placeholder="What it's for — e.g. haul-away" />
+        </div>
+        <div className="hint">
+          Separate from the invoice balance. Leave it blank and we&apos;ll still flag anything the
+          client&apos;s own notes say is owed — but a figure typed here is the one that gets trusted.
         </div>
       </div>
 
