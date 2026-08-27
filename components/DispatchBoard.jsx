@@ -200,29 +200,31 @@ function DayCostForm({ date, drivers, busy, onSave }) {
   );
 }
 
-// Stops where a driver came off the crew and nobody assigned them off it.
+// Stops where a driver was on the crew and is no longer on it.
 //
-// This is the repair for a bug that ran silently: reordering a run used to write
-// the column's driver onto every card in it, and a column also holds the stops
-// that driver is RIDING on as second man — so one ▲ made one person both people
-// on a stop, and the next assignment dropped the duplicate seat and the other
-// driver's name with it. The stop simply had one fewer name on it and nothing
-// said so.
+// The repair half of a bug that ran silently: reordering a run used to write the
+// column's driver onto every card in it, and a column also holds the stops that
+// driver is RIDING on as second man — so one ▲ made one person both people on a
+// stop, and the next assignment dropped the duplicate seat and the other driver
+// with it. The stop simply had one fewer name and nothing said so.
 //
-// The names are recoverable because every assignment was logged. This offers
-// them back; it never restores anything on its own. Who was actually in the van
-// is a fact about a Tuesday, not something a query gets to decide.
+// The names are recoverable because every assignment was logged. What is NOT
+// recoverable is intent: the accidental drop happens inside assignJob, so it
+// writes the same kind of event a deliberate one does. So this reports the fact
+// and offers the crew back — it never restores anything on its own, and it never
+// claims the removal was a mistake. Who was in the van on a Tuesday is a fact
+// about a Tuesday, not something a query gets to decide.
 function CrewLost({ lost, busy, onRestore, onDismiss }) {
   if (!lost?.rows?.length) return null;
   return (
     <div className="error-box disp-crewlost">
       <b>
-        {lost.rows.length === 1 ? 'A driver came' : `${lost.rows.length} drivers came`} off
-        {lost.rows.length === 1 ? ' a stop' : ' these stops'} without being reassigned.
+        A driver came off {lost.rows.length === 1 ? 'this stop' : `${lost.rows.length} stops`}.
       </b>
       <div className="hint" style={{ margin: '4px 0 8px' }}>
-        Caused by reordering a run, which used to hand paired stops to the column it was reordered in.
-        That is fixed — this is putting the names back. Check each one against who was really in the van.
+        They were on it and they are not on it now. It may have been deliberate — the log records who
+        was assigned, not why — so check each one against who was actually in the van before putting a
+        name back. Reordering a run used to cause this on its own; that is fixed.
       </div>
       <ul className="disp-setup-list">
         {lost.rows.map((r) => (

@@ -848,9 +848,23 @@ with the stops behind every number.
 - **A stop that couldn't be completed earns nothing and is still counted**
   (`COUNTED = status IN ('done','failed')`), because it cost the same driver and
   the same fuel. Leaving failures out was the tidier query and the wrong number.
-- **Nothing is invented.** A completed stop with neither a charge nor an order
-  counts as zero AND is reported as unpriced, so a short total can never be
-  mistaken for a finished one. Same for unset pay.
+- **Nothing is invented.** A completed stop with no usable price counts as zero
+  AND is reported as unpriced, so a short total can never be mistaken for a
+  finished one. Same for unset pay.
+- **A delivery fee of ZERO is not a price.** `REVENUE_KNOWN` requires an explicit
+  charge or a fee that is actually greater than zero. Having an `order_id` is not
+  enough: an **invoice-bridged Bargain Bay order carries its delivery as a line
+  INSIDE the subtotal**, so `total − subtotal − hst` comes out at exactly 0 — and
+  the first cut counted that as "known", which made every Bargain Bay delivery on
+  the live board report revenue 0 with nothing flagged. Set the charge on the
+  stop's card instead.
+- **Only a duration that makes sense is summed** (`SANE`, and the same clamp in
+  `payReport`). Live data had a stop clocked in at 20:28 and out at 17:30 — three
+  NEGATIVE hours, one row of which dragged the whole period's total below zero.
+  The Times tab flags a backwards clock, and a zero-length one: a close-out that
+  happened before times were stamped by the taps wrote `time_in` and `time_out`
+  at the same instant, so a real delivery reports zero minutes. Both are numbers
+  to correct, never numbers to add up, and `missingTimes` covers both.
 - `stopTimes` is the **Times** tab: every stop with its clock, plus the two flags
   worth chasing — finished with no times at all, and clocked in with the day over.
 
@@ -899,13 +913,21 @@ them. The chain, in full, because every link is a rule somebody has to keep:
   second seat and silently discarded the first.
 
 **Putting the names back.** The columns lost the evidence; `job_events` never
-did. `crewLost({from,to})` finds stops whose **last `assigned` event names a
-driver the job no longer carries** — an exact test, because a deliberate removal
-writes its own newer `assigned` event and is therefore invisible to it. The board
-shows those stops in a banner, names who is missing, and offers the crew back as
-it was last actually assigned. It **reports and offers; it never repairs by
-itself** — who was in the van on a Tuesday is not something a query gets to
-decide.
+did. `crewLost({from,to})` walks the **whole** trail of `assigned` events for
+each stop and reports any driver who appears in it and is not on the job now. The
+board banners those, names who is missing, and offers the crew back as it was
+last actually assigned. It **reports and offers; it never repairs by itself.**
+
+**LANDMINE — do not "optimise" that to look at the last `assigned` event only.**
+That was the first cut, on the reasoning that a deliberate removal writes its own
+newer event and would mask itself. It could never fire: **the accidental drop
+happens INSIDE `assignJob`** — the guard that empties a duplicate second seat
+runs during an ordinary assign call — so the accident writes an `assigned` event
+too and is indistinguishable from a decision. Verified against the live board:
+RS-1023's trail reads `Ruban + Ardy` then `Ruban`, and the last-entry test
+returned zero rows. The log cannot tell intent and the UI must not claim it can;
+it says a name came off and leaves the judgement to somebody who knows who was in
+the van.
 
 Two things that keep that test honest and must not regress: `assignJob` now
 records `#N came off the stop` when it empties a seat, and `mergeDrivers` writes

@@ -132,7 +132,10 @@ export default function StopTimes({ drivers = [] }) {
             </div>
             <div className="kpi-card">
               <div className="kpi-value">{data.missing}</div>
-              <div className="kpi-label">Finished with no times</div>
+              <div className="kpi-label">
+                Finished with no usable times
+                {data.bad > 0 && ` · ${data.bad} clock${data.bad === 1 ? '' : 's'} to correct`}
+              </div>
             </div>
           </div>
 
@@ -169,7 +172,7 @@ export default function StopTimes({ drivers = [] }) {
                   <tr><td colSpan={8} style={{ color: 'var(--muted)' }}>No stops in that period.</td></tr>
                 )}
                 {!loading && rows.map((r) => (
-                  <tr key={r.id} className={r.stuckOpen ? 'is-warn' : undefined}>
+                  <tr key={r.id} className={r.stuckOpen || r.badTimes ? 'is-warn' : undefined}>
                     <td style={{ whiteSpace: 'nowrap' }}>{r.date ? dayLabel(r.date) : '—'}</td>
                     <td>
                       <div style={{ fontWeight: 600 }}>{r.customerName || '(no name)'}</div>
@@ -193,7 +196,14 @@ export default function StopTimes({ drivers = [] }) {
                         : '—')}
                     </td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {asDuration(r.minutes) || (r.missingTimes ? <span className="disp-late">—</span> : '—')}
+                      {/* A stop that took zero minutes, or finished before it
+                          started, is a clock to correct — not a duration. Both
+                          are real on this data: a close-out that happened before
+                          the times were stamped by the taps wrote in and out at
+                          the same instant. */}
+                      {r.badTimes
+                        ? <span className="disp-late">{r.minutes < 0 ? 'ends before it starts' : 'no time on it'}</span>
+                        : (asDuration(r.minutes) || '—')}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <button type="button" className="disp-toggle" disabled={busy}
