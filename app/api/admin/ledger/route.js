@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, canKeepBooks } from '../../../../lib/auth';
 import { setOpeningBalances, journal, trialBalance, getOpeningBalances } from '../../../../lib/ledger';
+import { setPurchaseInvoicePaid, unpaidPurchaseInvoices } from '../../../../lib/finance';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -13,9 +14,15 @@ export async function POST(req) {
   const s = await getSession();
   if (!(s && isAdmin(s))) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   let b; try { b = await req.json(); } catch { b = {}; }
-  if (b.action !== 'opening') return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   try {
-    return NextResponse.json({ ok: true, ...(await setOpeningBalances(b)) });
+    if (b.action === 'opening') return NextResponse.json({ ok: true, ...(await setOpeningBalances(b)) });
+    // Settling a supplier invoice: it leaves payables and the cash leaves the
+    // bank, both dated to the day it was actually paid.
+    if (b.action === 'pay_purchase') {
+      await setPurchaseInvoicePaid(b.id, b.paidAt);
+      return NextResponse.json({ ok: true, unpaid: await unpaidPurchaseInvoices() });
+    }
+    return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not save.' }, { status: 400 });
   }

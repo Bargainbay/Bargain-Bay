@@ -3,9 +3,11 @@ import { getSession, isAdmin, canKeepBooks } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { money, BUSINESS_NAME, BUSINESS_LEGAL, HST_NUMBER } from '../../../../lib/constants';
 import { balanceSheet, getOpeningBalances, ACCOUNTS } from '../../../../lib/ledger';
+import { inventoryAtCost, unpaidPurchaseInvoices } from '../../../../lib/finance';
 import AdminNav from '../../../../components/AdminNav';
 import PrintButton from '../../../../components/PrintButton';
 import OpeningBalances from '../../../../components/OpeningBalances';
+import PayablesList from '../../../../components/PayablesList';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Trial balance — Bargain Bay' };
@@ -13,8 +15,9 @@ export const metadata = { title: 'Trial balance — Bargain Bay' };
 // What each opening figure is, in the words the person typing it would use.
 const HELP = {
   1000: 'The balance in the TD account on that morning, straight off the app.',
-  1200: 'What the stock on hand cost you — not what it sells for.',
-  2200: 'Anything owed: a loan, a credit-card balance, unpaid supplier bills.'
+  1200: 'What ALL the stock on hand cost you — not what it sells for. Sellable, untested and salvage.',
+  2100: 'Supplier invoices still unpaid on that date, including any carried over.',
+  2200: 'Loans and credit-card balances. Not supplier bills — those go on the line above.'
 };
 
 export default async function LedgerPage() {
@@ -35,6 +38,12 @@ export default async function LedgerPage() {
     .map(([code, a]) => ({ code, name: a.name, type: a.type, help: HELP[code] || '' }));
 
   const bs = opening.set ? await balanceSheet().catch(() => null) : null;
+  // What the stock is actually worth at cost, broken out — the storefront's
+  // "inventory capital" counts only ACTIVE sellable units, which is the wrong
+  // number for a balance sheet and the easiest one to reach for by mistake.
+  const stock = await inventoryAtCost().catch(() => null);
+  const owing = await unpaidPurchaseInvoices().catch(() => []);
+  const owingTotal = owing.reduce((a, r) => a + r.total, 0);
 
   return (
     <div>
@@ -67,6 +76,33 @@ export default async function LedgerPage() {
       <div className="panel">
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Opening balances</h2>
         <OpeningBalances accounts={openingAccounts} initial={opening} canEdit={admin} />
+
+        {/* The two figures that are easiest to get wrong, computed from the
+            system's own records so they don't have to be guessed at. */}
+        {stock && (
+          <div className="hint" style={{ marginTop: 12, lineHeight: 1.7 }}>
+            <b>Stock on hand, at cost — {money(stock.total)}.</b> That&apos;s {money(stock.sellable)} sellable
+            ({stock.sellableUnits} units){stock.unlisted > 0 ? <>, {money(stock.unlisted)} bought but not listed
+            ({stock.unlistedUnits})</> : null}{stock.salvage > 0 ? <>, and {money(stock.salvage)} salvage
+            ({stock.salvageUnits})</> : null}. The Financial tab&apos;s &ldquo;inventory capital&rdquo; shows only the
+            sellable part — a balance sheet wants everything you own.
+            {owing.length > 0 && (
+              <div style={{ marginTop: 6 }}>
+                <b>Unpaid supplier invoices already on file — {money(owingTotal)}</b> across {owing.length}.
+                Anything owed from <i>before</i> your opening date goes in the payables box above; these are
+                already counted from the date they were raised, so don&apos;t enter them twice.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
+          Owed to suppliers
+          {owing.length > 0 && <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>{owing.length}</span>}
+        </h2>
+        <PayablesList initial={owing} canEdit={admin} />
       </div>
 
       {bs && (
