@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, isAdmin } from '../../../../lib/auth';
+import { getSession, isAdmin, canKeepBooks } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { money, BUSINESS_NAME, BUSINESS_LEGAL, HST_NUMBER } from '../../../../lib/constants';
 import { profitAndLoss, PNL_PERIODS } from '../../../../lib/pnl';
@@ -29,10 +29,10 @@ export default async function PnlPage({ searchParams }) {
   const sp = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/reports/pnl');
-  if (!isAdmin(session)) {
+  if (!(await canKeepBooks(session))) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
-      <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the admin list.</p>
+      <p style={{ fontSize: 14 }}>Your account ({session.email}) doesn&apos;t have access to the books.</p>
     </div></div>);
   }
   if (!hasDb()) return (<div><AdminNav active="operations" /><div className="panel">Database not configured.</div></div>);
@@ -56,7 +56,7 @@ export default async function PnlPage({ searchParams }) {
 
   return (
     <div>
-      <div className="no-print"><AdminNav active="operations" /></div>
+      <div className="no-print"><AdminNav active="operations" booksOnly={!isAdmin(session)} /></div>
 
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', margin: '4px 0 12px' }}>
         <div>

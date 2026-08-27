@@ -375,6 +375,36 @@ try/log/carry-on scaffolding.
 - **`syncInventoryFromTracker` is the one step allowed to fail the response.**
   The rest is best-effort housekeeping; stale stock is what customers see.
 
+## The books, and accountant access (added 2026-08-27)
+`/admin/reports/books` — every source record for a period, each section
+downloadable, plus the P&L built from them. `lib/books.js`.
+
+- **Accountant access is DATABASE-backed, not an env var** (`accountant_access`,
+  `lib/accountants.js`). Every other role here lives in `ADMIN_EMAILS` /
+  `SALES_EMAILS`, which is right for people who work here and wrong for this one:
+  an accountant is brought in for a season and cut off again, and that has to be
+  two clicks rather than a redeploy. Hence `canKeepBooks(session)` in
+  `lib/auth.js` is **async** where `isAdmin` is sync.
+- **Revoking keeps the row** (`revoked_at` / `revoked_by`) rather than deleting
+  it. Who had the financials, between which dates, and who let them in, is
+  exactly what gets asked later; "we think we removed them" is not an answer.
+- **What an accountant gets:** the financial dashboard, the P&L, the records
+  pack, and the expense APIs — categorising and answering HST is the work they
+  are here to do. **What they don't:** orders, inventory, pricing, payroll,
+  dispatch, the admin search box, granting other accountants, and the
+  QuickBooks/Plaid connect-disconnect panels. Linking a bank is an access grant,
+  not bookkeeping, so those panels are `admin &&` inside an otherwise-shared page.
+- **LANDMINE — this is a RECORDS pack, not financial statements.** There is no
+  general ledger with double entry, no trial balance, no balance sheet, because
+  there is no chart of accounts, no opening balances and no owner equity in this
+  system. Cash on hand, loans, draws and retained earnings are absent. The page
+  says so in as many words. Do NOT add a "balance sheet" that derives assets from
+  inventory + AR and quietly omits equity — it would balance to nothing real and
+  somebody would file it.
+- `SALE` is now copied in three places (`lib/analytics.js`, `lib/pnl.js`,
+  `lib/books.js`). Deliberate — each surface would be worse if it silently
+  disagreed — but change one, change all three.
+
 ## Expense sorting, the ledger floor, and the P&L (added 2026-08-27)
 
 ### Where the books start
