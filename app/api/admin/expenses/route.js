@@ -1,13 +1,15 @@
 // Operating expenses CRUD (one-off + recurring templates). Admin-only.
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin } from '../../../../lib/auth';
+import { getSession, canKeepBooks } from '../../../../lib/auth';
 import { listExpenses, addExpense, updateExpense, deleteExpense, bulkSetExpenseTax,
          listRecurringExpenses, addRecurringExpense, deleteRecurringExpense } from '../../../../lib/finance';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-async function admin() { const s = await getSession(); return !!(s && isAdmin(s)); }
+// Admins and granted accountants: categorising an expense and answering its
+// HST is exactly what an accountant is here to do.
+async function admin() { return canKeepBooks(await getSession()); }
 
 export async function GET() {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });

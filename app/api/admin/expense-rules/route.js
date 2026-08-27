@@ -1,7 +1,7 @@
 // Vendor → category rules, and the date the books start. Admin-only: both
 // decide what lands in the ledger and what it's called.
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin } from '../../../../lib/auth';
+import { getSession, canKeepBooks } from '../../../../lib/auth';
 import { listExpenseRules, saveExpenseRule, deleteExpenseRule, applyRulesToExisting,
          getLedgerStart, setLedgerStart } from '../../../../lib/finance';
 
@@ -9,7 +9,9 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-async function admin() { const s = await getSession(); return !!(s && isAdmin(s)); }
+// Admins and granted accountants: categorising an expense and answering its
+// HST is exactly what an accountant is here to do.
+async function admin() { return canKeepBooks(await getSession()); }
 
 export async function POST(req) {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });

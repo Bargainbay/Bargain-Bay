@@ -375,6 +375,62 @@ try/log/carry-on scaffolding.
 - **`syncInventoryFromTracker` is the one step allowed to fail the response.**
   The rest is best-effort housekeeping; stale stock is what customers see.
 
+## The general ledger (added 2026-08-27)
+`lib/ledger.js` → `/admin/reports/ledger`. Double-entry, trial balance, balance
+sheet, GL detail as CSV.
+
+- **The journal is DERIVED, never typed.** Nobody here keys journal entries, but
+  every document already implies its own: an invoice is Dr receivable / Cr sales
+  / Cr HST, a payment Dr bank / Cr receivable, a stock invoice Dr inventory / Dr
+  HST recoverable / Cr bank, a sale's COGS Dr cost / Cr inventory. `journal()`
+  recomputes them on every read. Nothing to post, nothing to keep in sync, and
+  the ledger cannot drift from the documents it describes. Do NOT add a stored
+  journal table "for speed" without solving that drift.
+- **Every entry is written as a balanced pair**, so the trial balance balances by
+  construction rather than by luck. `outOfBalance` is displayed: if it is ever
+  non-zero the bug is in `journal()`, not in the data.
+- **Opening equity is computed, not asked for.** Assets − liabilities at the
+  opening date. Asking an owner for "owner's equity" is asking the one question
+  they can't answer, and a guessed figure would be silently absorbed.
+- **LANDMINE — the bank balance is derived, not observed.** There is no accounts
+  payable, so every entry assumes payment from the bank on the document's date;
+  something bought on terms is treated as paid immediately. The consequence is
+  specific and checkable rather than vague: `bankDrift()` compares the derived
+  figure to a real balance, and the gap IS the measure of what the records are
+  missing (unrecorded cash, credit purchases, owner draws). The page says this.
+  When Plaid is live, wire the real balance in and make the comparison automatic.
+- `SALE` now exists in four files. Still deliberate, still: change one, change all.
+
+## The books, and accountant access (added 2026-08-27)
+`/admin/reports/books` — every source record for a period, each section
+downloadable, plus the P&L built from them. `lib/books.js`.
+
+- **Accountant access is DATABASE-backed, not an env var** (`accountant_access`,
+  `lib/accountants.js`). Every other role here lives in `ADMIN_EMAILS` /
+  `SALES_EMAILS`, which is right for people who work here and wrong for this one:
+  an accountant is brought in for a season and cut off again, and that has to be
+  two clicks rather than a redeploy. Hence `canKeepBooks(session)` in
+  `lib/auth.js` is **async** where `isAdmin` is sync.
+- **Revoking keeps the row** (`revoked_at` / `revoked_by`) rather than deleting
+  it. Who had the financials, between which dates, and who let them in, is
+  exactly what gets asked later; "we think we removed them" is not an answer.
+- **What an accountant gets:** the financial dashboard, the P&L, the records
+  pack, and the expense APIs — categorising and answering HST is the work they
+  are here to do. **What they don't:** orders, inventory, pricing, payroll,
+  dispatch, the admin search box, granting other accountants, and the
+  QuickBooks/Plaid connect-disconnect panels. Linking a bank is an access grant,
+  not bookkeeping, so those panels are `admin &&` inside an otherwise-shared page.
+- **LANDMINE — this is a RECORDS pack, not financial statements.** There is no
+  general ledger with double entry, no trial balance, no balance sheet, because
+  there is no chart of accounts, no opening balances and no owner equity in this
+  system. Cash on hand, loans, draws and retained earnings are absent. The page
+  says so in as many words. Do NOT add a "balance sheet" that derives assets from
+  inventory + AR and quietly omits equity — it would balance to nothing real and
+  somebody would file it.
+- `SALE` is now copied in three places (`lib/analytics.js`, `lib/pnl.js`,
+  `lib/books.js`). Deliberate — each surface would be worse if it silently
+  disagreed — but change one, change all three.
+
 ## Expense sorting, the ledger floor, and the P&L (added 2026-08-27)
 
 ### Where the books start

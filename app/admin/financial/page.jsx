@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, isAdmin } from '../../../lib/auth';
+import { getSession, isAdmin, canKeepBooks } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { financialDashboard, DASH_PERIODS } from '../../../lib/analytics';
@@ -25,9 +25,13 @@ export default async function FinancialDashboardPage({ searchParams }) {
   const sParams = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/financial');
-  if (!isAdmin(session)) {
+  const admin = isAdmin(session);
+  // A granted accountant works here too — categorising expenses and answering
+  // HST is the job they were brought in to do. The feed connect/disconnect
+  // controls stay admin-only below: linking a bank is an access grant.
+  if (!(await canKeepBooks(session))) {
     return (<div className="narrow"><div className="panel"><h1 style={{ marginTop: 0 }}>Not authorized</h1>
-      <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the admin list.</p></div></div>);
+      <p style={{ fontSize: 14 }}>Your account ({session.email}) doesn&apos;t have access to the books.</p></div></div>);
   }
   if (!hasDb()) return (<DashboardShell active="financial"><div className="panel">Database not configured.</div></DashboardShell>);
 
@@ -96,10 +100,14 @@ export default async function FinancialDashboardPage({ searchParams }) {
         <div>
           <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Profit &amp; loss statement</h2>
           <p className="hint" style={{ margin: '2px 0 0' }}>
-            Revenue, cost of goods, every expense category, net profit — printable, and downloadable for your accountant.
+            Revenue, cost of goods, every expense category, net profit — printable. <b>The books</b> is the full
+            records pack, and where you grant an accountant access.
           </p>
         </div>
-        <a className="btn accent" href="/admin/reports/pnl">Open the statement →</a>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a className="btn accent" href="/admin/reports/pnl">Open the statement →</a>
+          <a className="btn" href="/admin/reports/books">The books →</a>
+        </div>
       </div>
 
       {/* Rules sit above the feeds they govern: what arrives tomorrow depends on
@@ -124,13 +132,15 @@ export default async function FinancialDashboardPage({ searchParams }) {
         <ExpenseRules initial={rules} categories={EXPENSE_CATEGORIES} ledgerStart={ledgerStart} />
       </div>
 
-      <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
-          Bank feed — transactions straight from the account
-          {plaid.connected && <span className="pill ok" style={{ marginLeft: 8, fontSize: 11 }}>connected</span>}
-        </h2>
-        <PlaidPanel status={plaid} />
-      </div>
+      {admin && (
+        <div className="panel" style={{ marginTop: 18 }}>
+          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
+            Bank feed — transactions straight from the account
+            {plaid.connected && <span className="pill ok" style={{ marginLeft: 8, fontSize: 11 }}>connected</span>}
+          </h2>
+          <PlaidPanel status={plaid} />
+        </div>
+      )}
 
       {/* The review queue sits directly under the feed that fills it: an
           imported row claims no input tax credit until somebody says what tax
@@ -145,13 +155,15 @@ export default async function FinancialDashboardPage({ searchParams }) {
         </div>
       )}
 
-      <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
-          QuickBooks — automatic expense tracking
-          {qbo.connected && <span className="pill ok" style={{ marginLeft: 8, fontSize: 11 }}>connected</span>}
-        </h2>
-        <QboPanel status={qbo} />
-      </div>
+      {admin && (
+        <div className="panel" style={{ marginTop: 18 }}>
+          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
+            QuickBooks — automatic expense tracking
+            {qbo.connected && <span className="pill ok" style={{ marginLeft: 8, fontSize: 11 }}>connected</span>}
+          </h2>
+          <QboPanel status={qbo} />
+        </div>
+      )}
 
       <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Operating expenses · {periodLabel(period)}</h2>
