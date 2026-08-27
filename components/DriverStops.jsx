@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { queueAction, flush, pending, newRef } from '../lib/driver-outbox';
 import { cashAtTheDoor } from '../lib/cash-at-the-door';
 import { formatPhone } from '../lib/constants';
-import { startSharing, stopSharing, geoSupported } from '../lib/driver-geo';
+import { startSharing, stopSharing, markNow, geoSupported } from '../lib/driver-geo';
 import DriverFinish from './DriverFinish';
 import DriverPhotos from './DriverPhotos';
 
@@ -77,9 +77,11 @@ export default function DriverStops({ initial, driverName }) {
   useEffect(() => {
     if (!geoSupported()) { setGeo({ state: 'unsupported' }); return undefined; }
     const live = () => stops.find((x) => ['on_the_way', 'arrived'].includes(x.status))?.id || null;
-    const begin = () => startSharing({ jobId: live, onStatus: setGeo });
+    const begin = () => { startSharing({ jobId: live, onStatus: setGeo }); markNow('foreground'); };
     const end = () => stopSharing();
     if (document.visibilityState === 'visible') begin();
+    // Coming BACK to the app is the other end of every gap: the driver has just
+    // arrived somewhere, and a fix taken now is the most useful one of the trip.
     const onVis = () => (document.visibilityState === 'visible' ? begin() : end());
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('pagehide', end);
@@ -376,7 +378,8 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
         // Look, plan, ring ahead — but not start. The buttons that change a
         // stop's state are deliberately absent until it's actually today.
         <div className="drv-row">
-          <a className="drv-btn" href={mapsUrl(addr)} target="_blank" rel="noopener noreferrer">🧭 Navigate</a>
+          <a className="drv-btn" href={mapsUrl(addr)} target="_blank" rel="noopener noreferrer"
+            onClick={() => markNow('navigate')}>🧭 Navigate</a>
           {stop.phone && <a className="drv-btn" href={`tel:${stop.phone}`}>📞 Call</a>}
           {stop.pickupPhone && <a className="drv-btn" href={`tel:${stop.pickupPhone}`}>📞 Call pickup</a>}
         </div>
@@ -398,7 +401,8 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
       ) : (
         <>
           <div className="drv-row">
-            <a className="drv-btn" href={mapsUrl(addr)} target="_blank" rel="noopener noreferrer">🧭 Navigate</a>
+            <a className="drv-btn" href={mapsUrl(addr)} target="_blank" rel="noopener noreferrer"
+            onClick={() => markNow('navigate')}>🧭 Navigate</a>
             {stop.phone && (
               <a className="drv-btn" href={`tel:${stop.phone}`}>📞 Call{stop.pickupPhone ? ' drop-off' : ''}</a>
             )}

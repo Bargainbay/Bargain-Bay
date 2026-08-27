@@ -1254,6 +1254,20 @@ native app or a tracker in the van (which tracks the VEHICLE, usually the thing
 actually wanted). Don't let the Live tab quietly imply otherwise; it says so on
 the screen, and that notice is load-bearing.
 
+- **"The app is still open in the background" is true and does not help.** The
+  page stays in the tab list; it is not permitted to RUN. Backgrounded pages are
+  suspended (iOS) or frozen and timer-throttled (Android Chrome), `watchPosition`
+  callbacks stop being delivered, and the page may be evicted and reloaded on
+  return. This is the OS, not a setting we haven't found — and **Safari offers a
+  website no "Always" location option at all**; that choice exists only for
+  native apps. Granting the most permissive web permission there is still does
+  not produce a background fix.
+- **What DOES close most of the gap: sample both ENDS of it.** `markNow()` takes
+  an immediate fix on the **Navigate tap** (the instant they leave for Maps) and
+  again on **returning to the app** (the instant they arrive). The drive itself
+  stays invisible, but "no idea for 25 minutes" becomes "left the depot 9:04,
+  at the customer's road 9:29" — most of what the office wanted, for one extra
+  fix at each end.
 - **`at` is the DEVICE's timestamp, never the server's.** A phone coming back
   into signal posts twenty minutes of history at once; stamped on arrival, the
   office would be told a driver is somewhere they left long ago. Position is the
