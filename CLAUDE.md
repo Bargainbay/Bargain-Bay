@@ -349,6 +349,41 @@ changes no arithmetic.
 - Sarah can raise a tax-in invoice (`taxInclusive` on `create_invoice`); a phone
   quote is exactly where "out the door" pricing gets used.
 
+## HST on sales — the Sales dashboard panel (added 2026-08-27)
+`hstOwed()` in `lib/analytics.js`, rendered by `components/TaxOwed.jsx` on
+`/admin/dashboard` directly under the revenue KPIs. Owner-only (`!salesOnly`),
+same reasoning as the Profit KPI beside it.
+
+- **Basis: the sale date.** Every figure is dated to `orders.created_at` — the
+  invoice date for an invoice-raised sale — because HST is charged when the sale
+  is made, not when the money lands. That is what an accrual filer reports, and
+  it is the same basis as the Revenue KPI, so the two agree on screen.
+- **The collected / still-to-come split is deliberate.** The liability and the
+  cash position are different questions: on a deposit sale the tax is owed from
+  the day the invoice was written, while most of the money arrives on delivery.
+  The "collected, not yet remitted" card is the one that stops a good year
+  becoming a bad quarter.
+- **Refunds need no line.** A refund shrinks its order's `hst` in place, in the
+  month of the original sale, so every total is already net of anything handed
+  back. Don't add a "refunded" figure — it would double-count.
+- **Quarters are calendar quarters** (most small registrants file quarterly), and
+  a quarter with no sales still prints as zeros so a gap reads as a quiet quarter
+  rather than as missing data. The quarter in progress is flagged; a part-period
+  total read as a finished one is how a remittance comes up short.
+- **LANDMINE — one live invoice per order.** The uncollected-HST expression takes
+  the NEWEST live invoice (`ORDER BY i.id DESC LIMIT 1`), not a SUM over them —
+  same guard as `balancesForOrders` in `lib/jobs.js`. Summing would report the
+  same tax as uncollected twice. (`revenueDashboard`'s own `owing` still JOINs;
+  if that is ever corrected, correct it the same way.)
+- **THIS IS NOT THE REMITTANCE FIGURE, and the panel says so in as many words.**
+  What gets remitted is HST charged less **input tax credits** — the HST paid out
+  on stock, fuel, rent and everything else — and none of that is captured
+  anywhere: `expenses` and `ad_spend` have an `amount` and no tax column, and
+  whether `products.cost` is tax-in is unknown per purchase. Adding an ITC total
+  would mean adding a tax field to expenses AND deciding the tax treatment of
+  unit costs. Until both exist, naming a number the owner might file would be
+  worse than naming half of one and saying which half.
+
 ## Dispatch — deliveries & service calls (added 2026-08-25)
 The daily run sheet used to be built by hand because the work comes from several
 client companies through several channels (email, spreadsheet, phone) and no one
