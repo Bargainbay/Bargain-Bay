@@ -386,6 +386,18 @@ env vars are set, both idempotent via `expenses.ext_id`.
   `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET`. If BOTH feeds are connected to the same
   bank account the same spend arrives twice under two different `ext_id`s —
   pick one per account.
+- **LANDMINE — sandbox keys import a DEMO company's spending as if it were real.**
+  Found live on 2026-08-27: the production site had been connected to Intuit's
+  "Sandbox Company US 93dd" for 48 days, and 46 rows of a fictional landscaping
+  firm's car washes and burger receipts were sitting in the expense ledger,
+  marked "edit in QB" so the table offered no way to remove them. The panel said
+  `CONNECTED` in green and nothing else. `qboStatus` now returns `env` and
+  `sandboxCompany` (Intuit's demo companies are all named "Sandbox Company …",
+  so the name is checked as well as the env var — the var can be changed without
+  the stored tokens being redone), the panel says so in red, and the
+  already-existing `purge_synced` action finally has a button. Sandbox and
+  production keys are DIFFERENT keys: switching worlds means replacing both
+  secrets, not just flipping `QBO_ENV`.
 
 ## HST remittance — the Sales dashboard panel (added 2026-08-27)
 `hstOwed()` in `lib/analytics.js`, rendered by `components/TaxOwed.jsx` on

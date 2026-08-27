@@ -8,7 +8,12 @@ import { useRouter } from 'next/navigation';
 //  - connected      → company + last sync + "Sync now" / "Disconnect"
 export default function QboPanel({ status }) {
   const router = useRouter();
-  const { configured, connected, company, lastSync } = status || {};
+  const { configured, connected, company, lastSync, env, sandboxCompany, imported = 0 } = status || {};
+  // Sandbox keys reach one of Intuit's DEMO companies. Its invented
+  // transactions import into the real expense ledger exactly like real ones,
+  // wrecking the P&L and every input tax credit taken off it — and until this
+  // banner existed the panel just said "connected" in green.
+  const isSandbox = env === 'sandbox' || sandboxCompany;
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
@@ -19,7 +24,11 @@ export default function QboPanel({ status }) {
       const res = await fetch('/api/admin/qbo/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || `${label} failed`);
-      setMsg(d.disconnected ? 'Disconnected.' : `Synced ${d.synced} transaction(s) from QuickBooks${d.errors?.length ? ` (${d.errors.length} issue(s) — see logs)` : ''}.`);
+      setMsg(d.disconnected
+        ? 'Disconnected.'
+        : d.purged !== undefined
+          ? `Removed ${d.purged} imported row(s) from the expense ledger.`
+          : `Synced ${d.synced} transaction(s) from QuickBooks${d.errors?.length ? ` (${d.errors.length} issue(s) — see logs)` : ''}.`);
       router.refresh();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
@@ -59,6 +68,21 @@ export default function QboPanel({ status }) {
 
   return (
     <div>
+      {isSandbox && (
+        <div className="error-box" style={{ marginTop: 0, lineHeight: 1.6 }}>
+          <b>This is Intuit&apos;s SANDBOX, not your books.</b> {company ? <><b>{company}</b> is a</> : 'You are connected to a'} demo
+          company, and everything it has imported is invented — a landscaping firm&apos;s car washes and burger
+          receipts, not your spending.
+          {imported > 0 && <> <b>{imported}</b> such row{imported === 1 ? '' : 's'} are in your expense ledger right now, dragging down
+            net profit and counting as unreviewed spending against your HST remittance.</>}
+          <div style={{ marginTop: 8 }}>
+            To switch to the real thing: take the <b>Production</b> keys from your app on developer.intuit.com,
+            replace <code>QBO_CLIENT_ID</code> / <code>QBO_CLIENT_SECRET</code> in Vercel, remove
+            <code> QBO_ENV</code> (or set it to <code>production</code>), redeploy — then disconnect below,
+            clear the imported rows, and connect again.
+          </div>
+        </div>
+      )}
       <p className="hint" style={{ marginTop: 0 }}>
         Connected{company ? <> to <b>{company}</b></> : null}
         {lastSync ? <> · last sync {new Date(lastSync).toLocaleString('en-CA', { timeZone: 'America/Toronto', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</> : null}.
@@ -67,6 +91,16 @@ export default function QboPanel({ status }) {
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button className="dash-filter active" disabled={busy} onClick={() => act({ days: 90 }, 'Sync')}>{busy ? '…' : 'Sync now'}</button>
+        {imported > 0 && (
+          <button className="dash-filter" disabled={busy}
+            title="Deletes every expense row QuickBooks imported. Hand-entered and recurring expenses are untouched."
+            onClick={() => {
+              if (!window.confirm(`Delete all ${imported} expense row(s) imported from QuickBooks? Anything you typed by hand stays. Reconnecting and syncing brings the real ones back.`)) return;
+              act({ action: 'purge_synced' }, 'Purge');
+            }}>
+            {busy ? '…' : `Remove ${imported} imported row${imported === 1 ? '' : 's'}`}
+          </button>
+        )}
         <button className="dash-filter" disabled={busy}
           onClick={() => { if (window.confirm('Disconnect QuickBooks? Nightly expense sync stops (already-imported expenses stay).')) act({ action: 'disconnect' }, 'Disconnect'); }}>
           Disconnect
