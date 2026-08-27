@@ -1228,3 +1228,20 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 }
 .disp-history li { margin-bottom: 3px; }
 .disp-history-when { display: block; color: var(--muted); font-size: 11px; }
+
+/* Cash at the door: money the customer hands over that has nothing to do with an
+   invoice balance — a haul-away they pay for on the spot, a client's surcharge.
+   Loud on both screens for the same reason it is boxed in black on the run
+   sheet: the driver is the one who does not get it back if it is missed. */
+.disp-cash {
+  margin-top: 6px; padding: 3px 7px; border-radius: 6px;
+  background: var(--charcoal); color: #fff;
+  font-size: 12px; font-weight: 700; display: inline-block;
+}
+.disp-cash-src { font-weight: 400; font-style: italic; opacity: .8; }
+.drv-cash {
+  margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+  background: var(--charcoal); color: #fff;
+  font-size: 18px; font-weight: 800; letter-spacing: .01em;
+}
+.drv-cash-src { font-size: 13px; font-weight: 400; font-style: italic; opacity: .85; margin-top: 3px; }

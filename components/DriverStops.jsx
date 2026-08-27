@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { queueAction, flush, pending, newRef } from '../lib/driver-outbox';
+import { cashAtTheDoor } from '../lib/cash-at-the-door';
 import DriverFinish from './DriverFinish';
 import DriverPhotos from './DriverPhotos';
 
@@ -253,6 +254,21 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
       {stop.balanceDue > 0 && (
         // The one number on this screen that costs money to miss.
         <div className="drv-collect">COLLECT ${Number(stop.balanceDue).toFixed(2)}{stop.invoiceNumber ? ` · ${stop.invoiceNumber}` : ''}</div>
+      )}
+
+      {/* Cash the customer hands over that is nothing to do with an invoice —
+          a haul-away they pay for at the door, a client's own surcharge. The
+          driver is the one holding the bag if it is missed, and until now it
+          was one clause inside the grey notes paragraph. */}
+      {cashAtTheDoor(stop) && (
+        <div className="drv-cash">
+          COLLECT ${cashAtTheDoor(stop).amount.toFixed(2)} CASH
+          {cashAtTheDoor(stop).note && (
+            <div className="drv-cash-src">
+              {cashAtTheDoor(stop).typed ? cashAtTheDoor(stop).note : `from the notes: “${cashAtTheDoor(stop).note}”`}
+            </div>
+          )}
+        </div>
       )}
 
       {(stop.tradeIns?.length > 0 || stop.services?.includes('trade_in')) && (
