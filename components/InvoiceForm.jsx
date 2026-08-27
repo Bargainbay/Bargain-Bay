@@ -15,9 +15,10 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
   const [items, setItems] = useState([blankItem()]);
   const [q, setQ] = useState('');
   const [custOpen, setCustOpen] = useState(false);
-  // 'exclusive' | 'inclusive' | 'none' — how to read the amounts in the boxes.
+  // 'exclusive' | 'inclusive' — how to read the amounts in the boxes. Every sale
+  // here carries HST; the only question is whether it's already in the price.
   const [taxMode, setTaxMode] = useState('exclusive');
-  const addHst = taxMode !== 'none';
+  const addHst = true;
   const [sendEmail, setSendEmail] = useState(true);
   const [daysUntilDue, setDaysUntilDue] = useState(14);
   const [invoiceDate, setInvoiceDate] = useState(todayToronto());
@@ -110,7 +111,7 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
     // updater: an updater has to be pure, and React runs it twice in dev —
     // which would convert the amounts twice.
     const prev = taxMode;
-    if (next !== prev && prev !== 'none' && next !== 'none') {
+    if (next !== prev) {
       setItems((xs) => {
         const amounts = xs.map((it) => Number(it.amount) || 0);
         const converted = next === 'inclusive'

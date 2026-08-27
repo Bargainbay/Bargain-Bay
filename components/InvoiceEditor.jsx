@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import InvoiceLines, { fromInvoice, toPayload } from './InvoiceLines';
-import TaxMode, { previewTotals, modeOf } from './TaxMode';
+import TaxMode, { previewTotals, modeOf, NO_TAX } from './TaxMode';
 import { toInclusiveLines, exTaxOf } from '../lib/tax';
 
 // Edit an invoice: the customer's details, the line items (add, remove, reprice,
@@ -34,7 +34,9 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
     const shown = toInclusiveLines(rows.map((r) => Number(r.amount) || 0), Number(invoice.total) || null);
     return rows.map((r, i) => ({ ...r, amount: shown[i].toFixed(2) }));
   });
-  const addHst = taxMode !== 'none';
+  // A salvage / parts-only invoice was raised with no HST on it. Re-saving one
+  // must not quietly add 13% to a sale that's already been settled.
+  const addHst = taxMode !== NO_TAX;
   const [memo, setMemo] = useState(invoice.memo || '');
   const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate || '');
   const todayToronto = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
@@ -63,7 +65,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
     // updater: an updater has to be pure, and React runs it twice in dev —
     // which would convert the amounts twice.
     const prev = taxMode;
-    if (next !== prev && prev !== 'none' && next !== 'none') {
+    if (next !== prev && prev !== NO_TAX && next !== NO_TAX) {
       setItems((xs) => {
         const amounts = xs.map((it) => Number(it.amount) || 0);
         const converted = next === 'inclusive'

@@ -331,10 +331,17 @@ changes no arithmetic.
   invoice moves nothing, and the total is what was quoted out loud. Storing the
   typed figures as well would be a second representation of the same money —
   see the coupon landmine for how that ends.
-- The mode is a three-way (`components/TaxMode.jsx`): before-tax / tax-in / no
-  HST. Switching between the first two CONVERTS what's already in the boxes, so
-  it reads the numbers rather than being a thing you must set first and remember.
-  Credit lines convert too — a discount quoted tax-in is tax-in as well.
+- The mode is a **two-way** (`components/TaxMode.jsx`): before-tax or tax-in.
+  Switching CONVERTS what's already in the boxes, so it reads the numbers rather
+  than being a thing you must set first and remember. Credit lines convert too —
+  a discount quoted tax-in is tax-in as well.
+- **There is no "no HST" choice, but `none` is still a state an invoice can be
+  IN.** Every sale here carries HST, so a rep is never offered the option — but
+  the salvage screen (`AdminSalvage`) raises parts-only invoices with
+  `addHst: false`, and one of those must not silently gain 13% because somebody
+  reopened it and hit save. The editor therefore renders a third option only when
+  the invoice it loaded already has zero HST, and choosing a real mode retires
+  it. Don't "tidy" that away.
 - Sarah can raise a tax-in invoice (`taxInclusive` on `create_invoice`); a phone
   quote is exactly where "out the door" pricing gets used.
 
