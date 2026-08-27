@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { queueAction, flush, pending, newRef } from '../lib/driver-outbox';
 import { cashAtTheDoor } from '../lib/cash-at-the-door';
 import { formatPhone } from '../lib/constants';
+import { startSharing, stopSharing, geoSupported } from '../lib/driver-geo';
 import DriverFinish from './DriverFinish';
 import DriverPhotos from './DriverPhotos';
 
@@ -46,6 +47,7 @@ export default function DriverStops({ initial, driverName }) {
   const [adding, setAdding] = useState(null);         // a finished stop getting more photos
   const [err, setErr] = useState('');
   const timer = useRef(null);
+  const [geo, setGeo] = useState({ state: 'off' });
 
   // Reload from the server, but never over the top of unsent work — the queue is
   // the truth until it has drained.
@@ -60,6 +62,34 @@ export default function DriverStops({ initial, driverName }) {
       if (Array.isArray(d.stops)) setStops(d.stops);
       if (Array.isArray(d.tomorrow)) setTomorrow(d.tomorrow);
     } catch { /* offline: keep what's on screen */ }
+  }, []);
+
+  // Location sharing, while the app is open.
+  //
+  // It is announced, never silent: a chip at the top of the driver's own screen
+  // says it is on and lets them see it. Tracking somebody who has not been told
+  // is a different thing from dispatching them, and the difference is one line
+  // of UI.
+  //
+  // It cannot run in the background — iOS suspends the page the moment the
+  // screen locks or they switch to Maps — so this starts when the app is on
+  // screen and stops when it isn't, rather than pretending otherwise.
+  useEffect(() => {
+    if (!geoSupported()) { setGeo({ state: 'unsupported' }); return undefined; }
+    const live = () => stops.find((x) => ['on_the_way', 'arrived'].includes(x.status))?.id || null;
+    const begin = () => startSharing({ jobId: live, onStatus: setGeo });
+    const end = () => stopSharing();
+    if (document.visibilityState === 'visible') begin();
+    const onVis = () => (document.visibilityState === 'visible' ? begin() : end());
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', end);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pagehide', end);
+      end();
+    };
+    // stops is read through a closure so the watcher isn't torn down every load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const push = useCallback(async () => {
@@ -158,6 +188,18 @@ export default function DriverStops({ initial, driverName }) {
         </div>
       )}
       {online && queued > 0 && <div className="drv-sending">Sending {queued} saved {queued === 1 ? 'update' : 'updates'}…</div>}
+
+      {/* Said out loud, on the driver's own screen. */}
+      {geo.state !== 'unsupported' && (
+        <div className={'drv-geo is-' + geo.state}>
+          {geo.state === 'denied'
+            ? <>📍 Location is off — the office can&apos;t see where you are. Turn it on for this site in your
+                phone&apos;s settings if they&apos;ve asked you to.</>
+            : geo.state === 'starting' || geo.state === 'searching'
+              ? <>📍 Finding your location…</>
+              : <>📍 The office can see where you are while this app is open.</>}
+        </div>
+      )}
       {err && <div className="error-box">{err}</div>}
 
       {unfinished.length > 0 && (

@@ -8,6 +8,7 @@ import { markOrderDeliveredForJob } from '../../../../lib/driver-jobs';
 import {
   profitReport, stopTimes, addExpense, listExpenses, deleteExpense, EXPENSE_KINDS
 } from '../../../../lib/dispatch-money';
+import { livePositions, driverTrail } from '../../../../lib/driver-location';
 import { sendSms, smsConfigured } from '../../../../lib/sms';
 import { SITE_URL } from '../../../../lib/site';
 import { hasDb } from '../../../../lib/db';
@@ -88,6 +89,14 @@ export async function GET(req) {
     // Stops where somebody came off the crew without anyone assigning them off.
     if (sp.get('view') === 'crew_lost') {
       return NextResponse.json(await crewLost({ from: sp.get('from'), to: sp.get('to') }));
+    }
+    // Where the vans are. Staff, not admin: this is the dispatcher's job, and
+    // it is the same information they already get by ringing the driver.
+    if (sp.get('view') === 'live') {
+      return NextResponse.json(await livePositions());
+    }
+    if (sp.get('view') === 'trail') {
+      return NextResponse.json({ trail: await driverTrail(sp.get('driverId'), { date: sp.get('date') }) });
     }
     if (sp.get('view') === 'drivers') {
       return NextResponse.json({ drivers: await listDriversForOffice() });

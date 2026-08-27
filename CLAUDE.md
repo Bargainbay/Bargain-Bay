@@ -1235,6 +1235,58 @@ and half a history in each.
   places that have nothing to do with driving). Offered automatically when a
   number change collides with another driver.
 
+## Live driver tracking (phase 4, added 2026-08-27)
+The **Live** tab on `/admin/dispatch`, `lib/driver-location.js`, `lib/driver-geo.js`,
+`POST /api/driver/location`, table `driver_pings`.
+
+**THE CONSTRAINT, first, because it decides everything else: a web app cannot
+report location in the background.** `watchPosition` lives and dies with the
+page; iOS Safari suspends JavaScript the moment the screen locks or the driver
+switches apps, and a PWA on the home screen behaves identically. There is no web
+API that changes this — Background Sync and Periodic Background Sync carry no
+location and Periodic doesn't exist on iOS at all. Drivers spend the drive **in
+Google Maps**, which means our page is not running for most of the road.
+
+So what this gives is a position whenever the app is on screen — which is at
+every stop, because that is when they tap — plus a trail of everything it managed
+to sample in between. It is **not** a dot moving down the road. Always-on needs a
+native app or a tracker in the van (which tracks the VEHICLE, usually the thing
+actually wanted). Don't let the Live tab quietly imply otherwise; it says so on
+the screen, and that notice is load-bearing.
+
+- **`at` is the DEVICE's timestamp, never the server's.** A phone coming back
+  into signal posts twenty minutes of history at once; stamped on arrival, the
+  office would be told a driver is somewhere they left long ago. Position is the
+  one thing where stale and wrong are the same thing.
+- **Everything that reads a ping ages it.** `FRESH_MINUTES` (5) splits "here now"
+  from "last known": fresh markers are solid and labelled, stale ones are hollow
+  and grey and say how long ago. Never draw an old fix as a current one — somebody
+  rings a customer on it.
+- **Location does NOT go through `lib/driver-outbox.js`.** That queue replays
+  forever until the server takes it, which is right for a completion and wrong
+  for a position. `driver-geo.js` keeps its own small buffer (60 fixes), drops
+  the OLDEST on overflow, and sends on a 45s timer or as soon as the van has
+  moved 100m — sitting at a door for forty minutes shouldn't cost forty round
+  trips. `stopSharing` flushes through `sendBeacon` so the last fix survives the
+  tab closing.
+- **It is announced on the driver's own screen**, always, in a chip that says the
+  office can see them while the app is open — and turns red if they've denied
+  permission, because a driver who thinks they're sharing and isn't is worse than
+  one who knows they aren't. Tracking somebody who hasn't been told is a
+  different thing from dispatching them, and the difference here is one line of
+  UI. Don't remove it.
+- Sharing starts on `visibilitychange` → visible and stops on hidden/`pagehide`,
+  rather than pretending to run when the OS has already stopped it.
+- **Staff-level, not admin** — knowing where a van is IS the dispatcher's job,
+  and it's the same thing they'd get by ringing the driver.
+- Pings are pruned after 30 days from the write path (2% of batches). Six drivers
+  at a fix every 45s is ~100k rows a month and nobody asks where a van was in
+  April.
+- The map needs `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (already set for Places
+  autocomplete). **With no key the list still works** and every row opens the
+  position in Google Maps — the list is what answers "where is Ruban", the map
+  only makes it quicker.
+
 ## Two businesses, one codebase — BRANDS
 Bargain Bay is the consumer storefront. **RS Solutions is the delivery/service
 company** whose clients are other businesses (Transource et al). A client must
