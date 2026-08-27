@@ -349,6 +349,32 @@ changes no arithmetic.
 - Sarah can raise a tax-in invoice (`taxInclusive` on `create_invoice`); a phone
   quote is exactly where "out the door" pricing gets used.
 
+## Scheduled jobs (added 2026-08-27)
+`lib/cron-jobs.js` holds what the scheduled work DOES; the `/api/cron/*` routes
+are thin triggers over it. The orchestration used to live inline in the routes,
+where it couldn't be composed and each one re-implemented the same
+try/log/carry-on scaffolding.
+
+- **The three jobs stay SEPARATELY scheduled** in `vercel.json`
+  (`expire-reservations`, `sync-inventory`, `sync-ads`). Do not merge them into
+  one entry: each scheduled invocation gets its own function time budget, so one
+  combined pass would give all three what one of them gets alone — and the
+  finance pass is already the long one. Checked on the live project 2026-08-27:
+  all three are registered and enabled on **Hobby**, so the cron *count* is not
+  a constraint. What Hobby does impose is a **1-hour flexible window** — a job
+  scheduled for 06:00 UTC may run any time in that hour, which is why nothing
+  here may depend on one job finishing before another starts.
+- **`/api/cron/nightly` runs all three back to back** in one request. It is NOT
+  scheduled — it's the catch-up path after an outage.
+- **Order and timeouts are deliberate.** Cheapest and most time-sensitive first
+  (a held unit is off the storefront until it's freed), and every call to
+  somebody else's API is capped — a hanging request to Meta or Intuit must not
+  eat the invocation and starve the finance pass behind it. Every step is
+  independently caught: a cron pass is a sequence of unrelated chores, and one
+  failing is a log line, not a reason to skip the rest.
+- **`syncInventoryFromTracker` is the one step allowed to fail the response.**
+  The rest is best-effort housekeeping; stale stock is what customers see.
+
 ## Expense sorting, the ledger floor, and the P&L (added 2026-08-27)
 
 ### Where the books start
@@ -414,10 +440,8 @@ env vars are set, both idempotent via `expenses.ext_id`.
   guard is "is this one of our items" plus a 60s throttle, not signature
   verification. Full JWT verification would be reasonable hardening; it is not
   what stands between this and bad data.
-- **The nightly pull is folded into `/api/cron/sync-inventory`**, beside the QBO
-  sync, rather than getting its own `vercel.json` entry — the plan's cron
-  allowance is small and these are one finance pass.
-  `/api/cron/sync-bank` exists for triggering it by hand.
+- **The nightly pull runs inside `runNightlyOps`**, beside the QBO sync — see the
+  cron section below. "Pull now" on the Financial tab is the by-hand trigger.
 - **What is deliberately NOT imported:** pending rows (they're replaced when they
   post), money IN, and `TRANSFER_IN`/`TRANSFER_OUT`/`LOAN_PAYMENTS`/`INCOME`. A
   credit-card payment is the same money as the purchases it settles — importing
@@ -437,6 +461,14 @@ env vars are set, both idempotent via `expenses.ext_id`.
   `QBO_CLIENT_ID` / `QBO_CLIENT_SECRET`. If BOTH feeds are connected to the same
   bank account the same spend arrives twice under two different `ext_id`s —
   pick one per account.
+- **LANDMINE — the sync window silently hides everything.** `syncQboExpenses`
+  asks QBO for `TxnDate >= today - days`: 35 on the nightly cron, 90 from "Sync
+  now". Books that haven't been posted to for a few months return NOTHING, which
+  looks exactly like a broken integration. Found live on 2026-08-27: RS Solutions
+  Inc. has **744** expenses in QuickBooks and the most recent is dated
+  **27/04/2026** — four months before the sync ran, so a 90-day window matched
+  zero of them. Hence "Import last 12 months" (365 is the route's cap), and a
+  zero result that names the window instead of just saying "Synced 0".
 - **LANDMINE — sandbox keys import a DEMO company's spending as if it were real.**
   Found live on 2026-08-27: the production site had been connected to Intuit's
   "Sandbox Company US 93dd" for 48 days, and 46 rows of a fictional landscaping
@@ -726,6 +758,32 @@ the paper run sheet that replaces it.
   prints as a label for the absence of a client, and every stop carries **In /
   Out** rules — the office costs a delivery by the time it took, so the times
   have to survive a dead phone and get typed in off the sheet.
+- **Cash at the door is not the invoice balance** (`jobs.collect_cash` +
+  `collect_cash_note`, `lib/cash-at-the-door.js`). A haul-away the customer pays
+  for on the spot, a client's own surcharge — money the driver has to come back
+  with that no invoice knows about. It surfaced as a sentence buried in a
+  client's imported notes ("CUSTOMER OWERS DRIVERS $50"), printed in italics at
+  the same weight as a reference number, on a sheet somebody reads in a van.
+  **Two sources, deliberately different.** A typed `collect_cash` is
+  authoritative — stated flat, totalled into the run's "to collect". Anything
+  `cashOwedInNotes` reads out of the client's prose is FLAGGED as read, never
+  presented as fact: the run sheet prints "read off the note — check it before
+  you ask" under the box, and the board card says the same. The reader exists
+  because those notes are already in the database and arrive that way with every
+  import; a structured field alone would be correct and would do nothing for the
+  stops on the board today.
+  It is deliberately conservative — an amount needs an owed/collect/cash/driver
+  word in the SAME clause, and any clause carrying paid/prepaid/deposit/credit is
+  skipped, so "customer already paid the driver $50" prints nothing. A miss keeps
+  the status quo; a false positive has a driver asking a customer for fifty
+  dollars they don't owe.
+  `lib/cash-at-the-door.js` imports NOTHING — it runs on the server for the
+  printed sheet and in the browser for the board and the driver's phone.
+  Shown boxed in **black** on the run sheet (louder than the trade-in's outline,
+  and the box holds the amount ALONE so it can never wrap), in the Collect
+  column, in the run's header total, on the board card, and shouting on the
+  driver's stop. Set from the job form — staff-level, because it is an
+  instruction to collect, not a price we charge.
 - **Anything meant to be printed carries a Print button** (`components/PrintButton.jsx`
   → `window.print()`): the run sheet and the POD form. "Press ⌘P" is not a
   feature, and on the warehouse tablet there is no ⌘P at all — Save as PDF is a
