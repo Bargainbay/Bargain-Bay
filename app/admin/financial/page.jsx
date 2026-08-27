@@ -3,7 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { financialDashboard, DASH_PERIODS } from '../../../lib/analytics';
-import { listExpenses, listRecurringExpenses, listUnreviewedExpenses, EXPENSE_CATEGORIES } from '../../../lib/finance';
+import { listExpenses, listRecurringExpenses, listUnreviewedExpenses, listExpenseRules, getLedgerStart, EXPENSE_CATEGORIES } from '../../../lib/finance';
 import { qboStatus } from '../../../lib/qbo';
 import { plaidStatus } from '../../../lib/plaid';
 import DashboardShell from '../../../components/DashboardShell';
@@ -12,6 +12,7 @@ import ExpenseEditor from '../../../components/ExpenseEditor';
 import QboPanel from '../../../components/QboPanel';
 import PlaidPanel from '../../../components/PlaidPanel';
 import TaxReview from '../../../components/TaxReview';
+import ExpenseRules from '../../../components/ExpenseRules';
 import { Kpi, HBars, TrendChart } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
@@ -30,11 +31,13 @@ export default async function FinancialDashboardPage({ searchParams }) {
   if (!hasDb()) return (<DashboardShell active="financial"><div className="panel">Database not configured.</div></DashboardShell>);
 
   const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
-  let d = null, expenses = [], recurring = [], unreviewed = [], error = '';
+  let d = null, expenses = [], recurring = [], unreviewed = [], rules = [], ledgerStart = '', error = '';
   try {
-    [d, expenses, recurring, unreviewed] = await Promise.all([
+    [d, expenses, recurring, unreviewed, rules, ledgerStart] = await Promise.all([
       financialDashboard(period), listExpenses(), listRecurringExpenses(),
-      listUnreviewedExpenses().catch(() => [])
+      listUnreviewedExpenses().catch(() => []),
+      listExpenseRules().catch(() => []),
+      getLedgerStart().catch(() => '')
     ]);
   } catch (e) { console.error('financial load failed', e.message); error = 'Could not load financial data.'; }
   let qbo = { configured: false, connected: false };
@@ -85,6 +88,26 @@ export default async function FinancialDashboardPage({ searchParams }) {
             : <HBars money rows={d.collections.map((c, i) => ({ label: methodLabel(c.method), value: c.amount, color: ['var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c6)'][i % 4] }))} />}
           <p className="hint" style={{ marginTop: 10 }}>Total collected: <strong>{money(k.collected)}</strong></p>
         </div>
+      </div>
+
+      <div className="panel" style={{ marginTop: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Profit &amp; loss statement</h2>
+          <p className="hint" style={{ margin: '2px 0 0' }}>
+            Revenue, cost of goods, every expense category, net profit — printable, and downloadable for your accountant.
+          </p>
+        </div>
+        <a className="btn accent" href="/admin/reports/pnl">Open the statement →</a>
+      </div>
+
+      {/* Rules sit above the feeds they govern: what arrives tomorrow depends on
+          what's set here today. */}
+      <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
+          Sorting rules
+          {rules.length > 0 && <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>{rules.length}</span>}
+        </h2>
+        <ExpenseRules initial={rules} categories={EXPENSE_CATEGORIES} ledgerStart={ledgerStart} />
       </div>
 
       <div className="panel" style={{ marginTop: 18 }}>
