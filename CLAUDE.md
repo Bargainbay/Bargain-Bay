@@ -1464,6 +1464,13 @@ of, and to leave in the other van.
   doorsteps this is for. Hence a real encoder rather than an image URL.
 - **The link ships with the stop list** (`/api/driver/jobs` returns `reviewUrl`),
   so it is on the handset before the driver is somewhere with one bar.
+- **The setting takes a LINK, not an image, and the owner asked why.** A QR code
+  IS a link — the existing review card has that same URL inside it. Storing the
+  artwork would fix the size, carry whatever margin and branding the card had
+  (both of which hurt scanning), and need an upload path for no gain. The setup
+  copy says this and tells them the two ways to get the link: Google Business
+  Profile → *Ask for reviews*, or point a phone camera at the card they already
+  have and copy the address it offers to open.
 - **`qrcode-generator` is a deliberate dependency** — the one place this repo
   takes a library where it wrote its own (`xlsx-lite`). The reasoning differs: a
   QR encoder is pure computation over OUR OWN url, not a parser eating untrusted

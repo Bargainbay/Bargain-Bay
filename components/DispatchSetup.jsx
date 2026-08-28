@@ -278,10 +278,14 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         <section className="panel">
           <h3 style={{ marginTop: 0 }}>Google review code</h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            Paste your Google review link and every driver gets a QR code on their phone to hold up at the
-            door — no card to carry, run out of, or leave in the other van. In Google Business Profile it is
-            <b> Ask for reviews</b>, and looks like <code>https://g.page/r/…/review</code>.
-            The code is generated on the handset, so it works with no signal.
+            <b>The link is all we need — the app draws the QR code itself</b>, on the handset, so it works
+            with no signal and stays sharp at any size. There is nothing to upload.
+          </p>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Two ways to get the link: in <b>Google Business Profile</b> it&apos;s <b>Ask for reviews</b>, and
+            it looks like <code>https://g.page/r/…/review</code> — or, if you already have a review card or
+            QR code, <b>point your phone camera at it</b> and copy the address it offers to open. That&apos;s
+            the same link, and it&apos;s exactly what your existing code has inside it.
           </p>
           <form onSubmit={saveReviewLink} className="disp-setup-form">
             <input value={reviewUrl} onChange={(e) => setReviewUrl(e.target.value)} style={{ minWidth: 320 }}
