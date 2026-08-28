@@ -1311,6 +1311,45 @@ and half a history in each.
   places that have nothing to do with driving). Offered automatically when a
   number change collides with another driver.
 
+## Shifts, the odometer, and fuel on the road (added 2026-08-27)
+`lib/shifts.js`, tables `vehicles` / `driver_shifts`, plus fuel columns on
+`dispatch_expenses`. Driver side: `components/DriverShift.jsx`,
+`/api/driver/shift` + `/api/driver/fuel`. Office side: the Shifts panel on the
+**Times** tab, Kilometres & fuel on **Profit**, vans under Clients & drivers.
+
+- **Shift hours are NOT time on site, and the two must never be added.** A shift
+  runs from picking the van up to parking it; `jobs.time_in`/`time_out` is the
+  minutes spent at a customer's door. One is what a person is paid for, the other
+  is what a delivery costs. Both screens say so out loud, because a number that
+  looks like the other one is how payroll and costing quietly diverge.
+- **One open shift per driver, enforced by a partial UNIQUE INDEX**
+  (`idx_driver_shift_open ... WHERE ended_at IS NULL`). A phone replaying "start
+  shift" off the offline queue must not open a second and double the hours; the
+  `ref` check catches the ordinary replay and the index catches everything else.
+- **`at` is the DEVICE's time**, same rule as a location ping: a driver clocking
+  on in an underground loading bay posts it when they find signal, and stamping
+  it on arrival would move the start of somebody's paid day.
+- **An end reading BELOW the start is refused**, in the app and again on the
+  server, naming the morning's figure and asking whether it's the trip meter.
+  Recording a negative distance would quietly poison every average built on it.
+- **A van is required for the odometer to mean anything** (`vehicles`). Two
+  trucks' readings in one column is not a mileage figure. Staff-level to add —
+  it's a name for a truck, not an access grant.
+- **Fuel a driver adds on the road lands in `dispatch_expenses`, the SAME table
+  the office types gas into.** No second code path, no two sets of fuel figures
+  to reconcile, and the Profit tab picks it up with no changes. Deduped on `ref`
+  — a replayed fill would double the day's fuel AND halve the mileage built on
+  it. The receipt goes to the private Blob store; **a failed photo upload must
+  not fail the entry** (the amount is the record, the picture is evidence).
+- **`mileageReport` reports L/100km ONLY when both halves are real** — distance
+  from shift odometer readings, litres from the fills. A figure built on one of
+  them looks authoritative and is invented, and somebody would price a delivery
+  off it. The panel names what's missing instead: shifts with a reading at only
+  one end, fills with no litres.
+- **`lib/driver-outbox.js` grew a `url`** so a shift or a fuel receipt rides the
+  SAME queue as everything else. Two queues would drain in an order nobody
+  controls and a fuel entry could land before the shift it belongs to.
+
 ## Two businesses, one codebase — BRANDS
 Bargain Bay is the consumer storefront. **RS Solutions is the delivery/service
 company** whose clients are other businesses (Transource et al). A client must

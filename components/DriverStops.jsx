@@ -5,6 +5,7 @@ import { cashAtTheDoor } from '../lib/cash-at-the-door';
 import { formatPhone } from '../lib/constants';
 import DriverFinish from './DriverFinish';
 import DriverPhotos from './DriverPhotos';
+import DriverShift from './DriverShift';
 
 // The driver's day. Designed for one hand, in a van, in the sun: big targets,
 // one obvious next action per stop, and no screen that needs reading.
@@ -159,6 +160,12 @@ export default function DriverStops({ initial, driverName }) {
       )}
       {online && queued > 0 && <div className="drv-sending">Sending {queued} saved {queued === 1 ? 'update' : 'updates'}…</div>}
       {err && <div className="error-box">{err}</div>}
+
+      {/* The day AROUND the stops: clocking on, the van's odometer, and a
+          fill-up on the road. Above the stop list because it is the first and
+          last thing touched, and because a shift nobody started is a day nobody
+          gets paid for. */}
+      <DriverShift onChanged={push} />
 
       {unfinished.length > 0 && (
         <div className="drv-unfinished">

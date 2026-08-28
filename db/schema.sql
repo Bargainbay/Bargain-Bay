@@ -647,3 +647,48 @@ CREATE TABLE IF NOT EXISTS dispatch_expenses (
   created_at      timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_dispatch_expenses_date ON dispatch_expenses(expense_date);
+
+-- Which van. An odometer reading that doesn't say which truck it came off is not
+-- a mileage figure, it's two trucks' numbers in one column.
+CREATE TABLE IF NOT EXISTS vehicles (
+  id serial PRIMARY KEY,
+  name text NOT NULL,
+  plate text,
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- The driver's DAY, as distinct from the stops inside it. Time on shift is what
+-- a person is paid for; time on site (jobs.time_in/out) is what a delivery
+-- costs. Separate on purpose — adding them up would be wrong both ways.
+CREATE TABLE IF NOT EXISTS driver_shifts (
+  id serial PRIMARY KEY,
+  user_id    int NOT NULL,
+  vehicle_id int,
+  started_at timestamptz NOT NULL,
+  ended_at   timestamptz,
+  start_km int,
+  end_km   int,
+  start_lat numeric(9,6), start_lng numeric(9,6),
+  end_lat   numeric(9,6), end_lng   numeric(9,6),
+  note text,
+  ref  text
+);
+CREATE INDEX IF NOT EXISTS idx_driver_shifts_user ON driver_shifts(user_id, started_at DESC);
+-- One open shift per driver, enforced where it can't be argued with: a phone
+-- replaying "start shift" off the offline queue must not open a second one and
+-- quietly double somebody's hours.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_driver_shift_open
+  ON driver_shifts(user_id) WHERE ended_at IS NULL;
+
+-- Fuel added by a driver on the road lands in the SAME table the office types
+-- gas into, so the Profit tab needs no second code path and there are never two
+-- sets of fuel figures to reconcile.
+ALTER TABLE dispatch_expenses ADD COLUMN IF NOT EXISTS litres       numeric(8,2);
+ALTER TABLE dispatch_expenses ADD COLUMN IF NOT EXISTS odometer_km  int;
+ALTER TABLE dispatch_expenses ADD COLUMN IF NOT EXISTS vehicle_id   int;
+ALTER TABLE dispatch_expenses ADD COLUMN IF NOT EXISTS shift_id     int;
+ALTER TABLE dispatch_expenses ADD COLUMN IF NOT EXISTS receipt_path text;
+ALTER TABLE dispatch_expenses ADD COLUMN IF NOT EXISTS receipt_url  text;
+ALTER TABLE dispatch_expenses ADD COLUMN IF NOT EXISTS ref          text;
+CREATE INDEX IF NOT EXISTS idx_dispatch_expenses_ref ON dispatch_expenses(ref) WHERE ref IS NOT NULL;
