@@ -657,6 +657,13 @@ CREATE TABLE IF NOT EXISTS vehicles (
   active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+-- WHO PAYS FOR THE FUEL — a property of the TRUCK, not of the fill. The 20ft box
+-- truck comes from a carrier who bills fortnightly for the truck and its diesel
+-- together; our own pickups are fuelled by the driver, who is e-transferred for
+-- it. Different kinds of money: counting a carrier truck's fills as cost charges
+-- us for the same tank twice, once as the fill and again inside the invoice.
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS fuel_paid_by text NOT NULL DEFAULT 'us';  -- us | carrier
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS carrier_name text;
 
 -- The driver's DAY, as distinct from the stops inside it. Time on shift is what
 -- a person is paid for; time on site (jobs.time_in/out) is what a delivery

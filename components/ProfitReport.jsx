@@ -178,15 +178,16 @@ export default function ProfitReport({ drivers = [], date }) {
                   <th style={{ textAlign: 'right' }}>Charged</th>
                   <th style={{ textAlign: 'right' }}>Drivers</th>
                   <th style={{ textAlign: 'right' }}>Gas</th>
+                  <th style={{ textAlign: 'right' }}>Carrier fuel</th>
                   <th style={{ textAlign: 'right' }}>Other</th>
                   <th style={{ textAlign: 'right' }}>Profit</th>
                   <th style={{ textAlign: 'right' }}>Margin</th>
                 </tr>
               </thead>
               <tbody>
-                {loading && <tr><td colSpan={9} style={{ color: 'var(--muted)' }}>Loading…</td></tr>}
+                {loading && <tr><td colSpan={10} style={{ color: 'var(--muted)' }}>Loading…</td></tr>}
                 {!loading && data.buckets.length === 0 && (
-                  <tr><td colSpan={9} style={{ color: 'var(--muted)' }}>
+                  <tr><td colSpan={10} style={{ color: 'var(--muted)' }}>
                     Nothing finished, and nothing spent, in that period.
                   </td></tr>
                 )}
@@ -203,6 +204,11 @@ export default function ProfitReport({ drivers = [], date }) {
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(b.revenue)}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(b.driverPay)}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(b.gas)}</td>
+                    {/* Shown, and NOT added in. It is already inside the
+                        carrier's invoice, which arrives as its own cost row. */}
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--muted)' }}>
+                      {b.carrierFuel ? money(b.carrierFuel) : '—'}
+                    </td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(b.otherCost)}</td>
                     <td style={{
                       textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700,
@@ -218,7 +224,10 @@ export default function ProfitReport({ drivers = [], date }) {
             <p className="hint">
               Charged is what the client pays: the charge typed on the job, or — for a Bargain Bay delivery — the
               delivery fee on the order. Cost is what the stop paid its driver, plus the gas and anything else
-              recorded against that day. A stop that <b>couldn&apos;t be completed</b> earns nothing and is still
+              recorded against that day.
+              <b> Carrier fuel is shown but not counted</b> — the diesel in a carrier-supplied truck is already
+              inside their fortnightly invoice, so adding the fills would charge the same tank twice. Record
+              that invoice as a <b>Carrier bill</b> cost when it comes in. A stop that <b>couldn&apos;t be completed</b> earns nothing and is still
               counted, because it cost the same driver and the same fuel.
             </p>
           </div>

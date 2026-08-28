@@ -18,6 +18,8 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   const [reviewUrl, setReviewUrl] = useState('');
   const [vanName, setVanName] = useState('');
   const [vanPlate, setVanPlate] = useState('');
+  const [vanFuel, setVanFuel] = useState('us');
+  const [vanCarrier, setVanCarrier] = useState('');
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
@@ -92,12 +94,15 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
     try {
       const res = await fetch('/api/admin/dispatch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'vehicle', name: vanName, plate: vanPlate })
+        body: JSON.stringify({
+          action: 'vehicle', name: vanName, plate: vanPlate,
+          fuelPaidBy: vanFuel, carrierName: vanCarrier
+        })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not save the van.'); return; }
       setOk(`${d.vehicle.name} added.`);
-      setVanName(''); setVanPlate('');
+      setVanName(''); setVanPlate(''); setVanFuel('us'); setVanCarrier('');
       await loadVans();
     } catch { setErr('Network error — nothing was saved.'); }
     finally { setBusy(''); }
@@ -108,7 +113,10 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
     try {
       await fetch('/api/admin/dispatch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'vehicle', id: v.id, name: v.name, plate: v.plate, active: !v.active })
+        body: JSON.stringify({
+          action: 'vehicle', id: v.id, name: v.name, plate: v.plate, active: !v.active,
+          fuelPaidBy: v.fuelPaidBy, carrierName: v.carrierName
+        })
       });
       await loadVans();
     } catch { setErr('Network error.'); }
@@ -315,6 +323,11 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
               <li key={v.id} style={{ opacity: v.active ? 1 : 0.55 }}>
                 <strong>{v.name}</strong>
                 {v.plate && <span className="hint" style={{ margin: 0 }}> · {v.plate}</span>}
+                <span className="hint" style={{ margin: 0 }}>
+                  {v.fuelPaidBy === 'carrier'
+                    ? ` · fuel billed by ${v.carrierName || 'the carrier'}`
+                    : ' · we pay the fuel'}
+                </span>
                 {!v.active && <span className="hint" style={{ margin: 0 }}> · retired</span>}
                 <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
                   onClick={() => toggleVan(v)}>{v.active ? 'retire' : 'bring back'}</button>
@@ -325,8 +338,26 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         <form onSubmit={saveVan} className="disp-setup-form">
           <input value={vanName} onChange={(e) => setVanName(e.target.value)} placeholder="Van name *" />
           <input value={vanPlate} onChange={(e) => setVanPlate(e.target.value)} placeholder="Plate (optional)" />
+          {/* Who settles the fuel decides whether a driver's fill is a COST or
+              only a mileage record. Get it wrong on the box truck and the P&L
+              charges the same diesel twice — once as the fill, again inside the
+              carrier's fortnightly invoice. */}
+          <select value={vanFuel} onChange={(e) => setVanFuel(e.target.value)} style={{ minWidth: 260 }}>
+            <option value="us">We pay the fuel — driver pumps, we e-transfer them</option>
+            <option value="carrier">Carrier pays — billed to us with the truck</option>
+          </select>
+          {vanFuel === 'carrier' && (
+            <input value={vanCarrier} onChange={(e) => setVanCarrier(e.target.value)}
+              placeholder="Carrier name (optional)" />
+          )}
           <button className="btn accent" disabled={busy === 'van'}>{busy === 'van' ? 'Adding…' : 'Add van'}</button>
         </form>
+        <p className="hint">
+          On a <b>carrier</b> truck the drivers still log fills — that is how we know the litres, and
+          therefore the mileage — but the money stays out of the Profit tab&apos;s cost, because it is
+          already inside the carrier&apos;s invoice. Record that invoice as a <b>Carrier bill</b> cost when
+          it arrives.
+        </p>
       </section>
 
       <section className="panel">

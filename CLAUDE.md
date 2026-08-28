@@ -1439,6 +1439,27 @@ and half a history in each.
   them looks authoritative and is invented, and somebody would price a delivery
   off it. The panel names what's missing instead: shifts with a reading at only
   one end, fills with no litres.
+- **WHO PAYS FOR THE FUEL is a property of the TRUCK** (`vehicles.fuel_paid_by`
+  = `us` | `carrier`), and it decides whether a driver's fill is a cost or only a
+  mileage record. The owner's two arrangements:
+  · the **20ft box truck** comes from a carrier who bills **fortnightly for the
+    truck AND its diesel** — so a fill logged against it is already paid for
+    inside that invoice;
+  · **our own pickups** are fuelled by the driver, who is **e-transferred** for
+    it — so the driver's entry is the ONLY record of that money anywhere, and
+    Plaid won't help (it drops `TRANSFER_OUT`, which is what an e-transfer is).
+  **LANDMINE — the double count.** Counting a carrier truck's fills as cost
+  charges us for the same tank twice: once as the fill, again inside the
+  carrier's invoice. `profitReport` therefore reports `carrierFuel` SEPARATELY
+  and leaves it out of `cost`, the Profit table shows it in its own greyed
+  column so the exclusion is never silent, and `EXPENSE_KINDS` gained
+  **`carrier`** ("Carrier bill — truck + fuel") for the invoice itself. Same rule
+  as the delivery fee: one representation at a time.
+  **Litres are counted for EVERY truck**, whoever paid — that is how far it went
+  on how much. So a carrier truck still gets its L/100km and simply has no cost
+  per km. Both the driver's fuel form and the van list say which kind of truck
+  it is, because a driver typing an amount deserves to know whether it is coming
+  back to them.
 - **The office can SEE the receipt** (`/api/admin/dispatch/receipt?id=`, same
   private-blob proxy shape as the POD). This is what makes the feature actually
   remove office work rather than move it: without it they'd be asking for the

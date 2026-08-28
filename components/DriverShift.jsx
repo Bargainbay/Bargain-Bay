@@ -143,7 +143,9 @@ export default function DriverShift({ onChanged }) {
               ■ End shift
             </button>
           </div>
-          {form === 'fuel' && <FuelForm onCancel={() => setForm(null)} onSave={fuel} />}
+          {form === 'fuel' && (
+            <FuelForm shift={shift} onCancel={() => setForm(null)} onSave={fuel} />
+          )}
           {form === 'end' && <EndForm shift={shift} onCancel={() => setForm(null)} onEnd={finish} />}
         </>
       )}
@@ -253,7 +255,7 @@ function EndForm({ shift, onCancel, onEnd }) {
   );
 }
 
-function FuelForm({ onCancel, onSave }) {
+function FuelForm({ shift, onCancel, onSave }) {
   const [amount, setAmount] = useState('');
   const [litres, setLitres] = useState('');
   const [odometer, setOdometer] = useState('');
@@ -268,6 +270,16 @@ function FuelForm({ onCancel, onSave }) {
         onSave({ amount, litres, odometer, note, receipt });
       }}
     >
+      {/* The driver should know which of the two this is before they type an
+          amount — one gets them e-transferred, the other is a mileage record on
+          a truck the carrier already bills us for. */}
+      {shift?.fuelPaidBy === 'carrier' && (
+        <p className="hint" style={{ margin: 0 }}>
+          {shift.carrierName || 'The carrier'} pays for fuel on {shift.vehicleName || 'this truck'}. Put it
+          in anyway — the litres are how we work out the mileage — but this isn&apos;t money coming back to
+          you, and it won&apos;t be counted twice.
+        </p>
+      )}
       <label>What it cost
         <input inputMode="decimal" value={amount} autoFocus placeholder="82.40"
           onChange={(e) => setAmount(e.target.value)} />
