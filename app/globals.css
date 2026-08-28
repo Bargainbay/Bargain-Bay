@@ -1260,6 +1260,42 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
    sheet totals this in its header; the phone was making drivers add it up. */
 .drv-owed { font-size: 13px; font-weight: 700; color: var(--charcoal); margin-top: 2px; white-space: nowrap; }
 
+/* The day around the stops: clocking on, the odometer, fuel on the road. */
+.drv-shift { margin: 10px 0 14px; }
+.drv-shift-btn { width: 100%; justify-content: center; }
+.drv-shift-on {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 11px 13px; border-radius: 10px; background: var(--tint); margin-bottom: 8px;
+}
+.drv-shift-on b { font-size: 17px; color: var(--charcoal); }
+.drv-shift-sub { display: block; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.drv-form {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px; border: 1px solid var(--line-soft); border-radius: 10px; margin-top: 8px;
+}
+.drv-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
+/* 16px minimum or iOS zooms the whole page when the field takes focus. */
+.drv-form input, .drv-form select { font-size: 16px; padding: 10px; width: 100%; }
+.drv-note-input { font-size: 16px; padding: 10px; width: 100%; }
+
+/* The Google review code, held up at a door. Full screen, maximum contrast, and
+   nothing else on it — a customer has about five seconds of goodwill and a
+   camera that wants a big, flat, bright target. */
+.drv-qr {
+  position: fixed; inset: 0; z-index: 60;
+  background: #fff; color: #111;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: 20px calc(20px + env(safe-area-inset-right, 0px))
+            calc(20px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-left, 0px));
+}
+.drv-qr-head { font-size: 21px; font-weight: 800; text-align: center; }
+.drv-qr-code {
+  width: min(78vw, 60vh); height: min(78vw, 60vh);
+  display: flex; align-items: center; justify-content: center;
+}
+.drv-qr-code svg { width: 100%; height: 100%; display: block; }
+.drv-qr-sub { font-size: 15px; text-align: center; color: #444; margin: 0; max-width: 30ch; }
+.drv-qr .drv-btn { width: min(78vw, 60vh); justify-content: center; }
 /* Location sharing, announced on the driver's own screen. Quiet by default —
    it is a standing fact, not an alert — and loud only when it is OFF and the
    office is therefore blind. */

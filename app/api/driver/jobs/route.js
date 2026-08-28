@@ -7,7 +7,10 @@ import {
   driverJobs, jobBelongsToDriver, podAlreadyRecorded, photoBatchRecorded, jobPhotoCount,
   jobPhotosWithRef, saveJobSignature, addJobPhoto, markOrderDeliveredForJob
 } from '../../../../lib/driver-jobs';
-import { setJobStatus, completeJob, jobInvoiceForPayment, noteJobEvent } from '../../../../lib/jobs';
+import {
+  setJobStatus, completeJob, jobInvoiceForPayment, noteJobEvent, markReviewAsked
+} from '../../../../lib/jobs';
+import { getSetting } from '../../../../lib/settings';
 import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +35,14 @@ export async function GET(req) {
   const date = new URL(req.url).searchParams.get('date') || '';
   touchDriverSeen(s.userId).catch(() => {});
   try {
-    return NextResponse.json({ ...(await driverJobs(s.userId, { date })), driver: { name: s.name || '' } });
+    // The review link rides along with the stop list so it is on the phone
+    // BEFORE the driver is standing at a door with one bar of signal.
+    const reviewUrl = await getSetting('google_review_url', '').catch(() => '');
+    return NextResponse.json({
+      ...(await driverJobs(s.userId, { date })),
+      driver: { name: s.name || '' },
+      reviewUrl: typeof reviewUrl === 'string' ? reviewUrl : ''
+    });
   } catch (e) {
     return fail(e);
   }
@@ -63,6 +73,11 @@ export async function PATCH(req) {
       if (rows[0]?.status === body.status) return NextResponse.json({ ok: true, unchanged: true });
       const job = await setJobStatus(jobId, body.status, body, who(s));
       return NextResponse.json({ ok: true, job });
+    }
+    // The review code was shown. Idempotent by construction — the column only
+    // ever moves forward — so a replay costs nothing.
+    if (body.action === 'review_asked') {
+      return NextResponse.json({ ok: true, job: await markReviewAsked(jobId) });
     }
     if (body.action === 'payment') {
       const target = await jobInvoiceForPayment(jobId);

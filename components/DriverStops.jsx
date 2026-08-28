@@ -6,6 +6,8 @@ import { formatPhone } from '../lib/constants';
 import { startSharing, stopSharing, markNow, geoSupported } from '../lib/driver-geo';
 import DriverFinish from './DriverFinish';
 import DriverPhotos from './DriverPhotos';
+import DriverShift from './DriverShift';
+import ReviewQr from './ReviewQr';
 
 // The driver's day. Designed for one hand, in a van, in the sun: big targets,
 // one obvious next action per stop, and no screen that needs reading.
@@ -52,6 +54,8 @@ export default function DriverStops({ initial, driverName }) {
   const [adding, setAdding] = useState(null);         // a finished stop getting more photos
   const [err, setErr] = useState('');
   const timer = useRef(null);
+  const [reviewFor, setReviewFor] = useState(null);   // the stop we're asking on
+  const [reviewUrl, setReviewUrl] = useState(initial.reviewUrl || '');
   const [geo, setGeo] = useState({ state: 'off' });
 
   // Reload from the server, but never over the top of unsent work — the queue is
@@ -71,6 +75,7 @@ export default function DriverStops({ initial, driverName }) {
       const d = await res.json();
       if (Array.isArray(d.stops)) setStops(d.stops);
       if (Array.isArray(d.tomorrow)) setTomorrow(d.tomorrow);
+      if (typeof d.reviewUrl === 'string') setReviewUrl(d.reviewUrl);
     } catch { /* offline: keep what's on screen */ }
   }, []);
 
@@ -164,6 +169,17 @@ export default function DriverStops({ initial, driverName }) {
     push();
   }
 
+  // Asking is what gets recorded. Whether a review was actually left is
+  // something Google never tells us, and "we asked on 12 of 15" is a number the
+  // office can act on in a way "we got 3 reviews" is not.
+  function askedForReview(stop) {
+    if (!stop?.id) return;
+    queueAction({
+      kind: 'patch', ref: newRef(),
+      body: { jobId: stop.id, action: 'review_asked' }
+    }).then(push).catch(() => {});
+  }
+
   const start = (s) => act(s, { status: 'on_the_way' }, { action: 'status', status: 'on_the_way' });
   // Arriving starts the clock, and the driver has to be able to SEE that it
   // started — the whole reason the office was retyping these times out of the
@@ -249,6 +265,12 @@ export default function DriverStops({ initial, driverName }) {
       )}
       {err && <div className="error-box">{err}</div>}
 
+      {/* The day AROUND the stops: clocking on, the van's odometer, and a
+          fill-up on the road. Above the stop list because it is the first and
+          last thing touched, and because a shift nobody started is a day nobody
+          gets paid for. */}
+      <DriverShift onChanged={push} />
+
       {unfinished.length > 0 && (
         <div className="drv-unfinished">
           You never finished {unfinished.length === 1 ? 'a stop' : `${unfinished.length} stops`} from an earlier day
@@ -271,8 +293,17 @@ export default function DriverStops({ initial, driverName }) {
       {closed.length > 0 && (
         <>
           <h2 className="drv-sub">Finished</h2>
-          {closed.map((s) => <StopCard key={s.id} stop={s} done onAddPhotos={() => setAdding(s)} />)}
+          {closed.map((s) => (
+            <StopCard key={s.id} stop={s} done
+              onAddPhotos={() => setAdding(s)}
+              onReview={reviewUrl && s.status === 'done' ? () => setReviewFor(s) : null} />
+          ))}
         </>
+      )}
+
+      {reviewFor && reviewUrl && (
+        <ReviewQr url={reviewUrl} onClose={() => setReviewFor(null)}
+          onAsked={() => askedForReview(reviewFor)} />
       )}
 
       {adding && (
@@ -315,7 +346,7 @@ export default function DriverStops({ initial, driverName }) {
   );
 }
 
-function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail, onAddPhotos }) {
+function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail, onAddPhotos, onReview }) {
   const addr = fullAddress(stop);
   const isService = stop.type === 'service_call';
   const cash = cashAtTheDoor(stop);
@@ -437,6 +468,11 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
           </div>
           {/* The pictures are what a driver remembers after walking away. Without
               this the only route was texting them to the office. */}
+          {onReview && (
+            <button type="button" className="drv-btn go" onClick={onReview}>
+              ⭐ Ask for a Google review
+            </button>
+          )}
           {onAddPhotos && (
             <button type="button" className="drv-btn small" onClick={onAddPhotos}>
               📷 {stop.photoCount ? 'Add more photos' : 'Add photos'}

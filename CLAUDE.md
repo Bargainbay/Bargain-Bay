@@ -1391,6 +1391,78 @@ and half a history in each.
   places that have nothing to do with driving). Offered automatically when a
   number change collides with another driver.
 
+## Shifts, the odometer, and fuel on the road (added 2026-08-27)
+`lib/shifts.js`, tables `vehicles` / `driver_shifts`, plus fuel columns on
+`dispatch_expenses`. Driver side: `components/DriverShift.jsx`,
+`/api/driver/shift` + `/api/driver/fuel`. Office side: the Shifts panel on the
+**Times** tab, Kilometres & fuel on **Profit**, vans under Clients & drivers.
+
+- **Shift hours are NOT time on site, and the two must never be added.** A shift
+  runs from picking the van up to parking it; `jobs.time_in`/`time_out` is the
+  minutes spent at a customer's door. One is what a person is paid for, the other
+  is what a delivery costs. Both screens say so out loud, because a number that
+  looks like the other one is how payroll and costing quietly diverge.
+- **One open shift per driver, enforced by a partial UNIQUE INDEX**
+  (`idx_driver_shift_open ... WHERE ended_at IS NULL`). A phone replaying "start
+  shift" off the offline queue must not open a second and double the hours; the
+  `ref` check catches the ordinary replay and the index catches everything else.
+- **`at` is the DEVICE's time**, same rule as a location ping: a driver clocking
+  on in an underground loading bay posts it when they find signal, and stamping
+  it on arrival would move the start of somebody's paid day.
+- **An end reading BELOW the start is refused**, in the app and again on the
+  server, naming the morning's figure and asking whether it's the trip meter.
+  Recording a negative distance would quietly poison every average built on it.
+- **A van is required for the odometer to mean anything** (`vehicles`). Two
+  trucks' readings in one column is not a mileage figure. Staff-level to add —
+  it's a name for a truck, not an access grant.
+- **Fuel a driver adds on the road lands in `dispatch_expenses`, the SAME table
+  the office types gas into.** No second code path, no two sets of fuel figures
+  to reconcile, and the Profit tab picks it up with no changes. Deduped on `ref`
+  — a replayed fill would double the day's fuel AND halve the mileage built on
+  it. The receipt goes to the private Blob store; **a failed photo upload must
+  not fail the entry** (the amount is the record, the picture is evidence).
+- **`mileageReport` reports L/100km ONLY when both halves are real** — distance
+  from shift odometer readings, litres from the fills. A figure built on one of
+  them looks authoritative and is invented, and somebody would price a delivery
+  off it. The panel names what's missing instead: shifts with a reading at only
+  one end, fills with no litres.
+- **`lib/driver-outbox.js` grew a `url`** so a shift or a fuel receipt rides the
+  SAME queue as everything else. Two queues would drain in an order nobody
+  controls and a fuel entry could land before the shift it belongs to.
+
+## The Google review code (added 2026-08-27)
+`components/ReviewQr.jsx` + `qrcode-generator`, setting `google_review_url`,
+`jobs.review_asked_at`. The driver holds up a QR at the door; the customer scans
+it and lands on the Google review page.
+
+It replaces a **physical review card** — the owner's reason, in his words: a card
+is "just one extra thing they have to keep". One more thing to carry, to run out
+of, and to leave in the other van.
+
+- **The code is generated ON THE PHONE, never fetched.** A QR that arrives as an
+  image from a server is a QR that does not exist in a basement, on a rural road,
+  or in the thirty seconds a customer will stand there — which is most of the
+  doorsteps this is for. Hence a real encoder rather than an image URL.
+- **The link ships with the stop list** (`/api/driver/jobs` returns `reviewUrl`),
+  so it is on the handset before the driver is somewhere with one bar.
+- **`qrcode-generator` is a deliberate dependency** — the one place this repo
+  takes a library where it wrote its own (`xlsx-lite`). The reasoning differs: a
+  QR encoder is pure computation over OUR OWN url, not a parser eating untrusted
+  files, and getting Reed-Solomon and mask scoring subtly wrong produces a code
+  that fails to scan on a doorstep with nothing to debug it. It adds no audit
+  findings (the repo's existing ones are next/sharp/postcss).
+- **Error correction 'M', not 'L'.** A fingerprint on the screen and a phone held
+  at an angle are the normal conditions here.
+- **A screen wake lock is held while the code is up.** A screen that dims
+  mid-scan is the single most likely way this fails.
+- **`review_asked_at` records that the code was SHOWN**, `COALESCE`d so it only
+  ever moves forward. Whether a review was left is something Google never tells
+  us; "we asked on 12 of 15 deliveries" is a number the office can act on, and
+  "we got 3 reviews" is not.
+- Offered on a stop once it is **done** — the moment the appliance is in and the
+  customer is pleased, not while a fridge is still on the trolley.
+- The link is **admin-only** to set: it is the address customers are sent to, and
+  a wrong one quietly sends a month of reviews somewhere else.
 ## Live driver tracking (phase 4, added 2026-08-27)
 The **Live** tab on `/admin/dispatch`, `lib/driver-location.js`, `lib/driver-geo.js`,
 `POST /api/driver/location`, table `driver_pings`.

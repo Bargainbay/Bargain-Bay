@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import Mileage from './Mileage';
 
 // What the delivery side of the business actually makes, day by day, week by
 // week, month by month.
@@ -257,6 +258,8 @@ export default function ProfitReport({ drivers = [], date }) {
               </p>
             </div>
           )}
+
+          <Mileage from={data.from} to={data.to} />
 
           <GasPanel kinds={data.kinds} drivers={drivers} expenses={data.expenses} defaultDate={date || t}
             busy={busy} onAdd={addExpense} onRemove={removeExpense} />

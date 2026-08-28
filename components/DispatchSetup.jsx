@@ -14,6 +14,10 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   const [link, setLink] = useState(null);   // the sign-in link just minted
   const [merge, setMerge] = useState(null);       // a duplicate account waiting to be folded in
   const [sameName, setSameName] = useState(null); // the driver an "add" collided with
+  const [vans, setVans] = useState([]);
+  const [reviewUrl, setReviewUrl] = useState('');
+  const [vanName, setVanName] = useState('');
+  const [vanPlate, setVanPlate] = useState('');
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
@@ -48,6 +52,68 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   }, []);
 
   useEffect(() => { if (canManageDrivers) loadRoster(); }, [canManageDrivers, loadRoster]);
+
+  // The vans. An odometer reading that doesn't say which truck it came off is
+  // not a mileage figure — it's two trucks' numbers in one column.
+  const loadVans = useCallback(async () => {
+    try {
+      const d = await fetch('/api/admin/dispatch?view=vehicles').then((r) => r.json());
+      if (Array.isArray(d.vehicles)) setVans(d.vehicles);
+    } catch { /* keep what we have */ }
+  }, []);
+  useEffect(() => { loadVans(); }, [loadVans]);
+
+  // The Google review link. It reaches the driver's phone with their stop list,
+  // so it is on the handset BEFORE they are standing at a door with one bar.
+  useEffect(() => {
+    fetch('/api/admin/dispatch?view=review_link')
+      .then((r) => r.json()).then((d) => setReviewUrl(d.url || '')).catch(() => {});
+  }, []);
+
+  async function saveReviewLink(e) {
+    e.preventDefault();
+    setBusy('review'); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'review_link', url: reviewUrl })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not save the link.'); return; }
+      setOk(reviewUrl ? 'Review link saved — the drivers get it with their next stop list.' : 'Review link cleared.');
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(''); }
+  }
+
+  async function saveVan(e) {
+    e.preventDefault();
+    if (!vanName.trim()) { setErr('Give the van a name — whatever the crew calls it.'); return; }
+    setBusy('van'); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'vehicle', name: vanName, plate: vanPlate })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not save the van.'); return; }
+      setOk(`${d.vehicle.name} added.`);
+      setVanName(''); setVanPlate('');
+      await loadVans();
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(''); }
+  }
+
+  async function toggleVan(v) {
+    setBusy(`van${v.id}`); setErr('');
+    try {
+      await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'vehicle', id: v.id, name: v.name, plate: v.plate, active: !v.active })
+      });
+      await loadVans();
+    } catch { setErr('Network error.'); }
+    finally { setBusy(''); }
+  }
 
   async function addDriverByPhone(e) {
     e.preventDefault();
@@ -205,6 +271,57 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
           <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="Contact email (optional)" />
           <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="Contact phone (optional)" />
           <button className="btn accent" disabled={busy === 'client'}>{busy === 'client' ? 'Adding…' : 'Add client'}</button>
+        </form>
+      </section>
+
+      {canManageDrivers && (
+        <section className="panel">
+          <h3 style={{ marginTop: 0 }}>Google review code</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Paste your Google review link and every driver gets a QR code on their phone to hold up at the
+            door — no card to carry, run out of, or leave in the other van. In Google Business Profile it is
+            <b> Ask for reviews</b>, and looks like <code>https://g.page/r/…/review</code>.
+            The code is generated on the handset, so it works with no signal.
+          </p>
+          <form onSubmit={saveReviewLink} className="disp-setup-form">
+            <input value={reviewUrl} onChange={(e) => setReviewUrl(e.target.value)} style={{ minWidth: 320 }}
+              placeholder="https://g.page/r/…/review" inputMode="url" />
+            <button className="btn accent" disabled={busy === 'review'}>
+              {busy === 'review' ? 'Saving…' : 'Save link'}
+            </button>
+          </form>
+          {reviewUrl && (
+            <p className="hint">
+              Drivers see <b>⭐ Ask for a Google review</b> on a stop once it&apos;s finished.{' '}
+              <a href={reviewUrl} target="_blank" rel="noopener noreferrer">Check the link goes to the right page ↗</a>
+            </p>
+          )}
+        </section>
+      )}
+
+      <section className="panel">
+        <h3 style={{ marginTop: 0 }}>Vans</h3>
+        <p className="hint" style={{ marginTop: 0 }}>
+          Drivers pick one when they start a shift, and the odometer readings hang off it. Without a van
+          on the reading, two trucks&apos; numbers land in one column and the mileage means nothing.
+        </p>
+        {vans.length > 0 && (
+          <ul className="disp-setup-list">
+            {vans.map((v) => (
+              <li key={v.id} style={{ opacity: v.active ? 1 : 0.55 }}>
+                <strong>{v.name}</strong>
+                {v.plate && <span className="hint" style={{ margin: 0 }}> · {v.plate}</span>}
+                {!v.active && <span className="hint" style={{ margin: 0 }}> · retired</span>}
+                <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
+                  onClick={() => toggleVan(v)}>{v.active ? 'retire' : 'bring back'}</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <form onSubmit={saveVan} className="disp-setup-form">
+          <input value={vanName} onChange={(e) => setVanName(e.target.value)} placeholder="Van name *" />
+          <input value={vanPlate} onChange={(e) => setVanPlate(e.target.value)} placeholder="Plate (optional)" />
+          <button className="btn accent" disabled={busy === 'van'}>{busy === 'van' ? 'Adding…' : 'Add van'}</button>
         </form>
       </section>
 

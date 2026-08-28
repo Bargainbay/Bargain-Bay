@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import ShiftHours from './ShiftHours';
 
 // The history of every stop, with the clock beside it: when the driver got
 // there, when they finished, how long it took.
@@ -146,6 +147,8 @@ export default function StopTimes({ drivers = [] }) {
               closing the stop out now, which would record every hour since as time on site.
             </div>
           )}
+
+          <ShiftHours from={data.from} to={data.to} drivers={drivers} />
 
           <div className="panel">
             <p className="hint" style={{ marginTop: 0 }}>
