@@ -15,6 +15,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   const [merge, setMerge] = useState(null);       // a duplicate account waiting to be folded in
   const [sameName, setSameName] = useState(null); // the driver an "add" collided with
   const [vans, setVans] = useState([]);
+  const [reviewUrl, setReviewUrl] = useState('');
   const [vanName, setVanName] = useState('');
   const [vanPlate, setVanPlate] = useState('');
   const [busy, setBusy] = useState('');
@@ -61,6 +62,28 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
     } catch { /* keep what we have */ }
   }, []);
   useEffect(() => { loadVans(); }, [loadVans]);
+
+  // The Google review link. It reaches the driver's phone with their stop list,
+  // so it is on the handset BEFORE they are standing at a door with one bar.
+  useEffect(() => {
+    fetch('/api/admin/dispatch?view=review_link')
+      .then((r) => r.json()).then((d) => setReviewUrl(d.url || '')).catch(() => {});
+  }, []);
+
+  async function saveReviewLink(e) {
+    e.preventDefault();
+    setBusy('review'); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'review_link', url: reviewUrl })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not save the link.'); return; }
+      setOk(reviewUrl ? 'Review link saved — the drivers get it with their next stop list.' : 'Review link cleared.');
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(''); }
+  }
 
   async function saveVan(e) {
     e.preventDefault();
@@ -250,6 +273,31 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
           <button className="btn accent" disabled={busy === 'client'}>{busy === 'client' ? 'Adding…' : 'Add client'}</button>
         </form>
       </section>
+
+      {canManageDrivers && (
+        <section className="panel">
+          <h3 style={{ marginTop: 0 }}>Google review code</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Paste your Google review link and every driver gets a QR code on their phone to hold up at the
+            door — no card to carry, run out of, or leave in the other van. In Google Business Profile it is
+            <b> Ask for reviews</b>, and looks like <code>https://g.page/r/…/review</code>.
+            The code is generated on the handset, so it works with no signal.
+          </p>
+          <form onSubmit={saveReviewLink} className="disp-setup-form">
+            <input value={reviewUrl} onChange={(e) => setReviewUrl(e.target.value)} style={{ minWidth: 320 }}
+              placeholder="https://g.page/r/…/review" inputMode="url" />
+            <button className="btn accent" disabled={busy === 'review'}>
+              {busy === 'review' ? 'Saving…' : 'Save link'}
+            </button>
+          </form>
+          {reviewUrl && (
+            <p className="hint">
+              Drivers see <b>⭐ Ask for a Google review</b> on a stop once it&apos;s finished.{' '}
+              <a href={reviewUrl} target="_blank" rel="noopener noreferrer">Check the link goes to the right page ↗</a>
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="panel">
         <h3 style={{ marginTop: 0 }}>Vans</h3>

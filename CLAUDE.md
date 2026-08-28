@@ -1350,6 +1350,40 @@ and half a history in each.
   SAME queue as everything else. Two queues would drain in an order nobody
   controls and a fuel entry could land before the shift it belongs to.
 
+## The Google review code (added 2026-08-27)
+`components/ReviewQr.jsx` + `qrcode-generator`, setting `google_review_url`,
+`jobs.review_asked_at`. The driver holds up a QR at the door; the customer scans
+it and lands on the Google review page.
+
+It replaces a **physical review card** — the owner's reason, in his words: a card
+is "just one extra thing they have to keep". One more thing to carry, to run out
+of, and to leave in the other van.
+
+- **The code is generated ON THE PHONE, never fetched.** A QR that arrives as an
+  image from a server is a QR that does not exist in a basement, on a rural road,
+  or in the thirty seconds a customer will stand there — which is most of the
+  doorsteps this is for. Hence a real encoder rather than an image URL.
+- **The link ships with the stop list** (`/api/driver/jobs` returns `reviewUrl`),
+  so it is on the handset before the driver is somewhere with one bar.
+- **`qrcode-generator` is a deliberate dependency** — the one place this repo
+  takes a library where it wrote its own (`xlsx-lite`). The reasoning differs: a
+  QR encoder is pure computation over OUR OWN url, not a parser eating untrusted
+  files, and getting Reed-Solomon and mask scoring subtly wrong produces a code
+  that fails to scan on a doorstep with nothing to debug it. It adds no audit
+  findings (the repo's existing ones are next/sharp/postcss).
+- **Error correction 'M', not 'L'.** A fingerprint on the screen and a phone held
+  at an angle are the normal conditions here.
+- **A screen wake lock is held while the code is up.** A screen that dims
+  mid-scan is the single most likely way this fails.
+- **`review_asked_at` records that the code was SHOWN**, `COALESCE`d so it only
+  ever moves forward. Whether a review was left is something Google never tells
+  us; "we asked on 12 of 15 deliveries" is a number the office can act on, and
+  "we got 3 reviews" is not.
+- Offered on a stop once it is **done** — the moment the appliance is in and the
+  customer is pleased, not while a fridge is still on the trolley.
+- The link is **admin-only** to set: it is the address customers are sent to, and
+  a wrong one quietly sends a month of reviews somewhere else.
+
 ## Two businesses, one codebase — BRANDS
 Bargain Bay is the consumer storefront. **RS Solutions is the delivery/service
 company** whose clients are other businesses (Transource et al). A client must

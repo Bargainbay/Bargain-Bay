@@ -14,6 +14,7 @@ import {
 import { sendSms, smsConfigured } from '../../../../lib/sms';
 import { SITE_URL } from '../../../../lib/site';
 import { hasDb } from '../../../../lib/db';
+import { getSetting, setSetting } from '../../../../lib/settings';
 import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
   upsertClient, importReadyBargainBayOrders, importOneBargainBayOrder, dispatchBoard,
@@ -104,6 +105,9 @@ export async function GET(req) {
     if (sp.get('view') === 'mileage') {
       if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see running costs.' }, { status: 403 });
       return NextResponse.json(await mileageReport({ from: sp.get('from'), to: sp.get('to') }));
+    }
+    if (sp.get('view') === 'review_link') {
+      return NextResponse.json({ url: (await getSetting('google_review_url', '')) || '' });
     }
     if (sp.get('view') === 'vehicles') {
       return NextResponse.json({ vehicles: await listVehicles({ includeInactive: true }) });
@@ -239,6 +243,18 @@ export async function POST(req) {
     }
     // A van. Staff-level like a client — it is a name for a truck, not an
     // access grant — and the odometer readings are meaningless without it.
+    // The Google review link the driver's QR code points at. Admin — it is the
+    // address customers are sent to, and a wrong one sends every review of the
+    // month somewhere else.
+    if (body.action === 'review_link') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set the review link.' }, { status: 403 });
+      const raw = String(body.url || '').trim();
+      if (raw && !/^https:\/\/\S+$/i.test(raw)) {
+        return NextResponse.json({ error: 'Paste the full https:// link from Google.' }, { status: 400 });
+      }
+      await setSetting('google_review_url', raw.slice(0, 500));
+      return NextResponse.json({ ok: true, url: raw });
+    }
     if (body.action === 'vehicle') {
       return NextResponse.json({ ok: true, vehicle: await upsertVehicle(body) });
     }
