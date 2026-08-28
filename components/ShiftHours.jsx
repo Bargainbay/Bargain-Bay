@@ -55,7 +55,11 @@ export default function ShiftHours({ from, to, drivers = [] }) {
                 <tr key={r.id} className={!r.endedAt ? 'is-warn' : undefined}>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.startedAt ? dayLabel(r.startedAt.slice(0, 10)) : '—'}</td>
                   <td style={{ fontWeight: 600 }}>{r.driverName || '—'}</td>
-                  <td style={{ color: 'var(--muted)' }}>{r.vehicleName || '—'}</td>
+                  <td style={{ color: 'var(--muted)' }}>
+                    {r.driving === false
+                      ? `riding${r.ridingWithName ? ` with ${r.ridingWithName}` : ''}`
+                      : (r.vehicleName || '—')}
+                  </td>
                   <td style={{ whiteSpace: 'nowrap' }}>{hhmm(r.startedAt)}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {r.endedAt ? hhmm(r.endedAt) : <span className="disp-late">still on</span>}
@@ -63,7 +67,10 @@ export default function ShiftHours({ from, to, drivers = [] }) {
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{asDuration(r.minutes) || '—'}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                     {r.km != null ? r.km.toLocaleString('en-CA') : (
-                      <span title="needs an odometer reading at both ends" style={{ color: 'var(--muted)' }}>—</span>
+                      <span style={{ color: 'var(--muted)' }}
+                        title={r.driving === false
+                          ? 'riding with someone — no van, no odometer'
+                          : 'needs an odometer reading at both ends'}>—</span>
                     )}
                   </td>
                 </tr>

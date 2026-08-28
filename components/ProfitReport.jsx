@@ -370,10 +370,25 @@ function GasPanel({ kinds = {}, drivers = [], expenses = [], defaultDate, busy, 
                 <strong>{x.date}</strong>
                 <span className="hint" style={{ margin: 0 }}>
                   {' '}· {x.kindLabel} {money(x.amount)}
+                  {x.litres ? ` · ${x.litres} L` : ''}
+                  {x.odometerKm ? ` · ${x.odometerKm.toLocaleString('en-CA')} km` : ''}
+                  {x.vehicleName ? ` · ${x.vehicleName}` : ''}
                   {x.driverName ? ` · ${x.driverName}` : ''}
                   {x.note ? ` · ${x.note}` : ''}
                   {x.byName ? ` · entered by ${x.byName}` : ''}
                 </span>
+                {/* The receipt the driver photographed. Without a way to see it
+                    from here the office chases it on WhatsApp, which is the
+                    work the driver's entry exists to remove. */}
+                {x.hasReceipt && (
+                  <>
+                    {' '}
+                    <a className="disp-toggle" href={`/api/admin/dispatch/receipt?id=${x.id}`}
+                      target="_blank" rel="noopener noreferrer">receipt ↗</a>
+                    <a className="disp-toggle" style={{ marginLeft: 6 }}
+                      href={`/api/admin/dispatch/receipt?id=${x.id}&download=1`}>⤓</a>
+                  </>
+                )}
                 <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={busy}
                   onClick={() => onRemove(x.id)}>remove</button>
               </li>
