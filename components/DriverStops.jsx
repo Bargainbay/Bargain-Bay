@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { queueAction, flush, pending, newRef } from '../lib/driver-outbox';
+import { queueOrSend, flush, queueState, newRef } from '../lib/driver-outbox';
 import { cashAtTheDoor } from '../lib/cash-at-the-door';
 import { formatPhone } from '../lib/constants';
 import { startSharing, stopSharing, markNow, geoSupported } from '../lib/driver-geo';
@@ -43,6 +43,11 @@ export default function DriverStops({ initial, driverName }) {
   const [date] = useState(initial.date);
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState(0);
+  // Work the phone has given up on getting through, and a phone that can't hold
+  // a queue at all. Both used to be invisible — which is the worst thing they
+  // could be, because the driver's screen went on saying Done either way.
+  const [stuck, setStuck] = useState(0);
+  const [storageBroken, setStorageBroken] = useState(false);
   const [finishing, setFinishing] = useState(null);   // the stop being closed out
   const [adding, setAdding] = useState(null);         // a finished stop getting more photos
   const [err, setErr] = useState('');
@@ -53,9 +58,14 @@ export default function DriverStops({ initial, driverName }) {
   // the truth until it has drained.
   const refresh = useCallback(async () => {
     try {
-      const left = (await pending()).length;
-      setQueued(left);
-      if (left > 0) return;
+      const q = await queueState();
+      setQueued(q.total);
+      setStuck(q.stuck);
+      setStorageBroken(!q.ok);
+      // Only work that is still going somewhere holds the list. An item the
+      // phone has given up on would otherwise freeze this screen permanently —
+      // no new stop the office added all day would ever appear on it.
+      if (q.total - q.stuck > 0) return;
       const res = await fetch('/api/driver/jobs', { cache: 'no-store' });
       if (!res.ok) return;
       const d = await res.json();
@@ -95,9 +105,11 @@ export default function DriverStops({ initial, driverName }) {
   }, []);
 
   const push = useCallback(async () => {
-    const { left } = await flush();
+    const { left, stuck: jammed, storageBroken: broken } = await flush();
     setQueued(left);
-    if (left === 0) refresh();
+    setStuck(jammed || 0);
+    if (broken) setStorageBroken(true);
+    if (left - (jammed || 0) === 0) refresh();
   }, [refresh]);
 
   useEffect(() => {
@@ -118,10 +130,22 @@ export default function DriverStops({ initial, driverName }) {
   }, [push]);
 
   // Optimistic local update + queued action.
+  //
+  // The optimistic part is only honest if the failure is put back. This used to
+  // paint "Arrived" on the card and then throw away the error from a queue write
+  // that never happened — so a driver could start a stop, watch the screen agree,
+  // and the office never hear a word about it.
   async function act(stop, patch, body) {
     setErr('');
+    const before = stops.find((s) => s.id === stop.id);
     setStops((xs) => xs.map((s) => (s.id === stop.id ? { ...s, ...patch } : s)));
-    await queueAction({ kind: 'patch', jobId: stop.id, body: { jobId: stop.id, ...body }, ref: newRef() });
+    try {
+      await queueOrSend({ kind: 'patch', jobId: stop.id, body: { jobId: stop.id, ...body }, ref: newRef() });
+    } catch (e) {
+      if (before) setStops((xs) => xs.map((s) => (s.id === stop.id ? before : s)));
+      setErr(`${e?.message || 'That didn’t save.'} Try again where you have signal.`);
+      return;
+    }
     push();
   }
 
@@ -129,7 +153,12 @@ export default function DriverStops({ initial, driverName }) {
   // driver standing in a basement can still add them and drive off.
   async function addPhotos(stop, blobs) {
     setErr('');
-    await queueAction({ kind: 'photos', jobId: stop.id, photos: blobs, fields: { mode: 'photos' }, ref: newRef() });
+    try {
+      await queueOrSend({ kind: 'photos', jobId: stop.id, photos: blobs, fields: { mode: 'photos' }, ref: newRef() });
+    } catch (e) {
+      setErr(`${e?.message || 'Those photos didn’t save.'} Try again where you have signal.`);
+      return;
+    }
     setStops((xs) => xs.map((s) => (s.id === stop.id ? { ...s, photoCount: (s.photoCount || 0) + blobs.length } : s)));
     setAdding(null);
     push();
@@ -189,7 +218,23 @@ export default function DriverStops({ initial, driverName }) {
           No signal — everything you tap is saved on the phone{queued > 0 ? ` (${queued} waiting)` : ''} and sent when you&apos;re back.
         </div>
       )}
-      {online && queued > 0 && <div className="drv-sending">Sending {queued} saved {queued === 1 ? 'update' : 'updates'}…</div>}
+      {online && queued - stuck > 0 && (
+        <div className="drv-sending">Sending {queued - stuck} saved {queued - stuck === 1 ? 'update' : 'updates'}…</div>
+      )}
+      {/* Something the phone has tried and tried and cannot get through. It is
+          still held and still being retried, but the driver is told rather than
+          left believing the office has it. */}
+      {stuck > 0 && (
+        <div className="drv-stuck">
+          {stuck === 1 ? 'One thing you did isn’t' : `${stuck} things you did aren’t`} getting through to the office.
+          Nothing is lost — it keeps trying. <b>Tell the office</b> so they can check the stop.
+        </div>
+      )}
+      {storageBroken && (
+        <div className="drv-stuck">
+          This phone won’t save anything offline right now, so <b>stay on signal</b> — everything is being sent as you tap it.
+        </div>
+      )}
 
       {/* Said out loud, on the driver's own screen. */}
       {geo.state !== 'unsupported' && (
