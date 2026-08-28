@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { queueAction, newRef } from '../lib/driver-outbox';
+import { queueOrSend, newRef } from '../lib/driver-outbox';
 import { compressPhotos } from './photo-pick';
 
 // Closing out a stop: photos, a signature, who signed, and — where there's money
@@ -54,6 +54,13 @@ export default function DriverFinish({ stop, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const isService = stop.type === 'service_call';
+  // One pair of refs for this close-out, minted once and reused if the driver
+  // has to tap Done again. Fresh refs on a retry meant the money and the
+  // completion were queued as NEW work: the outbox is keyed on ref, so the same
+  // refs simply overwrite the earlier attempt instead of stacking a second
+  // payment behind it.
+  const refs = useRef(null);
+  if (!refs.current) refs.current = { payment: newRef(), complete: newRef() };
 
   // The signature pad. Sized to its own box in device pixels so the line lands
   // under the finger on a phone.
@@ -135,14 +142,19 @@ export default function DriverFinish({ stop, onClose, onDone }) {
       // Money first: if the phone can only get one thing out before the signal
       // dies again, it should be the payment — that's the record the customer
       // and the books both depend on.
+      //
+      // queueOrSend, not queueAction: saving to the phone is still the first
+      // choice, but a phone that refuses to save must not be able to trap a
+      // driver on a doorstep with a signed form and no way to file it. If the
+      // storage write fails it goes straight down the wire instead.
       if (collect) {
-        await queueAction({
-          kind: 'patch', jobId: stop.id, ref: newRef(),
+        await queueOrSend({
+          kind: 'patch', jobId: stop.id, ref: refs.current.payment,
           body: { jobId: stop.id, action: 'payment', amount: Number(amount), method, note: 'Collected on delivery' }
         });
       }
-      await queueAction({
-        kind: 'complete', jobId: stop.id, ref: newRef(),
+      await queueOrSend({
+        kind: 'complete', jobId: stop.id, ref: refs.current.complete,
         signature: sig, photos: photos.map((p) => p.blob),
         fields: {
           timeIn: stop.arrivedAt || stop.startedAt || new Date().toISOString(),
@@ -164,7 +176,15 @@ export default function DriverFinish({ stop, onClose, onDone }) {
       });
       onDone({ hasSignature: !!sig, photoCount: photos.length, balanceDue: collect ? 0 : stop.balanceDue });
     } catch (e) {
-      setErr(e?.message || 'Could not save that on the phone.');
+      // Say what actually went wrong and what to do about it. The old message
+      // was the same eleven words whatever happened — and because a DOMException
+      // often carries no message at all, that generic line was what a driver
+      // saw for a full signature, a full form and no way forward.
+      setErr(
+        `${e?.message || 'The phone would not save it.'} `
+        + 'Nothing you typed is lost — move to where you have signal and tap Done again. '
+        + 'If it still won’t go, ring the office and read it to them.'
+      );
     } finally {
       setBusy(false);
     }

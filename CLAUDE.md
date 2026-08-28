@@ -1120,6 +1120,71 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
 - PWA: `public/driver.webmanifest` + `public/driver-sw.js` (shell only —
   network-first for the page, never caches `/api`). Installed via **Add to Home
   Screen**; there is no app store and no native build.
+### Why the office stopped getting completion emails, and why one driver could not close a stop (fixed 2026-08-27)
+Two reports, four separate defects, and every one of them was silent — which is
+the thread running through all of it: a driver's screen said Done and the office's
+inbox said nothing, and neither side had any way to tell which one was wrong.
+
+- **Dispatch mail was fired and forgotten inside a serverless function.**
+  `emailJobComplete`, `emailJobFailed` and the customer's `sendOrderStatusEmail`
+  were all `.catch()`ed but never awaited. A Vercel instance is **frozen the
+  moment the response goes out**, so whether the send finished came down to
+  whether Resend answered before the driver's phone got its 200 — a coin flip
+  nobody could see, and exactly the "I get some of them" the office reported.
+  They are **awaited now**, after the write, still wrapped in a catch so a mail
+  problem can never fail a stop. Do not "optimise" them back to fire-and-forget.
+- **`sendEmail` retries, inside a hard budget.** Resend allows **two requests a
+  second**; one finished stop can fire three emails (office, client, customer)
+  and the offline queue drains several stops back to back, so the third over the
+  line came back 429, got logged once and was gone. Now: 3 attempts, 429/408/5xx
+  only, 6s per attempt and 10s overall — because these sends are on the driver's
+  own request now, which has 60 seconds for everything it does. A 4xx that isn't
+  429 is a decision and is returned as it stands. A send that never leaves logs
+  **`resend GAVE UP`**; that line is the only trace, so grep for it first.
+- **LANDMINE — the replay guard was armed before the work it guards.** `pod_ref`
+  is stamped on the way IN, before the photos upload and before `completeJob`.
+  So a completion that died halfway (a blob upload, eight pictures on one bar of
+  LTE) was answered *"already recorded"* on the retry: the phone dropped it, the
+  stop was never completed, and no email was ever owed. `podAlreadyRecorded` now
+  also requires the job to have actually reached **done/failed** — a ref on a
+  stop that never closed is unfinished business, not a replay. Stops already
+  jammed this way heal on the next attempt. Completion photos carry the same ref
+  so the upload **resumes** instead of restarting and storing the first five
+  twice.
+- **LANDMINE — one stuck item used to freeze a driver's whole day.** `flush()`
+  sent oldest-first and `break`(!)ed on the first failure, and this route returns
+  **500 for every error**, deterministic ones included. So a single item the
+  server kept refusing blocked everything behind it forever — *and* froze the
+  stop list, which refuses to refresh while anything is queued. A driver in that
+  state could finish stops all afternoon and the office would hear about none of
+  them. It now **skips past a jammed stop and carries on with the others**;
+  ordering is only ever guaranteed WITHIN one stop (the payment before the
+  completion), never across them.
+- **"No answer" and "answered badly" are different, and only the second counts.**
+  `sendNow` returns `sent` / `drop` / `retry` / `offline`. Attempts are only
+  counted against an item when the **server actually answered** — a driver with
+  no signal for an hour must never be told their work is failing. After 6 real
+  refusals an item is **stuck**: still held, still retried on a widening backoff,
+  but shown to the driver in red and no longer allowed to hold the stop list
+  hostage. Silence was the bug; nothing is ever discarded.
+- **The queue is no longer a hard dependency.** `queueOrSend` writes to IndexedDB
+  first (that is what makes a basement work) and, if the phone refuses — storage
+  full, an in-app browser, Safari dropping its database connection after the app
+  has sat in a pocket all afternoon — **sends it straight down the wire instead**.
+  Before this, a phone that could not remember could not close a stop for the
+  rest of the day, on any amount of signal. `storageError` turns the DOMException
+  into something a driver can act on; the old screen printed the same eleven
+  words whatever happened, and a DOMException frequently has **no message at
+  all**, which is how "Could not save that on the phone." became the entire
+  diagnosis for a signed form with nowhere to go.
+- **An optimistic update that fails is put back.** `act()` painted "Arrived" on
+  the card and threw the error away — the start of a stop the server never heard
+  about, on a screen that agreed it had happened.
+- **The close-out's refs are minted once per screen**, not per tap. Fresh refs on
+  a retry queued the money as NEW work; the outbox is keyed on `ref`, so reusing
+  them makes a second Done overwrite the first attempt instead of stacking a
+  second payment behind it.
+
 - **Never hard-code "Share → Add to Home Screen".** That is the iPhone-Safari
   answer to a question four phones answer four ways, and a driver who cannot find
   the button we named concludes the app is broken (it happened). `AddToHome.jsx`

@@ -5,7 +5,7 @@ import { hasDb, query } from '../../../../lib/db';
 import { isDriver, touchDriverSeen } from '../../../../lib/drivers';
 import {
   driverJobs, jobBelongsToDriver, podAlreadyRecorded, photoBatchRecorded, jobPhotoCount,
-  saveJobSignature, addJobPhoto, markOrderDeliveredForJob
+  jobPhotosWithRef, saveJobSignature, addJobPhoto, markOrderDeliveredForJob
 } from '../../../../lib/driver-jobs';
 import {
   setJobStatus, completeJob, jobInvoiceForPayment, noteJobEvent, markReviewAsked
@@ -166,12 +166,17 @@ export async function POST(req) {
       // the ref recorded, or a replay writes the photos a second time.
       await saveJobSignature(jobId, null, ref);
     }
-    for (let i = 0; i < photos.length && i < 8; i++) {
+    // Resume rather than restart. The phone re-sends the whole close-out on a
+    // retry, so a run that died on photo six used to store the first five twice.
+    // Tagging them with the completion's own ref makes the upload restartable
+    // and the duplicate impossible.
+    const alreadyIn = ref ? await jobPhotosWithRef(jobId, ref) : 0;
+    for (let i = alreadyIn; i < photos.length && i < 8; i++) {
       const p = photos[i];
       const r = await put(`${base}/photo-${i}.jpg`, p, {
         access: 'private', addRandomSuffix: true, contentType: p.type || 'image/jpeg'
       });
-      await addJobPhoto(jobId, r.url, r.pathname);
+      await addJobPhoto(jobId, r.url, r.pathname, ref || null);
     }
 
     const job = await completeJob(jobId, {
