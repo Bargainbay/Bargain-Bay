@@ -664,6 +664,12 @@ CREATE TABLE IF NOT EXISTS vehicles (
 CREATE TABLE IF NOT EXISTS driver_shifts (
   id serial PRIMARY KEY,
   user_id    int NOT NULL,
+  -- Not everybody on a shift is DRIVING. A second crew member rides with
+  -- somebody else all day: on the clock, not responsible for a van, and unable
+  -- to read an odometer from the passenger seat. Whatever they typed would be a
+  -- guess, and a guess here corrupts every mileage figure built on it.
+  driving     boolean NOT NULL DEFAULT true,
+  riding_with int,
   vehicle_id int,
   started_at timestamptz NOT NULL,
   ended_at   timestamptz,

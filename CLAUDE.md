@@ -1415,6 +1415,19 @@ and half a history in each.
 - **A van is required for the odometer to mean anything** (`vehicles`). Two
   trucks' readings in one column is not a mileage figure. Staff-level to add —
   it's a name for a truck, not an access grant.
+- **NOT EVERYBODY ON A SHIFT IS DRIVING** (`driver_shifts.driving` /
+  `riding_with`). A second crew member rides with somebody else all day: on the
+  clock, not responsible for a van, and unable to read an odometer from the
+  passenger seat — so asking them for one gets a guess, and a guess in that
+  column corrupts every mileage figure built on it. **Driving-or-riding is the
+  FIRST question** the start form asks, because the answer decides whether the
+  rest of the form exists; a rider gets "riding with <name>" and nothing else,
+  and their end-of-shift is one tap. Enforced SERVER-side too (`startShift`
+  nulls the van and the reading for a passenger regardless of what was posted),
+  and `mileageReport` counts only `driving = true` shifts — otherwise "2 of 5
+  shifts have both readings" on a day when every driver gave both and three
+  people rode along. The **⛽ Add fuel** button is hidden from a passenger for
+  the same reason: they'd be filing a fill against a van they aren't running.
 - **Fuel a driver adds on the road lands in `dispatch_expenses`, the SAME table
   the office types gas into.** No second code path, no two sets of fuel figures
   to reconcile, and the Profit tab picks it up with no changes. Deduped on `ref`
@@ -1426,6 +1439,12 @@ and half a history in each.
   them looks authoritative and is invented, and somebody would price a delivery
   off it. The panel names what's missing instead: shifts with a reading at only
   one end, fills with no litres.
+- **The office can SEE the receipt** (`/api/admin/dispatch/receipt?id=`, same
+  private-blob proxy shape as the POD). This is what makes the feature actually
+  remove office work rather than move it: without it they'd be asking for the
+  photo on WhatsApp, which is the job the driver's entry exists to delete. The
+  expense list shows litres, odometer, van and driver beside the amount, so the
+  office REVIEWS an entry instead of re-typing one.
 - **`lib/driver-outbox.js` grew a `url`** so a shift or a fuel receipt rides the
   SAME queue as everything else. Two queues would drain in an order nobody
   controls and a fuel entry could land before the shift it belongs to.
