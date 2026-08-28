@@ -10,6 +10,7 @@ import ClientBilling from './ClientBilling';
 import StopTimes from './StopTimes';
 import { cashAtTheDoor } from '../lib/cash-at-the-door';
 import ProfitReport from './ProfitReport';
+import LiveMap from './LiveMap';
 
 // The day's run sheet, on screen. One unassigned pile plus a column per driver.
 // Assignment is by tap, not drag: drag is pleasant on a desktop and miserable on
@@ -939,6 +940,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
         <Tab id="board">Board</Tab>
         <Tab id="tickets">Service calls{tickets ? ` (${tickets})` : ''}</Tab>
         <Tab id="import">Import</Tab>
+        <Tab id="live">Live</Tab>
         <Tab id="times">Times</Tab>
         <Tab id="billing">Billing</Tab>
         <Tab id="pay">Pay</Tab>
@@ -958,6 +960,8 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
 
       {/* The clock, as a history — and the place a forgotten Done tap gets
           corrected in bulk rather than one card at a time. */}
+      {view === 'live' && <LiveMap />}
+
       {view === 'times' && <StopTimes drivers={board.drivers} />}
 
       {view === 'profit' && <ProfitReport drivers={board.drivers} date={board.date} />}

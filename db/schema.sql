@@ -692,3 +692,27 @@ ALTER TABLE dispatch_expenses ADD COLUMN IF NOT EXISTS receipt_path text;
 ALTER TABLE dispatch_expenses ADD COLUMN IF NOT EXISTS receipt_url  text;
 ALTER TABLE dispatch_expenses ADD COLUMN IF NOT EXISTS ref          text;
 CREATE INDEX IF NOT EXISTS idx_dispatch_expenses_ref ON dispatch_expenses(ref) WHERE ref IS NOT NULL;
+-- Where the vans are. Written by the driver's phone while the app is on screen;
+-- a web page cannot report in the background (iOS suspends it the moment the
+-- screen locks or the driver switches to Maps), so this is a breadcrumb trail
+-- with real gaps in it, not a continuous track.
+--
+-- `at` is the timestamp the DEVICE recorded, never the moment the row was
+-- written. A phone coming back into signal posts twenty minutes of history at
+-- once, and stamping those on arrival would tell the office a driver is
+-- somewhere they left long ago. Everything that reads this ages the row and
+-- refuses to draw an old fix as a current one.
+CREATE TABLE IF NOT EXISTS driver_pings (
+  id         bigserial PRIMARY KEY,
+  user_id    int NOT NULL,
+  job_id     int,                      -- the stop they were on, when there was one
+  lat        numeric(9,6) NOT NULL,
+  lng        numeric(9,6) NOT NULL,
+  accuracy_m int,
+  speed_kmh  numeric(6,2),
+  heading    int,
+  source     text NOT NULL DEFAULT 'watch',
+  at         timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_driver_pings_user_at ON driver_pings(user_id, at DESC);
+CREATE INDEX IF NOT EXISTS idx_driver_pings_at ON driver_pings(at);
