@@ -1221,6 +1221,63 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .imp-done { background: var(--okbg); color: var(--ok); border-radius: 8px; padding: 10px 12px; margin: 10px 0; font-weight: 600; }
 .imp-problems { margin: 6px 0 0; padding-left: 18px; font-weight: 400; font-size: 12.5px; }
 
+/* Read by a model, not parsed off columns — said where the rows are, because a
+   wrong address here is a van at the wrong door. (Referenced since the PDF
+   importer shipped and never actually styled.) */
+.imp-ai-warn { margin-top: 6px; color: var(--danger); font-size: 12.5px; font-weight: 600; }
+
+/* WHO THE SHEET IS FOR. At the top, in a sentence, because a client silently
+   carried over from the last import is how a day's stops end up filed under
+   another company one card at a time. */
+.imp-forwhom { display: flex; flex-direction: column; gap: 4px; background: var(--tint);
+  border: 1px solid var(--line); border-left: 4px solid var(--ok); border-radius: 10px;
+  padding: 10px 12px; margin: 10px 0; }
+.imp-forwhom.is-unset { border-left-color: var(--danger); background: var(--dangerbg); }
+.imp-forwhom-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.imp-forwhom-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.imp-forwhom select { width: auto; min-width: 240px; padding: 6px 8px; font-size: 14px; font-weight: 700; }
+.imp-forwhom-why { font-size: 12.5px; color: var(--muted); }
+
+.imp-questions li.is-blocking { color: var(--danger); font-weight: 600; }
+.imp-inline-btn { border: 1px solid var(--line); background: var(--card); border-radius: 6px;
+  padding: 2px 7px; margin-left: 6px; font-size: 11.5px; font-weight: 700; cursor: pointer; color: var(--charcoal); }
+.imp-inline-btn:hover { background: var(--tint); }
+.imp-none { color: var(--danger); font-weight: 600; }
+.imp-fixed { color: var(--ok); font-weight: 600; }
+.imp-preview tr.is-dropped td { opacity: .45; text-decoration: line-through; }
+.imp-fix { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 10px 0; background: var(--tint); }
+
+/* Sheets somebody started and walked away from. They survive the tab now, so
+   they have to be findable — otherwise a staged import is just a leak. */
+.imp-drafts { margin-top: 14px; }
+.imp-draft { display: block; width: 100%; text-align: left; border: 1px solid var(--line);
+  background: var(--card); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
+  font-size: 12.5px; cursor: pointer; color: var(--charcoal); }
+.imp-draft:hover { background: var(--tint); }
+
+/* "All of these are for X." The repair for a sheet that landed on the board
+   under the wrong company, which was otherwise thirty cards of edit form. */
+.disp-bulk { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+  margin-bottom: 12px; background: var(--card); }
+.disp-bulk-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.disp-bulk-list { max-height: 40vh; overflow: auto; border: 1px solid var(--line);
+  border-radius: 8px; margin: 8px 0; }
+.disp-bulk-row { display: grid; grid-template-columns: 22px 74px 1.2fr 2fr 1fr; gap: 8px;
+  align-items: center; padding: 5px 8px; border-top: 1px solid var(--line-soft);
+  font-size: 12.5px; margin: 0; cursor: pointer; }
+.disp-bulk-row:first-child { border-top: 0; }
+.disp-bulk-row.is-on { background: var(--tint); }
+.disp-bulk-row input { width: auto; margin: 0; }
+.disp-bulk-num { font-weight: 700; color: var(--muted); font-size: 11.5px; }
+.disp-bulk-who { font-weight: 600; }
+.disp-bulk-addr { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.disp-bulk-client { font-weight: 600; text-align: right; }
+.disp-bulk-client.is-none { color: var(--danger); }
+@media (max-width: 700px) {
+  .disp-bulk-row { grid-template-columns: 22px 1fr; }
+  .disp-bulk-num, .disp-bulk-addr, .disp-bulk-client { grid-column: 2; text-align: left; }
+}
+
 /* A driver came off a stop and nobody assigned them off it — the repair prompt
    for a bug that ran silently, listing the stops and offering the names back. */
 .disp-crewlost { margin-bottom: 12px; }

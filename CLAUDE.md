@@ -982,6 +982,75 @@ the paper run sheet that replaces it.
   quietly redirected to another city is exactly the kind of thing that should
   never happen invisibly. A QC row with no pickup address is BLOCKED: a
   cross-dock drop with nowhere to collect from is not a job.
+
+## An import is STAGED, and it knows whose sheet it is (added 2026-08-29)
+`lib/import-batches.js` + `lib/client-match.js`, tables `import_batches` /
+`client_sheet_profiles` / `client_aliases`. Written after a client's whole
+spreadsheet went onto the board filed under the wrong company, and the only way
+back was the edit form, one card at a time.
+
+- **An upload STAGES; it does not import.** The rows land in `import_batches` as
+  a draft the moment the file is read, and only `approveBatch` turns them into
+  jobs. A draft is not a stop: it has no address anybody drives to. Staging is
+  what lets the review happen somewhere other than the tab it was uploaded in —
+  a batch has an id, so a phone call can be reading row 4 while the person who
+  uploaded it has walked away. It is also what makes an import survive a closed
+  tab; open drafts are listed on the Import tab so a staged batch can't leak.
+- **Corrections live in `overrides`, keyed by row index — never written back
+  over `rows`.** "What did their spreadsheet actually say" is the first question
+  asked when a stop turns out wrong, and an importer that overwrites the sheet
+  with its own corrections cannot answer it.
+- **`clientName` is a real import field**, separate from `customerName`. A sheet
+  that names an account per row (`Account`, `Bill to`, `Dealer`) gets each stop
+  filed under the company that row names; the batch-level client is the fallback,
+  not the override. `Client Name` deliberately still means the CONSIGNEE — on a
+  delivery sheet it is the customer, and the two must not be conflated.
+- **A match is either confident enough to apply or it is a QUESTION.** There is
+  no middle setting (`lib/client-match.js`): exact name, a known alias, a ≥3
+  letter initialism (CDA), or full token containment apply; a Levenshtein
+  near-miss never does, and two clients scoring within 0.1 of each other is
+  ambiguous and applies neither. "Parallel Supply" and "Paragon Supply" are one
+  idea apart and two different companies in the driveway.
+- **A name on a sheet NEVER creates a client.** A parser inventing companies
+  leaves a client list nobody can invoice from. Unknown names come back unknown
+  with the text preserved, so the answer is one tap — and answering it once
+  writes a `client_aliases` row, which is the only way an alias is ever learned.
+- **The sheet's LAYOUT is remembered** (`client_sheet_profiles`, keyed on
+  `fingerprintHeaders` — the normalised heading row, sorted so a moved column
+  still lands on the same profile). Next time that sheet arrives it maps itself
+  and names its own client. Saved **only on approve**: a mapping learned off a
+  draft nobody accepted would teach it the wrong lesson.
+- **Client detection is ordered by how much the signal deserves to be trusted**:
+  a remembered profile, then a per-row client column that agrees with itself,
+  then the filename. A sheet carrying three companies has no single answer and
+  is not forced into one — each stop keeps the one it names.
+- **The day defaults to TOMORROW, not to the board's date.** A client's sheet
+  arrives the day before the run; defaulting to today put a whole client's
+  next-day stops on the wrong date every time the date column was missing.
+- **The client is a sentence at the top of the screen, not a dropdown three rows
+  down.** It used to be a `<select>` whose state survived a successful import, so
+  importing sheet B after sheet A silently filed B under A's client.
+- **Problems are objects now** (`{ kind, text, blocking, info, suggest }`), not
+  strings — the voice agent has to act on them, not just print them. Anything
+  that only wants to print goes through `problemText`.
+- **`setJobsClient` fixes what is already on the board** ("Set client" on the
+  board bar → `components/BulkClient.jsx`, PATCH `action: 'client_bulk'`). An
+  INVOICED job is **refused and named**, never quietly skipped: its client is who
+  was billed, and moving it would take a line off one company's invoice and put
+  it on another's.
+- **LANDMINE — a quote only opens a field when it is the field's FIRST
+  character.** `splitRow` treated `"` anywhere as an opening quote, so
+  `Whirlpool 36" Fridge` swallowed every delimiter to the end of the line and
+  shifted the whole row left — the window, the order type and the notes all
+  landed in the item description. Inches are universal on an appliance sheet.
+  This only ever bit the paste/CSV path (an xlsx hands over cells already split),
+  and paste is the primary input.
+- **LANDMINE — `guessMapping` assigns globally, strongest pair first.** It used
+  to walk the fields in declaration order, so an EARLIER field could take a
+  column on a loose match that a LATER field named exactly. With a `Client` field
+  in front of `Customer` that is not theoretical: it would swallow the
+  `Client Name` column that means the customer. Strength decides, not order.
+
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of

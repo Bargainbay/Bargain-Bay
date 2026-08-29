@@ -729,3 +729,66 @@ CREATE TABLE IF NOT EXISTS driver_pings (
 );
 CREATE INDEX IF NOT EXISTS idx_driver_pings_user_at ON driver_pings(user_id, at DESC);
 CREATE INDEX IF NOT EXISTS idx_driver_pings_at ON driver_pings(at);
+
+-- ── Staged sheet imports ────────────────────────────────────────────────────
+-- A client's spreadsheet, held still while somebody decides what to do with it.
+--
+-- The importer used to keep the whole thing in the browser, which meant the
+-- review could only happen in that tab, by the person who uploaded it, before
+-- they navigated away — and meant the app learned nothing from a mapping it had
+-- already been walked through once. A staged batch is not a stop: nothing here
+-- can be driven to until `approveBatch` turns it into jobs.
+CREATE TABLE IF NOT EXISTS import_batches (
+  id             serial PRIMARY KEY,
+  batch_number   text UNIQUE,
+  status         text NOT NULL DEFAULT 'draft',   -- draft | approved | cancelled
+  source_name    text,
+  read_as        text,                            -- sheet | ai | paste
+  client_id      int,
+  job_date       date,
+  quebec_rule    boolean NOT NULL DEFAULT true,
+  headers        jsonb NOT NULL DEFAULT '[]'::jsonb,
+  rows           jsonb NOT NULL DEFAULT '[]'::jsonb,
+  mapping        jsonb NOT NULL DEFAULT '{}'::jsonb,
+  -- Per-row corrections, keyed by row index. Deliberately SEPARATE from `rows`
+  -- so the sheet as it arrived is never overwritten: "what did their
+  -- spreadsheet actually say" is the first question asked when a stop is wrong.
+  overrides      jsonb NOT NULL DEFAULT '{}'::jsonb,
+  fingerprint    text,
+  note           text,
+  created_by     text,
+  created_by_name text,
+  created_at     timestamptz DEFAULT now(),
+  decided_at     timestamptz,
+  job_ids        int[]
+);
+CREATE INDEX IF NOT EXISTS idx_import_batches_open
+  ON import_batches (created_at DESC) WHERE status = 'draft';
+
+-- What a client's spreadsheet looks like, remembered against a fingerprint of
+-- its heading row. Written only when an import is APPROVED — a mapping learned
+-- off a draft nobody accepted would teach it the wrong lesson.
+CREATE TABLE IF NOT EXISTS client_sheet_profiles (
+  id          serial PRIMARY KEY,
+  fingerprint text NOT NULL UNIQUE,
+  client_id   int,
+  headers     jsonb,
+  mapping     jsonb NOT NULL DEFAULT '{}'::jsonb,
+  defaults    jsonb NOT NULL DEFAULT '{}'::jsonb,
+  hits        int NOT NULL DEFAULT 1,
+  last_used   timestamptz DEFAULT now(),
+  updated_by  text
+);
+
+-- The other names a client goes by ("CDA"). Learned from an answer, never
+-- invented: a parser minting companies leaves a client list nobody can invoice
+-- from.
+CREATE TABLE IF NOT EXISTS client_aliases (
+  id         serial PRIMARY KEY,
+  client_id  int NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  alias      text NOT NULL,
+  alias_norm text NOT NULL,
+  created_by text,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE (client_id, alias_norm)
+);
