@@ -1315,6 +1315,18 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 @media (max-width: 800px) { .live-wrap { grid-template-columns: 1fr; } }
 .live-map { height: 62vh; min-height: 380px; border-radius: 12px; border: 1px solid var(--line-soft); overflow: hidden; }
 .live-map-off { display: flex; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+/* The reason there is no map sits ON the map box rather than replacing it: the
+   element has to stay mounted for Google to attach to, and a map that recovers
+   needs somewhere to draw. */
+.live-map-wrap { position: relative; }
+.live-map-why {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+  padding: 24px; text-align: center; border-radius: 12px;
+  background: var(--card); border: 1px solid var(--danger);
+}
+.live-map-why b { color: var(--danger); }
+.live-map-why .hint { max-width: 46ch; margin: 0; }
 .live-list { display: flex; flex-direction: column; gap: 6px; }
 .live-row {
   display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left;
