@@ -1077,9 +1077,13 @@ be reading row 4 while whoever uploaded it has already walked away.
   POST param sorted by name) proves it came from Twilio; a token in the URL
   (`batchToken`, HMAC over the batch id) proves it is about a batch we actually
   rang out on. Verified against Twilio's own documented example vector.
-  **The signed URL is built from `RS_SITE_URL`, never from the incoming
-  request** — by the time it arrives its host and protocol have been through a
-  proxy and will not match what Twilio signed.
+  **The signed URL is built from `brandFor('rs_solutions').url()`, never from
+  the incoming request** — by the time it arrives its host and protocol have
+  been through a proxy and will not match what Twilio signed. It comes off the
+  BRAND rather than being defined twice: `RS_SITE_URL` is unset in production,
+  and the first cut's private fallback through `SITE_URL` would have pointed
+  both the webhook and the spoken audio at bargainbay.ca for a call that is
+  entirely RS Solutions.
 - **It only ever rings ONE number** (`DISPATCH_CALL_TO`, else the
   `dispatch_call_to` setting). Never a number from the request body and never
   one off a sheet: a review call that can be pointed anywhere is a robocaller
