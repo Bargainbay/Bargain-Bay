@@ -765,6 +765,13 @@ CREATE TABLE IF NOT EXISTS import_batches (
 CREATE INDEX IF NOT EXISTS idx_import_batches_open
   ON import_batches (created_at DESC) WHERE status = 'draft';
 
+-- The review call (lib/import-call.js). `call_log` is context for the NEXT turn
+-- of the conversation, not a recording — it is capped, and the batch's own
+-- state is the record of what was decided.
+ALTER TABLE import_batches ADD COLUMN IF NOT EXISTS call_sid text;
+ALTER TABLE import_batches ADD COLUMN IF NOT EXISTS call_to  text;
+ALTER TABLE import_batches ADD COLUMN IF NOT EXISTS call_log jsonb NOT NULL DEFAULT '[]'::jsonb;
+
 -- What a client's spreadsheet looks like, remembered against a fingerprint of
 -- its heading row. Written only when an import is APPROVED — a mapping learned
 -- off a draft nobody accepted would teach it the wrong lesson.

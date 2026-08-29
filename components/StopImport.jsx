@@ -21,6 +21,8 @@ export default function StopImport({ clients = [], date, onDone }) {
   const [batch, setBatch] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [drafts, setDrafts] = useState([]);
+  const [call, setCall] = useState(null);            // { configured, to }
+  const [calling, setCalling] = useState('');
   const [detected, setDetected] = useState(null);
   const [sheetInfo, setSheetInfo] = useState(null);   // { name, sheet, sheets, file, read, sender, warning }
   const [busy, setBusy] = useState(false);
@@ -60,7 +62,7 @@ export default function StopImport({ clients = [], date, onDone }) {
     try {
       const res = await fetch('/api/admin/dispatch?view=imports');
       const d = await res.json();
-      if (res.ok) setDrafts(d.batches || []);
+      if (res.ok) { setDrafts(d.batches || []); setCall(d.call || null); }
     } catch { /* a missing draft list is not worth an error box */ }
   }, []);
 
@@ -154,6 +156,17 @@ export default function StopImport({ clients = [], date, onDone }) {
       loadDrafts();
       onDone?.();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+
+  // The sheet rings the owner instead of waiting for him to reach a screen.
+  // Nothing about the batch changes here — the call reads what is staged and
+  // only the approve at the end of it puts anything on the board.
+  async function ringMe() {
+    setCalling('ringing'); setErr('');
+    try {
+      const d = await post({ action: 'import_call', batchId: batch.id });
+      setCalling(`Ringing ${d.to} now — it will read this sheet out and take your answers.`);
+    } catch (e) { setErr(e.message); setCalling(''); }
   }
 
   async function discard() {
@@ -386,7 +399,18 @@ export default function StopImport({ clients = [], date, onDone }) {
               onCancel={() => setFixing(null)} />
           )}
 
+          {calling && <div className="imp-done">{calling === 'ringing' ? 'Placing the call…' : calling}</div>}
+
           <div className="imp-row" style={{ justifyContent: 'flex-end' }}>
+            {call?.configured && (
+              <button type="button" className="btn" disabled={busy || calling === 'ringing'}
+                title={call.to
+                  ? `Ring ${call.to} and go through this sheet out loud`
+                  : 'Set the number to ring under Clients & drivers first'}
+                onClick={ringMe}>
+                {call.to ? '📞 Call me about this' : '📞 Call me (no number set)'}
+              </button>
+            )}
             <button type="button" className="btn" disabled={busy} onClick={discard}>Throw away</button>
             <button type="button" className="btn accent" disabled={busy || batch.summary.ready === 0}
               onClick={approve}>

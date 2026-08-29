@@ -30,6 +30,7 @@ import {
   stageBatch, resolveBatch, patchBatch, setBatchClient, approveBatch, cancelBatch,
   listOpenBatches, addClientAlias, openQuestions
 } from '../../../../lib/import-batches';
+import { startImportCall, callConfigured, callTarget } from '../../../../lib/import-call';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -103,7 +104,13 @@ export async function GET(req) {
       return NextResponse.json({ batch, questions: openQuestions(batch) });
     }
     if (sp.get('view') === 'imports') {
-      return NextResponse.json({ batches: await listOpenBatches({ limit: sp.get('limit') }) });
+      return NextResponse.json({
+        batches: await listOpenBatches({ limit: sp.get('limit') }),
+        // Whether the Import tab can offer "ring me about it", and where it
+        // would ring. Both are needed to decide what to render: configured but
+        // with no number set is a button that would fail on the press.
+        call: { configured: callConfigured(), to: await callTarget() }
+      });
     }
     // Stops where somebody came off the crew without anyone assigning them off.
     if (sp.get('view') === 'crew_lost') {
@@ -209,6 +216,26 @@ export async function POST(req) {
       await addClientAlias(body.clientId, body.alias, who(s));
       const batch = body.batchId ? await resolveBatch(body.batchId) : null;
       return NextResponse.json({ ok: true, batch, questions: batch ? openQuestions(batch) : [] });
+    }
+    // "Ring me and read it to me." The number is NOT taken from the request —
+    // a review call that can be pointed at an arbitrary number is a robocaller
+    // with our name on it. It is an env var or a setting, and nothing else.
+    if (body.action === 'import_call') {
+      if (!callConfigured()) {
+        return NextResponse.json({ error: 'Calling is not set up on this deployment.' }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true, ...(await startImportCall(body.batchId, { by: who(s) })) });
+    }
+    if (body.action === 'call_number') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set the number dispatch rings.' }, { status: 403 });
+      const raw = String(body.number || '').trim();
+      // E.164 only. A number the phone system can't dial is a call that fails
+      // silently at Twilio rather than on the screen somebody is looking at.
+      if (raw && !/^\+[1-9]\d{7,14}$/.test(raw)) {
+        return NextResponse.json({ error: 'Give it as +1 then the ten digits, e.g. +14165551234.' }, { status: 400 });
+      }
+      await setSetting('dispatch_call_to', raw.slice(0, 20));
+      return NextResponse.json({ ok: true, number: raw });
     }
     if (body.action === 'import_approve') {
       return NextResponse.json({ ok: true, ...(await approveBatch(body.batchId, who(s))) });

@@ -1051,6 +1051,68 @@ back was the edit form, one card at a time.
   in front of `Customer` that is not theoretical: it would swallow the
   `Client Name` column that means the customer. Strength decides, not order.
 
+## The import rings you (added 2026-08-29)
+`lib/import-call.js` + `POST /api/dispatch/import-call`. "📞 Call me about this"
+on a staged batch: the office phones the owner, reads the sheet out, names only
+the rows that need an answer, takes them as speech, and puts nothing on the
+board until he says so.
+
+A client's sheet arrives the night before a run and the owner is not at a
+screen — he's in the warehouse or a van. So the review either happened late or
+happened badly, and the stops that needed a second look were the ones that went
+out wrong. This is why the import is staged: a batch has an id, so the call can
+be reading row 4 while whoever uploaded it has already walked away.
+
+- **Built out of what was already here.** Twilio's REST API called the way
+  `lib/sms.js` calls it, ElevenLabs through `lib/voice.js`, and
+  `lib/sarah-audio.js` for the public mp3 URL — Twilio's media fetch is
+  anonymous and the Blob store is private, which `sarah-audio` already solved.
+  No new service, no new account.
+- **The loop is Twilio's to run.** One URL for the whole call: Twilio POSTs to
+  start, and again after every `<Gather input="speech">`. Each hit returns TwiML
+  that speaks and opens the next gather, so nothing has to hold a socket open
+  inside a serverless function.
+- **The route is unauthenticated by session and locked by TWO checks, neither
+  optional.** Twilio's `X-Twilio-Signature` (HMAC-SHA1 over the URL plus every
+  POST param sorted by name) proves it came from Twilio; a token in the URL
+  (`batchToken`, HMAC over the batch id) proves it is about a batch we actually
+  rang out on. Verified against Twilio's own documented example vector.
+  **The signed URL is built from `RS_SITE_URL`, never from the incoming
+  request** — by the time it arrives its host and protocol have been through a
+  proxy and will not match what Twilio signed.
+- **It only ever rings ONE number** (`DISPATCH_CALL_TO`, else the
+  `dispatch_call_to` setting). Never a number from the request body and never
+  one off a sheet: a review call that can be pointed anywhere is a robocaller
+  with our name on it. Setting it is admin; placing the call is staff.
+- **The agent can only touch its own staged batch.** Its tools wrap the same
+  functions the screen calls — there is no second way to change a batch, so the
+  phone and the browser can never disagree about what row 4 says — and there is
+  nothing in its reach that can touch a stop already on the board, an invoice, a
+  driver or an order. `approve` is the one tool that writes to the board.
+- **The opening summary is arithmetic off the batch, not something the model
+  reads back.** There is no reason to give it a chance to get a count wrong.
+- **A name is read back before it is written.** A misheard street number is a van
+  at the wrong door, and speech-to-text on a phone line is exactly where that
+  comes from.
+- **A voicemail is not a review** — `MachineDetection` is on and a machine gets
+  a hangup. The batch is still on the Import tab either way, which is also what
+  happens when nobody speaks (one reprompt, then goodbye) or when anything
+  throws. **Every failure path leaves the sheet untouched and says so.**
+- **The tool loop is capped at three passes.** Enough for "read me the bad ones,
+  fix that one, now add them"; a loop that can run forever is a phone call going
+  silent while Twilio's webhook times out. Same reason the model is Sonnet by
+  default (`DISPATCH_CALL_MODEL`) — a turn is a round trip somebody is listening
+  to.
+- **A fresh call clears `call_log`.** An old transcript has the model answering a
+  question nobody just asked. The log is capped at 16 turns: it is context for
+  the next turn, not a recording — the batch's own state is the record.
+- **LANDMINE — the `<Gather>` action URL already carries a query string**, so
+  the silence fall-through has to JOIN onto it. Appending `?silent=1` produced a
+  second `?` and Twilio posted back with the flag glued to the token.
+- **LANDMINE — `/api/dispatch/import-call` depends on `proxy.js` letting `/api`
+  through on the RS host.** Narrowing that allow-list kills the call mid-
+  conversation, with the batch half-answered.
+
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of
