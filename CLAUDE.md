@@ -1637,5 +1637,28 @@ Because there is no payment step, these stand in for it. All of them **degrade o
 - `orders.ip` / `orders.user_agent` are recorded so a burst from one source is actually visible — before this there was no way to characterise the traffic at all.
 - Admin: `/api/admin/blocklist` (POST with `cancelOrders: true` blocks an identifier *and* cancels+relists every unpaid order matching it in one call), and an **⚠ Email unconfirmed** badge on the order board.
 
+### When the Live tab shows no map (added 2026-08-29)
+**Google does not fail the SCRIPT when it rejects a key.** The `<script>` loads,
+`onload` fires, `new google.maps.Map()` constructs — and then nothing draws.
+A refused key was therefore indistinguishable on screen from a working one with
+nothing to plot: a blank grey box, on the one screen whose entire job is showing
+where a van is. The only signal Google gives is a console line and a call to the
+`window.gm_authFailure` global, which nothing was listening for.
+
+`lib/maps.js` now owns that global (`onMapsAuthFailure` / `mapsAuthFailed`, and
+it fires immediately for anything subscribing after the fact, so a map mounted
+later doesn't sit blank waiting for an event that already passed). `LiveMap`
+renders the reason **over** the map box — the box stays mounted, because the ref
+has to exist for Google to attach to and a map that recovers needs somewhere to
+draw.
+
+**The three things to check when it says the key was rejected**, in the order
+they actually bite: the key's **HTTP-referrer restrictions** (dispatch runs on
+`dispatch.rssolutions.ca`, which is NOT `bargainbay.ca` — a key restricted to the
+storefront is refused on the dispatch host); the **Maps JavaScript API** being
+enabled on the project (Places being enabled is not enough, and Places is what
+the address autocomplete uses — so autocomplete working is not evidence the map
+will); and **billing**, which the Maps JS API requires.
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.

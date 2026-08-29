@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadGoogleMaps, mapsKey } from '../lib/maps';
+import { loadGoogleMaps, mapsKey, onMapsAuthFailure } from '../lib/maps';
 import { formatPhone } from '../lib/constants';
 
 // Where the vans are, now.
@@ -26,6 +26,10 @@ export default function LiveMap() {
   const box = useRef(null);
   const map = useRef(null);
   const markers = useRef(new Map());
+  // Why there is no map, when there isn't one. 'ok' covers both "drawing" and
+  // "still loading" — a map that is merely slow must not accuse anybody of a
+  // misconfigured key.
+  const [mapProblem, setMapProblem] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -46,8 +50,16 @@ export default function LiveMap() {
   // part that actually answers "where is Ruban" — the map only makes it quicker.
   useEffect(() => {
     let dead = false;
+    // Google calls gm_authFailure AFTER the script has loaded successfully, so
+    // this is the only way to hear about a refused key. Subscribed before the
+    // load starts, because the rejection can arrive the moment it finishes.
+    const stop = onMapsAuthFailure(() => { if (!dead) setMapProblem('rejected'); });
     loadGoogleMaps().then((g) => {
-      if (dead || !g || !box.current || map.current) return;
+      if (dead) return;
+      // A null here is the script itself never arriving — no key (handled
+      // separately below), an ad blocker, or no network.
+      if (!g) { setMapProblem('unreachable'); return; }
+      if (!box.current || map.current) return;
       map.current = new g.Map(box.current, {
         center: { lat: 43.8354, lng: -79.0849 },  // the warehouse, until a van reports in
         zoom: 10,
@@ -56,7 +68,7 @@ export default function LiveMap() {
         fullscreenControl: false
       });
     });
-    return () => { dead = true; };
+    return () => { dead = true; stop(); };
   }, []);
 
   useEffect(() => {
@@ -159,16 +171,46 @@ export default function LiveMap() {
           ))}
         </div>
 
-        {mapsKey()
-          ? <div className="live-map" ref={box} />
-          : (
-            <div className="live-map live-map-off">
-              <p className="hint">
-                No <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code>, so there is no map — the list above still
-                works, and every row opens the position in Google Maps.
-              </p>
-            </div>
-          )}
+        {!mapsKey() ? (
+          <div className="live-map live-map-off">
+            <p className="hint">
+              No <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code>, so there is no map — the list above still
+              works, and every row opens the position in Google Maps.
+            </p>
+          </div>
+        ) : (
+          // The box stays mounted whatever goes wrong: the ref has to exist for
+          // the map to attach to, and swapping it out for a message would mean
+          // a map that recovers has nowhere to draw. The reason sits ON it.
+          <div className="live-map-wrap">
+            <div className="live-map" ref={box} />
+            {mapProblem && (
+              <div className="live-map-why">
+                {mapProblem === 'rejected' ? (
+                  <>
+                    <b>Google rejected the Maps key for this site.</b>
+                    <p className="hint">
+                      The key works, but not from <code>{typeof window !== 'undefined' ? window.location.host : 'this host'}</code>.
+                      In the Google Cloud console, on that key: add this host to the HTTP-referrer
+                      restrictions, check the <b>Maps JavaScript API</b> is enabled (Places being enabled
+                      is not enough), and check billing is on.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <b>The map couldn&apos;t load.</b>
+                    <p className="hint">
+                      Google&apos;s script never arrived — usually an ad blocker or no connection.
+                    </p>
+                  </>
+                )}
+                <p className="hint">
+                  The list on the left is unaffected, and every row opens the position in Google Maps.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
