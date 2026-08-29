@@ -38,7 +38,7 @@ export default function Mileage({ from, to }) {
             <th>Van</th>
             <th style={{ textAlign: 'right' }}>Km</th>
             <th style={{ textAlign: 'right' }}>Litres</th>
-            <th style={{ textAlign: 'right' }}>Fuel spend</th>
+            <th style={{ textAlign: 'right' }}>Fuel we paid</th>
             <th style={{ textAlign: 'right' }}>L/100km</th>
             <th style={{ textAlign: 'right' }}>Cost per km</th>
           </tr>
@@ -57,7 +57,13 @@ export default function Mileage({ from, to }) {
                 {v.km ? v.km.toLocaleString('en-CA') : '—'}
               </td>
               <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{v.litres || '—'}</td>
-              <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(v.spend)}</td>
+              <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                {v.fuelPaidBy === 'carrier'
+                  ? <span style={{ color: 'var(--muted)' }} title="on the carrier's invoice, not ours">
+                      carrier{v.carrierSpend ? ` (${money(v.carrierSpend)})` : ''}
+                    </span>
+                  : money(v.spend)}
+              </td>
               <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
                 {v.litresPer100 ?? <span style={{ color: 'var(--muted)', fontWeight: 400 }}>—</span>}
               </td>
@@ -70,6 +76,8 @@ export default function Mileage({ from, to }) {
       </table></div>
       <p className="hint">
         Distance comes from the odometer at the start and end of a shift; fuel from the gas entries.
+        A <b>carrier</b> truck still shows its litres and its L/100km — that is how far it went on how much,
+        whoever paid — but its fills are not our fuel spend, so it has no cost per km here.
         {missingKm && ' Some shifts have a reading at only one end, so their distance isn’t counted — the drivers are asked for both.'}
         {missingLitres && ' Some fills have no litres on them, so they add to the spend but not to the L/100km.'}
         {!missingKm && !missingLitres && ' Both halves are complete for this period.'}

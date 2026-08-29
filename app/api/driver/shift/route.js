@@ -3,6 +3,7 @@ import { getSession } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { isDriver } from '../../../../lib/drivers';
 import { startShift, endShift, openShift, listVehicles } from '../../../../lib/shifts';
+import { listDrivers } from '../../../../lib/drivers';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -18,7 +19,14 @@ export async function GET() {
   const s = await driver();
   if (!s) return nope();
   try {
-    return NextResponse.json({ shift: await openShift(s.userId), vehicles: await listVehicles() });
+    // Names only — enough to say who they're riding with, and nothing a driver
+    // couldn't already read off the "2 crew" line on a shared stop.
+    const mates = (await listDrivers())
+      .filter((d) => d.id !== s.userId)
+      .map((d) => ({ id: d.id, name: d.name || d.email }));
+    return NextResponse.json({
+      shift: await openShift(s.userId), vehicles: await listVehicles(), mates
+    });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not load that.' }, { status: 400 });
   }

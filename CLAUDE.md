@@ -1415,6 +1415,19 @@ and half a history in each.
 - **A van is required for the odometer to mean anything** (`vehicles`). Two
   trucks' readings in one column is not a mileage figure. Staff-level to add —
   it's a name for a truck, not an access grant.
+- **NOT EVERYBODY ON A SHIFT IS DRIVING** (`driver_shifts.driving` /
+  `riding_with`). A second crew member rides with somebody else all day: on the
+  clock, not responsible for a van, and unable to read an odometer from the
+  passenger seat — so asking them for one gets a guess, and a guess in that
+  column corrupts every mileage figure built on it. **Driving-or-riding is the
+  FIRST question** the start form asks, because the answer decides whether the
+  rest of the form exists; a rider gets "riding with <name>" and nothing else,
+  and their end-of-shift is one tap. Enforced SERVER-side too (`startShift`
+  nulls the van and the reading for a passenger regardless of what was posted),
+  and `mileageReport` counts only `driving = true` shifts — otherwise "2 of 5
+  shifts have both readings" on a day when every driver gave both and three
+  people rode along. The **⛽ Add fuel** button is hidden from a passenger for
+  the same reason: they'd be filing a fill against a van they aren't running.
 - **Fuel a driver adds on the road lands in `dispatch_expenses`, the SAME table
   the office types gas into.** No second code path, no two sets of fuel figures
   to reconcile, and the Profit tab picks it up with no changes. Deduped on `ref`
@@ -1426,6 +1439,33 @@ and half a history in each.
   them looks authoritative and is invented, and somebody would price a delivery
   off it. The panel names what's missing instead: shifts with a reading at only
   one end, fills with no litres.
+- **WHO PAYS FOR THE FUEL is a property of the TRUCK** (`vehicles.fuel_paid_by`
+  = `us` | `carrier`), and it decides whether a driver's fill is a cost or only a
+  mileage record. The owner's two arrangements:
+  · the **20ft box truck** comes from a carrier who bills **fortnightly for the
+    truck AND its diesel** — so a fill logged against it is already paid for
+    inside that invoice;
+  · **our own pickups** are fuelled by the driver, who is **e-transferred** for
+    it — so the driver's entry is the ONLY record of that money anywhere, and
+    Plaid won't help (it drops `TRANSFER_OUT`, which is what an e-transfer is).
+  **LANDMINE — the double count.** Counting a carrier truck's fills as cost
+  charges us for the same tank twice: once as the fill, again inside the
+  carrier's invoice. `profitReport` therefore reports `carrierFuel` SEPARATELY
+  and leaves it out of `cost`, the Profit table shows it in its own greyed
+  column so the exclusion is never silent, and `EXPENSE_KINDS` gained
+  **`carrier`** ("Carrier bill — truck + fuel") for the invoice itself. Same rule
+  as the delivery fee: one representation at a time.
+  **Litres are counted for EVERY truck**, whoever paid — that is how far it went
+  on how much. So a carrier truck still gets its L/100km and simply has no cost
+  per km. Both the driver's fuel form and the van list say which kind of truck
+  it is, because a driver typing an amount deserves to know whether it is coming
+  back to them.
+- **The office can SEE the receipt** (`/api/admin/dispatch/receipt?id=`, same
+  private-blob proxy shape as the POD). This is what makes the feature actually
+  remove office work rather than move it: without it they'd be asking for the
+  photo on WhatsApp, which is the job the driver's entry exists to delete. The
+  expense list shows litres, odometer, van and driver beside the amount, so the
+  office REVIEWS an entry instead of re-typing one.
 - **`lib/driver-outbox.js` grew a `url`** so a shift or a fuel receipt rides the
   SAME queue as everything else. Two queues would drain in an order nobody
   controls and a fuel entry could land before the shift it belongs to.
@@ -1445,6 +1485,13 @@ of, and to leave in the other van.
   doorsteps this is for. Hence a real encoder rather than an image URL.
 - **The link ships with the stop list** (`/api/driver/jobs` returns `reviewUrl`),
   so it is on the handset before the driver is somewhere with one bar.
+- **The setting takes a LINK, not an image, and the owner asked why.** A QR code
+  IS a link — the existing review card has that same URL inside it. Storing the
+  artwork would fix the size, carry whatever margin and branding the card had
+  (both of which hurt scanning), and need an upload path for no gain. The setup
+  copy says this and tells them the two ways to get the link: Google Business
+  Profile → *Ask for reviews*, or point a phone camera at the card they already
+  have and copy the address it offers to open.
 - **`qrcode-generator` is a deliberate dependency** — the one place this repo
   takes a library where it wrote its own (`xlsx-lite`). The reasoning differs: a
   QR encoder is pure computation over OUR OWN url, not a parser eating untrusted
