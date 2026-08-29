@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { getCart, removeFromCart, clearCart, onCartChange } from '../../lib/cart';
 import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS, CARD_PAYMENTS_ENABLED, ETRANSFER_EMAIL } from '../../lib/constants';
 import { loadGoogleMaps, placesReady, mapsKey } from '../../lib/maps';
+import HoneypotField from '../../components/HoneypotField';
 
 export default function CheckoutClient({ catalog, session, prefill }) {
   const [skus, setSkus] = useState(null);
@@ -13,7 +14,10 @@ export default function CheckoutClient({ catalog, session, prefill }) {
     deliveryMethod: 'pickup',
     address: prefill?.address || '', city: prefill?.city || '', postal: prefill?.postal || '',
     paymentMethod: 'etransfer',
-    password: ''
+    password: '',
+    // Honeypot — stays '' for every real customer and rides along in the POST
+    // body via the {...form} spread in submit().
+    website: ''
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -140,6 +144,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
     <div>
       <h1 style={{ color: 'var(--charcoal)' }}>Checkout</h1>
       <form onSubmit={submit}>
+        <HoneypotField value={form.website} onChange={set('website')} />
         <div className="checkout-layout">
           <div>
             <div className="panel">
