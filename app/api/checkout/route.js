@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getMany } from '../../../lib/inventory';
 import { hasDb, query, withTransaction } from '../../../lib/db';
-import { unavailableSkus, reserveWithClient, expireReservations, RESERVATION_MINUTES, OFFLINE_HOLD_MINUTES } from '../../../lib/reservations';
+import { unavailableSkus, reserveWithClient, expireReservations, RESERVATION_MINUTES, CHECKOUT_HOLD_MINUTES } from '../../../lib/reservations';
 import { ensureOrderLineKind } from '../../../lib/orders';
 import { stripeConfigured, createCheckoutSession } from '../../../lib/stripe';
 import {
@@ -231,7 +231,7 @@ export async function POST(req) {
       );
       // Card checkout holds the unit for 30 min (pay-now window); offline orders
       // hold it long-term until the owner confirms payment or cancels a no-show.
-      await reserveWithClient(client, skus, orderId, cardOnline ? RESERVATION_MINUTES : OFFLINE_HOLD_MINUTES);
+      await reserveWithClient(client, skus, orderId, cardOnline ? RESERVATION_MINUTES : CHECKOUT_HOLD_MINUTES);
       for (const u of items) {
         await client.query(
           "INSERT INTO order_items (order_id, sku, title, price, kind) VALUES ($1,$2,$3,$4,'unit')",
