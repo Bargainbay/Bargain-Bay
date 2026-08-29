@@ -23,9 +23,14 @@ import {
   setTicketStatus, listTickets, reopenJob, updateJob,
   findServiceCustomers, ordersForServiceCall,
   completeJob, setJobPay, payReport, bookRevisit, setJobTimes,
-  setJobCharge, billingSummary, invoiceClientJobs, crewLost, jobHistory
+  setJobCharge, setJobsClient, billingSummary, invoiceClientJobs, crewLost, jobHistory
 } from '../../../../lib/jobs';
 import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
+import {
+  stageBatch, resolveBatch, patchBatch, setBatchClient, approveBatch, cancelBatch,
+  listOpenBatches, addClientAlias, openQuestions
+} from '../../../../lib/import-batches';
+import { startImportCall, callConfigured, callTarget } from '../../../../lib/import-call';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -89,6 +94,23 @@ export async function GET(req) {
     // answer — job_events had recorded it all along and nothing rendered it.
     if (sp.get('view') === 'history') {
       return NextResponse.json({ events: await jobHistory(sp.get('jobId')) });
+    }
+    // A staged sheet, and what it still needs answered. Readable from anywhere,
+    // which is the point of staging it — the tab it was uploaded in is not the
+    // only place the review can happen.
+    if (sp.get('view') === 'import') {
+      const batch = await resolveBatch(sp.get('batchId'));
+      if (!batch) return NextResponse.json({ error: 'That import is no longer here.' }, { status: 404 });
+      return NextResponse.json({ batch, questions: openQuestions(batch) });
+    }
+    if (sp.get('view') === 'imports') {
+      return NextResponse.json({
+        batches: await listOpenBatches({ limit: sp.get('limit') }),
+        // Whether the Import tab can offer "ring me about it", and where it
+        // would ring. Both are needed to decide what to render: configured but
+        // with no number set is a button that would fail on the press.
+        call: { configured: callConfigured(), to: await callTarget() }
+      });
     }
     // Stops where somebody came off the crew without anyone assigning them off.
     if (sp.get('view') === 'crew_lost') {
@@ -162,6 +184,64 @@ export async function POST(req) {
         }
       }
       return NextResponse.json({ ok: true, added: created.length, created, failed });
+    }
+    // ── Staged imports ──────────────────────────────────────────────────────
+    // A sheet is STAGED first and approved second, so the review can happen
+    // somewhere other than the tab it was uploaded in — including over the
+    // phone. Nothing here puts a stop on the board except `import_approve`.
+    if (body.action === 'stage_import') {
+      const rows = Array.isArray(body.rows) ? body.rows.slice(0, 1000) : [];
+      const batch = await stageBatch({
+        headers: Array.isArray(body.headers) ? body.headers : [],
+        rows,
+        sourceName: body.sourceName,
+        readAs: body.readAs || 'paste',
+        jobDate: body.jobDate || null,
+        clientId: body.clientId || null,
+        createdBy: who(s)
+      });
+      return NextResponse.json({ ok: true, batch, questions: openQuestions(batch) });
+    }
+    if (body.action === 'import_patch') {
+      const batch = await patchBatch(body.batchId, body.patch || {}, who(s));
+      return NextResponse.json({ ok: true, batch, questions: openQuestions(batch) });
+    }
+    // "This whole sheet is for X" — the one that answers a day of stops filed
+    // under the wrong company one card at a time.
+    if (body.action === 'import_client') {
+      const batch = await setBatchClient(body.batchId, body.clientId, { everyRow: body.everyRow !== false });
+      return NextResponse.json({ ok: true, batch, questions: openQuestions(batch) });
+    }
+    if (body.action === 'import_alias') {
+      await addClientAlias(body.clientId, body.alias, who(s));
+      const batch = body.batchId ? await resolveBatch(body.batchId) : null;
+      return NextResponse.json({ ok: true, batch, questions: batch ? openQuestions(batch) : [] });
+    }
+    // "Ring me and read it to me." The number is NOT taken from the request —
+    // a review call that can be pointed at an arbitrary number is a robocaller
+    // with our name on it. It is an env var or a setting, and nothing else.
+    if (body.action === 'import_call') {
+      if (!callConfigured()) {
+        return NextResponse.json({ error: 'Calling is not set up on this deployment.' }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true, ...(await startImportCall(body.batchId, { by: who(s) })) });
+    }
+    if (body.action === 'call_number') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set the number dispatch rings.' }, { status: 403 });
+      const raw = String(body.number || '').trim();
+      // E.164 only. A number the phone system can't dial is a call that fails
+      // silently at Twilio rather than on the screen somebody is looking at.
+      if (raw && !/^\+[1-9]\d{7,14}$/.test(raw)) {
+        return NextResponse.json({ error: 'Give it as +1 then the ten digits, e.g. +14165551234.' }, { status: 400 });
+      }
+      await setSetting('dispatch_call_to', raw.slice(0, 20));
+      return NextResponse.json({ ok: true, number: raw });
+    }
+    if (body.action === 'import_approve') {
+      return NextResponse.json({ ok: true, ...(await approveBatch(body.batchId, who(s))) });
+    }
+    if (body.action === 'import_cancel') {
+      return NextResponse.json({ ok: true, batch: await cancelBatch(body.batchId, who(s)) });
     }
     // "Add anyway": one order the pull declined — a pickup that does need a
     // driver, a cancelled job coming back, an order still at Pending payment.
@@ -347,6 +427,11 @@ export async function PATCH(req) {
     if (body.action === 'charge') {
       if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set what a job charges.' }, { status: 403 });
       return NextResponse.json({ ok: true, job: await setJobCharge(jobId, body, who(s)) });
+    }
+    // Whose work a stop is, on many stops at once. Staff — a client is a company
+    // name, the same gate that lets staff add one from inside the job form.
+    if (body.action === 'client_bulk') {
+      return NextResponse.json({ ok: true, ...(await setJobsClient(body.jobIds, body.clientId, who(s))) });
     }
     if (body.action === 'pay') {
       // Money, so admin only — same line the rest of the app draws.

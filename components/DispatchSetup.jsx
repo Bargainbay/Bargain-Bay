@@ -16,6 +16,11 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   const [sameName, setSameName] = useState(null); // the driver an "add" collided with
   const [vans, setVans] = useState([]);
   const [reviewUrl, setReviewUrl] = useState('');
+  // The number the import review rings. Held here and not passed in from the
+  // browser at call time — a review call that can be pointed at an arbitrary
+  // number is a robocaller with our name on it.
+  const [callTo, setCallTo] = useState('');
+  const [callReady, setCallReady] = useState(false);
   const [vanName, setVanName] = useState('');
   const [vanPlate, setVanPlate] = useState('');
   const [vanFuel, setVanFuel] = useState('us');
@@ -70,7 +75,26 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   useEffect(() => {
     fetch('/api/admin/dispatch?view=review_link')
       .then((r) => r.json()).then((d) => setReviewUrl(d.url || '')).catch(() => {});
+    fetch('/api/admin/dispatch?view=imports')
+      .then((r) => r.json())
+      .then((d) => { setCallTo(d.call?.to || ''); setCallReady(!!d.call?.configured); })
+      .catch(() => {});
   }, []);
+
+  async function saveCallNumber(e) {
+    e.preventDefault();
+    setBusy('callto'); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'call_number', number: callTo })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not save the number.'); return; }
+      setOk(callTo ? `Import reviews will ring ${callTo}.` : 'Number cleared — nothing will ring.');
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(''); }
+  }
 
   async function saveReviewLink(e) {
     e.preventDefault();
@@ -306,6 +330,31 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
             <p className="hint">
               Drivers see <b>⭐ Ask for a Google review</b> on a stop once it&apos;s finished.{' '}
               <a href={reviewUrl} target="_blank" rel="noopener noreferrer">Check the link goes to the right page ↗</a>
+            </p>
+          )}
+        </section>
+      )}
+
+      {canManageDrivers && (
+        <section className="panel">
+          <h3 style={{ marginTop: 0 }}>The number an import review rings</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            A client&apos;s sheet arrives the night before the run and somebody has to check it. Press
+            <b> 📞 Call me about this</b> on the Import tab and the office rings this number, reads out what
+            is on the sheet, names only the rows that need an answer, and takes them as speech.
+            <b> Nothing goes on the board until you say so on the call.</b>
+          </p>
+          <form onSubmit={saveCallNumber} className="disp-setup-form">
+            <input value={callTo} onChange={(e) => setCallTo(e.target.value)} style={{ minWidth: 220 }}
+              placeholder="+14165551234" inputMode="tel" />
+            <button className="btn accent" disabled={busy === 'callto'}>
+              {busy === 'callto' ? 'Saving…' : 'Save number'}
+            </button>
+          </form>
+          {!callReady && (
+            <p className="hint" style={{ color: 'var(--danger)' }}>
+              Calling isn&apos;t switched on for this deployment yet — it needs the Twilio keys and
+              <code> ANTHROPIC_API_KEY</code>. The number can be set now either way.
             </p>
           )}
         </section>

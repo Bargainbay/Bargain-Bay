@@ -982,6 +982,141 @@ the paper run sheet that replaces it.
   quietly redirected to another city is exactly the kind of thing that should
   never happen invisibly. A QC row with no pickup address is BLOCKED: a
   cross-dock drop with nowhere to collect from is not a job.
+
+## An import is STAGED, and it knows whose sheet it is (added 2026-08-29)
+`lib/import-batches.js` + `lib/client-match.js`, tables `import_batches` /
+`client_sheet_profiles` / `client_aliases`. Written after a client's whole
+spreadsheet went onto the board filed under the wrong company, and the only way
+back was the edit form, one card at a time.
+
+- **An upload STAGES; it does not import.** The rows land in `import_batches` as
+  a draft the moment the file is read, and only `approveBatch` turns them into
+  jobs. A draft is not a stop: it has no address anybody drives to. Staging is
+  what lets the review happen somewhere other than the tab it was uploaded in —
+  a batch has an id, so a phone call can be reading row 4 while the person who
+  uploaded it has walked away. It is also what makes an import survive a closed
+  tab; open drafts are listed on the Import tab so a staged batch can't leak.
+- **Corrections live in `overrides`, keyed by row index — never written back
+  over `rows`.** "What did their spreadsheet actually say" is the first question
+  asked when a stop turns out wrong, and an importer that overwrites the sheet
+  with its own corrections cannot answer it.
+- **`clientName` is a real import field**, separate from `customerName`. A sheet
+  that names an account per row (`Account`, `Bill to`, `Dealer`) gets each stop
+  filed under the company that row names; the batch-level client is the fallback,
+  not the override. `Client Name` deliberately still means the CONSIGNEE — on a
+  delivery sheet it is the customer, and the two must not be conflated.
+- **A match is either confident enough to apply or it is a QUESTION.** There is
+  no middle setting (`lib/client-match.js`): exact name, a known alias, a ≥3
+  letter initialism (CDA), or full token containment apply; a Levenshtein
+  near-miss never does, and two clients scoring within 0.1 of each other is
+  ambiguous and applies neither. "Parallel Supply" and "Paragon Supply" are one
+  idea apart and two different companies in the driveway.
+- **A name on a sheet NEVER creates a client.** A parser inventing companies
+  leaves a client list nobody can invoice from. Unknown names come back unknown
+  with the text preserved, so the answer is one tap — and answering it once
+  writes a `client_aliases` row, which is the only way an alias is ever learned.
+- **The sheet's LAYOUT is remembered** (`client_sheet_profiles`, keyed on
+  `fingerprintHeaders` — the normalised heading row, sorted so a moved column
+  still lands on the same profile). Next time that sheet arrives it maps itself
+  and names its own client. Saved **only on approve**: a mapping learned off a
+  draft nobody accepted would teach it the wrong lesson.
+- **Client detection is ordered by how much the signal deserves to be trusted**:
+  a remembered profile, then a per-row client column that agrees with itself,
+  then the filename. A sheet carrying three companies has no single answer and
+  is not forced into one — each stop keeps the one it names.
+- **The day defaults to TOMORROW, not to the board's date.** A client's sheet
+  arrives the day before the run; defaulting to today put a whole client's
+  next-day stops on the wrong date every time the date column was missing.
+- **The client is a sentence at the top of the screen, not a dropdown three rows
+  down.** It used to be a `<select>` whose state survived a successful import, so
+  importing sheet B after sheet A silently filed B under A's client.
+- **Problems are objects now** (`{ kind, text, blocking, info, suggest }`), not
+  strings — the voice agent has to act on them, not just print them. Anything
+  that only wants to print goes through `problemText`.
+- **`setJobsClient` fixes what is already on the board** ("Set client" on the
+  board bar → `components/BulkClient.jsx`, PATCH `action: 'client_bulk'`). An
+  INVOICED job is **refused and named**, never quietly skipped: its client is who
+  was billed, and moving it would take a line off one company's invoice and put
+  it on another's.
+- **LANDMINE — a quote only opens a field when it is the field's FIRST
+  character.** `splitRow` treated `"` anywhere as an opening quote, so
+  `Whirlpool 36" Fridge` swallowed every delimiter to the end of the line and
+  shifted the whole row left — the window, the order type and the notes all
+  landed in the item description. Inches are universal on an appliance sheet.
+  This only ever bit the paste/CSV path (an xlsx hands over cells already split),
+  and paste is the primary input.
+- **LANDMINE — `guessMapping` assigns globally, strongest pair first.** It used
+  to walk the fields in declaration order, so an EARLIER field could take a
+  column on a loose match that a LATER field named exactly. With a `Client` field
+  in front of `Customer` that is not theoretical: it would swallow the
+  `Client Name` column that means the customer. Strength decides, not order.
+
+## The import rings you (added 2026-08-29)
+`lib/import-call.js` + `POST /api/dispatch/import-call`. "📞 Call me about this"
+on a staged batch: the office phones the owner, reads the sheet out, names only
+the rows that need an answer, takes them as speech, and puts nothing on the
+board until he says so.
+
+A client's sheet arrives the night before a run and the owner is not at a
+screen — he's in the warehouse or a van. So the review either happened late or
+happened badly, and the stops that needed a second look were the ones that went
+out wrong. This is why the import is staged: a batch has an id, so the call can
+be reading row 4 while whoever uploaded it has already walked away.
+
+- **Built out of what was already here.** Twilio's REST API called the way
+  `lib/sms.js` calls it, ElevenLabs through `lib/voice.js`, and
+  `lib/sarah-audio.js` for the public mp3 URL — Twilio's media fetch is
+  anonymous and the Blob store is private, which `sarah-audio` already solved.
+  No new service, no new account.
+- **The loop is Twilio's to run.** One URL for the whole call: Twilio POSTs to
+  start, and again after every `<Gather input="speech">`. Each hit returns TwiML
+  that speaks and opens the next gather, so nothing has to hold a socket open
+  inside a serverless function.
+- **The route is unauthenticated by session and locked by TWO checks, neither
+  optional.** Twilio's `X-Twilio-Signature` (HMAC-SHA1 over the URL plus every
+  POST param sorted by name) proves it came from Twilio; a token in the URL
+  (`batchToken`, HMAC over the batch id) proves it is about a batch we actually
+  rang out on. Verified against Twilio's own documented example vector.
+  **The signed URL is built from `brandFor('rs_solutions').url()`, never from
+  the incoming request** — by the time it arrives its host and protocol have
+  been through a proxy and will not match what Twilio signed. It comes off the
+  BRAND rather than being defined twice: `RS_SITE_URL` is unset in production,
+  and the first cut's private fallback through `SITE_URL` would have pointed
+  both the webhook and the spoken audio at bargainbay.ca for a call that is
+  entirely RS Solutions.
+- **It only ever rings ONE number** (`DISPATCH_CALL_TO`, else the
+  `dispatch_call_to` setting). Never a number from the request body and never
+  one off a sheet: a review call that can be pointed anywhere is a robocaller
+  with our name on it. Setting it is admin; placing the call is staff.
+- **The agent can only touch its own staged batch.** Its tools wrap the same
+  functions the screen calls — there is no second way to change a batch, so the
+  phone and the browser can never disagree about what row 4 says — and there is
+  nothing in its reach that can touch a stop already on the board, an invoice, a
+  driver or an order. `approve` is the one tool that writes to the board.
+- **The opening summary is arithmetic off the batch, not something the model
+  reads back.** There is no reason to give it a chance to get a count wrong.
+- **A name is read back before it is written.** A misheard street number is a van
+  at the wrong door, and speech-to-text on a phone line is exactly where that
+  comes from.
+- **A voicemail is not a review** — `MachineDetection` is on and a machine gets
+  a hangup. The batch is still on the Import tab either way, which is also what
+  happens when nobody speaks (one reprompt, then goodbye) or when anything
+  throws. **Every failure path leaves the sheet untouched and says so.**
+- **The tool loop is capped at three passes.** Enough for "read me the bad ones,
+  fix that one, now add them"; a loop that can run forever is a phone call going
+  silent while Twilio's webhook times out. Same reason the model is Sonnet by
+  default (`DISPATCH_CALL_MODEL`) — a turn is a round trip somebody is listening
+  to.
+- **A fresh call clears `call_log`.** An old transcript has the model answering a
+  question nobody just asked. The log is capped at 16 turns: it is context for
+  the next turn, not a recording — the batch's own state is the record.
+- **LANDMINE — the `<Gather>` action URL already carries a query string**, so
+  the silence fall-through has to JOIN onto it. Appending `?silent=1` produced a
+  second `?` and Twilio posted back with the flag glued to the token.
+- **LANDMINE — `/api/dispatch/import-call` depends on `proxy.js` letting `/api`
+  through on the RS host.** Narrowing that allow-list kills the call mid-
+  conversation, with the batch half-answered.
+
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of
