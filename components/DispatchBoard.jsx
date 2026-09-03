@@ -743,6 +743,34 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     } finally { setBusy(false); }
   }
 
+  // Putting a stop back. RS-1023 is a job, BB-1078 is an order, and whoever is
+  // holding one number should not have to know which of the two it is — so the
+  // one box takes both. This is the only way back for a cancelled stop that has
+  // no order behind it: cancelled stops are off the board, so their card, and
+  // the Reopen button on it, is not there to click.
+  async function reopenByNumber(num) {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reopen_number', jobNumber: num })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not put that stop back.'); return; }
+      setAddNum('');
+      // It comes back on the day it was booked for, which is often not the day
+      // on screen — so say so, and go to that day. A board that looked exactly
+      // the same afterwards would read as nothing having happened.
+      const on = d.job?.jobDate;
+      setPull({
+        note: `${d.job.jobNumber} is back on the board${on ? ` for ${prettyDate(on)}` : ', waiting for a day'}.`
+      });
+      await refresh(on || board.date);
+    } catch {
+      setErr('Network error — nothing was changed.');
+    } finally { setBusy(false); }
+  }
+
   // Typing a number is the way in for an order the pull never looked at — it
   // only scans the recent weeks, and a special order sold in June still gets
   // delivered in August.
@@ -750,6 +778,9 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     e.preventDefault();
     const num = addNum.trim();
     if (!num) return;
+    // A bare number stays an order number, which is what this box has always
+    // meant. Only an explicit RS is a stop.
+    if (/^rs/i.test(num)) return reopenByNumber(num);
     setBusy(true); setErr('');
     try {
       const res = await fetch('/api/admin/dispatch', {
@@ -900,9 +931,9 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             onClick={pullBargainBay}>Pull Bargain Bay orders</button>
           <form className="disp-addnum" onSubmit={addByNumber}>
             <input value={addNum} onChange={(e) => setAddNum(e.target.value)}
-              placeholder="BB-1078" aria-label="Add a Bargain Bay order by number"
-              title="Put one order on the board by number — works for orders older than the pull looks back" />
-            <button type="submit" className="btn" disabled={busy || !addNum.trim()}>Add order</button>
+              placeholder="BB-1078 or RS-1023" aria-label="Add an order, or put a stop back, by number"
+              title="BB-1078 puts one Bargain Bay order on the board, including orders older than the pull looks back. RS-1023 puts a stop back that was cancelled or finished — it returns on the day it was booked for." />
+            <button type="submit" className="btn" disabled={busy || !addNum.trim()}>Add</button>
           </form>
           <a className="btn" href={`/admin/dispatch/print?date=${board.date}`} target="_blank" rel="noopener noreferrer">Print run sheet</a>
           {/* Gas, on the day, from the screen the office is already looking at.
@@ -935,9 +966,10 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
         <div className="disp-pull">
           <button type="button" className="disp-pull-x" onClick={() => setPull(null)} aria-label="Dismiss">×</button>
           <b>
-            {pull.imported
-              ? `Added ${pull.imported} order${pull.imported === 1 ? '' : 's'} to the board: ${pull.created.map((c) => `${c.order} → ${c.job}`).join(', ')}.`
-              : 'Nothing new to add.'}
+            {pull.note
+              || (pull.imported
+                ? `Added ${pull.imported} order${pull.imported === 1 ? '' : 's'} to the board: ${pull.created.map((c) => `${c.order} → ${c.job}`).join(', ')}.`
+                : 'Nothing new to add.')}
           </b>
           {pull.alreadyOnBoard > 0 && (
             <div className="hint" style={{ margin: '4px 0 0' }}>
