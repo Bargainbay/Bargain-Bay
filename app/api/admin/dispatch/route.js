@@ -23,7 +23,7 @@ import {
   setTicketStatus, listTickets, reopenJob, updateJob,
   findServiceCustomers, ordersForServiceCall,
   completeJob, setJobPay, payReport, bookRevisit, setJobTimes,
-  setJobCharge, billingSummary, invoiceClientJobs, crewLost, jobHistory
+  setJobCharge, billingSummary, invoiceClientJobs, jobHistory
 } from '../../../../lib/jobs';
 import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 
@@ -89,10 +89,6 @@ export async function GET(req) {
     // answer — job_events had recorded it all along and nothing rendered it.
     if (sp.get('view') === 'history') {
       return NextResponse.json({ events: await jobHistory(sp.get('jobId')) });
-    }
-    // Stops where somebody came off the crew without anyone assigning them off.
-    if (sp.get('view') === 'crew_lost') {
-      return NextResponse.json(await crewLost({ from: sp.get('from'), to: sp.get('to') }));
     }
     // The day AROUND the stops: who clocked on, for how long, and how far the
     // van went. Deliberately separate from the pay report's "hours on site" —
