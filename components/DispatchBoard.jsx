@@ -202,63 +202,6 @@ function DayCostForm({ date, drivers, busy, onSave }) {
   );
 }
 
-// Stops where a driver was on the crew and is no longer on it.
-//
-// The repair half of a bug that ran silently: reordering a run used to write the
-// column's driver onto every card in it, and a column also holds the stops that
-// driver is RIDING on as second man — so one ▲ made one person both people on a
-// stop, and the next assignment dropped the duplicate seat and the other driver
-// with it. The stop simply had one fewer name and nothing said so.
-//
-// The names are recoverable because every assignment was logged. What is NOT
-// recoverable is intent: the accidental drop happens inside assignJob, so it
-// writes the same kind of event a deliberate one does. So this reports the fact
-// and offers the crew back — it never restores anything on its own, and it never
-// claims the removal was a mistake. Who was in the van on a Tuesday is a fact
-// about a Tuesday, not something a query gets to decide.
-function CrewLost({ lost, busy, onRestore, onDismiss }) {
-  if (!lost?.rows?.length) return null;
-  return (
-    <div className="error-box disp-crewlost">
-      <b>
-        A driver came off {lost.rows.length === 1 ? 'this stop' : `${lost.rows.length} stops`}.
-      </b>
-      <div className="hint" style={{ margin: '4px 0 8px' }}>
-        They were on it and they are not on it now. It may have been deliberate — the log records who
-        was assigned, not why — so check each one against who was actually in the van, and use
-        <b> History</b> on the card to see the trail. Putting a name back only ever ADDS them to a free
-        seat; it never takes off whoever is on the stop today. Reordering a run used to cause this on
-        its own; that is fixed.
-      </div>
-      <ul className="disp-setup-list">
-        {lost.rows.map((r) => (
-          <li key={r.id}>
-            <strong>{r.jobNumber}</strong>
-            <span className="hint" style={{ margin: 0 }}>
-              {' '}· {r.date} · {r.customerName || '(no name)'} · now{' '}
-              {r.driverName || 'unassigned'}{r.driver2Name ? ` + ${r.driver2Name}` : ' alone'}
-              {' '}· missing <b>{r.missing.join(', ')}</b>
-            </span>
-            {r.restore
-              ? (
-                <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={busy}
-                  onClick={() => onRestore(r)}>
-                  add {r.addBackName} back{r.driverName ? ` beside ${r.driverName}` : ''}
-                </button>
-              )
-              : (
-                <span className="hint" style={{ margin: 0 }}>
-                  {' '}· both seats taken — take one off first if {r.missing[0]} should be on it
-                </span>
-              )}
-          </li>
-        ))}
-      </ul>
-      <button type="button" className="disp-toggle" onClick={onDismiss}>dismiss</button>
-    </div>
-  );
-}
-
 // Everything that has ever happened to one stop, in the words it was logged in.
 // `job_events` has recorded every assignment, status move, payment and
 // correction since dispatch was built, and nothing ever showed it — so when a
@@ -686,7 +629,6 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   const [pull, setPull] = useState(null);        // what the last Bargain Bay pull did
   const [addNum, setAddNum] = useState('');      // order number typed into "add by number"
   const [gassing, setGassing] = useState(false); // the day-cost box, open on the bar
-  const [lost, setLost] = useState(null);        // crews a name went missing from
 
   async function refresh(date = board.date) {
     setErr('');
@@ -696,14 +638,6 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       if (!res.ok) { setErr(d.error || 'Could not load the board.'); return; }
       setBoard(d);
     } catch { setErr('Network error — the board may be out of date.'); }
-    // A fortnight either side, not just this day: a name that went missing last
-    // Tuesday is still missing, and nobody is going to page back through the
-    // board looking for it. Its own request, and a failure is silent — this is
-    // a repair prompt, not the day's work.
-    fetch(`/api/admin/dispatch?view=crew_lost&from=${shiftDate(date, -14)}&to=${shiftDate(date, 14)}`)
-      .then((r) => r.json())
-      .then((d) => setLost(d?.rows?.length ? d : null))
-      .catch(() => {});
   }
 
   async function send(method, body) {
@@ -753,28 +687,6 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   // here — setJobCharge and setJobPay both read '' as "no figure".
   const onCharge = (jobId, amount, note) => send('PATCH', { action: 'charge', jobId, amount, note });
   const onPay = (jobId, amount, note) => send('PATCH', { action: 'pay', jobId, amount, note });
-
-  // The board's first render comes from the server, so the audit has to go and
-  // ask on mount — otherwise a name only turns up missing after somebody happens
-  // to change the day.
-  useEffect(() => {
-    fetch(`/api/admin/dispatch?view=crew_lost&from=${shiftDate(board.date, -14)}&to=${shiftDate(board.date, 14)}`)
-      .then((r) => r.json())
-      .then((d) => setLost(d?.rows?.length ? d : null))
-      .catch(() => {});
-    // Once, for the day the board opened on; refresh() re-asks after that.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Putting a lost name back is an ordinary assignment — both seats, as they
-  // were last actually assigned.
-  // Additive: the missing name goes into a free seat beside whoever is on the
-  // stop now. Never the old crew wholesale — that would remove somebody who is
-  // on it today, and most of what this list catches is an ordinary reassignment.
-  const onRestoreCrew = (row) => send('PATCH', {
-    action: 'assign', jobId: row.id, jobDate: row.date,
-    driverId: row.restore.driverId, driver2Id: row.restore.driver2Id
-  });
 
   // The pull used to refresh in silence, so an order it declined to take looked
   // exactly like an order it had taken. It now says what it did and, for
@@ -1010,8 +922,6 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       </div>
 
       {err && <div className="error-box">{err}</div>}
-
-      <CrewLost lost={lost} busy={busy} onRestore={onRestoreCrew} onDismiss={() => setLost(null)} />
 
       {gassing && (
         <DayCostForm date={board.date} drivers={board.drivers} busy={busy}
