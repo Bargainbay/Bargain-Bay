@@ -1027,22 +1027,6 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
           </section>
         )}
 
-        {board.cancelled?.length > 0 && (
-          // Cancelled stops used to disappear from the board completely, which
-          // is indistinguishable from being deleted — and a cancelled BB job
-          // still blocks that order from being pulled in again. They stay,
-          // greyed, with the button that undoes it.
-          <BoardColumn title="Cancelled" count={board.cancelled.length}
-            bodyKey={String(board.cancelled.length)}>
-            {board.cancelled.map((j) => (
-              <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
-                onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes}
-              onCharge={canManageClients ? onCharge : null} onPay={onPay} />
-            ))}
-          </BoardColumn>
-        )}
-
         {board.drivers.map((d) => {
           const stops = byDriver(d.id);
           const own = ownedBy(d.id);
