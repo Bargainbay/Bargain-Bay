@@ -23,7 +23,7 @@ import {
   setTicketStatus, listTickets, reopenJob, updateJob,
   findServiceCustomers, ordersForServiceCall,
   completeJob, setJobPay, payReport, bookRevisit, setJobTimes,
-  setJobCharge, billingSummary, invoiceClientJobs, jobHistory
+  setJobCharge, billingSummary, invoiceClientJobs, jobHistory, reopenJobByNumber
 } from '../../../../lib/jobs';
 import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 
@@ -165,6 +165,12 @@ export async function POST(req) {
       return NextResponse.json({ ok: true, ...(await importOneBargainBayOrder(body.orderNumber, {
         by: who(s), address: body.address, city: body.city, postal: body.postal
       })) });
+    }
+    // Same box, the other kind of number: RS-1023 is a stop that was cancelled
+    // (or finished) and needs to come back. Cancelled stops are off the board,
+    // so the Reopen button on the card cannot be got at for them.
+    if (body.action === 'reopen_number') {
+      return NextResponse.json({ ok: true, job: await reopenJobByNumber(body.jobNumber, who(s)) });
     }
     if (body.action === 'invoice_client') {
       // Raising an invoice is money leaving the building — admin only.
