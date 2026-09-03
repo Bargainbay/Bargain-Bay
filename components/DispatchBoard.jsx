@@ -933,7 +933,7 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             <input value={addNum} onChange={(e) => setAddNum(e.target.value)}
               placeholder="BB-1078 or RS-1023" aria-label="Add an order, or put a stop back, by number"
               title="BB-1078 puts one Bargain Bay order on the board, including orders older than the pull looks back. RS-1023 puts a stop back that was cancelled or finished — it returns on the day it was booked for." />
-            <button type="submit" className="btn" disabled={busy || !addNum.trim()}>Add</button>
+            <button type="submit" className="btn" disabled={busy || !addNum.trim()}>Add order</button>
           </form>
           <a className="btn" href={`/admin/dispatch/print?date=${board.date}`} target="_blank" rel="noopener noreferrer">Print run sheet</a>
           {/* Gas, on the day, from the screen the office is already looking at.
