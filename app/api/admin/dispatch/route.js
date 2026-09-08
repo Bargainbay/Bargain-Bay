@@ -58,10 +58,15 @@ export async function GET(req) {
     if (sp.get('view') === 'orders') {
       return NextResponse.json({ orders: await ordersForServiceCall(sp.get('email') || '') });
     }
+    // What we bill a client and what we pay a driver. Admin — the same line the
+    // Profit tab is on, and the reason is the same: a sales associate dispatches
+    // the work, they don't price it or pay for it.
     if (sp.get('view') === 'billing') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see client billing.' }, { status: 403 });
       return NextResponse.json(await billingSummary({ from: sp.get('from'), to: sp.get('to') }));
     }
     if (sp.get('view') === 'pay') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see driver pay.' }, { status: 403 });
       return NextResponse.json(await payReport({ from: sp.get('from'), to: sp.get('to') }));
     }
     // What the delivery side made, against what it cost. Admin only — it is the
@@ -76,6 +81,8 @@ export async function GET(req) {
     // The clock on every stop: when they got there, when they finished, and the
     // two things worth chasing — no times at all, and never clocked out.
     if (sp.get('view') === 'times') {
+      // Hours. They are what pay is calculated from, so they sit with pay.
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see the hours.' }, { status: 403 });
       return NextResponse.json(await stopTimes({
         from: sp.get('from'), to: sp.get('to'), driverId: sp.get('driverId')
       }));
@@ -97,6 +104,7 @@ export async function GET(req) {
     // shift hours are what a person is paid for, time on site is what a delivery
     // costs, and adding them up would be wrong in both directions.
     if (sp.get('view') === 'shifts') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see shift hours.' }, { status: 403 });
       return NextResponse.json(await shiftReport({
         from: sp.get('from'), to: sp.get('to'), driverId: sp.get('driverId')
       }));

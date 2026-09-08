@@ -3,11 +3,6 @@ import { useState } from 'react';
 import { money, STATUS_LABELS } from '../../lib/constants';
 
 const STATUSES = ['pending_payment', 'confirmed', 'ready', 'out_for_delivery', 'delivered', 'cancelled'];
-// What a sales associate can move an order to. Everything that FULFILS a sale,
-// and nothing that undoes one: cancelling relists the unit and takes the money
-// back off the dashboard, which is the same line the rest of the app draws
-// around refunds and voids.
-const FULFILMENT = ['pending_payment', 'confirmed', 'ready', 'out_for_delivery', 'delivered'];
 
 // Format a stored pickup slot ("YYYY-MM-DDTHH:MM", store-local) for display.
 function fmtPickup(value) {
@@ -20,7 +15,7 @@ function fmtPickup(value) {
   return `${wd} · ${h12}:${String(mm).padStart(2, '0')} ${hh < 12 ? 'AM' : 'PM'}`;
 }
 
-export default function AdminOrders({ initialOrders, drivers = [], reps = [], canVoid = true }) {
+export default function AdminOrders({ initialOrders, drivers = [], reps = [] }) {
   const [orders, setOrders] = useState(initialOrders);
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState('');
@@ -107,13 +102,8 @@ export default function AdminOrders({ initialOrders, drivers = [], reps = [], ca
                 <td>
                   <a href={`/order/${o.order_number}?email=${encodeURIComponent(o.email)}`} style={{ fontWeight: 700, color: 'var(--charcoal)' }}>{o.order_number}</a>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>{new Date(o.created_at).toLocaleString('en-CA')}</div>
-                  {/* Admin only, and hidden rather than shown-and-refused: the
-                      page behind it is admin-gated, so a sales associate
-                      clicking it would only find a wall. */}
-                  {canVoid && (
-                    <a href={`/admin/orders/${o.order_number}/edit`} style={{ fontSize: 12, textDecoration: 'underline' }}
-                      title="Edit contact/address, change line items, or refund — even after payment.">Edit / refund</a>
-                  )}
+                  <a href={`/admin/orders/${o.order_number}/edit`} style={{ fontSize: 12, textDecoration: 'underline' }}
+                    title="Edit contact/address, change line items, or refund — even after payment.">Edit / refund</a>
                 </td>
                 <td>
                   {o.name}<br />
@@ -230,7 +220,7 @@ export default function AdminOrders({ initialOrders, drivers = [], reps = [], ca
                         disabled={savingId === o.id}
                         onChange={(e) => setStatus(o.id, e.target.value)}
                       >
-                        {(canVoid ? STATUSES : FULFILMENT).map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                        {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
                       </select>
                       <label style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: 'var(--muted)' }} title="Uncheck to change status without emailing the customer (e.g. a quiet in-person payment).">
                         <input type="checkbox" style={{ width: 'auto', marginRight: 4 }} checked={!silent[o.id]} onChange={(e) => setSilent((s) => ({ ...s, [o.id]: !e.target.checked }))} />

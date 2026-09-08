@@ -63,17 +63,26 @@ See `.env.example` for the full annotated list. The site builds and browses with
 - `AUTH_SECRET` — login sessions. `ADMIN_EMAILS` — admin gate (comma-separated; admin user id=1 is service@rssolutions.ca).
 - `SALES_EMAILS` — **sales-associate gate** (comma-separated). Sales get the Sales dashboard, Quotes, Invoices (full invoice control: create/send/edit/mark-paid/void/refund), **Orders** and **Dispatch** — the surfaces you need to sell a thing and then get it to the customer. Cost-derived figures are hidden from them: the Profit KPI, the Profit column in sales-by-category, and the per-line cost input on the invoice form. Helpers live in `lib/auth.js`: `isAdmin` / `isSales` / `isStaff` (admin implies sales). Nav is filtered via `<AdminNav salesOnly>` and `<DashboardShell salesOnly>`.
 
-  **Gate rule (widened 2026-09-08): `isStaff` covers selling AND fulfilment — the
-  selling surfaces + `/api/admin/{invoices,quotes}`, dispatch, and the orders
-  board (`/admin/orders`, `/api/admin/{orders,schedule-delivery,order-rep,pod}`).
-  Everything else stays `isAdmin`.** The line is no longer "money vs not" — sales
-  have always been able to mark an invoice paid — it is **fulfilling a sale vs
-  undoing one**. So: moving an order to confirmed/ready/out/delivered is staff,
-  and cancelling it is admin (it relists the unit and takes the sale off the
-  dashboard), enforced in `/api/admin/orders` AND hidden in `AdminOrders`
-  (`canVoid`) so nobody is shown a button that will refuse them. Costs, profit,
-  pay, charges and client billing stay admin on every surface they touch,
-  including the dispatch board (`canManageClients`).
+  **Gate rule (rewritten 2026-09-08, by the owner). The line is NOT "money vs
+  not" — sales handle money all day. It is THE CUSTOMER'S SALE versus THE
+  BUSINESS'S BOOKS.**
+
+  - **Staff** — everything a sale needs from the customer's side: quotes,
+    invoices (create/send/edit/**mark paid**/void/**refund**), the orders board
+    (`/admin/orders`, and `/api/admin/{orders,order-edit,schedule-delivery,order-rep,pod}`)
+    including cancelling and refunding an order, and dispatch — scheduling,
+    assigning drivers, pulling BB orders onto the board, the run sheet, POD.
+  - **Admin** — what the business costs and earns, and what it pays people:
+    cost and profit anywhere, the dashboards' Profit KPI and Profit column, the
+    per-line cost input, `dispatch_expenses`, and on the dispatch board the
+    **Times, Billing, Pay and Profit** tabs (hidden AND refused server-side —
+    a hidden tab is not a permission), plus `charge_amount` / `pay_amount` on
+    a job card, which ride on `canManageClients`. Payroll, the books, the
+    ledger, the P&L, HST, campaigns, coupons and Operations stay admin as they
+    were.
+
+  When adding a surface, ask which of those two it is. If it is something a rep
+  would do with a customer on the phone, it is staff.
 - `SITE_URL` = `https://bargainbay.ca` (used by feed links, canonical, Clover redirects).
 - `CLOVER_ENV` / `CLOVER_MERCHANT_ID` / `CLOVER_PRIVATE_TOKEN` — card payments (blank token = pay-on-pickup mode).
 - `GOOGLE_CREDENTIALS` / `SHEET_ID` / `GOOGLE_SHEETS_TAB` / `SHEET_WRITEBACK` — sheet sync + sold write-back.
@@ -178,6 +187,11 @@ was behind an admin-only page, so they sold the appliance and then asked
 somebody else to press the buttons. Scheduling from here goes through
 `assignDelivery`, which creates and assigns the dispatch job too — the board and
 Operations must never disagree about who is delivering what.
+
+Sales get the **whole** board, cancel and edit/refund included (`/api/admin/order-edit`
+and the `[number]/edit` screen are staff for the same reason the invoice editor
+is). The order editor carries `cost` through its state to preserve it on save and
+renders it nowhere — check that stays true if that screen ever grows a column.
 
 ## Refunds — three shapes, one ledger (added 2026-08-26)
 `/admin/invoices/<INV>/refund` is the whole refund surface (`RefundControl`).

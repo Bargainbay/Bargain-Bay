@@ -15,10 +15,10 @@ export const metadata = { title: 'Orders — Bargain Bay' };
 // for delivery, and could not put a delivery on a driver's day. They were
 // selling the appliance and then asking somebody else to press the buttons.
 //
-// Same component the owner has always used. What a sales associate does NOT get
-// is the two ways to undo a sale: cancelling an order (which relists the unit)
-// and the edit/refund screen, both of which stay on the admin side of the line
-// the rest of the app already draws.
+// Same component and the same powers for both roles. The money on an order is
+// the selling side's own work — they take it, they refund it, they cancel the
+// sale that fell through — exactly as they already do on an invoice. What sales
+// never see is the other half: cost, profit, client billing and the hours.
 export default async function OrdersPage() {
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/orders');
@@ -49,7 +49,7 @@ export default async function OrdersPage() {
           Could not read all of it — if a feature was just deployed, run the schema migration from Operations.
         </div>
       )}
-      <AdminOrders initialOrders={orders} drivers={drivers} reps={reps} canVoid={admin} />
+      <AdminOrders initialOrders={orders} drivers={drivers} reps={reps} />
     </div>
   );
 }
