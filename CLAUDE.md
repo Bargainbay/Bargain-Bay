@@ -1133,6 +1133,21 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
   Done is pressed. Note the limit: a phone sitting open and idle won't see the
   new worker until it navigates or the browser's own update check runs.
 
+#### Loose ends — the stops nobody closed (added 2026-09-08)
+`staleStops()` / `staleStopCount()` in `lib/jobs.js`, `GET /api/admin/dispatch?view=stale`,
+`StaleStops.jsx` behind the **Loose ends** tab (count on the tab). Stale = a job
+with a `job_date` before today whose status is not done / failed / cancelled.
+Capped at 300 and it SAYS when it is capped.
+
+Each row carries what is actually known — driver, whether the clock was ever
+stopped, signature/photo count (it happened), balance owing, and any pending
+`job_collections` money sitting against it. Four actions, all existing endpoints:
+close it out **with the real times** (`action:'times'` + `markDone`, never "now",
+or a two-hour delivery from last Tuesday costs as a six-day one), move it to
+today (`assign` with `jobDate`), couldn't complete (`status` + reason), cancel.
+**There is deliberately no clear-all** — each row is a different question, and a
+sweep would erase the only thing the list is for.
+
 #### The day on the phone is ONE day (changed 2026-09-08)
 `driverJobs` used to carry every unfinished stop from every earlier day inline
 into today's run, so a driver opened the app to last week's leftovers above this
