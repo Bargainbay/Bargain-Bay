@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin } from '../../../../lib/auth';
+import { getSession, isAdmin, isStaff } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
 import { ORDER_STATUSES, updateOrderStatus } from '../../../../lib/orders';
 import { markUnitsSold } from '../../../../lib/catalog-sync';
@@ -7,9 +7,18 @@ import { sendOrderStatusEmail } from '../../../../lib/email';
 
 export const dynamic = 'force-dynamic';
 
+// Moving an order along is FULFILMENT — taking the money, saying it's ready,
+// sending it out — and that is the job of whoever sold it. Sales associates do
+// it here as they already do on invoices.
+//
+// Cancelling is not fulfilment. It relists the unit on the storefront and takes
+// the sale back off the dashboard, so it stays where every other undo in this
+// app stays: with an admin.
+const SALES_STATUSES = ['pending_payment', 'confirmed', 'ready', 'out_for_delivery', 'delivered'];
+
 export async function PATCH(req) {
   const session = await getSession();
-  if (!session || !isAdmin(session)) {
+  if (!session || !isStaff(session)) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   }
   if (!hasDb()) return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
@@ -21,6 +30,12 @@ export async function PATCH(req) {
   const notify = body.notify !== false; // default true; false = change status without emailing the customer
   if (!id || !ORDER_STATUSES.includes(status)) {
     return NextResponse.json({ error: 'Invalid id or status' }, { status: 400 });
+  }
+  if (!isAdmin(session) && !SALES_STATUSES.includes(status)) {
+    return NextResponse.json(
+      { error: 'Only an admin can cancel an order — it relists the unit and takes the sale off the dashboard.' },
+      { status: 403 }
+    );
   }
   try {
     const order = await updateOrderStatus(id, status);

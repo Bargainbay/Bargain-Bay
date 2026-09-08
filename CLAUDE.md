@@ -61,7 +61,19 @@ A unit object: `{ id (SKU), make, model, category, title, condition, price, comp
 See `.env.example` for the full annotated list. The site builds and browses with none of them set.
 - `POSTGRES_URL` — accounts/orders/reservations/admin (Neon).
 - `AUTH_SECRET` — login sessions. `ADMIN_EMAILS` — admin gate (comma-separated; admin user id=1 is service@rssolutions.ca).
-- `SALES_EMAILS` — **sales-associate gate** (comma-separated). Sales get the Sales dashboard, Quotes, and Invoices (full invoice control: create/send/edit/mark-paid/void/refund) and nothing else. Cost-derived figures are hidden from them: the Profit KPI, the Profit column in sales-by-category, and the per-line cost input on the invoice form. Helpers live in `lib/auth.js`: `isAdmin` / `isSales` / `isStaff` (admin implies sales). **Gate rule: use `isStaff` ONLY on the three selling surfaces + `/api/admin/{invoices,quotes}`; everything else stays `isAdmin`.** Nav is filtered via `<AdminNav salesOnly>` and `<DashboardShell salesOnly>`.
+- `SALES_EMAILS` — **sales-associate gate** (comma-separated). Sales get the Sales dashboard, Quotes, Invoices (full invoice control: create/send/edit/mark-paid/void/refund), **Orders** and **Dispatch** — the surfaces you need to sell a thing and then get it to the customer. Cost-derived figures are hidden from them: the Profit KPI, the Profit column in sales-by-category, and the per-line cost input on the invoice form. Helpers live in `lib/auth.js`: `isAdmin` / `isSales` / `isStaff` (admin implies sales). Nav is filtered via `<AdminNav salesOnly>` and `<DashboardShell salesOnly>`.
+
+  **Gate rule (widened 2026-09-08): `isStaff` covers selling AND fulfilment — the
+  selling surfaces + `/api/admin/{invoices,quotes}`, dispatch, and the orders
+  board (`/admin/orders`, `/api/admin/{orders,schedule-delivery,order-rep,pod}`).
+  Everything else stays `isAdmin`.** The line is no longer "money vs not" — sales
+  have always been able to mark an invoice paid — it is **fulfilling a sale vs
+  undoing one**. So: moving an order to confirmed/ready/out/delivered is staff,
+  and cancelling it is admin (it relists the unit and takes the sale off the
+  dashboard), enforced in `/api/admin/orders` AND hidden in `AdminOrders`
+  (`canVoid`) so nobody is shown a button that will refuse them. Costs, profit,
+  pay, charges and client billing stay admin on every surface they touch,
+  including the dispatch board (`canManageClients`).
 - `SITE_URL` = `https://bargainbay.ca` (used by feed links, canonical, Clover redirects).
 - `CLOVER_ENV` / `CLOVER_MERCHANT_ID` / `CLOVER_PRIVATE_TOKEN` — card payments (blank token = pay-on-pickup mode).
 - `GOOGLE_CREDENTIALS` / `SHEET_ID` / `GOOGLE_SHEETS_TAB` / `SHEET_WRITEBACK` — sheet sync + sold write-back.
@@ -153,6 +165,19 @@ record anywhere. Rules that must hold:
 - status is re-derived from the payment ledger. Paying more than the corrected
   total is reported as `overpaid`; no refund record is invented, because no money
   has physically moved.
+
+## The orders board has its own tab (added 2026-09-08)
+`/admin/orders` (staff) renders the same `AdminOrders` the Operations page has
+always folded away, and `lib/order-board.js` is the ONE loader behind both — the
+orders, the drivers, the reps and the POD photos — so the two boards cannot
+drift. Operations keeps its Orders fold for the owner's muscle memory.
+
+It moved because the people who take the orders could not mark one paid, ready,
+or out for delivery, and could not put a delivery on a driver's day: the board
+was behind an admin-only page, so they sold the appliance and then asked
+somebody else to press the buttons. Scheduling from here goes through
+`assignDelivery`, which creates and assigns the dispatch job too — the board and
+Operations must never disagree about who is delivering what.
 
 ## Refunds — three shapes, one ledger (added 2026-08-26)
 `/admin/invoices/<INV>/refund` is the whole refund surface (`RefundControl`).
