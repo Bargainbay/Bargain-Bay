@@ -1109,8 +1109,9 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
   and `markInvoicePaid` only promotes `pending_payment`/`confirmed`, so settling
   the balance later can't drag it backwards.
 - **The balance is collected in the app**: the close-out screen prefills what's
-  owed, and the payment is queued FIRST — if the phone gets one thing out before
-  the signal dies again, it should be the money.
+  owed, and the money is queued FIRST — if the phone gets one thing out before
+  the signal dies again, it should be the money. It is a **report, not a
+  payment** — see below.
 - **Assigning from Operations reaches the board too** (`assignDelivery` creates
   and assigns the job). Two assignment screens that don't agree is how a driver
   ends up with a stop nobody told them about.
@@ -1120,6 +1121,45 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
 - PWA: `public/driver.webmanifest` + `public/driver-sw.js` (shell only —
   network-first for the page, never caches `/api`). Installed via **Add to Home
   Screen**; there is no app store and no native build.
+### Money at the door is REPORTED by the driver and CONFIRMED by the office (changed 2026-09-08)
+A finished delivery used to mark its invoice **paid** outright: the driver ticked
+"I took the money", tapped Done, and the phone's `action:'payment'` went straight
+into `recordInvoicePayment` → `markInvoicePaid`. Revenue booked, units delisted,
+receipt emailed to the customer, payment ledger locked — all on the say-so of a
+tick box in a van, before anybody in the office had counted anything. If the cash
+never arrived, unpicking it was a refund and an argument.
+
+A door collection is now a **claim** (`job_collections`, provisioned in
+`ensureJobSchema`), and `lib/door-money.js` owns the whole life of one:
+
+- `recordDoorCollection` — what the driver says they took. Writes NO payment: the
+  invoice stays `open`/`partial` and the balance stays owing. Deduped on the
+  offline queue's `ref`, so a close-out replayed from a basement doesn't put the
+  same $500 on the office's list twice, and capped at what is actually owing
+  (minus anything already claimed and unjudged).
+- `confirmDoorCollection` — **this is what marks the invoice paid.** Calls the
+  ordinary `recordInvoicePayment`, dated to the day the money was *collected*,
+  not the day it was confirmed. The amount is editable: a $500 claim that is
+  $480 in the envelope is confirmed as $480. Claims the row first
+  (`WHERE status = 'pending'`) so two screens can't confirm it twice, and rolls
+  back to pending if the ledger refuses it.
+- `rejectDoorCollection` — it never arrived. The invoice is untouched and still
+  owing, which is the entire point.
+
+Surfaces: a **Money to confirm** queue at the top of `/admin/dispatch` (NOT
+scoped to the day on screen — money reported at 7pm is confirmed the next
+morning), the same claim on the invoice's own row in `/admin/invoices`
+(`ConfirmCollection`), and the stop card on both boards showing what has been
+reported against it. Confirming and rejecting are **admin only** on both
+surfaces; the office typing a payment in itself (the card's Record payment,
+`MarkPaidControl`) is unchanged and still immediate — that IS an admin
+confirming.
+
+The order side is untouched by the delay: the driver's completion still marks the
+order delivered and the units sold, and `markInvoicePaid` only ever promotes
+`pending_payment`/`confirmed`, so confirming money after delivery cannot drag a
+delivered order backwards.
+
 ### Why the office stopped getting completion emails, and why one driver could not close a stop (fixed 2026-08-27)
 Two reports, four separate defects, and every one of them was silent — which is
 the thread running through all of it: a driver's screen said Done and the office's

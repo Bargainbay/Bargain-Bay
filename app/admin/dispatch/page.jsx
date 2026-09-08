@@ -21,7 +21,7 @@ export default async function DispatchPage({ searchParams }) {
 
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(sp?.date || '')) ? String(sp.date) : torontoToday();
 
-  let board = { date, jobs: [], unscheduled: [], drivers: [], clients: [] };
+  let board = { date, jobs: [], unscheduled: [], drivers: [], clients: [], moneyToConfirm: [] };
   let openTickets = 0;
   let loadError = '';
   if (hasDb()) {
@@ -45,6 +45,7 @@ export default async function DispatchPage({ searchParams }) {
       {loadError && <div className="error-box">{loadError}</div>}
 
       <DispatchBoard initial={board} canManageClients={isAdmin(session)} openTickets={openTickets}
+        canConfirmMoney={isAdmin(session)}
         initialView={String(sp?.view || 'board')} />
     </div>
   );

@@ -235,6 +235,57 @@ function JobHistory({ jobId }) {
   );
 }
 
+// The money drivers say they took, waiting on somebody in the office to say it
+// is actually in.
+//
+// Nothing here has touched an invoice yet. A stop being finished used to mark
+// its invoice PAID off a tick box on a phone — revenue booked, receipt emailed,
+// ledger locked — and if the cash never made it back to the office, unpicking
+// that was a refund and an argument. So the driver reports, and this is where
+// the office agrees.
+//
+// Deliberately NOT scoped to the day on screen: money reported at 7pm gets
+// confirmed the next morning, and a queue that empties at midnight loses money.
+function MoneyToConfirm({ rows, busy, canConfirm, onConfirm, onReject }) {
+  if (!rows?.length) return null;
+  const total = rows.reduce((a, r) => a + Number(r.amount || 0), 0);
+  return (
+    <div className="disp-confirm">
+      <div className="disp-confirm-head">
+        <b>Money to confirm — ${total.toFixed(2)}</b>
+        <span className="hint" style={{ margin: 0 }}>
+          {canConfirm
+            ? 'Reported at the door. The invoice stays open until you say it landed.'
+            : 'Reported at the door. An admin confirms it before the invoice is marked paid.'}
+        </span>
+      </div>
+      {rows.map((r) => (
+        <div key={r.id} className="disp-confirm-row">
+          <span className="disp-confirm-amt">${Number(r.amount).toFixed(2)}</span>
+          <span className="disp-confirm-what">
+            {PAY_METHODS[r.method] || r.method}
+            {' · '}{r.customerName || r.jobNumber}
+            {r.invoiceNumber ? ` · ${r.invoiceNumber}` : ''}
+            {r.byName ? ` · ${r.byName}` : ''}
+            {r.jobDate ? ` · ${r.jobDate}` : ''}
+            {r.note ? <span className="disp-confirm-note"> — {r.note}</span> : null}
+          </span>
+          {canConfirm && (
+            <span className="disp-confirm-acts">
+              <button type="button" className="btn accent" disabled={busy} onClick={() => onConfirm(r)}>
+                Confirm ${Number(r.amount).toFixed(2)}
+              </button>
+              <button type="button" className="disp-collect-btn" disabled={busy} onClick={() => onReject(r)}>
+                Not received
+              </button>
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Taking the balance at the door. Deliberately on the card and not behind a trip
 // to the Invoices page: the money is counted while the driver is still on the
 // phone, and anything else means it gets logged tomorrow from a note in a pocket.
@@ -399,6 +450,15 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
               {collecting ? 'Cancel' : 'Record payment'}
             </button>
           </div>
+          {/* Reported by the driver, not yet counted by the office. It sits
+              INSIDE the amount owing rather than replacing it, because until
+              somebody confirms the money is in, it is still owing. */}
+          {job.pendingCollections?.map((c) => (
+            <div key={c.id} className="disp-collect-pending">
+              ${Number(c.amount).toFixed(2)} {PAY_METHODS[c.method] || c.method} reported
+              {c.byName ? ` by ${c.byName}` : ''} — waiting on the office to confirm it
+            </div>
+          ))}
           {collecting && (
             <CollectForm job={job} busy={busy}
               onRecord={async (id, payload) => { const ok = await onRecord(id, payload); if (ok) setCollecting(false); }} />
@@ -615,7 +675,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
   );
 }
 
-export default function DispatchBoard({ initial, canManageClients, openTickets, initialView = 'board' }) {
+export default function DispatchBoard({ initial, canManageClients, canConfirmMoney, openTickets, initialView = 'board' }) {
   const [board, setBoard] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -714,6 +774,26 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     const ok = await send('PATCH', { action: 'record_payment', jobId, ...payload });
     if (ok) setPull(null);
     return ok;
+  }
+
+  // Saying the driver's money is in. This — not the delivery, and not the
+  // driver's own tick box — is what marks the invoice paid.
+  async function onConfirmMoney(row) {
+    if (!window.confirm(
+      `Confirm $${Number(row.amount).toFixed(2)} ${PAY_METHODS[row.method] || row.method} received`
+      + `${row.invoiceNumber ? ` on ${row.invoiceNumber}` : ''}? This records the payment and, if it clears the balance, marks the invoice paid.`
+    )) return;
+    await send('PATCH', { action: 'confirm_collection', collectionId: row.id });
+  }
+
+  // It never arrived. The invoice keeps its balance owing.
+  async function onRejectMoney(row) {
+    const note = window.prompt(
+      `$${Number(row.amount).toFixed(2)} reported${row.invoiceNumber ? ` on ${row.invoiceNumber}` : ''} was not received. What happened? (optional)`,
+      ''
+    );
+    if (note === null) return;
+    await send('PATCH', { action: 'reject_collection', collectionId: row.id, note });
   }
 
   // The escape hatch: put this one order on the board regardless of what the
@@ -1021,6 +1101,9 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             onDone={() => { setEditing(null); refresh(); }} />
         </div>
       )}
+
+      <MoneyToConfirm rows={board.moneyToConfirm} busy={busy} canConfirm={!!canConfirmMoney}
+        onConfirm={onConfirmMoney} onReject={onRejectMoney} />
 
       <div className="disp-strip">
         {stripOver && (

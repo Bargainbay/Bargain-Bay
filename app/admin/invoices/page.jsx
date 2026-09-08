@@ -3,11 +3,13 @@ import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
 import { listInvoices, listInvoiceAuthors, INVOICE_FILTERS } from '../../../lib/invoices';
+import { pendingCollectionsForInvoices } from '../../../lib/door-money';
 import { contactsForAutofill } from '../../../lib/customers';
 import { getAll } from '../../../lib/inventory';
 import AdminNav from '../../../components/AdminNav';
 import InvoiceForm from '../../../components/InvoiceForm';
 import MarkPaidControl from '../../../components/MarkPaidControl';
+import ConfirmCollection from '../../../components/ConfirmCollection';
 import InvoiceActions from '../../../components/InvoiceActions';
 import SyncDashboardButton from '../../../components/SyncDashboardButton';
 
@@ -49,11 +51,16 @@ export default async function InvoicesPage({ searchParams }) {
   let matchCount = 0;
   let owing = 0;
   let hasMore = false;
+  let pendingMoney = new Map();
   let loadError = '';
   if (hasDb()) {
     try {
       const res = await listInvoices({ q, status, rep, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
       invoices = res.invoices; matchCount = res.total; owing = res.owing; hasMore = res.hasMore;
+      // Money a driver says they took at the door on these invoices. It is NOT a
+      // payment yet — that is the whole point — so it rides alongside the row
+      // rather than changing what the row says is owing.
+      pendingMoney = await pendingCollectionsForInvoices(invoices.map((i) => i.id));
     } catch (e) { loadError = e?.message || 'Could not load invoices.'; }
   }
   const pageUrl = (n) => {
@@ -201,6 +208,9 @@ export default async function InvoicesPage({ searchParams }) {
                   )}
                 </td>
                 <td>
+                  {/* Reported at the door, waiting on the office. Above the
+                      mark-paid control, because confirming it IS the payment. */}
+                  {isAdmin(session) && <ConfirmCollection rows={pendingMoney.get(inv.id) || []} />}
                   {inv.status === 'open' || inv.status === 'partial'
                     ? <MarkPaidControl invoiceId={inv.id} balance={inv.balance ?? inv.total} payments={inv.payments || []} />
                     : (inv.method || (inv.status === 'paid' ? 'Paid' : inv.status === 'refunded' ? 'Refunded' : '—'))}

@@ -26,6 +26,7 @@ import {
   setJobCharge, billingSummary, invoiceClientJobs, jobHistory, reopenJobByNumber
 } from '../../../../lib/jobs';
 import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
+import { confirmDoorCollection, rejectDoorCollection } from '../../../../lib/door-money';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -302,6 +303,24 @@ export async function PATCH(req) {
     }
     if (body.action === 'resequence') {
       return NextResponse.json({ ok: true, ...(await resequence(body.driverId, body.date, body.jobIds, who(s))) });
+    }
+    // The money the driver said they took, once somebody in the office has it in
+    // front of them. THIS is what marks the invoice paid — the driver's report
+    // never does. Admin only: it is the moment revenue is booked and a receipt
+    // goes to the customer, and that is the line the rest of the app draws
+    // around money.
+    if (body.action === 'confirm_collection') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can confirm money received.' }, { status: 403 });
+      const r = await confirmDoorCollection(body.collectionId, who(s), {
+        amount: body.amount, method: body.method
+      });
+      return NextResponse.json({ ok: true, ...r });
+    }
+    // It never arrived. The invoice keeps its balance owing, which is the point.
+    if (body.action === 'reject_collection') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can write off money the driver reported.' }, { status: 403 });
+      const r = await rejectDoorCollection(body.collectionId, who(s), body.note);
+      return NextResponse.json({ ok: true, ...r });
     }
     if (!jobId) return NextResponse.json({ error: 'jobId is required.' }, { status: 400 });
     if (body.action === 'assign') {
