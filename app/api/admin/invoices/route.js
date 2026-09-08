@@ -3,6 +3,7 @@ import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../
 import { hasDb } from '../../../../lib/db';
 import { createAndSendInvoice, listInvoices, listInvoiceAuthors, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, refundInvoiceAmount, deleteInvoice,
          updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, voidInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
+import { confirmDoorCollection, rejectDoorCollection } from '../../../../lib/door-money';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -106,6 +107,26 @@ export async function PATCH(req) {
       return NextResponse.json({ ok: true, ...r });
     } catch (e) {
       return NextResponse.json({ error: e?.message || 'Backfill failed.' }, { status: 500 });
+    }
+  }
+
+  // Money a driver reported at the door, confirmed (or refused) from the
+  // invoice's own row. No invoiceId of its own — the collection knows which
+  // invoice it belongs to — so it is handled before that check.
+  // Admin only, on both surfaces: confirming is what books the revenue.
+  if (body.action === 'confirm_collection' || body.action === 'reject_collection') {
+    if (!(await admin())) {
+      return NextResponse.json({ error: 'Only an admin can confirm money received.' }, { status: 403 });
+    }
+    const session = await getSession();
+    const by = { email: session?.email, name: session?.name };
+    try {
+      const r = body.action === 'confirm_collection'
+        ? await confirmDoorCollection(body.collectionId, by, { amount: body.amount, method: body.method })
+        : await rejectDoorCollection(body.collectionId, by, body.note);
+      return NextResponse.json({ ok: true, ...r });
+    } catch (e) {
+      return NextResponse.json({ error: e?.message || 'Could not update that collection.' }, { status: 400 });
     }
   }
 

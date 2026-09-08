@@ -390,8 +390,16 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
       <div className="drv-addr">{stop.pickupAddress ? <b>TO </b> : null}{addr}</div>
 
       {stop.balanceDue > 0 && (
-        // The one number on this screen that costs money to miss.
-        <div className="drv-collect">COLLECT ${Number(stop.balanceDue).toFixed(2)}{stop.invoiceNumber ? ` · ${stop.invoiceNumber}` : ''}</div>
+        // The one number on this screen that costs money to miss — until the
+        // driver has said they took it, at which point it stops being an
+        // instruction and becomes a receipt. The balance itself stays owing:
+        // the office confirms the money before the invoice is marked paid.
+        Number(stop.reported) > 0
+          ? <div className="drv-collect is-reported">
+              ${Number(stop.reported).toFixed(2)} REPORTED{stop.invoiceNumber ? ` · ${stop.invoiceNumber}` : ''}
+              <span className="drv-collect-sub">office to confirm</span>
+            </div>
+          : <div className="drv-collect">COLLECT ${Number(stop.balanceDue).toFixed(2)}{stop.invoiceNumber ? ` · ${stop.invoiceNumber}` : ''}</div>
       )}
 
       {/* Cash the customer hands over that is nothing to do with an invoice —
