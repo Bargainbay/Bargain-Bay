@@ -1,6 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { compressPhotos } from './photo-pick';
+import { holdReload, releaseReload } from '../lib/driver-busy';
 
 // Photos onto a stop that's already closed out.
 //
@@ -14,6 +15,9 @@ export default function DriverPhotos({ stop, onClose, onAdded }) {
   const [photos, setPhotos] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  // Photos picked and not yet sent live only here. A new build taking over the
+  // app must wait for this sheet to close before it reloads the page.
+  useEffect(() => { holdReload(); return releaseReload; }, []);
 
   async function onPick(e) {
     const files = [...e.target.files].slice(0, 8);

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { queueOrSend, newRef } from '../lib/driver-outbox';
 import { compressPhotos } from './photo-pick';
+import { holdReload, releaseReload } from '../lib/driver-busy';
 
 // Closing out a stop: photos, a signature, who signed, and — where there's money
 // owing — what was taken at the door. Everything is captured to the phone first
@@ -58,6 +59,9 @@ export default function DriverFinish({ stop, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const isService = stop.type === 'service_call';
+  // A signature, eight photos and the damage answers exist nowhere but this
+  // form until Done is pressed. Nothing gets to reload the page underneath it.
+  useEffect(() => { holdReload(); return releaseReload; }, []);
   // One pair of refs for this close-out, minted once and reused if the driver
   // has to tap Done again. Fresh refs on a retry meant the money and the
   // completion were queued as NEW work: the outbox is keyed on ref, so the same
