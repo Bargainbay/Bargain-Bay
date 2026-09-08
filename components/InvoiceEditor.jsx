@@ -107,7 +107,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
 
   return (
     <div>
-      {err && <div className="error-box">{err}</div>}
+
       {settled && (
         <div className="notice-box" style={{ marginTop: 0 }}>
           This invoice is <b>paid</b>. Correcting it adjusts the original sale <b>on its own date</b> —
@@ -175,7 +175,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
       <InvoiceLines items={items} setItems={setItems} services={SERVICES} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
-        <TaxMode mode={taxMode} onChange={changeTaxMode} preview={preview} />
+        <TaxMode mode={taxMode} onChange={changeTaxMode} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
           title="Backdate for a sale rung up late — the invoice shows this date. Revenue counts on the PAID date, set when you mark it paid.">
           Invoice date
@@ -233,6 +233,8 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
           <a className="btn" href="/admin/invoices">Cancel</a>
           <button className="btn accent" disabled={busy} onClick={save}>{busy ? 'Saving…' : (resend && !settled) ? 'Save & email' : 'Save changes'}</button>
         </div>
+        {/* With the button, not at the top of the page — see InvoiceForm. */}
+        {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
       </div>
     </div>
   );

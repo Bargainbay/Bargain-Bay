@@ -32,13 +32,13 @@ export const modeOf = (addHst, taxInclusive) => (!addHst ? NO_TAX : (taxInclusiv
 export function previewTotals(amounts, mode) {
   const nums = (amounts || []).map((n) => Number(n) || 0);
   const sum = Math.round(nums.reduce((a, n) => a + n, 0) * 100) / 100;
-  if (mode === NO_TAX) return { subtotal: sum, hst: 0, total: sum, quoted: sum, residual: 0 };
+  if (mode === NO_TAX) return { subtotal: sum, hst: 0, total: sum, quoted: sum };
   if (mode === 'inclusive') return splitTaxInclusive(nums);
   const hst = Math.round(sum * 13) / 100;
-  return { subtotal: sum, hst, total: Math.round((sum + hst) * 100) / 100, quoted: sum, residual: 0 };
+  return { subtotal: sum, hst, total: Math.round((sum + hst) * 100) / 100, quoted: sum };
 }
 
-export default function TaxMode({ mode, onChange, preview }) {
+export default function TaxMode({ mode, onChange }) {
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 14 }}>
       <label htmlFor="inv-taxmode">Tax</label>
@@ -48,17 +48,12 @@ export default function TaxMode({ mode, onChange, preview }) {
             select can show its own value. Choosing either real mode retires it. */}
         {mode === NO_TAX && <option value={NO_TAX}>{NO_TAX_LABEL}</option>}
       </select>
+      {/* No "this comes to a cent less" caveat any more: the total IS the price
+          typed, always, because the HST is taken as the remainder of it rather
+          than recomputed off the subtotal. See lib/tax.js. */}
       {mode === 'inclusive' && (
         <span className="hint" style={{ margin: 0 }}>
           Type what the customer pays. The invoice still shows the tax separately — it has to.
-          {/* One cent-value in eight has no exact 13% split. Saying so beats the
-              rep spotting a penny they can't explain in front of a customer. */}
-          {preview && Math.abs(preview.residual) >= 0.005 && (
-            <b style={{ color: 'var(--charcoal)' }}>
-              {' '}${Math.abs(preview.quoted).toFixed(2)} can&apos;t be split exactly at 13% — this invoice comes to $
-              {preview.total.toFixed(2)}.
-            </b>
-          )}
         </span>
       )}
     </div>
