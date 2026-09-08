@@ -1,14 +1,11 @@
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb, query } from '../../../lib/db';
-import { getAllOrders } from '../../../lib/orders';
+import { orderBoard } from '../../../lib/order-board';
 import { listClearanceAdmin } from '../../../lib/clearance';
 import { listMembers } from '../../../lib/members';
 import { listSold } from '../../../lib/catalog-sync';
-import { listDrivers } from '../../../lib/drivers';
-import { podPhotosForOrders } from '../../../lib/pod';
 import { listSalvage } from '../../../lib/salvage';
-import { listReps } from '../../../lib/reps';
 import AdminNav from '../../../components/AdminNav';
 import OpsSection from '../../../components/OpsSection';
 import OpsFoldBar from '../../../components/OpsFoldBar';
@@ -46,19 +43,17 @@ export default async function OperationsPage() {
   if (!hasDb()) {
     return <div><AdminNav active="operations" /><div className="panel">Database not configured — set POSTGRES_URL.</div></div>;
   }
-  let orders = [];
   let reservations = [];
   let clearance = [];
   let members = [];
   let sold = [];
-  let drivers = [];
   let salvage = null;
   let needsMigration = false;
+  // Orders, drivers, reps and the proof-of-delivery photos, exactly as the
+  // Orders tab loads them — one loader, so the two boards can't drift apart.
+  const { orders, drivers, reps, degraded } = await orderBoard();
+  if (degraded) needsMigration = true;
   try {
-    orders = (await getAllOrders(200)).map((o) => ({
-      ...o,
-      delivery_date: o.delivery_date ? new Date(o.delivery_date).toISOString().slice(0, 10) : null
-    }));
     const { rows } = await query(
       `SELECT r.sku, r.expires_at, r.order_id, o.order_number, o.status AS order_status, o.email
          FROM reservations r LEFT JOIN orders o ON o.id = r.order_id
@@ -88,19 +83,6 @@ export default async function OperationsPage() {
     needsMigration = true;
   }
   try {
-    drivers = await listDrivers();
-  } catch (e) {
-    console.error('drivers load failed (run migration?)', e.message);
-    needsMigration = true;
-  }
-  try {
-    const podMap = await podPhotosForOrders(orders.map((o) => o.id));
-    orders = orders.map((o) => ({ ...o, pod_photo_ids: podMap.get(o.id) || [] }));
-  } catch (e) {
-    console.error('pod photos load failed (run migration?)', e.message);
-    needsMigration = true;
-  }
-  try {
     salvage = await listSalvage();
   } catch (e) {
     console.error('salvage load failed (run migration?)', e.message);
@@ -109,12 +91,6 @@ export default async function OperationsPage() {
   let pendingIntake = [];
   try { pendingIntake = await listPendingIntake(); } catch (e) { console.error('intake queue load failed', e.message); }
 
-  let reps = [];
-  try {
-    reps = await listReps();
-  } catch (e) {
-    console.error('reps load failed', e.message);
-  }
   return (
     <div>
       <AdminNav active="operations" />

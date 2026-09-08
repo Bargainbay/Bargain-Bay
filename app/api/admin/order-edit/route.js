@@ -4,7 +4,7 @@
 //   refund  — full or per-unit order-level refund (storefront orders)
 // Invoice-bridged orders refuse items/refund with a pointer to the invoice.
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin } from '../../../../lib/auth';
+import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { updateOrderContact, updateOrderItems, refundOrder } from '../../../../lib/orders';
 
@@ -13,7 +13,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req) {
   const s = await getSession();
-  if (!(s && isAdmin(s))) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!(s && isStaff(s))) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
 
   let body;

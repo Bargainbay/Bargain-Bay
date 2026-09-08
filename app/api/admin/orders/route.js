@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin } from '../../../../lib/auth';
+import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
 import { ORDER_STATUSES, updateOrderStatus } from '../../../../lib/orders';
 import { markUnitsSold } from '../../../../lib/catalog-sync';
@@ -7,9 +7,13 @@ import { sendOrderStatusEmail } from '../../../../lib/email';
 
 export const dynamic = 'force-dynamic';
 
+// Staff, not admin. An order's own lifecycle — taking the money, saying it's
+// ready, sending it out, and cancelling the one that fell through — belongs to
+// whoever sold it, the same as an invoice does. What stays admin is the other
+// half of the business: cost, profit, client billing and pay.
 export async function PATCH(req) {
   const session = await getSession();
-  if (!session || !isAdmin(session)) {
+  if (!session || !isStaff(session)) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   }
   if (!hasDb()) return NextResponse.json({ error: 'Database not configured' }, { status: 503 });

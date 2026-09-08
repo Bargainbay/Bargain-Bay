@@ -512,7 +512,11 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
             <div className="disp-items">{job.items.map((i) => i.description).join(' · ')}</div>
           )}
       {job.partsNeeded && <div className="disp-fail">Waiting on: {job.partsNeeded}</div>}
-      {(job.timeIn || job.payAmount != null || job.chargeAmount != null) && (
+      {/* The clock stays on the card for everyone — a stop that has been running
+          ninety minutes is a dispatch problem, not a financial one. What it
+          COSTS and what it BILLS is the owner's, so it rides on `onCharge`,
+          which is the admin signal this card already carries. */}
+      {(job.timeIn || (onCharge && (job.payAmount != null || job.chargeAmount != null))) && (
         <div className="disp-times">
           {job.timeIn && (
             <>
@@ -529,9 +533,9 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
           {/* Finished with no clock on it: nothing can cost this stop until
               somebody types the times in. */}
           {!job.timeIn && closed && job.status === 'done' && <span className="disp-late">no times recorded</span>}
-          {job.payAmount != null && <> · pays ${Number(job.payAmount).toFixed(2)}</>}
-          {job.chargeAmount != null && <> · bills ${Number(job.chargeAmount).toFixed(2)}</>}
-          {job.invoiceId && <> · invoiced</>}
+          {onCharge && job.payAmount != null && <> · pays ${Number(job.payAmount).toFixed(2)}</>}
+          {onCharge && job.chargeAmount != null && <> · bills ${Number(job.chargeAmount).toFixed(2)}</>}
+          {onCharge && job.invoiceId && <> · invoiced</>}
         </div>
       )}
       {/* Cash at the door — not the invoice balance below it, and not a price
@@ -965,12 +969,16 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
         <Tab id="tickets">Service calls{tickets ? ` (${tickets})` : ''}</Tab>
         <Tab id="import">Import</Tab>
         <Tab id="live">Live</Tab>
-        <Tab id="times">Times</Tab>
         {/* Stops whose day has gone that nobody closed. The count is on the tab
             because a list nobody knows about is a list nobody opens. */}
         <Tab id="stale">Loose ends{board.staleCount ? ` (${board.staleCount})` : ''}</Tab>
-        <Tab id="billing">Billing</Tab>
-        <Tab id="pay">Pay</Tab>
+        {/* The hours, what we bill a client, what we pay a driver, and what a
+            run made. A sales associate schedules and dispatches; none of this is
+            theirs, and it is the half of the board that has always been the
+            owner's. Gated on the SERVER too — a hidden tab is not a permission. */}
+        {canManageClients && <Tab id="times">Times</Tab>}
+        {canManageClients && <Tab id="billing">Billing</Tab>}
+        {canManageClients && <Tab id="pay">Pay</Tab>}
         {canManageClients && <Tab id="profit">Profit</Tab>}
         <Tab id="setup">Clients &amp; drivers</Tab>
       </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin } from '../../../../lib/auth';
+import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { assignDelivery } from '../../../../lib/drivers';
 
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // Assign a delivery date + driver to a delivery order. body: { orderId, deliveryDate, driverId }
 export async function POST(req) {
   const s = await getSession();
-  if (!s || !isAdmin(s)) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!s || !isStaff(s)) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
   let body;
   try { body = await req.json(); } catch { body = {}; }
