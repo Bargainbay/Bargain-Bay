@@ -232,7 +232,7 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
       <InvoiceLines items={items} setItems={setItems} services={SERVICES} showCost={!hideCost} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
-        <TaxMode mode={taxMode} onChange={changeTaxMode} preview={preview} />
+        <TaxMode mode={taxMode} onChange={changeTaxMode} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
           title="Backdate for a sale you rang up late. Revenue counts on THIS date — the day the sale was made — not the day the money clears.">
           Invoice date
