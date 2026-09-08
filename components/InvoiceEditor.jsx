@@ -107,7 +107,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
 
   return (
     <div>
-      {err && <div className="error-box">{err}</div>}
+
       {settled && (
         <div className="notice-box" style={{ marginTop: 0 }}>
           This invoice is <b>paid</b>. Correcting it adjusts the original sale <b>on its own date</b> —
@@ -233,6 +233,8 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
           <a className="btn" href="/admin/invoices">Cancel</a>
           <button className="btn accent" disabled={busy} onClick={save}>{busy ? 'Saving…' : (resend && !settled) ? 'Save & email' : 'Save changes'}</button>
         </div>
+        {/* With the button, not at the top of the page — see InvoiceForm. */}
+        {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
       </div>
     </div>
   );

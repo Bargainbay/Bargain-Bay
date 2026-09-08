@@ -110,8 +110,34 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
   const changeTaxMode = setTaxMode;
   const fmt = (n) => '$' + n.toFixed(2);
 
+  // The three things the server refuses a POST for, checked here first so the rep
+  // is told which one and can fix it, instead of getting a bare rejection back.
+  //
+  // The email rule is the one that actually catches people: the browser's own
+  // type="email" is happy with "jane@gmail" — no dot, no TLD — and the server is
+  // not, so a plain typo came back as a refusal with nothing pointing at it.
+  function whatsWrong() {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim().toLowerCase())) {
+      return `“${email.trim() || 'blank'}” isn’t a complete email address — it needs a domain with a dot, like jane@gmail.com.`;
+    }
+    const priced = toPayload(items).filter((it) => String(it.description || '').trim() && Number(it.amount) > 0);
+    if (!priced.length) {
+      const named = items.find((it) => String(it.description || '').trim() && !(Number(it.amount) > 0));
+      return named
+        ? `“${String(named.description).trim()}” has no price on it. Every invoice needs at least one line with a description AND an amount.`
+        : 'Add at least one line item with a description and a positive amount.';
+    }
+    if (deliveryMethod === 'delivery') {
+      const missing = [!address.trim() && 'street address', !city.trim() && 'city', !postal.trim() && 'postal code'].filter(Boolean);
+      if (missing.length) return `Delivery needs a ${missing.join(', a ')}. Type it in if the address lookup didn’t fill it.`;
+    }
+    return '';
+  }
+
   async function submit(e) {
     e.preventDefault();
+    const wrong = whatsWrong();
+    if (wrong) { setErr(wrong); setDone(null); return; }
     setBusy(true); setErr(''); setDone(null);
     try {
       const res = await fetch('/api/admin/invoices', {
@@ -160,7 +186,6 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
 
   return (
     <form onSubmit={submit}>
-      {err && <div className="error-box">{err}</div>}
       <div className="form-2col">
         <div className="field">
           <label>Customer name</label>
@@ -250,6 +275,12 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
         <label>Memo / notes (optional)</label>
         <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="Shown on the invoice" />
       </div>
+
+      {/* Sits WITH the button, not at the top of the form. This is a long form:
+          with the message up by the customer name, a rep who scrolled down to
+          click Create saw the page not move and reported that invoicing was
+          dead. The error has to appear where the eyes already are. */}
+      {err && <div className="error-box" style={{ marginTop: 12 }}>{err}</div>}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
         <div style={{ fontSize: 14, color: 'var(--muted)' }}>
