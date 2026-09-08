@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getById, getSiblings } from '../../../lib/inventory';
 import { decorateOne, decorate } from '../../../lib/pricing';
@@ -102,11 +103,19 @@ export default async function Product({ params }) {
           <>
             <h2>Photos of this exact unit</h2>
             <p>Taken by our technicians during inspection — what you see is the unit you get.</p>
+            {/* These tiles are ~160px wide, but RS Ops stores the sale photos at
+                1600px so they stay sharp when a buyer opens one full-size. Served
+                raw that was a ~10x oversized download per tile, six times over, on
+                a page most people reach from a phone. next/image resizes and
+                re-encodes them to the tile — the anchor still links the untouched
+                original for anyone who wants the full-size shot. */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
               {u.rsopsPhotos.map((p) => (
-                <a key={p.url} href={p.url} target="_blank" rel="noopener">
-                  <img src={p.url} alt={`${u.make} ${u.model} — ${p.slot}`} loading="lazy"
-                    style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8 }} />
+                <a key={p.url} href={p.url} target="_blank" rel="noopener"
+                  style={{ position: 'relative', display: 'block', aspectRatio: '1', borderRadius: 8, overflow: 'hidden' }}>
+                  <Image src={p.url} alt={`${u.make} ${u.model} — ${p.slot}`} fill
+                    sizes="(max-width: 700px) 45vw, 200px"
+                    style={{ objectFit: 'cover' }} />
                 </a>
               ))}
             </div>
