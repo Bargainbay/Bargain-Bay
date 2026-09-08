@@ -4,6 +4,7 @@ import JobForm from './JobForm';
 import ServiceVisitForm from './ServiceVisitForm';
 import TicketQueue from './TicketQueue';
 import DispatchSetup from './DispatchSetup';
+import StaleStops from './StaleStops';
 import StopImport from './StopImport';
 import PayReport from './PayReport';
 import ClientBilling from './ClientBilling';
@@ -684,7 +685,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   const [closing, setClosing] = useState(null);   // the service visit being closed out
   // Everything dispatch does happens on this page — no tab-hopping to add a
   // client or chase a service call mid-shift.
-  const [view, setView] = useState(['board', 'tickets', 'setup', 'import'].includes(initialView) ? initialView : 'board');
+  const [view, setView] = useState(['board', 'tickets', 'setup', 'import', 'stale'].includes(initialView) ? initialView : 'board');
   const [tickets, setTickets] = useState(openTickets);
   const [pull, setPull] = useState(null);        // what the last Bargain Bay pull did
   const [addNum, setAddNum] = useState('');      // order number typed into "add by number"
@@ -965,6 +966,9 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
         <Tab id="import">Import</Tab>
         <Tab id="live">Live</Tab>
         <Tab id="times">Times</Tab>
+        {/* Stops whose day has gone that nobody closed. The count is on the tab
+            because a list nobody knows about is a list nobody opens. */}
+        <Tab id="stale">Loose ends{board.staleCount ? ` (${board.staleCount})` : ''}</Tab>
         <Tab id="billing">Billing</Tab>
         <Tab id="pay">Pay</Tab>
         {canManageClients && <Tab id="profit">Profit</Tab>}
@@ -986,6 +990,8 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
       {view === 'live' && <LiveMap />}
 
       {view === 'times' && <StopTimes drivers={board.drivers} />}
+
+      {view === 'stale' && <StaleStops onChanged={() => refresh()} />}
 
       {view === 'profit' && <ProfitReport drivers={board.drivers} date={board.date} />}
 

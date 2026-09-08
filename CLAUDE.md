@@ -1121,6 +1121,58 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
 - PWA: `public/driver.webmanifest` + `public/driver-sw.js` (shell only —
   network-first for the page, never caches `/api`). Installed via **Add to Home
   Screen**; there is no app store and no native build.
+- **The phones update themselves** (added 2026-09-08). An installed app is opened
+  once and then lives in a pocket for days, so a phone can run an old build long
+  after a change ships. The SW already `skipWaiting()`s and claims the page; a
+  `controllerchange` in `DriverShell` now reloads onto the new build.
+  **`CACHE` in `driver-sw.js` is the lever that reaches every home screen** —
+  bump it (`bb-driver-vN`) and the next activation drops each phone's cached
+  shell and build assets. The reload NEVER lands on a half-filled close-out:
+  `lib/driver-busy.js` is held by `DriverFinish`/`DriverPhotos` while a sheet is
+  open, because a signature just drawn and eight photos exist nowhere else until
+  Done is pressed. Note the limit: a phone sitting open and idle won't see the
+  new worker until it navigates or the browser's own update check runs.
+
+#### Loose ends — the stops nobody closed (added 2026-09-08)
+`staleStops()` / `staleStopCount()` in `lib/jobs.js`, `GET /api/admin/dispatch?view=stale`,
+`StaleStops.jsx` behind the **Loose ends** tab (count on the tab). Stale = a job
+with a `job_date` before today whose status is not done / failed / cancelled.
+Capped at 300 and it SAYS when it is capped.
+
+Each row carries what is actually known — driver, whether the clock was ever
+stopped, signature/photo count (it happened), balance owing, and any pending
+`job_collections` money sitting against it. Four actions, all existing endpoints:
+close it out **with the real times** (`action:'times'` + `markDone`, never "now",
+or a two-hour delivery from last Tuesday costs as a six-day one), move it to
+today (`assign` with `jobDate`), couldn't complete (`status` + reason), cancel.
+**There is deliberately no clear-all** — each row is a different question, and a
+sweep would erase the only thing the list is for.
+
+#### The day on the phone is ONE day (changed 2026-09-08)
+`driverJobs` used to carry every unfinished stop from every earlier day inline
+into today's run, so a driver opened the app to last week's leftovers above this
+morning's first delivery — and the "to go" count and the "$ to collect" total at
+the top were both counting them. Four buckets now, and they are separate arrays
+on purpose:
+
+- `stops` — the day being looked at, and nothing else.
+- `earlier` — before today, never closed. Its own folded section at the BOTTOM of
+  the screen, still finishable from there. The carry-forward existed for a good
+  reason (a stop that drops off at midnight is forgotten for a week); it is held
+  apart, not deleted.
+- `tomorrow` — the day after, for planning. Nothing on it can be started.
+- `tomorrow` and `earlier` are returned **only when the day on screen is today**.
+  Looking back at last Tuesday returns last Tuesday.
+
+`/driver` has ‹ › and a date picker over any past day (`GET /api/driver/jobs?date=`).
+**The server decides what "today" is, never the phone** — a driver's clock can be
+a day out and the run sheet cannot — and a date after today is clamped back.
+
+Two drivers ride one stop as ONE row (`driver_id` + `driver2_id`), so closing it
+closes it for both; there is no second copy. What was missing was who: the
+finished card now carries `closedBy` (the last `done`/`service_complete`/`failed`
+job_event), so a stop the mate closed doesn't just look like one that never went
+anywhere.
 ### Money at the door is REPORTED by the driver and CONFIRMED by the office (changed 2026-09-08)
 A finished delivery used to mark its invoice **paid** outright: the driver ticked
 "I took the money", tapped Done, and the phone's `action:'payment'` went straight

@@ -21,7 +21,7 @@ export default async function DispatchPage({ searchParams }) {
 
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(sp?.date || '')) ? String(sp.date) : torontoToday();
 
-  let board = { date, jobs: [], unscheduled: [], drivers: [], clients: [], moneyToConfirm: [] };
+  let board = { date, jobs: [], unscheduled: [], drivers: [], clients: [], moneyToConfirm: [], staleCount: 0 };
   let openTickets = 0;
   let loadError = '';
   if (hasDb()) {

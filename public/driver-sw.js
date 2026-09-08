@@ -8,7 +8,11 @@
 //     app opens in a basement instead of showing a dinosaur;
 //   * static build assets: cache first (they're content-hashed);
 //   * anything under /api: never cached, never served stale.
-const CACHE = 'bb-driver-v1';
+// Bump this to evict every phone's cached shell and build assets on the next
+// activation. It is the one lever that reaches a driver's home screen: an
+// installed app that has been in a pocket since Tuesday is otherwise holding
+// whatever it last saw.
+const CACHE = 'bb-driver-v2';
 const SHELL = '/driver';
 
 self.addEventListener('install', (e) => {
