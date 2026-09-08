@@ -1072,12 +1072,6 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
   margin-top: 6px; font-size: 13.5px; font-weight: 700;
   color: var(--muted); font-variant-numeric: tabular-nums;
 }
-.drv-unfinished {
-  margin: 8px 0; padding: 12px 14px; border-radius: 10px;
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-  border: 1px solid var(--danger);
-  font-size: 15px; line-height: 1.35; color: var(--charcoal);
-}
 
 /* The money. Biggest thing on the card, because forgetting it costs real cash
    and the driver is reading this in a hurry. */
@@ -1130,6 +1124,31 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .drv-field { margin-bottom: 16px; }
 .drv-field > label { display: block; font-size: 14px; font-weight: 700; color: var(--charcoal); margin-bottom: 5px; }
 .drv-field input, .drv-field select { width: 100%; font-size: 16px; padding: 12px; border-radius: 10px; }
+/* The day being looked at, and the way back through it. Big targets: this is
+   used one-handed, in a van, in the sun, like everything else on this screen. */
+.drv-days { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.drv-day-btn {
+  flex: 0 0 auto; width: 44px; height: 44px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card); color: var(--charcoal);
+  font-size: 22px; line-height: 1; font-weight: 800; cursor: pointer;
+}
+.drv-day-btn:disabled { opacity: .35; }
+.drv-day-pick {
+  flex: 1 1 auto; min-width: 0; height: 44px; font-size: 16px; padding: 0 10px;
+  border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--charcoal);
+}
+.drv-day-today {
+  flex: 0 0 auto; height: 44px; padding: 0 14px; border-radius: 10px; border: none;
+  background: var(--charcoal); color: #fff; font-size: 15px; font-weight: 800; cursor: pointer;
+}
+/* Looking at a day that has already been. Said plainly, because a driver who
+   thinks last Tuesday is today's run will drive to the wrong house. */
+.drv-past {
+  background: var(--tint); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; margin: 0 0 12px; font-size: 14px; color: var(--charcoal);
+}
+/* Who actually closed the stop, when it wasn't the person holding this phone. */
+.drv-doneby { font-weight: 700; }
 .drv-check { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 700; color: var(--charcoal); }
 .drv-check input { width: 26px; height: 26px; }
 .drv-money { display: flex; gap: 8px; margin-top: 10px; }
