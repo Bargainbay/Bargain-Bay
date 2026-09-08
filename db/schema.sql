@@ -191,7 +191,12 @@ CREATE TABLE IF NOT EXISTS invoice_items (
   invoice_id  int REFERENCES invoices(id) ON DELETE CASCADE,
   description text,
   sku         text,
-  amount      numeric(10,2),
+  amount      numeric(10,2),                  -- ALWAYS pre-tax
+  -- What the rep typed, when the invoice was quoted tax-in. Signed like amount.
+  -- amount can't be grossed back up to it: the tax-in split parks a rounding
+  -- cent on the largest line. Null on a before-tax invoice, where amount is
+  -- already the typed figure. See lib/tax.js.
+  typed_amount numeric(10,2),
   refunded_at timestamptz                     -- set per line on a partial (per-unit) refund
 );
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS tax_inclusive boolean NOT NULL DEFAULT false;
