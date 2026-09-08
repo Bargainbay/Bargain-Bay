@@ -857,6 +857,19 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .disp-collect-form label:nth-child(2) { width: 132px; }
 .disp-collect-note { flex: 1 1 130px; }
 .disp-collect-form .btn { padding: 6px 10px; font-size: 13px; }
+/* Loose ends: the actions on a stop nobody ever closed, and the two times that
+   close it properly. Wrapped rather than crammed — this is a real decision per
+   row, not a tidy-up button. */
+.stale-acts { display: flex; flex-wrap: wrap; gap: 5px; }
+.stale-acts .btn { padding: 4px 9px; font-size: 12px; white-space: nowrap; }
+.stale-cancel {
+  border: none; background: none; color: var(--danger); cursor: pointer;
+  font: inherit; font-size: 12px; padding: 4px 2px;
+}
+.stale-close { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; min-width: 260px; }
+.stale-close label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 700; margin: 0; }
+.stale-close input { font-size: 13px; padding: 4px 6px; width: 104px; }
+.stale-close .btn { padding: 5px 10px; font-size: 12.5px; }
 /* Money a driver says they took, waiting on the office. Not styled as an alarm:
    nothing has gone wrong — it is a queue of two-second decisions, and the
    invoice behind each one is deliberately still open until one is made. */

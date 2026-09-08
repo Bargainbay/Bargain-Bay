@@ -23,7 +23,8 @@ import {
   setTicketStatus, listTickets, reopenJob, updateJob,
   findServiceCustomers, ordersForServiceCall,
   completeJob, setJobPay, payReport, bookRevisit, setJobTimes,
-  setJobCharge, billingSummary, invoiceClientJobs, jobHistory, reopenJobByNumber
+  setJobCharge, billingSummary, invoiceClientJobs, jobHistory, reopenJobByNumber,
+  staleStops
 } from '../../../../lib/jobs';
 import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 import { confirmDoorCollection, rejectDoorCollection } from '../../../../lib/door-money';
@@ -120,6 +121,11 @@ export async function GET(req) {
     }
     if (sp.get('view') === 'drivers') {
       return NextResponse.json({ drivers: await listDriversForOffice() });
+    }
+    // Every stop whose day has gone that nobody closed. Staff, like the board
+    // itself: whoever notices it is whoever should be able to deal with it.
+    if (sp.get('view') === 'stale') {
+      return NextResponse.json(await staleStops());
     }
     if (sp.get('view') === 'tickets') {
       return NextResponse.json(await listTickets({ status: sp.get('status') || 'open_states' }));
