@@ -7,9 +7,11 @@ import { splitTaxInclusive } from '../lib/tax';
 //   inclusive — "twelve hundred out the door". The system backs the tax out and
 //               the total lands on the figure that was quoted
 //
-// Switching between them CONVERTS what's already typed, so it's a way of reading
-// the boxes rather than a thing you have to remember to set first. The stored
-// invoice is identical either way: line amounts are always pre-tax.
+// Switching is purely a way of READING the boxes — it never rewrites what's in
+// them. 750 + 100 - 50 is a $904 sale read exclusive and an $800 sale read
+// inclusive; the mode is the answer to "is the tax already in these numbers?",
+// so the numbers themselves must not move when you answer it. The stored
+// invoice is pre-tax line amounts either way.
 //
 // Every sale here carries HST, so there is no "no tax" choice. But zero-HST
 // invoices DO exist — the salvage screen raises parts-only sales without it —

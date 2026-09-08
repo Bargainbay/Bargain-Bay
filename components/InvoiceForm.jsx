@@ -3,7 +3,6 @@ import { useState, useRef } from 'react';
 import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
 import InvoiceLines, { blankItem, toPayload } from './InvoiceLines';
 import TaxMode, { previewTotals } from './TaxMode';
-import { toInclusiveLines, exTaxOf, inclusiveOf } from '../lib/tax';
 
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 // Business days run on Toronto time (same as the dashboard's buckets).
@@ -102,26 +101,13 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
   const preview = previewTotals(signed, taxMode);
   const { subtotal, hst, total } = preview;
 
-  // Switching between before-tax and tax-in re-reads the numbers already typed,
-  // so it's a way of reading the boxes rather than something you have to set
-  // first and remember. Credit lines are converted too — a discount quoted
-  // tax-in is tax-in as well.
-  function changeTaxMode(next) {
-    // Read the current mode straight from state, not from inside a setTaxMode
-    // updater: an updater has to be pure, and React runs it twice in dev —
-    // which would convert the amounts twice.
-    const prev = taxMode;
-    if (next !== prev) {
-      setItems((xs) => {
-        const amounts = xs.map((it) => Number(it.amount) || 0);
-        const converted = next === 'inclusive'
-          ? toInclusiveLines(amounts)
-          : amounts.map((n) => exTaxOf(n));
-        return xs.map((it, i) => (it.amount === '' ? it : { ...it, amount: converted[i].toFixed(2) }));
-      });
-    }
-    setTaxMode(next);
-  }
+  // Switching only changes how the boxes are READ. The typed figures are left
+  // exactly as they are: pick tax-in on 750 + 100 - 50 and the sale is $800 out
+  // the door, not $904. Rewriting the boxes on the switch (which this used to
+  // do, to hold the total steady) meant choosing "prices include HST" grossed
+  // the numbers UP and the customer was quoted the before-tax total plus 13% —
+  // the opposite of what the option says.
+  const changeTaxMode = setTaxMode;
   const fmt = (n) => '$' + n.toFixed(2);
 
   async function submit(e) {

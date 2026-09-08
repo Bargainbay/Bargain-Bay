@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import InvoiceLines, { fromInvoice, toPayload } from './InvoiceLines';
 import TaxMode, { previewTotals, modeOf, NO_TAX } from './TaxMode';
-import { toInclusiveLines, exTaxOf } from '../lib/tax';
+import { toInclusiveLines } from '../lib/tax';
 
 // Edit an invoice: the customer's details, the line items (add, remove, reprice,
 // change warranty, add a service or a unit from stock), HST, memo and issue date.
@@ -59,23 +59,13 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   const preview = previewTotals(signed, taxMode);
   const { subtotal, hst, total } = preview;
 
-  // Same as the new-invoice form: switching re-reads what's already in the boxes.
-  function changeTaxMode(next) {
-    // Read the current mode straight from state, not from inside a setTaxMode
-    // updater: an updater has to be pure, and React runs it twice in dev —
-    // which would convert the amounts twice.
-    const prev = taxMode;
-    if (next !== prev && prev !== NO_TAX && next !== NO_TAX) {
-      setItems((xs) => {
-        const amounts = xs.map((it) => Number(it.amount) || 0);
-        const converted = next === 'inclusive'
-          ? toInclusiveLines(amounts)
-          : amounts.map((n) => exTaxOf(n));
-        return xs.map((it, i) => (it.amount === '' ? it : { ...it, amount: converted[i].toFixed(2) }));
-      });
-    }
-    setTaxMode(next);
-  }
+  // Same as the new-invoice form: switching only re-reads what's in the boxes,
+  // it never rewrites them. Choosing "prices include HST" on 750 + 100 - 50
+  // makes this an $800 sale with the tax backed out of it, not an $800 subtotal
+  // grossed up to $904. The boxes still open showing the figures the rep
+  // originally typed (see the items initialiser above) — that part is display,
+  // and stays.
+  const changeTaxMode = setTaxMode;
   const fmt = (n) => '$' + n.toFixed(2);
   // How this edit lands: which way the sale moves, and where that leaves the
   // customer against what they've already handed over.
