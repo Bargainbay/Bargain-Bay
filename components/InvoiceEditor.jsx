@@ -3,6 +3,7 @@ import { useState } from 'react';
 import InvoiceLines, { fromInvoice, toPayload } from './InvoiceLines';
 import TaxMode, { previewTotals, modeOf, NO_TAX } from './TaxMode';
 import { toInclusiveLines } from '../lib/tax';
+import { isCreditLine } from '../lib/invoice-lines';
 
 // Edit an invoice: the customer's details, the line items (add, remove, reprice,
 // change warranty, add a service or a unit from stock), HST, memo and issue date.
@@ -31,8 +32,23 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   const [items, setItems] = useState(() => {
     const rows = fromInvoice(invoice.items);
     if (!invoice.taxInclusive || !(Number(invoice.hst) > 0)) return rows;
-    const shown = toInclusiveLines(rows.map((r) => Number(r.amount) || 0), Number(invoice.total) || null);
-    return rows.map((r, i) => ({ ...r, amount: shown[i].toFixed(2) }));
+    // A tax-in invoice raised since we started keeping typed_amount comes back
+    // exactly as it was keyed — nothing to reconstruct.
+    if (rows.every((r) => r.typedAmount != null)) return rows;
+    // Older ones only have the pre-tax amounts, so the tax-in figures have to be
+    // derived, and a derivation cannot land on the cent — the split moved a
+    // rounding cent onto the biggest line and grossing back up can't put it back.
+    // All-or-nothing on purpose: deriving only SOME rows would leave the boxes
+    // not adding up to the invoice total.
+    //
+    // toInclusiveLines works in the SIGNED amounts an invoice is stored in, so
+    // the credits have to go back to negative first. fromInvoice hands them over
+    // positive, the way the form shows them, and feeding those straight in made
+    // a $50 trade-in read as +$50: the total it was reconciling against was then
+    // $100 adrift, and the fix-up spread that error across every line. A washer
+    // typed at $750 came back as $716.65.
+    const shown = toInclusiveLines(toPayload(rows).map((r) => Number(r.amount) || 0), Number(invoice.total) || null);
+    return rows.map((r, i) => ({ ...r, amount: (isCreditLine(r.kind) ? Math.abs(shown[i]) : shown[i]).toFixed(2) }));
   });
   // A salvage / parts-only invoice was raised with no HST on it. Re-saving one
   // must not quietly add 13% to a sale that's already been settled.
