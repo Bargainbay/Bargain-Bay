@@ -1573,10 +1573,20 @@ and half a history in each.
 - **WHO PAYS FOR THE FUEL is a property of the TRUCK** (`vehicles.fuel_paid_by`
   = `us` | `carrier`), and it decides whether a driver's fill is a cost or only a
   mileage record. It is **DATA, per van — not a rule about what kind of truck it
-  is.** The box truck was the first `carrier` van and the pickups were `us`, so
-  the two read for a while like a distinction between big trucks and small ones;
-  they are not. A Dodge Ram is on the carrier arrangement as of 2026-09-09.
-  Always read the van's own row. The two arrangements:
+  is.** Always read the van's own row, and do not infer it from the size or the
+  name of the truck.
+
+  **As of 2026-09-09 the owner confirms: WE pay for the fuel on our trucks, the
+  20ft box truck included. The driver pays at the pump and is reimbursed after.
+  That is `us`, and every van is correctly on it. Do NOT flip a van to `carrier`
+  without asking the owner first.** This paragraph previously read as though the
+  box truck's fuel came bundled into a carrier's invoice; a session acted on
+  that, told the owner his P&L was double-counting diesel, and was wrong. The
+  arrangement it described may never have applied to fuel — the carrier bills
+  for the TRUCK. `carrier` is a mode the code supports, not a mode anything is
+  currently in.
+
+  The two modes:
   · a **carrier** truck is billed to us **fortnightly for the truck AND its
     diesel** — so a fill logged against it is already paid for inside that
     invoice;
@@ -1589,10 +1599,11 @@ and half a history in each.
   right behaviour and it is not obvious; the van list says so out loud.
   A van added before this column existed defaults to `us`, and until 2026-09-09
   there was **no way to change it** — the who-pays selector was on the ADD form
-  only. Both trucks sat mis-set that whole time. The van list now has a
-  **"who pays the fuel"** control per row. Never fix one by retiring the van and
-  adding it again: a second `vehicles` row orphans the odometer history and
-  every fill already logged, the same way a re-added driver did.
+  only. The van list now has a **"who pays the fuel"** control per row (PR #226).
+  That gap was worth closing on its own; it is NOT evidence that anything was
+  set wrong, which is how it got read the first time. Never fix a van by
+  retiring it and adding it again: a second `vehicles` row orphans the odometer
+  history and every fill already logged, the same way a re-added driver did.
   **LANDMINE — the double count.** Counting a carrier truck's fills as cost
   charges us for the same tank twice: once as the fill, again inside the
   carrier's invoice. `profitReport` therefore reports `carrierFuel` SEPARATELY
