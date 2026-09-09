@@ -1572,13 +1572,27 @@ and half a history in each.
   one end, fills with no litres.
 - **WHO PAYS FOR THE FUEL is a property of the TRUCK** (`vehicles.fuel_paid_by`
   = `us` | `carrier`), and it decides whether a driver's fill is a cost or only a
-  mileage record. The owner's two arrangements:
-  · the **20ft box truck** comes from a carrier who bills **fortnightly for the
-    truck AND its diesel** — so a fill logged against it is already paid for
-    inside that invoice;
-  · **our own pickups** are fuelled by the driver, who is **e-transferred** for
+  mileage record. It is **DATA, per van — not a rule about what kind of truck it
+  is.** The box truck was the first `carrier` van and the pickups were `us`, so
+  the two read for a while like a distinction between big trucks and small ones;
+  they are not. A Dodge Ram is on the carrier arrangement as of 2026-09-09.
+  Always read the van's own row. The two arrangements:
+  · a **carrier** truck is billed to us **fortnightly for the truck AND its
+    diesel** — so a fill logged against it is already paid for inside that
+    invoice;
+  · a truck **we** fuel is pumped by the driver, who is **e-transferred** for
     it — so the driver's entry is the ONLY record of that money anywhere, and
     Plaid won't help (it drops `TRANSFER_OUT`, which is what an e-transfer is).
+  **The setting is read when the Profit tab ADDS UP, not when the fill is
+  logged** (`profitReport` joins `vehicles` — lib/dispatch-money.js:239), so
+  correcting a van moves its PAST fills between the columns too. That is the
+  right behaviour and it is not obvious; the van list says so out loud.
+  A van added before this column existed defaults to `us`, and until 2026-09-09
+  there was **no way to change it** — the who-pays selector was on the ADD form
+  only. Both trucks sat mis-set that whole time. The van list now has a
+  **"who pays the fuel"** control per row. Never fix one by retiring the van and
+  adding it again: a second `vehicles` row orphans the odometer history and
+  every fill already logged, the same way a re-added driver did.
   **LANDMINE — the double count.** Counting a carrier truck's fills as cost
   charges us for the same tank twice: once as the fill, again inside the
   carrier's invoice. `profitReport` therefore reports `carrierFuel` SEPARATELY
