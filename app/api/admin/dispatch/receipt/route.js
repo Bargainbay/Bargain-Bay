@@ -32,10 +32,19 @@ export async function GET(req) {
   if (!row?.receipt_path) return NextResponse.json({ error: 'No receipt on that one.' }, { status: 404 });
 
   try {
-    const res = await get(row.receipt_path);
+    // `access: 'private'` is REQUIRED — without the options object @vercel/blob
+    // refuses with "missing options, see usage", which is what this route has
+    // returned for every receipt it has ever been asked for. And the body is
+    // `res.stream`, not `res.body`: `res.body` is undefined, so even with the
+    // options it would have streamed nothing. Both are copied from the POD
+    // proxy next door, which does this correctly and has worked all along.
+    const res = await get(row.receipt_path, { access: 'private' });
+    if (!res || res.statusCode !== 200 || !res.stream) {
+      return NextResponse.json({ error: 'Could not read that receipt.' }, { status: 404 });
+    }
     const ext = (res.blob?.contentType || '').includes('png') ? 'png' : 'jpg';
     const name = `fuel-${row.expense_date?.toISOString?.().slice(0, 10) || 'receipt'}-$${Number(row.amount).toFixed(2)}.${ext}`;
-    return new NextResponse(res.body, {
+    return new NextResponse(res.stream, {
       headers: {
         'Content-Type': res.blob?.contentType || 'application/octet-stream',
         'Content-Disposition': `${url.searchParams.get('download') ? 'attachment' : 'inline'}; filename="${name}"`,
@@ -43,6 +52,7 @@ export async function GET(req) {
       }
     });
   } catch (e) {
+    console.error('fuel receipt get failed', e?.message || e);
     return NextResponse.json({ error: e?.message || 'Could not read that receipt.' }, { status: 404 });
   }
 }
