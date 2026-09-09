@@ -20,6 +20,12 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   const [vanPlate, setVanPlate] = useState('');
   const [vanFuel, setVanFuel] = useState('us');
   const [vanCarrier, setVanCarrier] = useState('');
+  // The van being re-settled. Who pays for the fuel was askable only when the
+  // van was FIRST added, so every truck added before that question existed sat
+  // on the default — "we pay" — with no way to correct it. Retiring and
+  // re-adding is not the way out: a second `vehicles` row orphans the odometer
+  // history and every fill already logged against the first one.
+  const [editVan, setEditVan] = useState(null);   // { id, fuelPaidBy, carrierName }
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
@@ -103,6 +109,30 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
       if (!res.ok) { setErr(d.error || 'Could not save the van.'); return; }
       setOk(`${d.vehicle.name} added.`);
       setVanName(''); setVanPlate(''); setVanFuel('us'); setVanCarrier('');
+      await loadVans();
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(''); }
+  }
+
+  // Change who settles the fuel on a van we already have. Same `vehicle` action
+  // as adding one — `upsertVehicle` has always taken an id — so this is the UI
+  // catching up with what the server could already do.
+  async function saveVanFuel(v) {
+    setBusy(`van${v.id}`); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'vehicle', id: v.id, name: v.name, plate: v.plate, active: v.active,
+          fuelPaidBy: editVan.fuelPaidBy, carrierName: editVan.carrierName
+        })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not save the van.'); return; }
+      setOk(editVan.fuelPaidBy === 'carrier'
+        ? `${v.name}: fuel is on ${editVan.carrierName || 'the carrier'} — fills logged against it stay out of the Profit tab's cost from now on.`
+        : `${v.name}: we pay the fuel — the driver gets e-transferred for fills.`);
+      setEditVan(null);
       await loadVans();
     } catch { setErr('Network error — nothing was saved.'); }
     finally { setBusy(''); }
@@ -330,7 +360,37 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                 </span>
                 {!v.active && <span className="hint" style={{ margin: 0 }}> · retired</span>}
                 <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
+                  onClick={() => setEditVan(editVan?.id === v.id ? null
+                    : { id: v.id, fuelPaidBy: v.fuelPaidBy || 'us', carrierName: v.carrierName || '' })}>
+                  who pays the fuel
+                </button>
+                <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
                   onClick={() => toggleVan(v)}>{v.active ? 'retire' : 'bring back'}</button>
+                {editVan?.id === v.id && (
+                  <div className="disp-setup-form" style={{ marginTop: 8 }}>
+                    <select value={editVan.fuelPaidBy} style={{ minWidth: 260 }}
+                      onChange={(e) => setEditVan({ ...editVan, fuelPaidBy: e.target.value })}>
+                      <option value="us">We pay the fuel — driver pumps, we e-transfer them</option>
+                      <option value="carrier">Carrier pays — billed to us with the truck</option>
+                    </select>
+                    {editVan.fuelPaidBy === 'carrier' && (
+                      <input value={editVan.carrierName} placeholder="Carrier name (optional)"
+                        onChange={(e) => setEditVan({ ...editVan, carrierName: e.target.value })} />
+                    )}
+                    <button type="button" className="btn accent" disabled={busy === `van${v.id}`}
+                      onClick={() => saveVanFuel(v)}>
+                      {busy === `van${v.id}` ? 'Saving…' : 'Save'}
+                    </button>
+                    <button type="button" className="btn" onClick={() => setEditVan(null)}>Cancel</button>
+                    {/* Changing this does not rewrite what has already been
+                        recorded. The Profit tab reads the van's setting when it
+                        adds the numbers up, so past fills move columns too —
+                        which is the point, and worth knowing before it happens. */}
+                    <p className="hint" style={{ flexBasis: '100%', margin: 0 }}>
+                      This applies to fills already logged against {v.name}, not just new ones.
+                    </p>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
