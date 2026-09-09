@@ -1,8 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { money } from '../../lib/constants';
-
-const CATEGORIES = ['Refrigerator', 'Range', 'Washer', 'Dryer', 'Dishwasher', 'Freezer', 'Microwave', 'Range Hood', 'Other'];
+import { money, INTAKE_CATEGORIES as CATEGORIES } from '../../lib/constants';
 const CONDITIONS = ['New Open Box', 'Scratch & Dent', 'Refurbished', 'Used'];
 const blank = { make: '', model: '', category: 'Refrigerator', condition: '', retail: '', cost: '', vendor: '', invoice: '', qty: '1' };
 
