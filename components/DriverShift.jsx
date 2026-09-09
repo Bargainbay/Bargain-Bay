@@ -305,13 +305,20 @@ function FuelForm({ shift, onCancel, onSave }) {
       }}
     >
       {/* The driver should know which of the two this is before they type an
-          amount — one gets them e-transferred, the other is a mileage record on
-          a truck the carrier already bills us for. */}
+          amount — one gets them e-transferred, the other is already inside the
+          bill for the truck.
+
+          Phrased around the TRUCK, never around who pays for it. On a
+          driver-owned truck the carrier IS the man holding the phone, and the
+          old wording told him "Kowsi pays for fuel on Dodge Ram… this isn't
+          money coming back to you" — his own name, in the third person, in what
+          reads as a refusal. Same fact, and it lands as an accusation. */}
       {shift?.fuelPaidBy === 'carrier' && (
         <p className="hint" style={{ margin: 0 }}>
-          {shift.carrierName || 'The carrier'} pays for fuel on {shift.vehicleName || 'this truck'}. Put it
-          in anyway — the litres are how we work out the mileage — but this isn&apos;t money coming back to
-          you, and it won&apos;t be counted twice.
+          Fuel on {shift.vehicleName || 'this truck'} is billed with the truck
+          {shift.carrierName ? `, on ${shift.carrierName}’s invoice` : ''}. Put the fill in anyway — the
+          litres are how we work out the mileage — but it isn&apos;t e-transferred back on its own:
+          it&apos;s already in that bill, and we won&apos;t count it twice.
         </p>
       )}
       <label>What it cost
