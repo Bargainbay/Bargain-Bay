@@ -785,3 +785,21 @@ CREATE TABLE IF NOT EXISTS unit_photos (
   created_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_unit_photos_sku ON unit_photos(sku, position, id);
+
+-- Stock we HOLD but do not OWN. A vendor drops appliances here with no invoice,
+-- a cost agreed out loud, and is paid only once the unit sells. So it is not an
+-- asset of ours, and the day it sells the cost becomes a liability (ledger
+-- account 2150) rather than a credit against Inventory, which was never debited
+-- for it. See lib/consignment.js.
+CREATE TABLE IF NOT EXISTS consignment_units (
+  sku         text PRIMARY KEY,
+  vendor      text,
+  cost        numeric(10,2),
+  taken_on    date NOT NULL DEFAULT current_date,
+  paid_on     date,                  -- when we actually settled with the vendor
+  paid_amount numeric(10,2),
+  note        text,
+  created_by  text,
+  created_at  timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_consignment_unpaid ON consignment_units(paid_on) WHERE paid_on IS NULL;

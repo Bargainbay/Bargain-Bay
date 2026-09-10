@@ -214,8 +214,47 @@ cannot drift.
 - **The Invoice column is written `CONSIGNMENT`** (plus any note). An empty cell
   reads as an invoice number nobody has typed in yet; whoever settles up with
   this vendor has to be able to see off the tracker that the money is owed
-  **on sale**, not already paid. Nothing wires that into payables yet — a
-  consignment liability is not modelled in `lib/ledger.js`.
+  **on sale**, not already paid. The books know it too — see below.
+
+### Stock we hold but do not own
+`lib/consignment.js`, table `consignment_units`, ledger account **2150 "Owed to
+consignment vendors"**, and an *Owed to consignment vendors* panel on
+`/admin/reports/ledger` (admin settles; an accountant can read it).
+
+Two things were wrong by default, and both are silent:
+
+- **`inventoryAtCost()` counted it as an asset.** We didn't buy it, and nothing
+  is owed for it until it sells — so it overstated what the business owns AND,
+  with no matching liability, overstated equity by the same amount. Consigned
+  units are now excluded from every owned figure and reported on their own line,
+  so the exclusion is never invisible. The guard is `NOT EXISTS` against a
+  **separately-run** query, not a join: `one()` soft-fails, and a join against a
+  table that doesn't exist yet would have returned zero stock. If the
+  consignment table can't be read at all it falls back to the old answer
+  (everything owned) rather than reporting no inventory.
+- **The COGS entry credited Inventory (1200) for a unit that was never debited
+  into it**, so inventory drifted NEGATIVE by the cost while the money owed to
+  the vendor appeared nowhere. A consigned line now credits **2150** instead —
+  the liability starts the day the unit sells, which is the deal — and clears
+  Dr 2150 / Cr bank when the vendor is actually paid.
+
+Rules that must hold:
+- **The COGS query reads per LINE and splits in JS**, rather than joining
+  `consignment_units`. `safe()` swallows a failed query, so a join against a
+  missing table would have **silently deleted COGS from the entire ledger**. An
+  unreadable consignment table degrades to "nothing is consigned".
+- **It is settled per UNIT, not per document** — the vendor is paid for the
+  appliance that went out, not for the five still standing here. That is why it
+  is a separate panel from *Owed to suppliers* and not another row in it.
+- **A typed amount beats the agreed cost.** Settling at a round number is
+  ordinary, and the figure that left the bank is the one the ledger carries.
+  Blank means "what was agreed".
+- **The P&L needed no change.** Cost was already recognised per-unit at the sale,
+  which is the right period either way. Only the balance sheet was wrong.
+- **`recordConsignmentUnit` is best-effort at intake and the failure is SHOWN.**
+  The tracker row is the record of the appliance and must not be lost over a
+  bookkeeping write; the screen tells the rep the books don't know we owe for
+  this one, because nothing else would.
 
 ### The photos, and why they are not on `products`
 `unit_photos` is its own table, keyed by SKU, joined on read by `lib/inventory`.

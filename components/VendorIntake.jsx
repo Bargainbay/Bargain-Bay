@@ -77,7 +77,13 @@ export default function VendorIntake() {
       const title = [form.make, form.model].filter(Boolean).join(' ') || form.category;
       setAdded((a) => [{
         sku: d.sku, title, photos: d.photosSaved || 0,
-        note: d.photoError || (d.photosFailed ? `${d.photosFailed} photo(s) didn't save — add them again below.` : '')
+        // `booked` false means the appliance is in the tracker but the "we owe
+        // this vendor when it sells" record isn't. The unit is fine and sellable;
+        // the money is what needs a person. Say so rather than nothing.
+        note: [
+          d.booked === false ? 'Added — but the consignment record failed, so the books don\u2019t know we owe for this one. Tell the owner.' : '',
+          d.photoError || (d.photosFailed ? `${d.photosFailed} photo(s) didn't save — add them again below.` : '')
+        ].filter(Boolean).join(' ')
       }, ...a]);
       photos.forEach((p) => URL.revokeObjectURL(p.url));
       setPhotos([]); setPhotoWarn('');

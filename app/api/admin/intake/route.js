@@ -52,13 +52,16 @@ export async function POST(req) {
     }
     const f = (k) => String(form.get(k) || '').trim();
     let sku;
+    let booked = true; // did the consignment liability get recorded?
     try {
       const r = await addConsignmentUnit({
         make: f('make'), model: f('model'), category: f('category'), condition: f('condition'),
         retail: f('retail'), cost: f('cost'), vendor: f('vendor'), serial: f('serial'),
-        description: f('description'), note: f('note')
+        description: f('description'), note: f('note'),
+        createdBy: s.email || null
       });
       sku = r.sku;
+      booked = r.booked;
     } catch (e) {
       return NextResponse.json({ error: e?.message || 'Could not add.' }, { status: 400 });
     }
@@ -78,7 +81,7 @@ export async function POST(req) {
         console.error('consignment photos failed', sku, photoError);
       }
     }
-    return NextResponse.json({ ok: true, sku, photosSaved: photos.length, photosFailed: failed, photoError });
+    return NextResponse.json({ ok: true, sku, booked, photosSaved: photos.length, photosFailed: failed, photoError });
   }
 
   // Everything else is the RS Ops path: admin only.

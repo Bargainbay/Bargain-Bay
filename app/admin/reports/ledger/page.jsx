@@ -4,10 +4,12 @@ import { hasDb } from '../../../../lib/db';
 import { money, BUSINESS_NAME, BUSINESS_LEGAL, HST_NUMBER } from '../../../../lib/constants';
 import { balanceSheet, getOpeningBalances, ACCOUNTS } from '../../../../lib/ledger';
 import { inventoryAtCost, unpaidPurchaseInvoices } from '../../../../lib/finance';
+import { consignmentOwed } from '../../../../lib/consignment';
 import AdminNav from '../../../../components/AdminNav';
 import PrintButton from '../../../../components/PrintButton';
 import OpeningBalances from '../../../../components/OpeningBalances';
 import PayablesList from '../../../../components/PayablesList';
+import ConsignmentOwed from '../../../../components/ConsignmentOwed';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Trial balance — Bargain Bay' };
@@ -15,7 +17,7 @@ export const metadata = { title: 'Trial balance — Bargain Bay' };
 // What each opening figure is, in the words the person typing it would use.
 const HELP = {
   1000: 'The balance in the TD account on that morning, straight off the app.',
-  1200: 'What ALL the stock on hand cost you — not what it sells for. Sellable, untested and salvage.',
+  1200: 'What ALL the stock on hand cost you — not what it sells for. Sellable, untested and salvage. NOT consigned stock: that was never bought.',
   2100: 'Supplier invoices still unpaid on that date, including any carried over.',
   2200: 'Loans and credit-card balances. Not supplier bills — those go on the line above.'
 };
@@ -43,6 +45,7 @@ export default async function LedgerPage() {
   // number for a balance sheet and the easiest one to reach for by mistake.
   const stock = await inventoryAtCost().catch(() => null);
   const owing = await unpaidPurchaseInvoices().catch(() => []);
+  const consOwed = await consignmentOwed().catch(() => []);
   const owingTotal = owing.reduce((a, r) => a + r.total, 0);
 
   return (
@@ -84,7 +87,9 @@ export default async function LedgerPage() {
             <b>Stock on hand, at cost — {money(stock.total)}.</b> That&apos;s {money(stock.sellable)} sellable
             ({stock.sellableUnits} units){stock.unlisted > 0 ? <>, {money(stock.unlisted)} bought but not listed
             ({stock.unlistedUnits})</> : null}{stock.salvage > 0 ? <>, and {money(stock.salvage)} salvage
-            ({stock.salvageUnits})</> : null}. The Financial tab&apos;s &ldquo;inventory capital&rdquo; shows only the
+            ({stock.salvageUnits})</> : null}.{stock.consigned > 0 ? <> Consigned stock ({stock.consignedUnits} units,
+            {' '}{money(stock.consigned)}) is <b>excluded</b> — a vendor left it here and is paid only when it
+            sells, so we hold it without owning it.</> : null} The Financial tab&apos;s &ldquo;inventory capital&rdquo; shows only the
             sellable part — a balance sheet wants everything you own.
             {owing.length > 0 && (
               <div style={{ marginTop: 6 }}>
@@ -103,6 +108,18 @@ export default async function LedgerPage() {
           {owing.length > 0 && <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>{owing.length}</span>}
         </h2>
         <PayablesList initial={owing} canEdit={admin} />
+      </div>
+
+      {/* Separate from suppliers on purpose. A supplier invoice is money owed
+          for stock we BOUGHT; this is money owed for stock that was left with us
+          and has since sold. They clear differently — one per document, one per
+          unit — and merging them would hide which. */}
+      <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
+          Owed to consignment vendors
+          {consOwed.length > 0 && <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>{consOwed.length}</span>}
+        </h2>
+        <ConsignmentOwed initial={consOwed} canEdit={admin} />
       </div>
 
       {bs && (
