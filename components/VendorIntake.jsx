@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { INTAKE_CATEGORIES as CATEGORIES } from '../lib/constants';
+import { INTAKE_CATEGORIES as CATEGORIES, INTAKE_CONDITIONS as CONDITIONS } from '../lib/constants';
 import { compressPhotos } from './photo-pick';
 
 // Vendor drop-off — a unit that goes on the site without passing RS Ops.
@@ -17,7 +17,6 @@ import { compressPhotos } from './photo-pick';
 // Must match MAX_PHOTOS in lib/unit-photos.js — the server is the one that
 // enforces it; this only stops the rep picking twelve and losing four silently.
 const MAX_PHOTOS = 8;
-const CONDITIONS = ['New Open Box', 'Scratch & Dent', 'Refurbished', 'Used'];
 const blank = { make: '', model: '', category: 'Refrigerator', condition: '', retail: '', cost: '', vendor: '', serial: '', note: '' };
 
 export default function VendorIntake() {

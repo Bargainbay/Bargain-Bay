@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { money, INTAKE_CATEGORIES as CATEGORIES } from '../../lib/constants';
-const CONDITIONS = ['New in Box', 'New Open Box', 'New Scratch & Dent', 'Refurbished'];
+import { money, INTAKE_CATEGORIES as CATEGORIES, INTAKE_CONDITIONS as CONDITIONS } from '../../lib/constants';
 const blank = { make: '', model: '', category: 'Refrigerator', condition: '', retail: '', cost: '', vendor: '', invoice: '', qty: '1' };
 
 // Inventory intake — writes straight into the master Google tracker. New units
