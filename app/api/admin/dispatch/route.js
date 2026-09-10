@@ -311,7 +311,12 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Only an admin can change shift hours.' }, { status: 403 });
       }
       try {
-        return NextResponse.json({ ok: true, shift: await setShiftTimes(body.shiftId, body, who(s)) });
+        // `who()` returns an OBJECT, and every other caller takes it as one.
+        // `edited_by` is a text column, so passing it straight through wrote
+        // the literal "[object Object]" against every correction.
+        return NextResponse.json({
+          ok: true, shift: await setShiftTimes(body.shiftId, body, s?.name || s?.email || null)
+        });
       } catch (e) {
         return NextResponse.json({ error: e?.message || 'Could not save that shift.' }, { status: 400 });
       }
