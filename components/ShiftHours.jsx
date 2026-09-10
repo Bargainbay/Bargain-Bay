@@ -11,17 +11,23 @@ const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-CA', { hour: '
 const asDuration = (m) => (m == null ? null : (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`));
 const dayLabel = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
 
-export default function ShiftHours({ from, to, drivers = [] }) {
+// `driverId` is passed through because the panel sits UNDER the Times filters
+// and looked like it obeyed them. It never did: the stops table filtered to one
+// driver and the shifts below carried on showing everyone, so "Kowsi's hours"
+// was a number for the whole crew sitting directly beneath his name.
+export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
 
   const load = useCallback(async () => {
     try {
-      const d = await fetch(`/api/admin/dispatch?view=shifts&from=${from}&to=${to}`).then((r) => r.json());
+      const q = new URLSearchParams({ view: 'shifts', from, to });
+      if (driverId) q.set('driverId', driverId);
+      const d = await fetch(`/api/admin/dispatch?${q}`).then((r) => r.json());
       if (d.error) { setErr(d.error); return; }
       setErr(''); setData(d);
     } catch { setErr('Could not load shifts.'); }
-  }, [from, to]);
+  }, [from, to, driverId]);
   useEffect(() => { load(); }, [load]);
 
   if (err) return <div className="error-box">{err}</div>;
