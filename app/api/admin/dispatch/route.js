@@ -11,7 +11,7 @@ import {
   profitReport, stopTimes, addExpense, listExpenses, deleteExpense, EXPENSE_KINDS
 } from '../../../../lib/dispatch-money';
 import {
-  shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate } from '../../../../lib/shifts';
+  shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate, setShiftTimes } from '../../../../lib/shifts';
 import { livePositions, driverTrail } from '../../../../lib/driver-location';
 import { sendSms, smsConfigured } from '../../../../lib/sms';
 import { SITE_URL } from '../../../../lib/site';
@@ -129,6 +129,9 @@ export async function GET(req) {
     if (sp.get('view') === 'mileage') {
       if (!s.full) return NextResponse.json({ error: 'Only an admin can see running costs.' }, { status: 403 });
       return NextResponse.json(await mileageReport({ from: sp.get('from'), to: sp.get('to') }));
+    }
+    if (sp.get('view') === 'base_address') {
+      return NextResponse.json({ base: await getBaseAddress() });
     }
     if (sp.get('view') === 'review_link') {
       return NextResponse.json({ url: (await getSetting('google_review_url', '')) || '' });
@@ -282,6 +285,34 @@ export async function POST(req) {
         return NextResponse.json({ ok: true, driver: await setDriverRate(body.driverId, body.hourlyRate) });
       } catch (e) {
         return NextResponse.json({ error: e?.message || 'Could not save that rate.' }, { status: 400 });
+      }
+    }
+    // The yard, and the stop that ends a run there.
+    if (body.action === 'base_address') {
+      try {
+        return NextResponse.json({ ok: true, base: await setBaseAddress(body) });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not save that address.' }, { status: 400 });
+      }
+    }
+    if (body.action === 'return_to_base') {
+      try {
+        return NextResponse.json({
+          ok: true, ...(await addReturnToBase({ date: body.date, driverIds: body.driverIds, createdBy: who(s) }))
+        });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not add that.' }, { status: 400 });
+      }
+    }
+    // Correcting a shift the driver's taps got wrong.
+    if (body.action === 'shift_times') {
+      if (!isAdmin(s)) {
+        return NextResponse.json({ error: 'Only an admin can change shift hours.' }, { status: 403 });
+      }
+      try {
+        return NextResponse.json({ ok: true, shift: await setShiftTimes(body.shiftId, body, who(s)) });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not save that shift.' }, { status: 400 });
       }
     }
     if (body.action === 'driver_merge') {

@@ -27,6 +27,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   // history and every fill already logged against the first one.
   const [editVan, setEditVan] = useState(null);   // { id, fuelPaidBy, carrierName, dayRate }
   const [vanRate, setVanRate] = useState('');
+  const [base, setBase] = useState({ address: '', city: '', postal: '' });
   const [editDrv, setEditDrv] = useState(null);   // { id, hourlyRate }
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
@@ -94,13 +95,35 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
 
   // The vans. An odometer reading that doesn't say which truck it came off is
   // not a mileage figure — it's two trucks' numbers in one column.
+  const loadBase = useCallback(async () => {
+    try {
+      const d = await fetch('/api/admin/dispatch?view=base_address').then((r) => r.json());
+      if (d.base) setBase({ address: d.base.address || '', city: d.base.city || '', postal: d.base.postal || '' });
+    } catch { /* leave the form empty */ }
+  }, []);
+
+  async function saveBase(e) {
+    e.preventDefault();
+    setBusy('base'); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'base_address', ...base })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not save the yard.'); return; }
+      setOk('Yard saved — "End runs at base" on the board will use it.');
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(''); }
+  }
+
   const loadVans = useCallback(async () => {
     try {
       const d = await fetch('/api/admin/dispatch?view=vehicles').then((r) => r.json());
       if (Array.isArray(d.vehicles)) setVans(d.vehicles);
     } catch { /* keep what we have */ }
   }, []);
-  useEffect(() => { loadVans(); }, [loadVans]);
+  useEffect(() => { loadVans(); loadBase(); }, [loadVans, loadBase]);
 
   // The Google review link. It reaches the driver's phone with their stop list,
   // so it is on the handset BEFORE they are standing at a door with one bar.
@@ -473,6 +496,26 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
             style={{ width: 150 }} placeholder="Day rate, e.g. 60" />
           <button className="btn accent" disabled={busy === 'van'}>{busy === 'van' ? 'Adding…' : 'Add van'}</button>
         </form>
+        {/* Where the vans end up. It is here rather than in general settings
+            because the only thing that uses it is the stop at the end of a run,
+            and that is a dispatch idea. */}
+        <h3 style={{ marginBottom: 4 }}>The yard</h3>
+        <p className="hint" style={{ marginTop: 0 }}>
+          Where a run ends. <b>🏁 End runs at base</b> on the board puts a <b>Return to base</b> stop on every
+          driver who is out that day; their Done tap when the van is parked is what tells you the time they
+          actually finished — which is the number the shift editor needs whenever somebody forgets to clock off.
+          It is never billed and never counts as a delivery.
+        </p>
+        <form onSubmit={saveBase} className="disp-setup-form">
+          <input value={base.address} onChange={(e) => setBase({ ...base, address: e.target.value })}
+            placeholder="Yard address *" style={{ minWidth: 240 }} />
+          <input value={base.city} onChange={(e) => setBase({ ...base, city: e.target.value })}
+            placeholder="City" style={{ width: 150 }} />
+          <input value={base.postal} onChange={(e) => setBase({ ...base, postal: e.target.value })}
+            placeholder="Postal" style={{ width: 110 }} />
+          <button className="btn accent" disabled={busy === 'base'}>{busy === 'base' ? 'Saving…' : 'Save yard'}</button>
+        </form>
+
         <p className="hint">
           On a <b>carrier</b> truck the drivers still log fills — that is how we know the litres, and
           therefore the mileage — but the money stays out of the Profit tab&apos;s cost, because it is
