@@ -6,6 +6,7 @@ import TicketQueue from './TicketQueue';
 import DispatchSetup from './DispatchSetup';
 import StaleStops from './StaleStops';
 import StopImport from './StopImport';
+import BulkClient from './BulkClient';
 import PayReport from './PayReport';
 import ClientBilling from './ClientBilling';
 import StopTimes from './StopTimes';
@@ -694,6 +695,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   const [pull, setPull] = useState(null);        // what the last Bargain Bay pull did
   const [addNum, setAddNum] = useState('');      // order number typed into "add by number"
   const [gassing, setGassing] = useState(false); // the day-cost box, open on the bar
+  const [bulking, setBulking] = useState(false); // "these are all for X"
 
   async function refresh(date = board.date) {
     setErr('');
@@ -717,6 +719,24 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
       return true;
     } catch {
       setErr('Network error — nothing was changed.'); return false;
+    } finally { setBusy(false); }
+  }
+
+  // Unlike `send`, this hands the answer back: the bulk panel reports which
+  // stops moved and which were refused for being on an invoice, and "true"
+  // cannot say that.
+  async function sendFor(body) {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'That didn’t work.'); return null; }
+      await refresh();
+      return d;
+    } catch {
+      setErr('Network error — nothing was changed.'); return null;
     } finally { setBusy(false); }
   }
 
@@ -1059,6 +1079,11 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
               title={`Record gas or another cost against ${board.date}`}
               onClick={() => setGassing((v) => !v)}>{gassing ? 'Close' : '⛽ Gas'}</button>
           )}
+          {/* A sheet that landed under the wrong company is fixed here, not by
+              opening every card. */}
+          <button type="button" className="btn" disabled={busy}
+            title="Set which client several of this day's stops belong to"
+            onClick={() => setBulking((v) => !v)}>{bulking ? 'Close' : 'Set client'}</button>
           {/* The last stop of the night, on every driver who is out. Its Done
               tap is the only independent record of what time the day actually
               ended — which is exactly what is missing every time somebody
@@ -1076,6 +1101,12 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
       </div>
 
       {err && <div className="error-box">{err}</div>}
+
+      {bulking && (
+        <BulkClient jobs={board.jobs} clients={board.clients} busy={busy}
+          onApply={(jobIds, clientId) => sendFor({ action: 'client_bulk', jobIds, clientId })}
+          onClose={() => setBulking(false)} />
+      )}
 
       {gassing && (
         <DayCostForm date={board.date} drivers={board.drivers} busy={busy}
