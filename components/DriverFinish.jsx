@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { queueOrSend, newRef } from '../lib/driver-outbox';
 import { compressPhotos } from './photo-pick';
+import { holdReload, releaseReload } from '../lib/driver-busy';
 
 // Closing out a stop: photos, a signature, who signed, and — where there's money
 // owing — what was taken at the door. Everything is captured to the phone first
@@ -42,7 +43,11 @@ export default function DriverFinish({ stop, onClose, onDone }) {
   const [partsUsed, setPartsUsed] = useState('');
   const [partsNeeded, setPartsNeeded] = useState('');
   const [note, setNote] = useState('');
-  const [collect, setCollect] = useState(stop.balanceDue > 0);
+  // Already reported on this stop (a close-out being redone, or a stop the
+  // office put back). Don't pre-tick it a second time: the money is on the
+  // office's list once, and twice is a claim nobody can reconcile.
+  const alreadyReported = Number(stop.reported) > 0;
+  const [collect, setCollect] = useState(stop.balanceDue > 0 && !alreadyReported);
   // A trade-in has to be answered, not defaulted: 'yes' it's on the van, 'no' it
   // isn't. Pre-ticking it would turn the one question that protects a unit we
   // have already paid for into a box nobody reads.
@@ -54,6 +59,9 @@ export default function DriverFinish({ stop, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const isService = stop.type === 'service_call';
+  // A signature, eight photos and the damage answers exist nowhere but this
+  // form until Done is pressed. Nothing gets to reload the page underneath it.
+  useEffect(() => { holdReload(); return releaseReload; }, []);
   // One pair of refs for this close-out, minted once and reused if the driver
   // has to tap Done again. Fresh refs on a retry meant the money and the
   // completion were queued as NEW work: the outbox is keyed on ref, so the same
@@ -140,8 +148,12 @@ export default function DriverFinish({ stop, onClose, onDone }) {
         : null;
 
       // Money first: if the phone can only get one thing out before the signal
-      // dies again, it should be the payment — that's the record the customer
-      // and the books both depend on.
+      // dies again, it should be what was taken at the door — that's the record
+      // the customer and the books both depend on.
+      //
+      // It is a REPORT, not a payment. The invoice stays open until the office
+      // confirms the money is in: this used to mark it paid outright, which put
+      // "the invoice is settled" on the say-so of a tick box in a van.
       //
       // queueOrSend, not queueAction: saving to the phone is still the first
       // choice, but a phone that refuses to save must not be able to trap a
@@ -174,7 +186,13 @@ export default function DriverFinish({ stop, onClose, onDone }) {
           })
         }
       });
-      onDone({ hasSignature: !!sig, photoCount: photos.length, balanceDue: collect ? 0 : stop.balanceDue });
+      // The balance is deliberately unchanged: nothing has been paid off yet.
+      // `reported` is what the card shows instead, so the driver can see their
+      // own answer without the stop claiming the invoice is settled.
+      onDone({
+        hasSignature: !!sig, photoCount: photos.length,
+        balanceDue: stop.balanceDue, reported: collect ? Number(amount) : 0
+      });
     } catch (e) {
       // Say what actually went wrong and what to do about it. The old message
       // was the same eleven words whatever happened — and because a DOMException
@@ -210,6 +228,14 @@ export default function DriverFinish({ stop, onClose, onDone }) {
               <input type="checkbox" checked={collect} onChange={(e) => setCollect(e.target.checked)} />
               I took the money
             </label>
+            {/* Said plainly, because a driver who thinks this closes the invoice
+                stops chasing a short envelope. It goes to the office to check. */}
+            {collect && <div className="drv-hint">The office confirms it before the invoice is marked paid.</div>}
+            {alreadyReported && !collect && (
+              <div className="drv-hint">
+                ${Number(stop.reported).toFixed(2)} is already reported on this stop and with the office.
+              </div>
+            )}
             {collect && (
               <div className="drv-money">
                 <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="Amount taken" />

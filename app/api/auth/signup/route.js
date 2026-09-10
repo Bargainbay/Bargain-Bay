@@ -6,6 +6,10 @@ import {
 } from '../../../../lib/auth';
 import { notifyOwner, esc } from '../../../../lib/email';
 import { upsertCustomer } from '../../../../lib/customers';
+import {
+  clientIp, honeypotTripped, isDisposableEmail, isBlocked,
+  checkSignupRate, ensureAbuseSchema
+} from '../../../../lib/antifraud';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,14 +28,37 @@ export async function POST(req) {
   if (!name) return NextResponse.json({ error: 'Please enter your name.' }, { status: 400 });
   if (password.length < 8) return NextResponse.json({ error: 'Password must be at least 8 characters.' }, { status: 400 });
 
+  // ---- abuse gate (see lib/antifraud.js) ----
+  // An account isn't valuable on its own, but a signed-in buyer's order skips
+  // the confirm-your-email step at checkout — so the same controls apply here.
+  const ip = clientIp(req);
+  await ensureAbuseSchema().catch((e) => console.error('abuse schema', e.message));
+
+  if (honeypotTripped(body)) {
+    console.warn('signup honeypot tripped', { ip, email });
+    return NextResponse.json({ error: "We couldn't process that submission. Please email sales@bargainbay.ca if you need an account." }, { status: 400 });
+  }
+  if (await isBlocked({ email, ip, phone })) {
+    console.warn('signup blocked by blocklist', { ip, email });
+    return NextResponse.json({ error: 'We are unable to create an account for these details. Please contact sales@bargainbay.ca.' }, { status: 403 });
+  }
+  if (isDisposableEmail(email)) {
+    return NextResponse.json({ error: 'Please use a permanent email address so we can reach you about your orders.' }, { status: 400 });
+  }
+  const rate = await checkSignupRate({ ip });
+  if (!rate.ok) {
+    console.warn('signup rate limited', { ip, email });
+    return NextResponse.json({ error: 'Too many accounts created from this connection. Please try again later.' }, { status: 429 });
+  }
+
   try {
     const password_hash = await hashPassword(password);
     const { rows } = await query(
-      `INSERT INTO users (email, name, phone, password_hash)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO users (email, name, phone, password_hash, signup_ip)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (email) DO NOTHING
        RETURNING id, email, name`,
-      [email, name, phone || null, password_hash]
+      [email, name, phone || null, password_hash, ip]
     );
     if (!rows.length) {
       return NextResponse.json({ error: 'An account with that email already exists. Try logging in.' }, { status: 409 });

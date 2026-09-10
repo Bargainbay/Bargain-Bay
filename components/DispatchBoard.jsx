@@ -4,6 +4,7 @@ import JobForm from './JobForm';
 import ServiceVisitForm from './ServiceVisitForm';
 import TicketQueue from './TicketQueue';
 import DispatchSetup from './DispatchSetup';
+import StaleStops from './StaleStops';
 import StopImport from './StopImport';
 import BulkClient from './BulkClient';
 import PayReport from './PayReport';
@@ -203,63 +204,6 @@ function DayCostForm({ date, drivers, busy, onSave }) {
   );
 }
 
-// Stops where a driver was on the crew and is no longer on it.
-//
-// The repair half of a bug that ran silently: reordering a run used to write the
-// column's driver onto every card in it, and a column also holds the stops that
-// driver is RIDING on as second man — so one ▲ made one person both people on a
-// stop, and the next assignment dropped the duplicate seat and the other driver
-// with it. The stop simply had one fewer name and nothing said so.
-//
-// The names are recoverable because every assignment was logged. What is NOT
-// recoverable is intent: the accidental drop happens inside assignJob, so it
-// writes the same kind of event a deliberate one does. So this reports the fact
-// and offers the crew back — it never restores anything on its own, and it never
-// claims the removal was a mistake. Who was in the van on a Tuesday is a fact
-// about a Tuesday, not something a query gets to decide.
-function CrewLost({ lost, busy, onRestore, onDismiss }) {
-  if (!lost?.rows?.length) return null;
-  return (
-    <div className="error-box disp-crewlost">
-      <b>
-        A driver came off {lost.rows.length === 1 ? 'this stop' : `${lost.rows.length} stops`}.
-      </b>
-      <div className="hint" style={{ margin: '4px 0 8px' }}>
-        They were on it and they are not on it now. It may have been deliberate — the log records who
-        was assigned, not why — so check each one against who was actually in the van, and use
-        <b> History</b> on the card to see the trail. Putting a name back only ever ADDS them to a free
-        seat; it never takes off whoever is on the stop today. Reordering a run used to cause this on
-        its own; that is fixed.
-      </div>
-      <ul className="disp-setup-list">
-        {lost.rows.map((r) => (
-          <li key={r.id}>
-            <strong>{r.jobNumber}</strong>
-            <span className="hint" style={{ margin: 0 }}>
-              {' '}· {r.date} · {r.customerName || '(no name)'} · now{' '}
-              {r.driverName || 'unassigned'}{r.driver2Name ? ` + ${r.driver2Name}` : ' alone'}
-              {' '}· missing <b>{r.missing.join(', ')}</b>
-            </span>
-            {r.restore
-              ? (
-                <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={busy}
-                  onClick={() => onRestore(r)}>
-                  add {r.addBackName} back{r.driverName ? ` beside ${r.driverName}` : ''}
-                </button>
-              )
-              : (
-                <span className="hint" style={{ margin: 0 }}>
-                  {' '}· both seats taken — take one off first if {r.missing[0]} should be on it
-                </span>
-              )}
-          </li>
-        ))}
-      </ul>
-      <button type="button" className="disp-toggle" onClick={onDismiss}>dismiss</button>
-    </div>
-  );
-}
-
 // Everything that has ever happened to one stop, in the words it was logged in.
 // `job_events` has recorded every assignment, status move, payment and
 // correction since dispatch was built, and nothing ever showed it — so when a
@@ -290,6 +234,57 @@ function JobHistory({ jobId }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+// The money drivers say they took, waiting on somebody in the office to say it
+// is actually in.
+//
+// Nothing here has touched an invoice yet. A stop being finished used to mark
+// its invoice PAID off a tick box on a phone — revenue booked, receipt emailed,
+// ledger locked — and if the cash never made it back to the office, unpicking
+// that was a refund and an argument. So the driver reports, and this is where
+// the office agrees.
+//
+// Deliberately NOT scoped to the day on screen: money reported at 7pm gets
+// confirmed the next morning, and a queue that empties at midnight loses money.
+function MoneyToConfirm({ rows, busy, canConfirm, onConfirm, onReject }) {
+  if (!rows?.length) return null;
+  const total = rows.reduce((a, r) => a + Number(r.amount || 0), 0);
+  return (
+    <div className="disp-confirm">
+      <div className="disp-confirm-head">
+        <b>Money to confirm — ${total.toFixed(2)}</b>
+        <span className="hint" style={{ margin: 0 }}>
+          {canConfirm
+            ? 'Reported at the door. The invoice stays open until you say it landed.'
+            : 'Reported at the door. An admin confirms it before the invoice is marked paid.'}
+        </span>
+      </div>
+      {rows.map((r) => (
+        <div key={r.id} className="disp-confirm-row">
+          <span className="disp-confirm-amt">${Number(r.amount).toFixed(2)}</span>
+          <span className="disp-confirm-what">
+            {PAY_METHODS[r.method] || r.method}
+            {' · '}{r.customerName || r.jobNumber}
+            {r.invoiceNumber ? ` · ${r.invoiceNumber}` : ''}
+            {r.byName ? ` · ${r.byName}` : ''}
+            {r.jobDate ? ` · ${r.jobDate}` : ''}
+            {r.note ? <span className="disp-confirm-note"> — {r.note}</span> : null}
+          </span>
+          {canConfirm && (
+            <span className="disp-confirm-acts">
+              <button type="button" className="btn accent" disabled={busy} onClick={() => onConfirm(r)}>
+                Confirm ${Number(r.amount).toFixed(2)}
+              </button>
+              <button type="button" className="disp-collect-btn" disabled={busy} onClick={() => onReject(r)}>
+                Not received
+              </button>
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -457,6 +452,15 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
               {collecting ? 'Cancel' : 'Record payment'}
             </button>
           </div>
+          {/* Reported by the driver, not yet counted by the office. It sits
+              INSIDE the amount owing rather than replacing it, because until
+              somebody confirms the money is in, it is still owing. */}
+          {job.pendingCollections?.map((c) => (
+            <div key={c.id} className="disp-collect-pending">
+              ${Number(c.amount).toFixed(2)} {PAY_METHODS[c.method] || c.method} reported
+              {c.byName ? ` by ${c.byName}` : ''} — waiting on the office to confirm it
+            </div>
+          ))}
           {collecting && (
             <CollectForm job={job} busy={busy}
               onRecord={async (id, payload) => { const ok = await onRecord(id, payload); if (ok) setCollecting(false); }} />
@@ -509,7 +513,11 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
             <div className="disp-items">{job.items.map((i) => i.description).join(' · ')}</div>
           )}
       {job.partsNeeded && <div className="disp-fail">Waiting on: {job.partsNeeded}</div>}
-      {(job.timeIn || job.payAmount != null || job.chargeAmount != null) && (
+      {/* The clock stays on the card for everyone — a stop that has been running
+          ninety minutes is a dispatch problem, not a financial one. What it
+          COSTS and what it BILLS is the owner's, so it rides on `onCharge`,
+          which is the admin signal this card already carries. */}
+      {(job.timeIn || (onCharge && (job.payAmount != null || job.chargeAmount != null))) && (
         <div className="disp-times">
           {job.timeIn && (
             <>
@@ -526,9 +534,9 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
           {/* Finished with no clock on it: nothing can cost this stop until
               somebody types the times in. */}
           {!job.timeIn && closed && job.status === 'done' && <span className="disp-late">no times recorded</span>}
-          {job.payAmount != null && <> · pays ${Number(job.payAmount).toFixed(2)}</>}
-          {job.chargeAmount != null && <> · bills ${Number(job.chargeAmount).toFixed(2)}</>}
-          {job.invoiceId && <> · invoiced</>}
+          {onCharge && job.payAmount != null && <> · pays ${Number(job.payAmount).toFixed(2)}</>}
+          {onCharge && job.chargeAmount != null && <> · bills ${Number(job.chargeAmount).toFixed(2)}</>}
+          {onCharge && job.invoiceId && <> · invoiced</>}
         </div>
       )}
       {/* Cash at the door — not the invoice balance below it, and not a price
@@ -673,7 +681,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
   );
 }
 
-export default function DispatchBoard({ initial, canManageClients, openTickets, initialView = 'board' }) {
+export default function DispatchBoard({ initial, canManageClients, canConfirmMoney, canGrantAccess = false, openTickets, initialView = 'board' }) {
   const [board, setBoard] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -682,13 +690,12 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   const [closing, setClosing] = useState(null);   // the service visit being closed out
   // Everything dispatch does happens on this page — no tab-hopping to add a
   // client or chase a service call mid-shift.
-  const [view, setView] = useState(['board', 'tickets', 'setup', 'import'].includes(initialView) ? initialView : 'board');
+  const [view, setView] = useState(['board', 'tickets', 'setup', 'import', 'stale'].includes(initialView) ? initialView : 'board');
   const [tickets, setTickets] = useState(openTickets);
   const [pull, setPull] = useState(null);        // what the last Bargain Bay pull did
   const [addNum, setAddNum] = useState('');      // order number typed into "add by number"
   const [gassing, setGassing] = useState(false); // the day-cost box, open on the bar
   const [bulking, setBulking] = useState(false); // "these are all for X"
-  const [lost, setLost] = useState(null);        // crews a name went missing from
 
   async function refresh(date = board.date) {
     setErr('');
@@ -698,14 +705,6 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       if (!res.ok) { setErr(d.error || 'Could not load the board.'); return; }
       setBoard(d);
     } catch { setErr('Network error — the board may be out of date.'); }
-    // A fortnight either side, not just this day: a name that went missing last
-    // Tuesday is still missing, and nobody is going to page back through the
-    // board looking for it. Its own request, and a failure is silent — this is
-    // a repair prompt, not the day's work.
-    fetch(`/api/admin/dispatch?view=crew_lost&from=${shiftDate(date, -14)}&to=${shiftDate(date, 14)}`)
-      .then((r) => r.json())
-      .then((d) => setLost(d?.rows?.length ? d : null))
-      .catch(() => {});
   }
 
   async function send(method, body) {
@@ -768,33 +767,30 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
   // The times, corrected from the office.
   const onTimes = (jobId, patch) => send('PATCH', { action: 'times', jobId, ...patch });
 
+  async function endAtBase() {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'return_to_base', date: board.date })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not add those.'); return; }
+      if (!d.added.length) {
+        setErr(d.skipped
+          ? 'Every driver out today already has one.'
+          : 'Nobody has stops on this day, so there is nothing to end.');
+      }
+      await refresh();
+    } catch { setErr('Network error — nothing was added.'); }
+    finally { setBusy(false); }
+  }
+
   // Both halves of a stop's money, each through its own guarded action. '' means
   // clear it, which is why the amount is passed through rather than Number()'d
   // here — setJobCharge and setJobPay both read '' as "no figure".
   const onCharge = (jobId, amount, note) => send('PATCH', { action: 'charge', jobId, amount, note });
   const onPay = (jobId, amount, note) => send('PATCH', { action: 'pay', jobId, amount, note });
-
-  // The board's first render comes from the server, so the audit has to go and
-  // ask on mount — otherwise a name only turns up missing after somebody happens
-  // to change the day.
-  useEffect(() => {
-    fetch(`/api/admin/dispatch?view=crew_lost&from=${shiftDate(board.date, -14)}&to=${shiftDate(board.date, 14)}`)
-      .then((r) => r.json())
-      .then((d) => setLost(d?.rows?.length ? d : null))
-      .catch(() => {});
-    // Once, for the day the board opened on; refresh() re-asks after that.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Putting a lost name back is an ordinary assignment — both seats, as they
-  // were last actually assigned.
-  // Additive: the missing name goes into a free seat beside whoever is on the
-  // stop now. Never the old crew wholesale — that would remove somebody who is
-  // on it today, and most of what this list catches is an ordinary reassignment.
-  const onRestoreCrew = (row) => send('PATCH', {
-    action: 'assign', jobId: row.id, jobDate: row.date,
-    driverId: row.restore.driverId, driver2Id: row.restore.driver2Id
-  });
 
   // The pull used to refresh in silence, so an order it declined to take looked
   // exactly like an order it had taken. It now says what it did and, for
@@ -824,6 +820,26 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     return ok;
   }
 
+  // Saying the driver's money is in. This — not the delivery, and not the
+  // driver's own tick box — is what marks the invoice paid.
+  async function onConfirmMoney(row) {
+    if (!window.confirm(
+      `Confirm $${Number(row.amount).toFixed(2)} ${PAY_METHODS[row.method] || row.method} received`
+      + `${row.invoiceNumber ? ` on ${row.invoiceNumber}` : ''}? This records the payment and, if it clears the balance, marks the invoice paid.`
+    )) return;
+    await send('PATCH', { action: 'confirm_collection', collectionId: row.id });
+  }
+
+  // It never arrived. The invoice keeps its balance owing.
+  async function onRejectMoney(row) {
+    const note = window.prompt(
+      `$${Number(row.amount).toFixed(2)} reported${row.invoiceNumber ? ` on ${row.invoiceNumber}` : ''} was not received. What happened? (optional)`,
+      ''
+    );
+    if (note === null) return;
+    await send('PATCH', { action: 'reject_collection', collectionId: row.id, note });
+  }
+
   // The escape hatch: put this one order on the board regardless of what the
   // pull thought of it. A pickup order carries no delivery address, so ask for
   // one rather than refusing — it goes on the job, not back onto the order.
@@ -851,6 +867,34 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     } finally { setBusy(false); }
   }
 
+  // Putting a stop back. RS-1023 is a job, BB-1078 is an order, and whoever is
+  // holding one number should not have to know which of the two it is — so the
+  // one box takes both. This is the only way back for a cancelled stop that has
+  // no order behind it: cancelled stops are off the board, so their card, and
+  // the Reopen button on it, is not there to click.
+  async function reopenByNumber(num) {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reopen_number', jobNumber: num })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not put that stop back.'); return; }
+      setAddNum('');
+      // It comes back on the day it was booked for, which is often not the day
+      // on screen — so say so, and go to that day. A board that looked exactly
+      // the same afterwards would read as nothing having happened.
+      const on = d.job?.jobDate;
+      setPull({
+        note: `${d.job.jobNumber} is back on the board${on ? ` for ${prettyDate(on)}` : ', waiting for a day'}.`
+      });
+      await refresh(on || board.date);
+    } catch {
+      setErr('Network error — nothing was changed.');
+    } finally { setBusy(false); }
+  }
+
   // Typing a number is the way in for an order the pull never looked at — it
   // only scans the recent weeks, and a special order sold in June still gets
   // delivered in August.
@@ -858,6 +902,9 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
     e.preventDefault();
     const num = addNum.trim();
     if (!num) return;
+    // A bare number stays an order number, which is what this box has always
+    // meant. Only an explicit RS is a stop.
+    if (/^rs/i.test(num)) return reopenByNumber(num);
     setBusy(true); setErr('');
     try {
       const res = await fetch('/api/admin/dispatch', {
@@ -961,9 +1008,16 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
         <Tab id="tickets">Service calls{tickets ? ` (${tickets})` : ''}</Tab>
         <Tab id="import">Import</Tab>
         <Tab id="live">Live</Tab>
-        <Tab id="times">Times</Tab>
-        <Tab id="billing">Billing</Tab>
-        <Tab id="pay">Pay</Tab>
+        {/* Stops whose day has gone that nobody closed. The count is on the tab
+            because a list nobody knows about is a list nobody opens. */}
+        <Tab id="stale">Loose ends{board.staleCount ? ` (${board.staleCount})` : ''}</Tab>
+        {/* The hours, what we bill a client, what we pay a driver, and what a
+            run made. A sales associate schedules and dispatches; none of this is
+            theirs, and it is the half of the board that has always been the
+            owner's. Gated on the SERVER too — a hidden tab is not a permission. */}
+        {canManageClients && <Tab id="times">Times</Tab>}
+        {canManageClients && <Tab id="billing">Billing</Tab>}
+        {canManageClients && <Tab id="pay">Pay</Tab>}
         {canManageClients && <Tab id="profit">Profit</Tab>}
         <Tab id="setup">Clients &amp; drivers</Tab>
       </div>
@@ -984,11 +1038,13 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
 
       {view === 'times' && <StopTimes drivers={board.drivers} />}
 
+      {view === 'stale' && <StaleStops onChanged={() => refresh()} />}
+
       {view === 'profit' && <ProfitReport drivers={board.drivers} date={board.date} />}
 
       {view === 'setup' && (
         <DispatchSetup clients={board.clients} drivers={board.drivers}
-          canManageDrivers={canManageClients} onChanged={() => refresh()} />
+          canManageDrivers={canManageClients} canGrantAccess={canGrantAccess} onChanged={() => refresh()} />
       )}
 
       {view !== 'board' ? null : (
@@ -1008,8 +1064,8 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             onClick={pullBargainBay}>Pull Bargain Bay orders</button>
           <form className="disp-addnum" onSubmit={addByNumber}>
             <input value={addNum} onChange={(e) => setAddNum(e.target.value)}
-              placeholder="BB-1078" aria-label="Add a Bargain Bay order by number"
-              title="Put one order on the board by number — works for orders older than the pull looks back" />
+              placeholder="BB-1078 or RS-1023" aria-label="Add an order, or put a stop back, by number"
+              title="BB-1078 puts one Bargain Bay order on the board, including orders older than the pull looks back. RS-1023 puts a stop back that was cancelled or finished — it returns on the day it was booked for." />
             <button type="submit" className="btn" disabled={busy || !addNum.trim()}>Add order</button>
           </form>
           <a className="btn" href={`/admin/dispatch/print?date=${board.date}`} target="_blank" rel="noopener noreferrer">Print run sheet</a>
@@ -1028,6 +1084,16 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
           <button type="button" className="btn" disabled={busy}
             title="Set which client several of this day's stops belong to"
             onClick={() => setBulking((v) => !v)}>{bulking ? 'Close' : 'Set client'}</button>
+          {/* The last stop of the night, on every driver who is out. Its Done
+              tap is the only independent record of what time the day actually
+              ended — which is exactly what is missing every time somebody
+              forgets to clock off, and what the shift editor then has to
+              guess at. One per driver per day; pressing it twice does nothing. */}
+          {canManageClients && (
+            <button type="button" className="btn" disabled={busy}
+              title="Put a 'return to base' on the end of every driver's run for this day"
+              onClick={endAtBase}>🏁 End runs at base</button>
+          )}
           <button type="button" className="btn accent" onClick={() => setAdding((v) => !v)}>
             {adding ? 'Close' : '+ Add job'}
           </button>
@@ -1035,8 +1101,6 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
       </div>
 
       {err && <div className="error-box">{err}</div>}
-
-      <CrewLost lost={lost} busy={busy} onRestore={onRestoreCrew} onDismiss={() => setLost(null)} />
 
       {bulking && (
         <BulkClient jobs={board.jobs} clients={board.clients} busy={busy}
@@ -1056,9 +1120,10 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
         <div className="disp-pull">
           <button type="button" className="disp-pull-x" onClick={() => setPull(null)} aria-label="Dismiss">×</button>
           <b>
-            {pull.imported
-              ? `Added ${pull.imported} order${pull.imported === 1 ? '' : 's'} to the board: ${pull.created.map((c) => `${c.order} → ${c.job}`).join(', ')}.`
-              : 'Nothing new to add.'}
+            {pull.note
+              || (pull.imported
+                ? `Added ${pull.imported} order${pull.imported === 1 ? '' : 's'} to the board: ${pull.created.map((c) => `${c.order} → ${c.job}`).join(', ')}.`
+                : 'Nothing new to add.')}
           </b>
           {pull.alreadyOnBoard > 0 && (
             <div className="hint" style={{ margin: '4px 0 0' }}>
@@ -1111,6 +1176,9 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
         </div>
       )}
 
+      <MoneyToConfirm rows={board.moneyToConfirm} busy={busy} canConfirm={!!canConfirmMoney}
+        onConfirm={onConfirmMoney} onReject={onRejectMoney} />
+
       <div className="disp-strip">
         {stripOver && (
           <button type="button" className="disp-page left" disabled={stripAt.start}
@@ -1146,22 +1214,6 @@ export default function DispatchBoard({ initial, canManageClients, openTickets, 
             <h3 className="disp-col-head">No drivers yet</h3>
             <p className="hint">Add a driver under Operations, then they&apos;ll get a column here.</p>
           </section>
-        )}
-
-        {board.cancelled?.length > 0 && (
-          // Cancelled stops used to disappear from the board completely, which
-          // is indistinguishable from being deleted — and a cancelled BB job
-          // still blocks that order from being pulled in again. They stay,
-          // greyed, with the button that undoes it.
-          <BoardColumn title="Cancelled" count={board.cancelled.length}
-            bodyKey={String(board.cancelled.length)}>
-            {board.cancelled.map((j) => (
-              <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
-                onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes}
-              onCharge={canManageClients ? onCharge : null} onPay={onPay} />
-            ))}
-          </BoardColumn>
         )}
 
         {board.drivers.map((d) => {

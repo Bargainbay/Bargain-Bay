@@ -191,7 +191,12 @@ CREATE TABLE IF NOT EXISTS invoice_items (
   invoice_id  int REFERENCES invoices(id) ON DELETE CASCADE,
   description text,
   sku         text,
-  amount      numeric(10,2),
+  amount      numeric(10,2),                  -- ALWAYS pre-tax
+  -- What the rep typed, when the invoice was quoted tax-in. Signed like amount.
+  -- amount can't be grossed back up to it: the tax-in split parks a rounding
+  -- cent on the largest line. Null on a before-tax invoice, where amount is
+  -- already the typed figure. See lib/tax.js.
+  typed_amount numeric(10,2),
   refunded_at timestamptz                     -- set per line on a partial (per-unit) refund
 );
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS tax_inclusive boolean NOT NULL DEFAULT false;
@@ -799,3 +804,72 @@ CREATE TABLE IF NOT EXISTS client_aliases (
   created_at timestamptz DEFAULT now(),
   UNIQUE (client_id, alias_norm)
 );
+-- ---------------------------------------------------------------------------
+-- Fake-order defences. Card payments are off (CARD_PAYMENTS_ENABLED), so an
+-- order is created with no payment step while still reserving a qty-1 unit.
+-- These columns are what lets us tell a real buyer from a junk order.
+-- Mirrored by ensureAbuseSchema() in lib/antifraud.js so the site self-heals
+-- without waiting for an admin migration.
+-- ---------------------------------------------------------------------------
+
+-- Forensics: where the order actually came from. Without these there is no way
+-- to spot a burst from one source, live or after the fact.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS ip         text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_agent text;
+CREATE INDEX IF NOT EXISTS idx_orders_ip ON orders(ip);
+
+-- Confirm-your-email for guest offline orders. The unit is held immediately;
+-- an order whose token is never clicked is swept by expireReservations().
+-- Null verify_token = never issued one (card order, signed-in buyer, or an
+-- order placed before this shipped) and is therefore never swept for it.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS verify_token text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS verified_at  timestamptz;
+CREATE INDEX IF NOT EXISTS idx_orders_verify_token ON orders(verify_token);
+
+-- Per-IP signup throttling needs to know where an account came from.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_ip text;
+
+-- Owner-managed block list. 'domain' blocks a whole email domain; 'phone' is
+-- stored digits-only so formatting can't dodge it.
+CREATE TABLE IF NOT EXISTS blocklist (
+  id         serial PRIMARY KEY,
+  kind       text NOT NULL CHECK (kind IN ('email','domain','ip','phone')),
+  value      text NOT NULL,
+  note       text,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE (kind, value)
+);
+
+-- Per-unit photos taken by us (a vendor drop-off the sales floor listed itself),
+-- as opposed to the RS Ops inspection gallery which arrives over a feed. Kept in
+-- their OWN table and never on `products`, because every tracker sync rewrites
+-- every column of that row — a photo stored there would be wiped by the next
+-- sync, which is the one thing the rep is told to press afterwards.
+CREATE TABLE IF NOT EXISTS unit_photos (
+  id         serial PRIMARY KEY,
+  sku        text NOT NULL,
+  path       text NOT NULL,          -- blob pathname (products/<sku>-<n>.jpg)
+  url        text NOT NULL,          -- our own proxy path: /api/photo/<key>
+  position   int NOT NULL DEFAULT 0, -- 0 = the one cards and the Meta feed use
+  created_by text,
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_unit_photos_sku ON unit_photos(sku, position, id);
+
+-- Stock we HOLD but do not OWN. A vendor drops appliances here with no invoice,
+-- a cost agreed out loud, and is paid only once the unit sells. So it is not an
+-- asset of ours, and the day it sells the cost becomes a liability (ledger
+-- account 2150) rather than a credit against Inventory, which was never debited
+-- for it. See lib/consignment.js.
+CREATE TABLE IF NOT EXISTS consignment_units (
+  sku         text PRIMARY KEY,
+  vendor      text,
+  cost        numeric(10,2),
+  taken_on    date NOT NULL DEFAULT current_date,
+  paid_on     date,                  -- when we actually settled with the vendor
+  paid_amount numeric(10,2),
+  note        text,
+  created_by  text,
+  created_at  timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_consignment_unpaid ON consignment_units(paid_on) WHERE paid_on IS NULL;

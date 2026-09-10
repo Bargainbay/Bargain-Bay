@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin, canKeepBooks } from '../../../../lib/auth';
 import { setOpeningBalances, journal, trialBalance, getOpeningBalances } from '../../../../lib/ledger';
 import { setPurchaseInvoicePaid, unpaidPurchaseInvoices } from '../../../../lib/finance';
+import { markConsignmentPaid, consignmentOwed } from '../../../../lib/consignment';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -21,6 +22,14 @@ export async function POST(req) {
     if (b.action === 'pay_purchase') {
       await setPurchaseInvoicePaid(b.id, b.paidAt);
       return NextResponse.json({ ok: true, unpaid: await unpaidPurchaseInvoices() });
+    }
+    // Settling a consignment vendor: per UNIT, because that is how the deal
+    // works — they are paid for the appliance that went out, not for the ones
+    // still standing here. Clears 2150 and takes the cash out on the day it
+    // actually moved.
+    if (b.action === 'pay_consignment') {
+      await markConsignmentPaid(b.sku, { paidOn: b.paidOn, amount: b.amount });
+      return NextResponse.json({ ok: true, owed: await consignmentOwed() });
     }
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (e) {

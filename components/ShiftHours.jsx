@@ -11,18 +11,51 @@ const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-CA', { hour: '
 const asDuration = (m) => (m == null ? null : (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`));
 const dayLabel = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
 
-export default function ShiftHours({ from, to, drivers = [] }) {
+// `driverId` is passed through because the panel sits UNDER the Times filters
+// and looked like it obeyed them. It never did: the stops table filtered to one
+// driver and the shifts below carried on showing everyone, so "Kowsi's hours"
+// was a number for the whole crew sitting directly beneath his name.
+const timeField = (iso) =>
+  (iso ? new Date(iso).toLocaleTimeString('en-CA', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '');
+
+export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
+  const [editing, setEditing] = useState(null);   // { id, startTime, endTime, startKm, endKm }
+  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const d = await fetch(`/api/admin/dispatch?view=shifts&from=${from}&to=${to}`).then((r) => r.json());
+      const q = new URLSearchParams({ view: 'shifts', from, to });
+      if (driverId) q.set('driverId', driverId);
+      const d = await fetch(`/api/admin/dispatch?${q}`).then((r) => r.json());
       if (d.error) { setErr(d.error); return; }
       setErr(''); setData(d);
     } catch { setErr('Could not load shifts.'); }
-  }, [from, to]);
+  }, [from, to, driverId]);
   useEffect(() => { load(); }, [load]);
+
+  // Correcting what the taps got wrong. The report refuses to cost a shift
+  // nobody closed and says "fix them in Times" — this is where that happens.
+  async function save(row) {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'shift_times', shiftId: row.id,
+          startTime: editing.startTime, endTime: editing.endTime,
+          startKm: editing.startKm, endKm: editing.endKm,
+          note: 'hours corrected from the Times tab'
+        })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not save that shift.'); return; }
+      setEditing(null);
+      await load();
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(false); }
+  }
 
   if (err) return <div className="error-box">{err}</div>;
   if (!data) return null;
@@ -48,6 +81,7 @@ export default function ShiftHours({ from, to, drivers = [] }) {
                 <th>On</th><th>Off</th>
                 <th style={{ textAlign: 'right' }}>Hours</th>
                 <th style={{ textAlign: 'right' }}>Km</th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -64,7 +98,16 @@ export default function ShiftHours({ from, to, drivers = [] }) {
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {r.endedAt ? hhmm(r.endedAt) : <span className="disp-late">still on</span>}
                   </td>
-                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{asDuration(r.minutes) || '—'}</td>
+                  <td style={{
+                    textAlign: 'right', fontVariantNumeric: 'tabular-nums',
+                    color: r.needsFixing ? 'var(--danger, #c0392b)' : undefined,
+                    fontWeight: r.needsFixing ? 700 : undefined
+                  }}>
+                    {asDuration(r.minutes) || '—'}
+                    {r.needsFixing && (
+                      <div style={{ fontSize: 11, fontWeight: 400 }}>not costed</div>
+                    )}
+                  </td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                     {r.km != null ? r.km.toLocaleString('en-CA') : (
                       <span style={{ color: 'var(--muted)' }}
@@ -73,8 +116,68 @@ export default function ShiftHours({ from, to, drivers = [] }) {
                           : 'needs an odometer reading at both ends'}>—</span>
                     )}
                   </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button type="button" className="disp-toggle" disabled={busy}
+                      onClick={() => setEditing(editing?.id === r.id ? null : {
+                        id: r.id,
+                        startTime: timeField(r.startedAt),
+                        // Pre-filled with what the stops say, when there is
+                        // nothing on the clock. The office is retyping a number
+                        // it would otherwise go hunting for one tab away.
+                        endTime: timeField(r.endedAt) || (r.lastStop ? timeField(r.lastStop.at) : ''),
+                        startKm: r.startKm == null ? '' : String(r.startKm),
+                        endKm: r.endKm == null ? '' : String(r.endKm)
+                      })}>
+                      {editing?.id === r.id ? 'close' : 'fix hours'}
+                    </button>
+                  </td>
                 </tr>
               ))}
+              {data.rows.map((r) => (editing?.id === r.id ? (
+                <tr key={`edit${r.id}`}>
+                  <td colSpan={8}>
+                    <div className="disp-setup-form">
+                      <label style={{ display: 'grid', fontSize: 12 }}>On
+                        <input value={editing.startTime} placeholder="08:50" style={{ width: 110 }}
+                          onChange={(e) => setEditing({ ...editing, startTime: e.target.value })} />
+                      </label>
+                      <label style={{ display: 'grid', fontSize: 12 }}>Off
+                        <input value={editing.endTime} placeholder="19:30" style={{ width: 110 }}
+                          onChange={(e) => setEditing({ ...editing, endTime: e.target.value })} />
+                      </label>
+                      {r.driving !== false && (
+                        <>
+                          <label style={{ display: 'grid', fontSize: 12 }}>Km on
+                            <input value={editing.startKm} inputMode="numeric" style={{ width: 120 }}
+                              onChange={(e) => setEditing({ ...editing, startKm: e.target.value.replace(/\D+/g, '') })} />
+                          </label>
+                          <label style={{ display: 'grid', fontSize: 12 }}>Km off
+                            <input value={editing.endKm} inputMode="numeric" style={{ width: 120 }}
+                              onChange={(e) => setEditing({ ...editing, endKm: e.target.value.replace(/\D+/g, '') })} />
+                          </label>
+                        </>
+                      )}
+                      <button type="button" className="btn accent" disabled={busy} onClick={() => save(r)}>
+                        {busy ? 'Saving…' : 'Save hours'}
+                      </button>
+                      <button type="button" className="btn" onClick={() => setEditing(null)}>Cancel</button>
+                      <p className="hint" style={{ flexBasis: '100%', margin: 0 }}>
+                        24-hour, on {r.startedAt ? dayLabel(r.startedAt.slice(0, 10)) : 'the shift’s own day'}. An Off
+                        before the On is taken as past midnight.
+                        {r.lastStop && (
+                          <> The last thing {r.driverName} finished that day was <b>{r.lastStop.what}</b> at{' '}
+                            <b>{hhmm(r.lastStop.at)}</b>
+                            {r.lastStop.type === 'return_to_base'
+                              ? ' — that is the van being parked, so it is the finish time.'
+                              : ' — the real finish is after that, plus the drive back.'}
+                          </>
+                        )}
+                        {r.editedBy && <> Last corrected by {r.editedBy}.</>}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : null))}
             </tbody>
           </table></div>
         )}

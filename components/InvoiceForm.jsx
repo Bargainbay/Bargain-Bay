@@ -3,7 +3,6 @@ import { useState, useRef } from 'react';
 import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
 import InvoiceLines, { blankItem, toPayload } from './InvoiceLines';
 import TaxMode, { previewTotals } from './TaxMode';
-import { toInclusiveLines, exTaxOf, inclusiveOf } from '../lib/tax';
 
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 // Business days run on Toronto time (same as the dashboard's buckets).
@@ -102,30 +101,43 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
   const preview = previewTotals(signed, taxMode);
   const { subtotal, hst, total } = preview;
 
-  // Switching between before-tax and tax-in re-reads the numbers already typed,
-  // so it's a way of reading the boxes rather than something you have to set
-  // first and remember. Credit lines are converted too — a discount quoted
-  // tax-in is tax-in as well.
-  function changeTaxMode(next) {
-    // Read the current mode straight from state, not from inside a setTaxMode
-    // updater: an updater has to be pure, and React runs it twice in dev —
-    // which would convert the amounts twice.
-    const prev = taxMode;
-    if (next !== prev) {
-      setItems((xs) => {
-        const amounts = xs.map((it) => Number(it.amount) || 0);
-        const converted = next === 'inclusive'
-          ? toInclusiveLines(amounts)
-          : amounts.map((n) => exTaxOf(n));
-        return xs.map((it, i) => (it.amount === '' ? it : { ...it, amount: converted[i].toFixed(2) }));
-      });
-    }
-    setTaxMode(next);
-  }
+  // Switching only changes how the boxes are READ. The typed figures are left
+  // exactly as they are: pick tax-in on 750 + 100 - 50 and the sale is $800 out
+  // the door, not $904. Rewriting the boxes on the switch (which this used to
+  // do, to hold the total steady) meant choosing "prices include HST" grossed
+  // the numbers UP and the customer was quoted the before-tax total plus 13% —
+  // the opposite of what the option says.
+  const changeTaxMode = setTaxMode;
   const fmt = (n) => '$' + n.toFixed(2);
+
+  // The three things the server refuses a POST for, checked here first so the rep
+  // is told which one and can fix it, instead of getting a bare rejection back.
+  //
+  // The email rule is the one that actually catches people: the browser's own
+  // type="email" is happy with "jane@gmail" — no dot, no TLD — and the server is
+  // not, so a plain typo came back as a refusal with nothing pointing at it.
+  function whatsWrong() {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim().toLowerCase())) {
+      return `“${email.trim() || 'blank'}” isn’t a complete email address — it needs a domain with a dot, like jane@gmail.com.`;
+    }
+    const priced = toPayload(items).filter((it) => String(it.description || '').trim() && Number(it.amount) > 0);
+    if (!priced.length) {
+      const named = items.find((it) => String(it.description || '').trim() && !(Number(it.amount) > 0));
+      return named
+        ? `“${String(named.description).trim()}” has no price on it. Every invoice needs at least one line with a description AND an amount.`
+        : 'Add at least one line item with a description and a positive amount.';
+    }
+    if (deliveryMethod === 'delivery') {
+      const missing = [!address.trim() && 'street address', !city.trim() && 'city', !postal.trim() && 'postal code'].filter(Boolean);
+      if (missing.length) return `Delivery needs a ${missing.join(', a ')}. Type it in if the address lookup didn’t fill it.`;
+    }
+    return '';
+  }
 
   async function submit(e) {
     e.preventDefault();
+    const wrong = whatsWrong();
+    if (wrong) { setErr(wrong); setDone(null); return; }
     setBusy(true); setErr(''); setDone(null);
     try {
       const res = await fetch('/api/admin/invoices', {
@@ -174,7 +186,6 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
 
   return (
     <form onSubmit={submit}>
-      {err && <div className="error-box">{err}</div>}
       <div className="form-2col">
         <div className="field">
           <label>Customer name</label>
@@ -221,7 +232,7 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
       <InvoiceLines items={items} setItems={setItems} services={SERVICES} showCost={!hideCost} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
-        <TaxMode mode={taxMode} onChange={changeTaxMode} preview={preview} />
+        <TaxMode mode={taxMode} onChange={changeTaxMode} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
           title="Backdate for a sale you rang up late. Revenue counts on THIS date — the day the sale was made — not the day the money clears.">
           Invoice date
@@ -264,6 +275,12 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
         <label>Memo / notes (optional)</label>
         <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="Shown on the invoice" />
       </div>
+
+      {/* Sits WITH the button, not at the top of the form. This is a long form:
+          with the message up by the customer name, a rep who scrolled down to
+          click Create saw the page not move and reported that invoicing was
+          dead. The error has to appear where the eyes already are. */}
+      {err && <div className="error-box" style={{ marginTop: 12 }}>{err}</div>}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
         <div style={{ fontSize: 14, color: 'var(--muted)' }}>

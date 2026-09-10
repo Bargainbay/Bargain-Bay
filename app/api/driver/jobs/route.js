@@ -8,10 +8,10 @@ import {
   jobPhotosWithRef, saveJobSignature, addJobPhoto, markOrderDeliveredForJob
 } from '../../../../lib/driver-jobs';
 import {
-  setJobStatus, completeJob, jobInvoiceForPayment, noteJobEvent, markReviewAsked
+  setJobStatus, completeJob, markReviewAsked
 } from '../../../../lib/jobs';
 import { getSetting } from '../../../../lib/settings';
-import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
+import { recordDoorCollection } from '../../../../lib/door-money';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -79,19 +79,20 @@ export async function PATCH(req) {
     if (body.action === 'review_asked') {
       return NextResponse.json({ ok: true, job: await markReviewAsked(jobId) });
     }
+    // What the driver came back with. REPORTED, not recorded: this used to mark
+    // the invoice paid the instant the phone said so — revenue booked and a
+    // receipt emailed off a tick box in a van — so it now waits for the office
+    // to confirm the money is actually in. lib/door-money.js does the waiting.
     if (body.action === 'payment') {
-      const target = await jobInvoiceForPayment(jobId);
-      const r = await recordInvoicePayment(target.invoiceId, {
-        amount: body.amount, method: String(body.method || '').trim(), note: body.note
-      });
-      await noteJobEvent(
-        jobId, 'payment',
-        `${PAYMENT_METHODS[String(body.method || '').trim()] || 'Payment'} $${Number(body.amount).toFixed(2)} `
-        + `collected at the door on ${target.invoiceNumber}`
-        + (r.fullyPaid ? ' — paid in full' : ` — $${Number(r.balance).toFixed(2)} still owing`),
+      const r = await recordDoorCollection(
+        jobId,
+        { amount: body.amount, method: String(body.method || '').trim(), note: body.note, ref: body.ref },
         who(s)
       );
-      return NextResponse.json({ ok: true, balance: r.balance, fullyPaid: !!r.fullyPaid });
+      return NextResponse.json({
+        ok: true, pending: true, amount: r.amount,
+        invoiceNumber: r.invoiceNumber || null, duplicate: !!r.duplicate
+      });
     }
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (e) {

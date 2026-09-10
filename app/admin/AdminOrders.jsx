@@ -85,7 +85,8 @@ export default function AdminOrders({ initialOrders, drivers = [], reps = [] }) 
         can also pay in person). When the money lands, click <b>Mark paid</b> — the customer gets a payment-received
         email and the unit drops off the site. Then click <b>Mark ready</b> when it's ready (the customer is notified;
         pickup customers can book a time). Uncheck <b>Email customer</b> on a row first to change its status silently
-        (no thank-you/status email). Unpaid orders auto-cancel after 24 hours.
+        (no thank-you/status email). Unpaid orders auto-cancel and relist after 7 days, or after 12 hours if the
+        customer never confirms their email (<b>⚠ Email unconfirmed</b>) — that badge is your best fake-order signal.
       </p>
       {error && <div className="error-box">{error}</div>}
       <div className="table-wrap">
@@ -171,6 +172,18 @@ export default function AdminOrders({ initialOrders, drivers = [], reps = [] }) 
                     <>
                       <span className="status-chip status-confirmed" style={{ display: 'inline-block' }}>Confirmed</span>
                       <span className="pill warn" style={{ marginLeft: 6 }}>Pending payment</span>
+                      {/* Guest orders get a "confirm it's really you" email. Never
+                          clicked = the address behind the order isn't reachable,
+                          which is the strongest fake-order signal we have. */}
+                      {o.verify_token && !o.verified_at && (
+                        <span
+                          className="pill warn"
+                          style={{ marginLeft: 6 }}
+                          title={`Email never confirmed${o.ip ? ` — placed from ${o.ip}` : ''}. Auto-cancels and relists if it stays unconfirmed.`}
+                        >
+                          ⚠ Email unconfirmed
+                        </span>
+                      )}
                       <div style={{ marginTop: 6 }}>
                         <button
                           className="btn primary"

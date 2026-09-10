@@ -1,17 +1,21 @@
 import { NextResponse } from 'next/server';
 import { get } from '@vercel/blob';
-import { getSession, isAdmin } from '../../../../lib/auth';
+import { dispatchAccess } from '../../../../lib/dispatch-access';
 import { podPhotoPath, orderSignaturePath } from '../../../../lib/pod';
 import { jobPhotoPath, jobSignaturePath } from '../../../../lib/driver-jobs';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Admin-only proxy that streams a PRIVATE POD blob (photo by id, or an order's
-// signature). The blob URLs are never exposed; only an admin session can read.
+// Staff-only proxy that streams a PRIVATE POD blob (photo by id, or an order's
+// signature). The blob URLs are never exposed; only a signed-in staff session
+// can read one. Staff and not admin because the dispatch board and the orders
+// board both link to these, and both are surfaces a sales associate works on —
+// an admin-only gate meant those links were on their screen and refused them.
 export async function GET(req) {
-  const s = await getSession();
-  if (!s || !isAdmin(s)) return new NextResponse('Not authorized', { status: 403 });
+  // Dispatch staff OR the dispatch coordinator — lib/dispatch-access.js.
+  const { allowed } = await dispatchAccess();
+  if (!allowed) return new NextResponse('Not authorized', { status: 403 });
 
   const url = new URL(req.url);
   const photoId = url.searchParams.get('photo');

@@ -3,7 +3,7 @@ import { put } from '@vercel/blob';
 import { getSession } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
 import { isDriver } from '../../../../lib/drivers';
-import { ensureShiftSchema, openShift } from '../../../../lib/shifts';
+import { ensureShiftSchema, openShift, assertOdometer } from '../../../../lib/shifts';
 import { ensureExpenseSchema } from '../../../../lib/dispatch-money';
 import { round2 } from '../../../../lib/constants';
 
@@ -53,6 +53,18 @@ export async function POST(req) {
   // blank and the mileage unusable.
   const shift = await openShift(s.userId);
   const vehicleId = Number(form.get('vehicleId')) || shift?.vehicleId || null;
+
+  // The reading at the pump is the other place a van's odometer gets recorded,
+  // so it gets the same guard as the shift's. A fill is where a driver in the
+  // wrong truck is most likely to be caught: they are standing still, looking
+  // at the dash, and the number is fresh.
+  if (vehicleId && num('odometer')) {
+    try {
+      await assertOdometer(vehicleId, Math.round(num('odometer')), { vehicleName: shift?.vehicleName });
+    } catch (e) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+  }
 
   let receipt = { url: null, pathname: null };
   const photo = form.get('receipt');

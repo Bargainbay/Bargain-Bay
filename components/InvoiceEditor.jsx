@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import InvoiceLines, { fromInvoice, toPayload } from './InvoiceLines';
 import TaxMode, { previewTotals, modeOf, NO_TAX } from './TaxMode';
-import { toInclusiveLines, exTaxOf } from '../lib/tax';
+import { toInclusiveLines } from '../lib/tax';
+import { isCreditLine } from '../lib/invoice-lines';
 
 // Edit an invoice: the customer's details, the line items (add, remove, reprice,
 // change warranty, add a service or a unit from stock), HST, memo and issue date.
@@ -31,8 +32,23 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   const [items, setItems] = useState(() => {
     const rows = fromInvoice(invoice.items);
     if (!invoice.taxInclusive || !(Number(invoice.hst) > 0)) return rows;
-    const shown = toInclusiveLines(rows.map((r) => Number(r.amount) || 0), Number(invoice.total) || null);
-    return rows.map((r, i) => ({ ...r, amount: shown[i].toFixed(2) }));
+    // A tax-in invoice raised since we started keeping typed_amount comes back
+    // exactly as it was keyed — nothing to reconstruct.
+    if (rows.every((r) => r.typedAmount != null)) return rows;
+    // Older ones only have the pre-tax amounts, so the tax-in figures have to be
+    // derived, and a derivation cannot land on the cent — the split moved a
+    // rounding cent onto the biggest line and grossing back up can't put it back.
+    // All-or-nothing on purpose: deriving only SOME rows would leave the boxes
+    // not adding up to the invoice total.
+    //
+    // toInclusiveLines works in the SIGNED amounts an invoice is stored in, so
+    // the credits have to go back to negative first. fromInvoice hands them over
+    // positive, the way the form shows them, and feeding those straight in made
+    // a $50 trade-in read as +$50: the total it was reconciling against was then
+    // $100 adrift, and the fix-up spread that error across every line. A washer
+    // typed at $750 came back as $716.65.
+    const shown = toInclusiveLines(toPayload(rows).map((r) => Number(r.amount) || 0), Number(invoice.total) || null);
+    return rows.map((r, i) => ({ ...r, amount: (isCreditLine(r.kind) ? Math.abs(shown[i]) : shown[i]).toFixed(2) }));
   });
   // A salvage / parts-only invoice was raised with no HST on it. Re-saving one
   // must not quietly add 13% to a sale that's already been settled.
@@ -59,23 +75,13 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   const preview = previewTotals(signed, taxMode);
   const { subtotal, hst, total } = preview;
 
-  // Same as the new-invoice form: switching re-reads what's already in the boxes.
-  function changeTaxMode(next) {
-    // Read the current mode straight from state, not from inside a setTaxMode
-    // updater: an updater has to be pure, and React runs it twice in dev —
-    // which would convert the amounts twice.
-    const prev = taxMode;
-    if (next !== prev && prev !== NO_TAX && next !== NO_TAX) {
-      setItems((xs) => {
-        const amounts = xs.map((it) => Number(it.amount) || 0);
-        const converted = next === 'inclusive'
-          ? toInclusiveLines(amounts)
-          : amounts.map((n) => exTaxOf(n));
-        return xs.map((it, i) => (it.amount === '' ? it : { ...it, amount: converted[i].toFixed(2) }));
-      });
-    }
-    setTaxMode(next);
-  }
+  // Same as the new-invoice form: switching only re-reads what's in the boxes,
+  // it never rewrites them. Choosing "prices include HST" on 750 + 100 - 50
+  // makes this an $800 sale with the tax backed out of it, not an $800 subtotal
+  // grossed up to $904. The boxes still open showing the figures the rep
+  // originally typed (see the items initialiser above) — that part is display,
+  // and stays.
+  const changeTaxMode = setTaxMode;
   const fmt = (n) => '$' + n.toFixed(2);
   // How this edit lands: which way the sale moves, and where that leaves the
   // customer against what they've already handed over.
@@ -117,7 +123,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
 
   return (
     <div>
-      {err && <div className="error-box">{err}</div>}
+
       {settled && (
         <div className="notice-box" style={{ marginTop: 0 }}>
           This invoice is <b>paid</b>. Correcting it adjusts the original sale <b>on its own date</b> —
@@ -185,7 +191,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
       <InvoiceLines items={items} setItems={setItems} services={SERVICES} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
-        <TaxMode mode={taxMode} onChange={changeTaxMode} preview={preview} />
+        <TaxMode mode={taxMode} onChange={changeTaxMode} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
           title="Backdate for a sale rung up late — the invoice shows this date. Revenue counts on the PAID date, set when you mark it paid.">
           Invoice date
@@ -243,6 +249,8 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
           <a className="btn" href="/admin/invoices">Cancel</a>
           <button className="btn accent" disabled={busy} onClick={save}>{busy ? 'Saving…' : (resend && !settled) ? 'Save & email' : 'Save changes'}</button>
         </div>
+        {/* With the button, not at the top of the page — see InvoiceForm. */}
+        {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
       </div>
     </div>
   );

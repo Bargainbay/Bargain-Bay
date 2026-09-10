@@ -42,7 +42,19 @@ export default function DriverStops({ initial, driverName }) {
   // on purpose: nothing here can be started, finished or failed today.
   const [tomorrow, setTomorrow] = useState(initial.tomorrow || []);
   const [showNext, setShowNext] = useState(false);
-  const [date] = useState(initial.date);
+  // Stops from before today that nobody ever closed. Held apart from the day's
+  // work — they used to sit inline above this morning's first delivery, and the
+  // "to go" count at the top was counting them.
+  const [earlier, setEarlier] = useState(initial.earlier || []);
+  const [showEarlier, setShowEarlier] = useState(false);
+  // The day being looked at. Today unless the driver walks it back — "what did
+  // we do Tuesday" is a question they get asked at a door, and the app had no
+  // answer to it.
+  const [date, setDate] = useState(initial.date || '');
+  // The server says what today is — never the phone. A driver's clock can be a
+  // day out and the run sheet cannot.
+  const today = initial.today || initial.date || '';
+  const viewingToday = !date || date === today;
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState(0);
   // Work the phone has given up on getting through, and a phone that can't hold
@@ -70,14 +82,15 @@ export default function DriverStops({ initial, driverName }) {
       // phone has given up on would otherwise freeze this screen permanently —
       // no new stop the office added all day would ever appear on it.
       if (q.total - q.stuck > 0) return;
-      const res = await fetch('/api/driver/jobs', { cache: 'no-store' });
+      const res = await fetch(`/api/driver/jobs?date=${encodeURIComponent(date)}`, { cache: 'no-store' });
       if (!res.ok) return;
       const d = await res.json();
       if (Array.isArray(d.stops)) setStops(d.stops);
       if (Array.isArray(d.tomorrow)) setTomorrow(d.tomorrow);
+      if (Array.isArray(d.earlier)) setEarlier(d.earlier);
       if (typeof d.reviewUrl === 'string') setReviewUrl(d.reviewUrl);
     } catch { /* offline: keep what's on screen */ }
-  }, []);
+  }, [date]);
 
   // Location sharing, while the app is open.
   //
@@ -117,6 +130,20 @@ export default function DriverStops({ initial, driverName }) {
     if (left - (jammed || 0) === 0) refresh();
   }, [refresh]);
 
+  // Walking the day back or forward. The list on screen belongs to the old day,
+  // so it is cleared rather than left there looking like the new day's work.
+  function goToDay(next) {
+    if (!next || next > today) return;
+    setStops([]);
+    setDate(next);
+    setShowEarlier(false);
+  }
+  const shiftDay = (days) => {
+    const d = new Date(`${date}T12:00:00`);
+    d.setDate(d.getDate() + days);
+    goToDay(d.toLocaleDateString('en-CA'));
+  };
+
   useEffect(() => {
     const on = () => { setOnline(true); push(); };
     const off = () => setOnline(false);
@@ -142,12 +169,18 @@ export default function DriverStops({ initial, driverName }) {
   // and the office never hear a word about it.
   async function act(stop, patch, body) {
     setErr('');
-    const before = stops.find((s) => s.id === stop.id);
-    setStops((xs) => xs.map((s) => (s.id === stop.id ? { ...s, ...patch } : s)));
+    // The stop can be in the day's list or in the unfinished pile below it, and
+    // an optimistic update that only knows about one of them paints nothing at
+    // all on a card from the other.
+    const before = stops.find((s) => s.id === stop.id) || earlier.find((s) => s.id === stop.id);
+    const apply = (xs) => xs.map((s) => (s.id === stop.id ? { ...s, ...patch } : s));
+    setStops(apply);
+    setEarlier(apply);
     try {
       await queueOrSend({ kind: 'patch', jobId: stop.id, body: { jobId: stop.id, ...body }, ref: newRef() });
     } catch (e) {
-      if (before) setStops((xs) => xs.map((s) => (s.id === stop.id ? before : s)));
+      const undo = (xs) => xs.map((s) => (s.id === stop.id ? before : s));
+      if (before) { setStops(undo); setEarlier(undo); }
       setErr(`${e?.message || 'That didn’t save.'} Try again where you have signal.`);
       return;
     }
@@ -203,15 +236,15 @@ export default function DriverStops({ initial, driverName }) {
 
   const left = stops.filter((s) => !['done', 'failed'].includes(s.status));
   const closed = stops.filter((s) => ['done', 'failed'].includes(s.status));
-  // Started on an earlier day and never finished. Forgetting to tap Done is the
-  // single most common thing that happens on this screen, and until now the
-  // driver was the last person to find out — the office noticed instead, days
-  // later, and closed the stop out at whatever time they happened to look.
-  const unfinished = left.filter((s) => s.overdue && s.timeIn);
-  // What the driver should come back with today, both kinds of money together.
-  // The run sheet totals this in its header and the phone did not, so a driver
-  // working off the app had to add it up stop by stop — or find out at the end
-  // of the day that they were short.
+  // Left running: started on an earlier day and never clocked out. Forgetting to
+  // tap Done is the single most common thing that happens on this screen, and
+  // the driver used to be the last person to find out — the office noticed days
+  // later and closed the stop at whatever time they happened to look.
+  const running = earlier.filter((s) => s.timeIn);
+  // What the driver should come back with TODAY, both kinds of money together.
+  // Scoped to this day's stops on purpose: it used to include every unfinished
+  // stop from every earlier day, so the figure at the top of the screen was
+  // money nobody was going to hand over this afternoon.
   const owed = left.reduce(
     (sum, s) => sum + (Number(s.balanceDue) || 0) + (cashAtTheDoor(s)?.amount || 0), 0
   );
@@ -221,13 +254,38 @@ export default function DriverStops({ initial, driverName }) {
       <div className="drv-top">
         <div>
           <div className="drv-hello">{driverName ? `${driverName}` : 'Your stops'}</div>
-          <div className="drv-date">{new Date(`${date}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' })}</div>
+          <div className="drv-date">
+            {date ? new Date(`${date}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' }) : ''}
+          </div>
         </div>
         <div className="drv-left">
-          {left.length} to go
-          {owed > 0 && <div className="drv-owed">${owed.toFixed(2)} to collect</div>}
+          {viewingToday ? `${left.length} to go` : `${stops.length} stop${stops.length === 1 ? '' : 's'}`}
+          {viewingToday && owed > 0 && <div className="drv-owed">${owed.toFixed(2)} to collect</div>}
         </div>
       </div>
+
+      {/* The day, and the way back through it. A driver gets asked "when did you
+          bring ours?" standing at a door — before this there was nowhere on the
+          phone to look, because yesterday simply stopped existing at midnight. */}
+      {today && (
+      <div className="drv-days">
+        <button type="button" className="drv-day-btn" onClick={() => shiftDay(-1)} aria-label="The day before">‹</button>
+        <input type="date" className="drv-day-pick" value={date} max={today}
+          onChange={(e) => goToDay(e.target.value)} aria-label="Pick a day" />
+        <button type="button" className="drv-day-btn" onClick={() => shiftDay(1)}
+          disabled={viewingToday} aria-label="The day after">›</button>
+        {!viewingToday && (
+          <button type="button" className="drv-day-today" onClick={() => goToDay(today)}>Today</button>
+        )}
+      </div>
+      )}
+
+      {!viewingToday && (
+        <div className="drv-past">
+          This is a day that has already been. It is here to look at — finish anything on it that
+          never got closed, and tap <b>Today</b> for today&apos;s run.
+        </div>
+      )}
 
       {!online && (
         <div className="drv-offline">
@@ -269,19 +327,14 @@ export default function DriverStops({ initial, driverName }) {
           fill-up on the road. Above the stop list because it is the first and
           last thing touched, and because a shift nobody started is a day nobody
           gets paid for. */}
-      <DriverShift onChanged={push} />
-
-      {unfinished.length > 0 && (
-        <div className="drv-unfinished">
-          You never finished {unfinished.length === 1 ? 'a stop' : `${unfinished.length} stops`} from an earlier day
-          {unfinished[0].timeIn ? ` — still counting since ${hhmm(unfinished[0].timeIn)}` : ''}.
-          Tap <b>Finish</b> on {unfinished.length === 1 ? 'it' : 'them'} below, or tell the office the real time you
-          left and they&apos;ll put it in.
-        </div>
-      )}
+      {viewingToday && <DriverShift onChanged={push} />}
 
       {stops.length === 0 && (
-        <div className="drv-card"><p className="hint" style={{ margin: 0 }}>No stops today. The office will text you if that changes.</p></div>
+        <div className="drv-card"><p className="hint" style={{ margin: 0 }}>
+          {viewingToday
+            ? 'No stops today. The office will text you if that changes.'
+            : 'Nothing on this day.'}
+        </p></div>
       )}
 
       {left.map((s, i) => (
@@ -294,7 +347,7 @@ export default function DriverStops({ initial, driverName }) {
         <>
           <h2 className="drv-sub">Finished</h2>
           {closed.map((s) => (
-            <StopCard key={s.id} stop={s} done
+            <StopCard key={s.id} stop={s} done me={driverName}
               onAddPhotos={() => setAdding(s)}
               onReview={reviewUrl && s.status === 'done' ? () => setReviewFor(s) : null} />
           ))}
@@ -312,6 +365,35 @@ export default function DriverStops({ initial, driverName }) {
           onClose={() => setAdding(null)}
           onAdded={(blobs) => addPhotos(adding, blobs)}
         />
+      )}
+
+      {/* Stops from before today that were never closed. At the BOTTOM and folded
+          shut: they are real work that still has to be dealt with, but they are
+          not today's run, and putting them in it is what made a driver open the
+          app to last week's leftovers above this morning's first delivery. */}
+      {earlier.length > 0 && (
+        <>
+          <button type="button" className="drv-next-head" onClick={() => setShowEarlier((v) => !v)} aria-expanded={showEarlier}>
+            <span>Not finished from earlier · {earlier.length}</span>
+            <span>{showEarlier ? 'hide' : 'show'}</span>
+          </button>
+          {showEarlier && (
+            <>
+              <p className="hint" style={{ margin: '0 0 8px' }}>
+                {running.length > 0
+                  ? `${running.length === 1 ? 'One of these is' : `${running.length} of these are`} still counting — you clocked in and never clocked out. `
+                  : ''}
+                Finish {earlier.length === 1 ? 'it' : 'them'} here, or tell the office the real time you left and
+                they&apos;ll put it in.
+              </p>
+              {earlier.map((s, i) => (
+                <StopCard key={s.id} stop={s} n={i + 1}
+                  onStart={() => start(s)} onArrive={() => arrive(s)}
+                  onFinish={() => setFinishing(s)} onFail={() => couldNot(s)} />
+              ))}
+            </>
+          )}
+        </>
       )}
 
       {tomorrow.length > 0 && (
@@ -336,7 +418,11 @@ export default function DriverStops({ initial, driverName }) {
           stop={finishing}
           onClose={() => setFinishing(null)}
           onDone={(patch) => {
-            setStops((xs) => xs.map((s) => (s.id === finishing.id ? { ...s, status: 'done', ...patch } : s)));
+            // The stop may be in either list — a close-out from the earlier pile
+            // has to leave that pile, not sit there still saying Finish.
+            const applied = (s) => (s.id === finishing.id ? { ...s, status: 'done', ...patch } : s);
+            setStops((xs) => xs.map(applied));
+            setEarlier((xs) => xs.filter((s) => s.id !== finishing.id));
             setFinishing(null);
             push();
           }}
@@ -346,10 +432,12 @@ export default function DriverStops({ initial, driverName }) {
   );
 }
 
-function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail, onAddPhotos, onReview }) {
+function StopCard({ stop, n, done, preview, me, onStart, onArrive, onFinish, onFail, onAddPhotos, onReview }) {
   const addr = fullAddress(stop);
   const isService = stop.type === 'service_call';
   const cash = cashAtTheDoor(stop);
+  // Closed by the other man on the van, not by whoever is holding this phone.
+  const byMate = !!(stop.closedBy && String(stop.closedBy).trim() !== String(me || '').trim());
   return (
     <div className={'drv-card' + (done ? ' is-done' : '') + (preview ? ' is-preview' : '')}>
       <div className="drv-card-top">
@@ -390,8 +478,16 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
       <div className="drv-addr">{stop.pickupAddress ? <b>TO </b> : null}{addr}</div>
 
       {stop.balanceDue > 0 && (
-        // The one number on this screen that costs money to miss.
-        <div className="drv-collect">COLLECT ${Number(stop.balanceDue).toFixed(2)}{stop.invoiceNumber ? ` · ${stop.invoiceNumber}` : ''}</div>
+        // The one number on this screen that costs money to miss — until the
+        // driver has said they took it, at which point it stops being an
+        // instruction and becomes a receipt. The balance itself stays owing:
+        // the office confirms the money before the invoice is marked paid.
+        Number(stop.reported) > 0
+          ? <div className="drv-collect is-reported">
+              ${Number(stop.reported).toFixed(2)} REPORTED{stop.invoiceNumber ? ` · ${stop.invoiceNumber}` : ''}
+              <span className="drv-collect-sub">office to confirm</span>
+            </div>
+          : <div className="drv-collect">COLLECT ${Number(stop.balanceDue).toFixed(2)}{stop.invoiceNumber ? ` · ${stop.invoiceNumber}` : ''}</div>
       )}
 
       {/* Cash the customer hands over that is nothing to do with an invoice —
@@ -465,6 +561,11 @@ function StopCard({ stop, n, done, preview, onStart, onArrive, onFinish, onFail,
             {stop.status === 'failed'
               ? (FAIL_REASONS[stop.failReason] || "Couldn't complete")
               : `Done${stop.hasSignature ? ' · signed' : ''}${stop.photoCount ? ` · ${stop.photoCount} photo${stop.photoCount === 1 ? '' : 's'}` : ''}`}
+            {/* Two men ride one stop. When the mate closes it, this card is the
+                only thing on the other's phone that can say so — without it, a
+                stop somebody else finished just looks like one that didn't
+                go anywhere. */}
+            {byMate ? <span className="drv-doneby"> · by {stop.closedBy}</span> : null}
           </div>
           {/* The pictures are what a driver remembers after walking away. Without
               this the only route was texting them to the office. */}

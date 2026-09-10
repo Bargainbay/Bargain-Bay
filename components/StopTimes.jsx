@@ -32,9 +32,15 @@ const asDuration = (m) => (m == null ? null : (m >= 60 ? `${Math.floor(m / 60)}h
 const dayLabel = (iso) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
 
+// "This month" is the wrong shape for the question actually asked, which is
+// "what was So-and-so doing a fortnight ago" — on the 3rd of the month, this
+// month is three days, and a fortnight back is somewhere Custom only. Both
+// rolling windows are here because a driver's history is a rolling thing.
 const RANGES = [
   { key: 'today', label: 'Today' },
   { key: 'week', label: 'This week' },
+  { key: 'd14', label: 'Last 14 days' },
+  { key: 'd30', label: 'Last 30 days' },
   { key: 'month', label: 'This month' },
   { key: 'custom', label: 'Custom' }
 ];
@@ -67,8 +73,20 @@ export default function StopTimes({ drivers = [] }) {
 
   function pickRange(k) {
     setRange(k);
-    if (k === 'custom') return;
-    const f = k === 'today' ? t : k === 'week' ? weekStart(t) : monthStart(t);
+    // Custom used to do NOTHING until two dates were typed and Show pressed —
+    // the chip lit up, the table below kept showing the last range, and it read
+    // as a filter that had been applied and ignored. It now opens on the last
+    // fortnight, which is both a sane starting point and visibly a change.
+    if (k === 'custom') {
+      const f = shift(t, -13);
+      setFrom(f); setTo(t); load(f, t, driverId);
+      return;
+    }
+    const f = k === 'today' ? t
+      : k === 'week' ? weekStart(t)
+      : k === 'd14' ? shift(t, -13)
+      : k === 'd30' ? shift(t, -29)
+      : monthStart(t);
     setFrom(f); setTo(t); load(f, t, driverId);
   }
 
@@ -148,7 +166,7 @@ export default function StopTimes({ drivers = [] }) {
             </div>
           )}
 
-          <ShiftHours from={data.from} to={data.to} drivers={drivers} />
+          <ShiftHours from={data.from} to={data.to} driverId={driverId} drivers={drivers} />
 
           <div className="panel">
             <p className="hint" style={{ marginTop: 0 }}>

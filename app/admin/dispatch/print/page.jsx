@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, isStaff } from '../../../../lib/auth';
+import { dispatchAccess } from '../../../../lib/dispatch-access';
 import { hasDb } from '../../../../lib/db';
 import { TZ, formatPhone as phone } from '../../../../lib/constants';
 import { cashAtTheDoor } from '../../../../lib/cash-at-the-door';
@@ -48,9 +48,10 @@ const SERVICE_LABEL = {
 
 export default async function RunSheetPage({ searchParams }) {
   const sp = await searchParams;
-  const session = await getSession();
+  // The coordinator prints the run sheet every morning; this is their page too.
+  const { session, allowed } = await dispatchAccess();
   if (!session) redirect('/login?next=/admin/dispatch');
-  if (!isStaff(session)) return <div style={{ padding: 24 }}>Not authorized.</div>;
+  if (!allowed) return <div style={{ padding: 24 }}>Not authorized.</div>;
   if (!hasDb()) return <div style={{ padding: 24 }}>Database not configured.</div>;
 
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(sp?.date || '')) ? String(sp.date) : torontoToday();

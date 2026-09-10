@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { queueAction, newRef } from '../lib/driver-outbox';
+import { queueOrSend, newRef } from '../lib/driver-outbox';
+import { compress } from './photo-pick';
 
 // Clocking on and off, and the fill-up in between.
 //
@@ -8,6 +9,12 @@ import { queueAction, newRef } from '../lib/driver-outbox';
 // driver picks the van up in an underground loading bay and fills up at a
 // station with one bar of signal; neither moment is one to be told "try again".
 const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' }) : null);
+// Every one of these used to be an unhandled rejection: the driver tapped, the
+// promise died inside IndexedDB, and the form just sat there looking untouched.
+// A driver who taps Save and sees NOTHING has no move left — not even a wrong
+// one — so a failure here has to arrive as words on the screen.
+const saveFailed = (e, fallback) =>
+  `${e?.message || fallback} Try again where you have signal.`;
 const asDuration = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`);
 
 export default function DriverShift({ onChanged }) {
@@ -44,10 +51,12 @@ export default function DriverShift({ onChanged }) {
 
   async function begin({ driving, vehicleId, startKm, ridingWith }) {
     setErr(''); setOk('');
-    await queueAction({
-      kind: 'patch', url: '/api/driver/shift', ref: newRef(),
-      body: { action: 'start', driving, vehicleId, startKm, ridingWith, at: Date.now() }
-    });
+    try {
+      await queueOrSend({
+        kind: 'patch', url: '/api/driver/shift', ref: newRef(),
+        body: { action: 'start', driving, vehicleId, startKm, ridingWith, at: Date.now() }
+      });
+    } catch (e) { setErr(saveFailed(e, 'That didn’t start.')); return; }
     // Optimistic: the day has started as far as the driver is concerned.
     setShift({
       startedAt: new Date().toISOString(),
@@ -73,10 +82,12 @@ export default function DriverShift({ onChanged }) {
       setErr(`That reads lower than this morning's ${shift.startKm} km — is it the trip meter?`);
       return;
     }
-    await queueAction({
-      kind: 'patch', url: '/api/driver/shift', ref: newRef(),
-      body: { action: 'end', endKm, at: Date.now() }
-    });
+    try {
+      await queueOrSend({
+        kind: 'patch', url: '/api/driver/shift', ref: newRef(),
+        body: { action: 'end', endKm, at: Date.now() }
+      });
+    } catch (e) { setErr(saveFailed(e, 'That didn’t save.')); return; }
     setShift(null);
     setForm(null);
     setOk('Shift ended. Have a good night.');
@@ -86,19 +97,35 @@ export default function DriverShift({ onChanged }) {
 
   async function fuel({ amount, litres, odometer, note, receipt }) {
     setErr(''); setOk('');
-    await queueAction({
-      kind: 'photos', url: '/api/driver/fuel', ref: newRef(),
-      fields: {
-        amount, litres, odometer, note,
-        vehicleId: shift?.vehicleId || '',
-        date: new Date().toLocaleDateString('en-CA')
-      },
-      // The receipt rides the same blob slot the delivery photos use, so it
-      // survives the same lost signal they do.
-      photos: receipt ? [receipt] : []
-    });
+    // The receipt is SHRUNK, exactly like every other photo this app sends. A
+    // raw file straight off the camera roll is several megabytes of HEIC or
+    // JPEG: too big for the phone's own storage to take happily, too big for
+    // the upload limit, and on iOS not decodable by the fast path at all. The
+    // close-out sheet has always done this; the fuel form was passing the file
+    // through untouched, which is what made Save look dead.
+    let blob = null;
+    if (receipt) {
+      try { blob = await compress(receipt); }
+      catch { blob = receipt; }   // a big photo that arrives beats none at all
+    }
+    try {
+      await queueOrSend({
+        kind: 'photos', url: '/api/driver/fuel', ref: newRef(),
+        fields: {
+          amount, litres, odometer, note,
+          vehicleId: shift?.vehicleId || '',
+          // Toronto's date, never the handset's. A phone left on another
+          // timezone would file the fill against the wrong day.
+          date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' })
+        },
+        // The fuel route reads `receipt`. Sending it under the delivery
+        // photos' name meant every receipt was uploaded and then ignored.
+        photoField: 'receipt',
+        photos: blob ? [blob] : []
+      });
+    } catch (e) { setErr(saveFailed(e, 'That fill didn’t save.')); return; }
     setForm(null);
-    setOk(`Fuel $${Number(amount).toFixed(2)} saved${receipt ? ' with the receipt' : ''}.`);
+    setOk(`Fuel $${Number(amount).toFixed(2)} saved${blob ? ' with the receipt' : ''}.`);
     onChanged?.();
   }
 
@@ -261,13 +288,20 @@ function FuelForm({ shift, onCancel, onSave }) {
   const [odometer, setOdometer] = useState('');
   const [note, setNote] = useState('');
   const [receipt, setReceipt] = useState(null);
+  // Shrinking the receipt takes a second or two on a phone. Without this the
+  // button stays live through it, and every impatient tap files ANOTHER fill —
+  // each one with its own `ref`, so the server's replay check cannot catch it
+  // and the day's fuel is $200 x however many times he tapped.
+  const [saving, setSaving] = useState(false);
   return (
     <form
       className="drv-form"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
-        if (!(Number(amount) > 0)) return;
-        onSave({ amount, litres, odometer, note, receipt });
+        if (saving || !(Number(amount) > 0)) return;
+        setSaving(true);
+        try { await onSave({ amount, litres, odometer, note, receipt }); }
+        finally { setSaving(false); }
       }}
     >
       {/* The driver should know which of the two this is before they type an
@@ -300,8 +334,10 @@ function FuelForm({ shift, onCancel, onSave }) {
       <input className="drv-note-input" value={note} placeholder="Note (optional)"
         onChange={(e) => setNote(e.target.value)} />
       <div className="drv-row">
-        <button type="submit" className="drv-btn go" disabled={!(Number(amount) > 0)}>Save fuel</button>
-        <button type="button" className="drv-btn" onClick={onCancel}>Cancel</button>
+        <button type="submit" className="drv-btn go" disabled={saving || !(Number(amount) > 0)}>
+          {saving ? 'Saving…' : 'Save fuel'}
+        </button>
+        <button type="button" className="drv-btn" onClick={onCancel} disabled={saving}>Cancel</button>
       </div>
     </form>
   );

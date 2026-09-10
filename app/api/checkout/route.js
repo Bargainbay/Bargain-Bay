@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getMany } from '../../../lib/inventory';
 import { hasDb, query, withTransaction } from '../../../lib/db';
-import { unavailableSkus, reserveWithClient, expireReservations, RESERVATION_MINUTES, OFFLINE_HOLD_MINUTES } from '../../../lib/reservations';
+import { unavailableSkus, reserveWithClient, expireReservations, RESERVATION_MINUTES, CHECKOUT_HOLD_MINUTES } from '../../../lib/reservations';
 import { ensureOrderLineKind } from '../../../lib/orders';
 import { stripeConfigured, createCheckoutSession } from '../../../lib/stripe';
 import {
@@ -15,6 +15,11 @@ import { readAttribution, ensureAttributionColumns } from '../../../lib/attribut
 import { createAndSendInvoice } from '../../../lib/invoices';
 import { validateCoupon, redeemCouponWithClient, releaseCouponForOrder, ensureCouponSchema } from '../../../lib/coupons';
 import { upsertCustomer } from '../../../lib/customers';
+import {
+  clientIp, userAgent, honeypotTripped, isDisposableEmail, isBlocked,
+  checkOrderRate, unpaidUnitsHeld, ensureAbuseSchema, MAX_UNPAID_UNITS
+} from '../../../lib/antifraud';
+import { newVerifyToken, sendOrderVerifyEmail } from '../../../lib/order-verify';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +55,60 @@ export async function POST(req) {
   }
   if (!hasDb()) {
     return NextResponse.json({ error: 'Online ordering is briefly offline — email sales@bargainbay.ca and we will hold the unit for you.' }, { status: 503 });
+  }
+
+  // ---- abuse gate -----------------------------------------------------------
+  // Card payments are off, so nothing downstream proves a real person is behind
+  // this order — but the reservation below takes a one-of-a-kind unit off the
+  // storefront regardless. These checks stand in for the missing payment step.
+  // Each one degrades open (see lib/antifraud.js): a false negative costs us a
+  // junk order the owner can cancel, a false positive costs a real sale.
+  const ip = clientIp(req);
+  await ensureAbuseSchema().catch((e) => console.error('abuse schema', e.message));
+
+  if (honeypotTripped(body)) {
+    // A field no human sees was filled in. Log the source so the owner can see
+    // the scale of it, and give a vague, recoverable error rather than naming
+    // the trap (a bot author reading the message would just skip the field).
+    console.warn('checkout honeypot tripped', { ip, email, ua: userAgent(req) });
+    return NextResponse.json(
+      { error: "We couldn't process that submission. If you're a real customer, please email sales@bargainbay.ca and we'll place the order for you." },
+      { status: 400 }
+    );
+  }
+
+  if (await isBlocked({ email, ip, phone })) {
+    console.warn('checkout blocked by blocklist', { ip, email });
+    return NextResponse.json(
+      { error: 'We are unable to accept this order online. Please contact sales@bargainbay.ca.' },
+      { status: 403 }
+    );
+  }
+
+  if (isDisposableEmail(email)) {
+    return NextResponse.json(
+      { error: 'Please use a permanent email address — we need to reach you to arrange payment and pickup.' },
+      { status: 400 }
+    );
+  }
+
+  const rate = await checkOrderRate({ ip, email });
+  if (!rate.ok) {
+    console.warn('checkout rate limited', { ip, email, reason: rate.reason });
+    return NextResponse.json(
+      { error: "That's a lot of orders in a short time. Please wait an hour, or email sales@bargainbay.ca and we'll help you directly." },
+      { status: 429 }
+    );
+  }
+
+  // Cap on units held unpaid at once — the highest-damage case is one actor
+  // reserving a pile of stock they never intend to pay for.
+  const alreadyHeld = await unpaidUnitsHeld({ email, phone });
+  if (alreadyHeld + skus.length > MAX_UNPAID_UNITS) {
+    return NextResponse.json(
+      { error: `You already have ${alreadyHeld} unit${alreadyHeld === 1 ? '' : 's'} on hold awaiting payment. We can hold up to ${MAX_UNPAID_UNITS} at a time — please complete those first, or email sales@bargainbay.ca for a larger order.` },
+      { status: 409 }
+    );
   }
 
   // Opportunistic housekeeping: clear expired holds / stale unpaid orders so
@@ -144,19 +203,26 @@ export async function POST(req) {
   // EVERY checkout, not just the ones with a promo.
   try { await ensureCouponSchema(); } catch (e) { console.error('coupon columns', e.message); }
   try { await ensureOrderLineKind(); } catch (e) { console.error('order line kind column', e.message); }
+  // A signed-in customer already proved they hold this mailbox when they set a
+  // password on the account, so their order skips the confirm-your-email step
+  // entirely and is stamped verified on creation. Guests get a token.
+  const preVerified = !!session?.userId;
+  const verifyToken = (!cardOnline && !preVerified) ? newVerifyToken() : null;
+
   let order;
   try {
     order = await withTransaction(async (client) => {
       const { rows } = await client.query(
         `INSERT INTO orders (user_id, email, name, phone, delivery_method, address, city, postal,
                              status, subtotal, hst, total, payment_method, source, utm_campaign, referrer,
-                             coupon_code, discount)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',$9,$10,$11,$12,$13,$14,$15,$16,$17)
+                             coupon_code, discount, ip, user_agent, verify_token, verified_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
          RETURNING id`,
         [userId, email, name, phone || null, deliveryMethod,
          address || null, city || null, postal || null, subtotal, hst, total,
          cardOnline ? null : paymentMethod, attr.source, attr.campaign, attr.referrer,
-         coupon ? coupon.code : null, discount]
+         coupon ? coupon.code : null, discount,
+         ip, userAgent(req), verifyToken, preVerified ? new Date() : null]
       );
       const orderId = rows[0].id;
       const { rows: numbered } = await client.query(
@@ -165,7 +231,7 @@ export async function POST(req) {
       );
       // Card checkout holds the unit for 30 min (pay-now window); offline orders
       // hold it long-term until the owner confirms payment or cancels a no-show.
-      await reserveWithClient(client, skus, orderId, cardOnline ? RESERVATION_MINUTES : OFFLINE_HOLD_MINUTES);
+      await reserveWithClient(client, skus, orderId, cardOnline ? RESERVATION_MINUTES : CHECKOUT_HOLD_MINUTES);
       for (const u of items) {
         await client.query(
           "INSERT INTO order_items (order_id, sku, title, price, kind) VALUES ($1,$2,$3,$4,'unit')",
@@ -267,7 +333,30 @@ export async function POST(req) {
         subtotal, hst, total, paymentMethod, discount, couponCode: coupon ? coupon.code : null },
       items.map((u) => ({ title: u.title || `${u.make} ${u.model}`, price: priceOf(u) }))
     ).catch((e) => console.error('order emails failed', e.message));
-    payload = { orderUrl: trackUrl, orderNumber: order.orderNumber, discount, couponCode: coupon ? coupon.code : null, couponError };
+    // Confirm-it's-really-you link. The unit is ALREADY held at this point, so a
+    // genuine buyer never races anyone while they go find the email; not clicking
+    // is what releases it (see expireReservations).
+    //
+    // AWAITED, unlike the receipt above it, and the difference is what happens
+    // when the send is lost. A dropped receipt is a customer who doesn't get a
+    // copy of something they can already see on their order page. A dropped
+    // VERIFY email is a customer who is never asked to confirm, cannot confirm,
+    // and has the appliance they just bought cancelled out from under them
+    // twelve hours later by the sweep above. Fired and forgotten, that was a
+    // real possibility: this function is frozen the moment the response goes
+    // out, and a send still in flight is abandoned (see the driver completion
+    // emails, PR #211, for the same bug caught in production).
+    if (verifyToken) {
+      await sendOrderVerifyEmail({
+        to: email, name, orderNumber: order.orderNumber, token: verifyToken,
+        items: items.map((u) => ({ title: u.title || `${u.make} ${u.model}` }))
+      }).catch((e) => console.error('order verify email failed', e.message));
+    }
+    payload = {
+      orderUrl: trackUrl, orderNumber: order.orderNumber,
+      discount, couponCode: coupon ? coupon.code : null, couponError,
+      verifyEmailSent: !!verifyToken
+    };
   }
 
   const res = NextResponse.json(payload);

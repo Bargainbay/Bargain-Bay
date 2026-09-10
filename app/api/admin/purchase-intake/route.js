@@ -3,6 +3,7 @@ import { getSession, isAdmin } from '../../../../lib/auth';
 import { extractPurchaseInvoice } from '../../../../lib/purchase-intake';
 import { addIntakeLines } from '../../../../lib/intake';
 import { recordPurchaseInvoice } from '../../../../lib/finance';
+import { pushManifestToRsOps } from '../../../../lib/rsops-push';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -59,7 +60,21 @@ export async function POST(req) {
           taxError = e?.message || 'Could not record the tax on that invoice.';
         }
       }
-      return NextResponse.json({ ok: true, addedSkus: r.created, count: r.count, failed: [], tax, taxUpdated, taxError });
+      // Hand the same manifest to RS Ops so the refurb floor knows what this
+      // invoice bought before the truck arrives. Like the tax record: written
+      // AFTER the units are safely in the tracker, and never allowed to fail the
+      // intake — RS Ops being unreachable is not a reason to lose the stock.
+      const manifest = await pushManifestToRsOps({
+        lot: r.lot, vendor: body.vendor || null, invoice: body.invoice || null,
+        clientId: body.clientId || null, units: r.units
+      });
+
+      return NextResponse.json({
+        ok: true, addedSkus: r.created, count: r.count, failed: [], tax, taxUpdated, taxError,
+        rsops: manifest.ok
+          ? { seeded: manifest.createdCount ?? 0, lot: manifest.lot }
+          : { seeded: 0, error: manifest.error || manifest.skipped || null }
+      });
     } catch (e) {
       return NextResponse.json({ error: e?.message || 'Could not write to the tracker.' }, { status: 400 });
     }

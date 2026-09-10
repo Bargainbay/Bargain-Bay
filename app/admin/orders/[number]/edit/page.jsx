@@ -1,5 +1,5 @@
 import { redirect, notFound } from 'next/navigation';
-import { getSession, isAdmin } from '../../../../../lib/auth';
+import { getSession, isStaff } from '../../../../../lib/auth';
 import { hasDb } from '../../../../../lib/db';
 import { getOrderByNumber, orderInvoiceLink } from '../../../../../lib/orders';
 import { getAll } from '../../../../../lib/inventory';
@@ -14,7 +14,7 @@ export default async function EditOrderPage({ params }) {
   const { number } = await params;
   const session = await getSession();
   if (!session) redirect(`/login?next=/admin/orders/${number}/edit`);
-  if (!isAdmin(session)) {
+  if (!isStaff(session)) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
     </div></div>);

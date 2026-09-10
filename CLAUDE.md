@@ -61,7 +61,32 @@ A unit object: `{ id (SKU), make, model, category, title, condition, price, comp
 See `.env.example` for the full annotated list. The site builds and browses with none of them set.
 - `POSTGRES_URL` — accounts/orders/reservations/admin (Neon).
 - `AUTH_SECRET` — login sessions. `ADMIN_EMAILS` — admin gate (comma-separated; admin user id=1 is service@rssolutions.ca).
-- `SALES_EMAILS` — **sales-associate gate** (comma-separated). Sales get the Sales dashboard, Quotes, and Invoices (full invoice control: create/send/edit/mark-paid/void/refund) and nothing else. Cost-derived figures are hidden from them: the Profit KPI, the Profit column in sales-by-category, and the per-line cost input on the invoice form. Helpers live in `lib/auth.js`: `isAdmin` / `isSales` / `isStaff` (admin implies sales). **Gate rule: use `isStaff` ONLY on the three selling surfaces + `/api/admin/{invoices,quotes}`; everything else stays `isAdmin`.** Nav is filtered via `<AdminNav salesOnly>` and `<DashboardShell salesOnly>`.
+- `SALES_EMAILS` — **sales-associate gate** (comma-separated). Sales get the Sales dashboard, Quotes, Invoices (full invoice control: create/send/edit/mark-paid/void/refund), **Orders** and **Dispatch** — the surfaces you need to sell a thing and then get it to the customer. Cost-derived figures are hidden from them: the Profit KPI, the Profit column in sales-by-category, and the per-line cost input on the invoice form. Helpers live in `lib/auth.js`: `isAdmin` / `isSales` / `isStaff` (admin implies sales). Nav is filtered via `<AdminNav salesOnly>` and `<DashboardShell salesOnly>`.
+
+  **Gate rule (rewritten 2026-09-08, by the owner). The line is NOT "money vs
+  not" — sales handle money all day. It is THE CUSTOMER'S SALE versus THE
+  BUSINESS'S BOOKS.**
+
+  - **Staff** — everything a sale needs from the customer's side: quotes,
+    invoices (create/send/edit/**mark paid**/void/**refund**), the orders board
+    (`/admin/orders`, and `/api/admin/{orders,order-edit,schedule-delivery,order-rep,pod}`)
+    including cancelling and refunding an order, and dispatch — scheduling,
+    assigning drivers, pulling BB orders onto the board, the run sheet, POD.
+    Plus **vendor drop-off intake** (`/admin/intake`, the consignment path on
+    `/api/admin/{intake,unit-photos,sync-inventory}`) — booking in an appliance a
+    vendor left at the loading bay, photographing it and putting it on the site.
+    NOT the "Pending — tested working?" queue: see the vendor drop-off section.
+  - **Admin** — what the business costs and earns, and what it pays people:
+    cost and profit anywhere, the dashboards' Profit KPI and Profit column, the
+    per-line cost input, `dispatch_expenses`, and on the dispatch board the
+    **Times, Billing, Pay and Profit** tabs (hidden AND refused server-side —
+    a hidden tab is not a permission), plus `charge_amount` / `pay_amount` on
+    a job card, which ride on `canManageClients`. Payroll, the books, the
+    ledger, the P&L, HST, campaigns, coupons and Operations stay admin as they
+    were.
+
+  When adding a surface, ask which of those two it is. If it is something a rep
+  would do with a customer on the phone, it is staff.
 - `SITE_URL` = `https://bargainbay.ca` (used by feed links, canonical, Clover redirects).
 - `CLOVER_ENV` / `CLOVER_MERCHANT_ID` / `CLOVER_PRIVATE_TOKEN` — card payments (blank token = pay-on-pickup mode).
 - `GOOGLE_CREDENTIALS` / `SHEET_ID` / `GOOGLE_SHEETS_TAB` / `SHEET_WRITEBACK` — sheet sync + sold write-back.
@@ -153,6 +178,146 @@ record anywhere. Rules that must hold:
 - status is re-derived from the payment ledger. Paying more than the corrected
   total is reported as `overpaid`; no refund record is invented, because no money
   has physically moved.
+
+## Vendor drop-offs — stock the sales floor lists itself (added 2026-09-10)
+Some vendors just leave appliances with us. **No invoice, a cost agreed out loud,
+and we pay them once the unit sells.** They arrive KNOWN WORKING, which is the
+whole point: there is nothing for the refurb floor to test, so routing them
+through `Untested` parks live, sellable stock in a queue waiting on an inspection
+nobody is going to do.
+
+`/admin/intake` is the tab (staff). `VendorIntake.jsx` → `addConsignmentUnit`
+(lib/intake.js) → `unit_photos` (lib/unit-photos.js) → **Sync inventory from
+tracker**, which is now staff-level too. Operations keeps the whole thing as its
+`intake` fold for the owner's muscle memory — the SAME components, so the two
+cannot drift.
+
+- **This is the ONE path that writes Status itself**, and it is a deliberate,
+  narrow exception to "Condition and Status belong to RS Ops". That rule exists
+  because a machine's state should come from the thing that tested it; here the
+  person filling the form IS the person who took the unit in and looked at it.
+  It is a **separate function**, not a flag on `addIntakeUnits`, so an invoice
+  manifest can never reach it by passing an extra field, and the route refuses
+  any multipart body that isn't `mode: 'consignment'`.
+- **Sales get the intake form and the sync button. They do NOT get the
+  "Pending — tested working?" queue.** That queue is machines off the refurb
+  floor, and calling one fit to sell is RS Ops's judgement, not a selling
+  decision — so a non-admin can reach nothing on `/api/admin/intake` but the
+  consignment POST. Same gate question as everything else: this is a thing a rep
+  does with a vendor at the loading bay, so it is staff.
+- **Condition and retail are REQUIRED here** and optional everywhere else,
+  because the unit is going straight on sale. The tracker prices it as
+  Retail × Condition%, and `lib/csv.js` **drops a priceless row without
+  comment** — the unit would be added, synced, and simply never appear.
+- **Qty is always ONE.** The photos are of a specific machine; stamping one set
+  onto five SKUs shows a buyer a different appliance than the one they get.
+- **The Invoice column is written `CONSIGNMENT`** (plus any note). An empty cell
+  reads as an invoice number nobody has typed in yet; whoever settles up with
+  this vendor has to be able to see off the tracker that the money is owed
+  **on sale**, not already paid. The books know it too — see below.
+
+### Stock we hold but do not own
+`lib/consignment.js`, table `consignment_units`, ledger account **2150 "Owed to
+consignment vendors"**, and an *Owed to consignment vendors* panel on
+`/admin/reports/ledger` (admin settles; an accountant can read it).
+
+Two things were wrong by default, and both are silent:
+
+- **`inventoryAtCost()` counted it as an asset.** We didn't buy it, and nothing
+  is owed for it until it sells — so it overstated what the business owns AND,
+  with no matching liability, overstated equity by the same amount. Consigned
+  units are now excluded from every owned figure and reported on their own line,
+  so the exclusion is never invisible. The guard is `NOT EXISTS` against a
+  **separately-run** query, not a join: `one()` soft-fails, and a join against a
+  table that doesn't exist yet would have returned zero stock. If the
+  consignment table can't be read at all it falls back to the old answer
+  (everything owned) rather than reporting no inventory.
+- **The COGS entry credited Inventory (1200) for a unit that was never debited
+  into it**, so inventory drifted NEGATIVE by the cost while the money owed to
+  the vendor appeared nowhere. A consigned line now credits **2150** instead —
+  the liability starts the day the unit sells, which is the deal — and clears
+  Dr 2150 / Cr bank when the vendor is actually paid.
+
+Rules that must hold:
+- **The COGS query reads per LINE and splits in JS**, rather than joining
+  `consignment_units`. `safe()` swallows a failed query, so a join against a
+  missing table would have **silently deleted COGS from the entire ledger**. An
+  unreadable consignment table degrades to "nothing is consigned".
+- **It is settled per UNIT, not per document** — the vendor is paid for the
+  appliance that went out, not for the five still standing here. That is why it
+  is a separate panel from *Owed to suppliers* and not another row in it.
+- **A typed amount beats the agreed cost.** Settling at a round number is
+  ordinary, and the figure that left the bank is the one the ledger carries.
+  Blank means "what was agreed".
+- **The P&L needed no change.** Cost was already recognised per-unit at the sale,
+  which is the right period either way. Only the balance sheet was wrong.
+- **`recordConsignmentUnit` is best-effort at intake and the failure is SHOWN.**
+  The tracker row is the record of the appliance and must not be lost over a
+  bookkeeping write; the screen tells the rep the books don't know we owe for
+  this one, because nothing else would.
+
+### The photos, and why they are not on `products`
+`unit_photos` is its own table, keyed by SKU, joined on read by `lib/inventory`.
+**`upsertProducts` rewrites every column of a product row on every sync**, and
+pressing Sync is literally the next thing the rep is told to do — a photo stored
+in `products.image_url` would be gone before the unit was on sale. Kept apart, a
+sync cannot touch them and a unit relisted later still has its pictures.
+
+- Files go to the **private Blob store** at `products/<sku>-<n>.jpg` and are
+  served through the pre-existing `/api/photo/<key>` proxy, so the storefront,
+  the OG tags and the Meta feed all get a stable public URL on our own domain.
+  The key sanitising in `lib/unit-photos.js` and in that route must stay in step.
+- **`imageFor` does NOT look at them. The STOCK picture always leads** — card,
+  buy panel, OG tag, Meta feed — and the real photographs come after it on the
+  product page. Same rule RS Ops's gallery has always followed. This is the
+  owner's call (2026-09-10) and it is about how the shop reads: a wall of studio
+  shots at one angle on one background is what makes a listing page look like a
+  shop, and a phone photo taken at the loading bay sitting next to eleven of them
+  looks like a mistake. The real pictures are what close the sale, and they are
+  one scroll down where a buyer is already looking for them.
+  **The cost is real and is not hidden:** a unit with no manufacturer photo for
+  its model falls through to the branded category placeholder, `hasRealImage` is
+  false for a placeholder, and `/feed` therefore skips it — that unit cannot be
+  advertised until a stock photo for the model exists in `data/images.json`. Do
+  not "fix" that by quietly promoting our own photo for placeholder units: the
+  ad would show a real machine and the landing page a placeholder, which is worse
+  than not advertising it.
+- Photos are attached by `withOwnPhotos` in `lib/inventory`, one query per page,
+  and every read soft-fails to "no photos" — the storefront must render whether
+  or not the table exists yet. **Not on the checkout read** (`getMany`): it
+  renders no gallery and would be buying a query it cannot use.
+- `POST /api/admin/unit-photos` adds more to a unit already booked in, because
+  otherwise a photo mistake could only be fixed by deleting the unit and adding
+  it again, which changes the SKU.
+- **No `capture` on the library input** — same rule as the driver app: on iOS it
+  makes an input camera-ONLY and ignores `multiple`. Two buttons.
+
+**LANDMINE — "Synced 43 units" is not an answer to "is my fridge on the site".**
+The tracker's Condition% / Suggested Price cells are formulas that recalculate a
+beat after a row lands, and the importer drops a row with no price silently
+(`markIntakeTested` sleeps and retries for exactly this reason). A rep who adds a
+unit and presses Sync immediately gets a cheerful success message about somebody
+else's stock. So the screen keeps what was added this session and asks
+`intakeLiveStatus` afterwards: **per-unit ✓ live / not live yet**, with what to
+check.
+
+## The orders board has its own tab (added 2026-09-08)
+`/admin/orders` (staff) renders the same `AdminOrders` the Operations page has
+always folded away, and `lib/order-board.js` is the ONE loader behind both — the
+orders, the drivers, the reps and the POD photos — so the two boards cannot
+drift. Operations keeps its Orders fold for the owner's muscle memory.
+
+It moved because the people who take the orders could not mark one paid, ready,
+or out for delivery, and could not put a delivery on a driver's day: the board
+was behind an admin-only page, so they sold the appliance and then asked
+somebody else to press the buttons. Scheduling from here goes through
+`assignDelivery`, which creates and assigns the dispatch job too — the board and
+Operations must never disagree about who is delivering what.
+
+Sales get the **whole** board, cancel and edit/refund included (`/api/admin/order-edit`
+and the `[number]/edit` screen are staff for the same reason the invoice editor
+is). The order editor carries `cost` through its state to preserve it on save and
+renders it nowhere — check that stays true if that screen ever grows a column.
 
 ## Refunds — three shapes, one ledger (added 2026-08-26)
 `/admin/invoices/<INV>/refund` is the whole refund surface (`RefundControl`).
@@ -415,6 +580,71 @@ sheet, GL detail as CSV.
   missing (unrecorded cash, credit purchases, owner draws). The page says this.
   When Plaid is live, wire the real balance in and make the comparison automatic.
 - `SALE` now exists in four files. Still deliberate, still: change one, change all.
+
+## The dispatch coordinator's portal (added 2026-09-09)
+
+The owner hired someone to run deliveries. They get dispatch and nothing else.
+
+- **The role is DATABASE-backed** (`dispatch_access`, `lib/dispatchers.js`), for the
+  same reason accountant access is: a hire starts on a Monday and might be gone by
+  Friday, and revoking has to be two clicks, not a redeploy. Granted and revoked
+  from the **Clients & drivers tab on the dispatch page itself** (the one-page
+  rule), by an admin only.
+- **Access was added, never widened.** `isStaff` / `isSales` / `isAdmin` in
+  `lib/auth.js` are UNCHANGED, and a coordinator is on none of them — which is
+  what makes every other surface in this app refuse them without knowing the role
+  exists. Verified: /admin/{dashboard,operations,orders,invoices,quotes,payroll,
+  campaigns,coupons,financial,reports/books,reports/pnl,agent} all answer "Not
+  authorized". **If a coordinator can't do something, add dispatch — never put
+  them in SALES_EMAILS**, which hands over the whole sales portal.
+- **`lib/dispatch-access.js` is the only place the rule is written.** Every dispatch
+  surface calls `dispatchAccess()` and gets `{ session, allowed, full, coordinator }`.
+  `full` is the old `isAdmin` test renamed: admin-equivalent INSIDE dispatch, true
+  for the owner and for the coordinator (the owner's decision — they run the board,
+  the billing, the pay, the P&L and the costs). Sales still get `allowed` without
+  `full`, exactly as before.
+- **`isAdmin` still means strictly the owner**, and guards one thing: granting
+  someone dispatch access. A coordinator appointing another coordinator is how a
+  revoked hire gets back in.
+- **Every dispatch surface must use the resolver.** Today that is
+  `app/admin/dispatch/{page,print,pod/[id]}`, `app/api/admin/dispatch/{route,sheet,
+  receipt}`, `app/api/admin/pod`, and `/admin` itself (which lands a coordinator on
+  the board instead of the dashboard they can't open). **A new dispatch route that
+  gates on `isStaff` silently locks the coordinator out of their own job** — the
+  xlsx/BOL sheet route was exactly that mistake, caught by testing. The unmerged
+  import-batches work (PR #215) adds more of these: give them `dispatchAccess()`.
+- **LANDMINE in `/api/admin/dispatch`:** POST FALLS THROUGH to `createJob`, so an
+  action that handler doesn't recognise silently creates a stop. The access actions
+  were first written into PATCH, where `revisit` lives, and a grant attempt from the
+  UI created a job instead. New setup-style actions go in POST, above the fall-through.
+- The nav for this role is `<AdminNav dispatchOnly>`: the Dispatch tab, and a
+  **Sign out** button (`components/NavSignOut.jsx`) because the portal is one page
+  with no /account link and the warehouse browser is shared. No search box — it
+  reaches customers, orders, invoices and quotes. No "View store" — on an
+  rssolutions.ca host that is a link into the other company. Note `/logout` is NOT
+  a route in this app despite being named in `proxy.js`'s allow-list; logging out is
+  a POST to `/api/auth/logout`.
+- **The coordinator still needs an ordinary account**: they sign up at `/signup`
+  with the address that was granted. The grant is by email, so the order doesn't
+  matter.
+
+### Delivery email goes to the dispatch desk
+`dispatch@rssolutions.ca` (`RS_DISPATCH_EMAIL` / `dispatchDesk()` in
+`lib/constants.js`, overridable with the `DISPATCH_EMAIL` env var + a redeploy) is
+the coordinator's mailbox, and it is now:
+- where the **office copy** of every dispatch email goes (`DISPATCH_INBOX` in
+  `lib/jobs.js` — completion, couldn't-complete, the lot). It used to fall through
+  to `SERVICE_EMAIL`, the owner's inbox.
+- the **reply-to and the letterhead contact on everything an RS Solutions client
+  receives** (`brands.rs_solutions.contactEmail`), including the hosted invoice
+  page. This is the half no mail rule can do: it decides where the client presses
+  Reply. A redirect rule only catches what has already been sent to the wrong place.
+- the default **From** for RS Solutions mail — but `RESEND_FROM_RS` is set in
+  Production to the Service@ address and overrides it, so that env var has to change
+  too. Resend verifies the DOMAIN, so the dispatch mailbox sends with no new setup.
+**Don't confuse it with `DISPATCH_EMAIL` the constant** (`dispatch@bargainbay.ca`),
+which is the storefront warehouse mailbox that packing slips are sent to. One letter
+apart, different jobs.
 
 ## The books, and accountant access (added 2026-08-27)
 `/admin/reports/books` — every source record for a period, each section
@@ -1178,8 +1408,8 @@ be reading row 4 while whoever uploaded it has already walked away.
   copies the customer, address and appliance onto a new visit against the SAME
   ticket and drops it in "To assign". Without it a second trip opens a second
   ticket and the open-service-call count inflates.
-- **Gate exception:** dispatch uses `isStaff`, making it a FOURTH staff surface
-  beyond the three named in the gate rule below. Intentional — whoever answers
+- **Gate exception:** dispatch uses `isStaff`, making it another staff surface
+  beyond the selling ones named in the gate rule above. Intentional — whoever answers
   the phone has to be able to put the job on the board. Adding a **client** is
   staff too (it's a company name). Adding a **driver** stays `isAdmin` — that one
   is a real access grant.
@@ -1244,8 +1474,9 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
   and `markInvoicePaid` only promotes `pending_payment`/`confirmed`, so settling
   the balance later can't drag it backwards.
 - **The balance is collected in the app**: the close-out screen prefills what's
-  owed, and the payment is queued FIRST — if the phone gets one thing out before
-  the signal dies again, it should be the money.
+  owed, and the money is queued FIRST — if the phone gets one thing out before
+  the signal dies again, it should be the money. It is a **report, not a
+  payment** — see below.
 - **Assigning from Operations reaches the board too** (`assignDelivery` creates
   and assigns the job). Two assignment screens that don't agree is how a driver
   ends up with a stop nobody told them about.
@@ -1255,6 +1486,97 @@ order-based `/api/driver/{deliveries,start,pod}` + `DriverDeliveries` /
 - PWA: `public/driver.webmanifest` + `public/driver-sw.js` (shell only —
   network-first for the page, never caches `/api`). Installed via **Add to Home
   Screen**; there is no app store and no native build.
+- **The phones update themselves** (added 2026-09-08). An installed app is opened
+  once and then lives in a pocket for days, so a phone can run an old build long
+  after a change ships. The SW already `skipWaiting()`s and claims the page; a
+  `controllerchange` in `DriverShell` now reloads onto the new build.
+  **`CACHE` in `driver-sw.js` is the lever that reaches every home screen** —
+  bump it (`bb-driver-vN`) and the next activation drops each phone's cached
+  shell and build assets. The reload NEVER lands on a half-filled close-out:
+  `lib/driver-busy.js` is held by `DriverFinish`/`DriverPhotos` while a sheet is
+  open, because a signature just drawn and eight photos exist nowhere else until
+  Done is pressed. Note the limit: a phone sitting open and idle won't see the
+  new worker until it navigates or the browser's own update check runs.
+
+#### Loose ends — the stops nobody closed (added 2026-09-08)
+`staleStops()` / `staleStopCount()` in `lib/jobs.js`, `GET /api/admin/dispatch?view=stale`,
+`StaleStops.jsx` behind the **Loose ends** tab (count on the tab). Stale = a job
+with a `job_date` before today whose status is not done / failed / cancelled.
+Capped at 300 and it SAYS when it is capped.
+
+Each row carries what is actually known — driver, whether the clock was ever
+stopped, signature/photo count (it happened), balance owing, and any pending
+`job_collections` money sitting against it. Four actions, all existing endpoints:
+close it out **with the real times** (`action:'times'` + `markDone`, never "now",
+or a two-hour delivery from last Tuesday costs as a six-day one), move it to
+today (`assign` with `jobDate`), couldn't complete (`status` + reason), cancel.
+**There is deliberately no clear-all** — each row is a different question, and a
+sweep would erase the only thing the list is for.
+
+#### The day on the phone is ONE day (changed 2026-09-08)
+`driverJobs` used to carry every unfinished stop from every earlier day inline
+into today's run, so a driver opened the app to last week's leftovers above this
+morning's first delivery — and the "to go" count and the "$ to collect" total at
+the top were both counting them. Four buckets now, and they are separate arrays
+on purpose:
+
+- `stops` — the day being looked at, and nothing else.
+- `earlier` — before today, never closed. Its own folded section at the BOTTOM of
+  the screen, still finishable from there. The carry-forward existed for a good
+  reason (a stop that drops off at midnight is forgotten for a week); it is held
+  apart, not deleted.
+- `tomorrow` — the day after, for planning. Nothing on it can be started.
+- `tomorrow` and `earlier` are returned **only when the day on screen is today**.
+  Looking back at last Tuesday returns last Tuesday.
+
+`/driver` has ‹ › and a date picker over any past day (`GET /api/driver/jobs?date=`).
+**The server decides what "today" is, never the phone** — a driver's clock can be
+a day out and the run sheet cannot — and a date after today is clamped back.
+
+Two drivers ride one stop as ONE row (`driver_id` + `driver2_id`), so closing it
+closes it for both; there is no second copy. What was missing was who: the
+finished card now carries `closedBy` (the last `done`/`service_complete`/`failed`
+job_event), so a stop the mate closed doesn't just look like one that never went
+anywhere.
+### Money at the door is REPORTED by the driver and CONFIRMED by the office (changed 2026-09-08)
+A finished delivery used to mark its invoice **paid** outright: the driver ticked
+"I took the money", tapped Done, and the phone's `action:'payment'` went straight
+into `recordInvoicePayment` → `markInvoicePaid`. Revenue booked, units delisted,
+receipt emailed to the customer, payment ledger locked — all on the say-so of a
+tick box in a van, before anybody in the office had counted anything. If the cash
+never arrived, unpicking it was a refund and an argument.
+
+A door collection is now a **claim** (`job_collections`, provisioned in
+`ensureJobSchema`), and `lib/door-money.js` owns the whole life of one:
+
+- `recordDoorCollection` — what the driver says they took. Writes NO payment: the
+  invoice stays `open`/`partial` and the balance stays owing. Deduped on the
+  offline queue's `ref`, so a close-out replayed from a basement doesn't put the
+  same $500 on the office's list twice, and capped at what is actually owing
+  (minus anything already claimed and unjudged).
+- `confirmDoorCollection` — **this is what marks the invoice paid.** Calls the
+  ordinary `recordInvoicePayment`, dated to the day the money was *collected*,
+  not the day it was confirmed. The amount is editable: a $500 claim that is
+  $480 in the envelope is confirmed as $480. Claims the row first
+  (`WHERE status = 'pending'`) so two screens can't confirm it twice, and rolls
+  back to pending if the ledger refuses it.
+- `rejectDoorCollection` — it never arrived. The invoice is untouched and still
+  owing, which is the entire point.
+
+Surfaces: a **Money to confirm** queue at the top of `/admin/dispatch` (NOT
+scoped to the day on screen — money reported at 7pm is confirmed the next
+morning), the same claim on the invoice's own row in `/admin/invoices`
+(`ConfirmCollection`), and the stop card on both boards showing what has been
+reported against it. Confirming and rejecting are **admin only** on both
+surfaces; the office typing a payment in itself (the card's Record payment,
+`MarkPaidControl`) is unchanged and still immediate — that IS an admin
+confirming.
+
+The order side is untouched by the delay: the driver's completion still marks the
+order delivered and the units sold, and `markInvoicePaid` only ever promotes
+`pending_payment`/`confirmed`, so confirming money after delivery cannot drag a
+delivered order backwards.
+
 ### Why the office stopped getting completion emails, and why one driver could not close a stop (fixed 2026-08-27)
 Two reports, four separate defects, and every one of them was silent — which is
 the thread running through all of it: a driver's screen said Done and the office's
@@ -1576,13 +1898,38 @@ and half a history in each.
   one end, fills with no litres.
 - **WHO PAYS FOR THE FUEL is a property of the TRUCK** (`vehicles.fuel_paid_by`
   = `us` | `carrier`), and it decides whether a driver's fill is a cost or only a
-  mileage record. The owner's two arrangements:
-  · the **20ft box truck** comes from a carrier who bills **fortnightly for the
-    truck AND its diesel** — so a fill logged against it is already paid for
-    inside that invoice;
-  · **our own pickups** are fuelled by the driver, who is **e-transferred** for
+  mileage record. It is **DATA, per van — not a rule about what kind of truck it
+  is.** Always read the van's own row, and do not infer it from the size or the
+  name of the truck.
+
+  **As of 2026-09-09 the owner confirms: WE pay for the fuel on our trucks, the
+  20ft box truck included. The driver pays at the pump and is reimbursed after.
+  That is `us`, and every van is correctly on it. Do NOT flip a van to `carrier`
+  without asking the owner first.** This paragraph previously read as though the
+  box truck's fuel came bundled into a carrier's invoice; a session acted on
+  that, told the owner his P&L was double-counting diesel, and was wrong. The
+  arrangement it described may never have applied to fuel — the carrier bills
+  for the TRUCK. `carrier` is a mode the code supports, not a mode anything is
+  currently in.
+
+  The two modes:
+  · a **carrier** truck is billed to us **fortnightly for the truck AND its
+    diesel** — so a fill logged against it is already paid for inside that
+    invoice;
+  · a truck **we** fuel is pumped by the driver, who is **e-transferred** for
     it — so the driver's entry is the ONLY record of that money anywhere, and
     Plaid won't help (it drops `TRANSFER_OUT`, which is what an e-transfer is).
+  **The setting is read when the Profit tab ADDS UP, not when the fill is
+  logged** (`profitReport` joins `vehicles` — lib/dispatch-money.js:239), so
+  correcting a van moves its PAST fills between the columns too. That is the
+  right behaviour and it is not obvious; the van list says so out loud.
+  A van added before this column existed defaults to `us`, and until 2026-09-09
+  there was **no way to change it** — the who-pays selector was on the ADD form
+  only. The van list now has a **"who pays the fuel"** control per row (PR #226).
+  That gap was worth closing on its own; it is NOT evidence that anything was
+  set wrong, which is how it got read the first time. Never fix a van by
+  retiring it and adding it again: a second `vehicles` row orphans the odometer
+  history and every fill already logged, the same way a re-added driver did.
   **LANDMINE — the double count.** Counting a carrier truck's fills as cost
   charges us for the same tank twice: once as the fill, again inside the
   carrier's invoice. `profitReport` therefore reports `carrierFuel` SEPARATELY
@@ -1761,6 +2108,16 @@ can be deleted.
 5. `data/catalog.json` can lag; availability is sourced live from Postgres — don't "fix" by trusting the JSON for stock.
 6. Some tracker rows have messy/mis-categorized titles (a few units land in a vague "Appliance" category); they render as-is. Clean at the sheet, not in code.
 7. Product photos are manufacturer/dealer stock images (AJ Madison, authorized-dealer) — standard for resellers. Don't scrape copyrighted marketplace images.
+8. **Card payments are OFF** (`CARD_PAYMENTS_ENABLED = false` in `lib/constants.js`, pending the Stripe appeal). This means an order is created with **no payment step at all** while still reserving a qty-1 unit — so anything that weakens the checks in `lib/antifraud.js` directly hands fake orders the power to strip real stock off the storefront. Note the stale references to Clover elsewhere in this file: checkout is on **Stripe** now (`lib/stripe.js`, `app/api/stripe-webhook`).
+
+## Fake-order defences (added 2026-08-01)
+Because there is no payment step, these stand in for it. All of them **degrade open** — a database error lets the order through, since losing a real sale is worse than admitting a junk one.
+- `lib/antifraud.js` — honeypot (`components/HoneypotField.jsx`, an invisible `website` field on the checkout + signup forms), per-IP/per-email order rate limits, a cap on units held unpaid at once, disposable-domain rejection, and the owner's `blocklist` table. Rate limits **count rows in Postgres, not in memory**: serverless gives each instance its own memory, so the in-process counter in `/api/chat` only throttles a burst that lands on one instance.
+- `lib/order-verify.js` — guest offline orders get a "confirm it's really you" email. The unit **is** held immediately (a real buyer must never lose a one-of-a-kind unit while they go find the email); not clicking within `ORDER_VERIFY_HOURS` is what releases it. Signed-in customers skip this and are stamped verified on creation.
+- `lib/reservations.js` — the sweep in `expireReservations()` now has three clocks: card orders at 24h, offline orders at `OFFLINE_HOLD_DAYS` (**7**, was 60), unverified orders at 12h. The offline clock is deliberately scoped to orders carrying a `verify_token`/`verified_at` so it can never mass-cancel orders that predate this feature, and the whole thing is ANDed with main's manual-invoice guard — a deposit sale must never be swept.
+- **LANDMINE — `CHECKOUT_HOLD_MINUTES` and `OFFLINE_HOLD_MINUTES` are two different holds, and merging them relists paid-for stock.** The short one (7 days) is the STOREFRONT offline order this feature is about. The long one (60 days) is what `holdInvoiceSkus` / `updateOrderItems` place when an INVOICE raises an order — deposit now, balance on delivery, and a delivery booked three weeks out. Cutting that to a week expires the reservation on a sale that is going perfectly well and puts the appliance back on the site underneath the customer. The order is safe either way (the sweep refuses anything carrying a manual invoice) but **an order and its reservation are separate things, and only the reservation keeps a unit off the storefront** — `unavailableSkus` does not treat `pending_payment` alone as unavailable. This split was not in the original branch: invoices only started raising their own orders on 2026-08-26, three weeks after it was written.
+- `orders.ip` / `orders.user_agent` are recorded so a burst from one source is actually visible — before this there was no way to characterise the traffic at all.
+- Admin: `/api/admin/blocklist` (POST with `cancelOrders: true` blocks an identifier *and* cancels+relists every unpaid order matching it in one call), and an **⚠ Email unconfirmed** badge on the order board.
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.

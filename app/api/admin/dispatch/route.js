@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
+import { isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
+import { dispatchAccess } from '../../../../lib/dispatch-access';
+import { listDispatchers, grantDispatcher, revokeDispatcher } from '../../../../lib/dispatchers';
 import {
   setDriverByEmail, addDriverByPhone, createDriverSignInLink,
   listDriversForOffice, driverSmsNumber, changeDriverPhone, mergeDrivers
@@ -9,8 +11,7 @@ import {
   profitReport, stopTimes, addExpense, listExpenses, deleteExpense, EXPENSE_KINDS
 } from '../../../../lib/dispatch-money';
 import {
-  shiftReport, mileageReport, listVehicles, upsertVehicle
-} from '../../../../lib/shifts';
+  shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate, setShiftTimes } from '../../../../lib/shifts';
 import { livePositions, driverTrail } from '../../../../lib/driver-location';
 import { sendSms, smsConfigured } from '../../../../lib/sms';
 import { SITE_URL } from '../../../../lib/site';
@@ -23,9 +24,11 @@ import {
   setTicketStatus, listTickets, reopenJob, updateJob,
   findServiceCustomers, ordersForServiceCall,
   completeJob, setJobPay, payReport, bookRevisit, setJobTimes,
-  setJobCharge, setJobsClient, billingSummary, invoiceClientJobs, crewLost, jobHistory
+  setJobCharge, setJobsClient, billingSummary, invoiceClientJobs, jobHistory,
+  reopenJobByNumber, staleStops
 } from '../../../../lib/jobs';
 import { recordInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
+import { confirmDoorCollection, rejectDoorCollection } from '../../../../lib/door-money';
 import {
   stageBatch, resolveBatch, patchBatch, setBatchClient, approveBatch, cancelBatch,
   listOpenBatches, addClientAlias, openQuestions
@@ -37,10 +40,19 @@ export const runtime = 'nodejs';
 
 // Dispatch is open to all back-office staff, not admins only: the whole point is
 // that whoever picks up the phone can put the job on the board while the customer
-// is still talking. (Everything money-sensitive stays isAdmin — see CLAUDE.md.)
+// is still talking. It is also open to the dispatch COORDINATOR, who is not staff
+// at all and for whom this is the only surface in the app (lib/dispatchers.js).
+//
+// `s.full` is the old `isAdmin(s)` test, renamed because two different people now
+// pass it: the owner, and the coordinator whose whole job this is. Read it off the
+// session object the gate returns so the database is asked once per request, not
+// once per money check. `isAdmin(s)` still means strictly the owner — it guards
+// granting access, which is not a dispatch operation.
 async function staff() {
-  const s = await getSession();
-  return s && isStaff(s) ? s : null;
+  const { session, allowed, full } = await dispatchAccess();
+  if (!allowed) return null;
+  // isAdmin() only ever reads .email, so the spread keeps it working.
+  return { ...session, full };
 }
 
 const who = (s) => ({ email: s?.email, name: s?.name });
@@ -61,16 +73,21 @@ export async function GET(req) {
     if (sp.get('view') === 'orders') {
       return NextResponse.json({ orders: await ordersForServiceCall(sp.get('email') || '') });
     }
+    // What we bill a client and what we pay a driver. Admin — the same line the
+    // Profit tab is on, and the reason is the same: a sales associate dispatches
+    // the work, they don't price it or pay for it.
     if (sp.get('view') === 'billing') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can see client billing.' }, { status: 403 });
       return NextResponse.json(await billingSummary({ from: sp.get('from'), to: sp.get('to') }));
     }
     if (sp.get('view') === 'pay') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can see driver pay.' }, { status: 403 });
       return NextResponse.json(await payReport({ from: sp.get('from'), to: sp.get('to') }));
     }
     // What the delivery side made, against what it cost. Admin only — it is the
     // one screen that puts what we charge and what we pay side by side.
     if (sp.get('view') === 'profit') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see the delivery P&L.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can see the delivery P&L.' }, { status: 403 });
       return NextResponse.json({
         ...(await profitReport({ from: sp.get('from'), to: sp.get('to'), group: sp.get('group') })),
         kinds: EXPENSE_KINDS
@@ -79,12 +96,14 @@ export async function GET(req) {
     // The clock on every stop: when they got there, when they finished, and the
     // two things worth chasing — no times at all, and never clocked out.
     if (sp.get('view') === 'times') {
+      // Hours. They are what pay is calculated from, so they sit with pay.
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can see the hours.' }, { status: 403 });
       return NextResponse.json(await stopTimes({
         from: sp.get('from'), to: sp.get('to'), driverId: sp.get('driverId')
       }));
     }
     if (sp.get('view') === 'expenses') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see costs.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can see costs.' }, { status: 403 });
       return NextResponse.json({
         expenses: await listExpenses({ from: sp.get('from'), to: sp.get('to') }), kinds: EXPENSE_KINDS
       });
@@ -112,22 +131,29 @@ export async function GET(req) {
         call: { configured: callConfigured(), to: await callTarget() }
       });
     }
-    // Stops where somebody came off the crew without anyone assigning them off.
-    if (sp.get('view') === 'crew_lost') {
-      return NextResponse.json(await crewLost({ from: sp.get('from'), to: sp.get('to') }));
+    // Who holds a dispatch portal login. Strictly the owner: `s.full` is true for
+    // a coordinator too, and a coordinator must not be able to see — or edit —
+    // the list of people who can reach the board.
+    if (sp.get('view') === 'access') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see who has dispatch access.' }, { status: 403 });
+      return NextResponse.json({ dispatchers: await listDispatchers() });
     }
     // The day AROUND the stops: who clocked on, for how long, and how far the
     // van went. Deliberately separate from the pay report's "hours on site" —
     // shift hours are what a person is paid for, time on site is what a delivery
     // costs, and adding them up would be wrong in both directions.
     if (sp.get('view') === 'shifts') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can see shift hours.' }, { status: 403 });
       return NextResponse.json(await shiftReport({
         from: sp.get('from'), to: sp.get('to'), driverId: sp.get('driverId')
       }));
     }
     if (sp.get('view') === 'mileage') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can see running costs.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can see running costs.' }, { status: 403 });
       return NextResponse.json(await mileageReport({ from: sp.get('from'), to: sp.get('to') }));
+    }
+    if (sp.get('view') === 'base_address') {
+      return NextResponse.json({ base: await getBaseAddress() });
     }
     if (sp.get('view') === 'review_link') {
       return NextResponse.json({ url: (await getSetting('google_review_url', '')) || '' });
@@ -145,6 +171,11 @@ export async function GET(req) {
     }
     if (sp.get('view') === 'drivers') {
       return NextResponse.json({ drivers: await listDriversForOffice() });
+    }
+    // Every stop whose day has gone that nobody closed. Staff, like the board
+    // itself: whoever notices it is whoever should be able to deal with it.
+    if (sp.get('view') === 'stale') {
+      return NextResponse.json(await staleStops());
     }
     if (sp.get('view') === 'tickets') {
       return NextResponse.json(await listTickets({ status: sp.get('status') || 'open_states' }));
@@ -227,7 +258,7 @@ export async function POST(req) {
       return NextResponse.json({ ok: true, ...(await startImportCall(body.batchId, { by: who(s) })) });
     }
     if (body.action === 'call_number') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set the number dispatch rings.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can set the number dispatch rings.' }, { status: 403 });
       const raw = String(body.number || '').trim();
       // E.164 only. A number the phone system can't dial is a call that fails
       // silently at Twilio rather than on the screen somebody is looking at.
@@ -250,9 +281,15 @@ export async function POST(req) {
         by: who(s), address: body.address, city: body.city, postal: body.postal
       })) });
     }
+    // Same box, the other kind of number: RS-1023 is a stop that was cancelled
+    // (or finished) and needs to come back. Cancelled stops are off the board,
+    // so the Reopen button on the card cannot be got at for them.
+    if (body.action === 'reopen_number') {
+      return NextResponse.json({ ok: true, job: await reopenJobByNumber(body.jobNumber, who(s)) });
+    }
     if (body.action === 'invoice_client') {
       // Raising an invoice is money leaving the building — admin only.
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can invoice a client.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can invoice a client.' }, { status: 403 });
       return NextResponse.json({ ok: true, ...(await invoiceClientJobs(body.clientId, body, who(s))) });
     }
     if (body.action === 'client') {
@@ -265,7 +302,7 @@ export async function POST(req) {
     // signs their phone in. No account for them to create, no password for them
     // to forget — that friction is exactly what kept drivers on paper.
     if (body.action === 'driver_phone' || body.action === 'driver_link') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can add or remove a driver.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can add or remove a driver.' }, { status: 403 });
       let d;
       try {
         d = body.action === 'driver_phone'
@@ -305,7 +342,7 @@ export async function POST(req) {
     }
     // A driver's new phone. The account, and everything hanging off it, stays.
     if (body.action === 'driver_rephone') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can change a driver’s number.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can change a driver’s number.' }, { status: 403 });
       try {
         const driver = await changeDriverPhone(body.driverId, body.phone);
         return NextResponse.json({ ok: true, driver });
@@ -317,17 +354,58 @@ export async function POST(req) {
       }
     }
     // The repair for a driver who was already added twice.
+    // What an hour of a driver costs is PAY, so it sits behind the same gate as
+    // the hours and the Profit tab — not the staff-level gate the van rates use.
+    // A truck's day rate is a fact about a truck; a person's rate is their wage.
+    if (body.action === 'driver_rate') {
+      if (!s.full) {
+        return NextResponse.json({ error: 'Only an admin can set a driver\'s rate.' }, { status: 403 });
+      }
+      try {
+        return NextResponse.json({ ok: true, driver: await setDriverRate(body.driverId, body.hourlyRate) });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not save that rate.' }, { status: 400 });
+      }
+    }
+    // The yard, and the stop that ends a run there.
+    if (body.action === 'base_address') {
+      try {
+        return NextResponse.json({ ok: true, base: await setBaseAddress(body) });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not save that address.' }, { status: 400 });
+      }
+    }
+    if (body.action === 'return_to_base') {
+      try {
+        return NextResponse.json({
+          ok: true, ...(await addReturnToBase({ date: body.date, driverIds: body.driverIds, createdBy: who(s) }))
+        });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not add that.' }, { status: 400 });
+      }
+    }
+    // Correcting a shift the driver's taps got wrong.
+    if (body.action === 'shift_times') {
+      if (!s.full) {
+        return NextResponse.json({ error: 'Only an admin can change shift hours.' }, { status: 403 });
+      }
+      try {
+        return NextResponse.json({ ok: true, shift: await setShiftTimes(body.shiftId, body, who(s)) });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not save that shift.' }, { status: 400 });
+      }
+    }
     if (body.action === 'driver_merge') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can merge driver accounts.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can merge driver accounts.' }, { status: 403 });
       return NextResponse.json({ ok: true, ...(await mergeDrivers(body.keepId, body.dropId)) });
     }
     // Gas, and anything else the day cost that isn't attached to one stop.
     if (body.action === 'expense') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can record costs.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can record costs.' }, { status: 403 });
       return NextResponse.json({ ok: true, expense: await addExpense(body, who(s)) });
     }
     if (body.action === 'delete_expense') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can remove a cost.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can remove a cost.' }, { status: 403 });
       return NextResponse.json({ ok: true, ...(await deleteExpense(body.id)) });
     }
     // A van. Staff-level like a client — it is a name for a truck, not an
@@ -336,7 +414,7 @@ export async function POST(req) {
     // address customers are sent to, and a wrong one sends every review of the
     // month somewhere else.
     if (body.action === 'review_link') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set the review link.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can set the review link.' }, { status: 403 });
       const raw = String(body.url || '').trim();
       if (raw && !/^https:\/\/\S+$/i.test(raw)) {
         return NextResponse.json({ error: 'Paste the full https:// link from Google.' }, { status: 400 });
@@ -349,12 +427,27 @@ export async function POST(req) {
     }
     if (body.action === 'driver') {
       // Making someone a driver IS a permission, so this one stays admin-only.
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can add or remove a driver.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can add or remove a driver.' }, { status: 403 });
       const email = normalizeEmail(body.email);
       if (!validEmail(email)) return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
       const r = await setDriverByEmail(email, body.on !== false);
       if (!r.ok) return NextResponse.json({ error: r.reason || 'No account with that email — have them sign up first.' }, { status: 400 });
       return NextResponse.json({ ok: true, driver: r.user });
+    }
+    // Dispatch portal access. ADMIN ONLY, deliberately not `s.full`: handing
+    // somebody a login is an access grant, not a dispatch job, and a coordinator
+    // appointing another coordinator is how a revoked hire gets back in.
+    if (body.action === 'access_grant') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can give someone dispatch access.' }, { status: 403 });
+      const email = normalizeEmail(body.email);
+      if (!validEmail(email)) return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
+      await grantDispatcher({ email, name: body.name, note: body.note, by: s.email });
+      return NextResponse.json({ ok: true, dispatchers: await listDispatchers() });
+    }
+    if (body.action === 'access_revoke') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can take dispatch access away.' }, { status: 403 });
+      await revokeDispatcher(body.email, s.email);
+      return NextResponse.json({ ok: true, dispatchers: await listDispatchers() });
     }
     const job = await createJob({ ...body, createdBy: who(s) });
     return NextResponse.json({ ok: true, job });
@@ -380,6 +473,24 @@ export async function PATCH(req) {
     }
     if (body.action === 'resequence') {
       return NextResponse.json({ ok: true, ...(await resequence(body.driverId, body.date, body.jobIds, who(s))) });
+    }
+    // The money the driver said they took, once somebody in the office has it in
+    // front of them. THIS is what marks the invoice paid — the driver's report
+    // never does. Admin only: it is the moment revenue is booked and a receipt
+    // goes to the customer, and that is the line the rest of the app draws
+    // around money.
+    if (body.action === 'confirm_collection') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can confirm money received.' }, { status: 403 });
+      const r = await confirmDoorCollection(body.collectionId, who(s), {
+        amount: body.amount, method: body.method
+      });
+      return NextResponse.json({ ok: true, ...r });
+    }
+    // It never arrived. The invoice keeps its balance owing, which is the point.
+    if (body.action === 'reject_collection') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can write off money the driver reported.' }, { status: 403 });
+      const r = await rejectDoorCollection(body.collectionId, who(s), body.note);
+      return NextResponse.json({ ok: true, ...r });
     }
     if (!jobId) return NextResponse.json({ error: 'jobId is required.' }, { status: 400 });
     if (body.action === 'assign') {
@@ -425,7 +536,7 @@ export async function PATCH(req) {
       return NextResponse.json({ ok: true, job: await completeJob(jobId, body, who(s)) });
     }
     if (body.action === 'charge') {
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set what a job charges.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can set what a job charges.' }, { status: 403 });
       return NextResponse.json({ ok: true, job: await setJobCharge(jobId, body, who(s)) });
     }
     // Whose work a stop is, on many stops at once. Staff — a client is a company
@@ -435,7 +546,7 @@ export async function PATCH(req) {
     }
     if (body.action === 'pay') {
       // Money, so admin only — same line the rest of the app draws.
-      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can set what a job pays.' }, { status: 403 });
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can set what a job pays.' }, { status: 403 });
       return NextResponse.json({ ok: true, job: await setJobPay(jobId, body, who(s)) });
     }
     // Putting a closed stop back on the board — the counterpart to Cancel and
@@ -448,7 +559,7 @@ export async function PATCH(req) {
       // money gate has to be applied HERE, where every other money gate is.
       // Editing a job is staff-level on purpose; setting what a client is charged
       // is not, and routing it through a staff action would quietly widen it.
-      const patch = isAdmin(s) ? body : { ...body, chargeAmount: undefined };
+      const patch = s.full ? body : { ...body, chargeAmount: undefined };
       return NextResponse.json({ ok: true, job: await updateJob(jobId, patch, who(s)) });
     }
     if (body.action === 'reopen') {

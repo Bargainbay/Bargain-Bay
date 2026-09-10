@@ -1,6 +1,7 @@
-// Tag an order with a salesperson. Admin-only.
+// Tag an order with a salesperson. Staff — crediting a sale is the selling
+// side's own bookkeeping, and a rep who can't set it asks an admin to.
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin } from '../../../../lib/auth';
+import { getSession, isStaff } from '../../../../lib/auth';
 import { setOrderRep } from '../../../../lib/reps';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req) {
   const s = await getSession();
-  if (!(s && isAdmin(s))) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!(s && isStaff(s))) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   let body;
   try { body = await req.json(); } catch { body = {}; }
   const id = Number(body.orderId);

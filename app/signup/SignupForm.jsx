@@ -1,11 +1,12 @@
 'use client';
 import { useState } from 'react';
+import HoneypotField from '../../components/HoneypotField';
 import { useSearchParams } from 'next/navigation';
 
 export default function SignupForm() {
   const params = useSearchParams();
   const next = params.get('next') || '/account';
-  const [form, setForm] = useState({ email: '', name: '', phone: '', password: '' });
+  const [form, setForm] = useState({ email: '', name: '', phone: '', password: '', website: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -37,6 +38,7 @@ export default function SignupForm() {
         <p className="hint" style={{ marginBottom: 16 }}>Track orders, get pickup updates, and check out faster.</p>
         {error && <div className="error-box">{error}</div>}
         <form onSubmit={submit}>
+          <HoneypotField value={form.website} onChange={set('website')} />
           <div className="field">
             <label htmlFor="name">Name</label>
             <input id="name" required autoComplete="name" value={form.name} onChange={set('name')} />
