@@ -680,7 +680,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
   );
 }
 
-export default function DispatchBoard({ initial, canManageClients, canConfirmMoney, openTickets, initialView = 'board' }) {
+export default function DispatchBoard({ initial, canManageClients, canConfirmMoney, canGrantAccess = false, openTickets, initialView = 'board' }) {
   const [board, setBoard] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -1005,7 +1005,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
 
       {view === 'setup' && (
         <DispatchSetup clients={board.clients} drivers={board.drivers}
-          canManageDrivers={canManageClients} onChanged={() => refresh()} />
+          canManageDrivers={canManageClients} canGrantAccess={canGrantAccess} onChanged={() => refresh()} />
       )}
 
       {view !== 'board' ? null : (

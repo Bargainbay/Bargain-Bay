@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { get } from '@vercel/blob';
-import { getSession, isStaff } from '../../../../../lib/auth';
+import { dispatchAccess } from '../../../../../lib/dispatch-access';
 import { hasDb, query } from '../../../../../lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -17,8 +17,9 @@ export const runtime = 'nodejs';
 // out; only a signed-in staff session can read one, and the filename is the
 // date and the amount rather than a blob id.
 export async function GET(req) {
-  const s = await getSession();
-  if (!s || !isStaff(s)) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  // Dispatch staff OR the dispatch coordinator — lib/dispatch-access.js.
+  const { allowed } = await dispatchAccess();
+  if (!allowed) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return NextResponse.json({ error: 'Database not configured.' }, { status: 503 });
 
   const url = new URL(req.url);

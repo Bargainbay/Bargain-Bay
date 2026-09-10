@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { get } from '@vercel/blob';
-import { getSession, isStaff } from '../../../../lib/auth';
+import { dispatchAccess } from '../../../../lib/dispatch-access';
 import { podPhotoPath, orderSignaturePath } from '../../../../lib/pod';
 import { jobPhotoPath, jobSignaturePath } from '../../../../lib/driver-jobs';
 
@@ -13,8 +13,9 @@ export const runtime = 'nodejs';
 // board both link to these, and both are surfaces a sales associate works on —
 // an admin-only gate meant those links were on their screen and refused them.
 export async function GET(req) {
-  const s = await getSession();
-  if (!s || !isStaff(s)) return new NextResponse('Not authorized', { status: 403 });
+  // Dispatch staff OR the dispatch coordinator — lib/dispatch-access.js.
+  const { allowed } = await dispatchAccess();
+  if (!allowed) return new NextResponse('Not authorized', { status: 403 });
 
   const url = new URL(req.url);
   const photoId = url.searchParams.get('photo');

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSession, isStaff } from '../../../../../lib/auth';
+import { dispatchAccess } from '../../../../../lib/dispatch-access';
 import { readXlsx } from '../../../../../lib/xlsx-lite';
 import { extractStopsFromPdf } from '../../../../../lib/pdf-stops';
 
@@ -16,8 +16,9 @@ export const runtime = 'nodejs';
 const MAX = 6 * 1024 * 1024;
 
 export async function POST(req) {
-  const s = await getSession();
-  if (!s || !isStaff(s)) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  // Reading a client's sheet or BOL is the coordinator's morning — lib/dispatch-access.js.
+  const { allowed } = await dispatchAccess();
+  if (!allowed) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 
   let form;
   try { form = await req.formData(); } catch { return NextResponse.json({ error: 'Invalid upload.' }, { status: 400 }); }

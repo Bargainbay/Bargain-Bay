@@ -455,6 +455,71 @@ sheet, GL detail as CSV.
   When Plaid is live, wire the real balance in and make the comparison automatic.
 - `SALE` now exists in four files. Still deliberate, still: change one, change all.
 
+## The dispatch coordinator's portal (added 2026-09-09)
+
+The owner hired someone to run deliveries. They get dispatch and nothing else.
+
+- **The role is DATABASE-backed** (`dispatch_access`, `lib/dispatchers.js`), for the
+  same reason accountant access is: a hire starts on a Monday and might be gone by
+  Friday, and revoking has to be two clicks, not a redeploy. Granted and revoked
+  from the **Clients & drivers tab on the dispatch page itself** (the one-page
+  rule), by an admin only.
+- **Access was added, never widened.** `isStaff` / `isSales` / `isAdmin` in
+  `lib/auth.js` are UNCHANGED, and a coordinator is on none of them — which is
+  what makes every other surface in this app refuse them without knowing the role
+  exists. Verified: /admin/{dashboard,operations,orders,invoices,quotes,payroll,
+  campaigns,coupons,financial,reports/books,reports/pnl,agent} all answer "Not
+  authorized". **If a coordinator can't do something, add dispatch — never put
+  them in SALES_EMAILS**, which hands over the whole sales portal.
+- **`lib/dispatch-access.js` is the only place the rule is written.** Every dispatch
+  surface calls `dispatchAccess()` and gets `{ session, allowed, full, coordinator }`.
+  `full` is the old `isAdmin` test renamed: admin-equivalent INSIDE dispatch, true
+  for the owner and for the coordinator (the owner's decision — they run the board,
+  the billing, the pay, the P&L and the costs). Sales still get `allowed` without
+  `full`, exactly as before.
+- **`isAdmin` still means strictly the owner**, and guards one thing: granting
+  someone dispatch access. A coordinator appointing another coordinator is how a
+  revoked hire gets back in.
+- **Every dispatch surface must use the resolver.** Today that is
+  `app/admin/dispatch/{page,print,pod/[id]}`, `app/api/admin/dispatch/{route,sheet,
+  receipt}`, `app/api/admin/pod`, and `/admin` itself (which lands a coordinator on
+  the board instead of the dashboard they can't open). **A new dispatch route that
+  gates on `isStaff` silently locks the coordinator out of their own job** — the
+  xlsx/BOL sheet route was exactly that mistake, caught by testing. The unmerged
+  import-batches work (PR #215) adds more of these: give them `dispatchAccess()`.
+- **LANDMINE in `/api/admin/dispatch`:** POST FALLS THROUGH to `createJob`, so an
+  action that handler doesn't recognise silently creates a stop. The access actions
+  were first written into PATCH, where `revisit` lives, and a grant attempt from the
+  UI created a job instead. New setup-style actions go in POST, above the fall-through.
+- The nav for this role is `<AdminNav dispatchOnly>`: the Dispatch tab, and a
+  **Sign out** button (`components/NavSignOut.jsx`) because the portal is one page
+  with no /account link and the warehouse browser is shared. No search box — it
+  reaches customers, orders, invoices and quotes. No "View store" — on an
+  rssolutions.ca host that is a link into the other company. Note `/logout` is NOT
+  a route in this app despite being named in `proxy.js`'s allow-list; logging out is
+  a POST to `/api/auth/logout`.
+- **The coordinator still needs an ordinary account**: they sign up at `/signup`
+  with the address that was granted. The grant is by email, so the order doesn't
+  matter.
+
+### Delivery email goes to the dispatch desk
+`dispatch@rssolutions.ca` (`RS_DISPATCH_EMAIL` / `dispatchDesk()` in
+`lib/constants.js`, overridable with the `DISPATCH_EMAIL` env var + a redeploy) is
+the coordinator's mailbox, and it is now:
+- where the **office copy** of every dispatch email goes (`DISPATCH_INBOX` in
+  `lib/jobs.js` — completion, couldn't-complete, the lot). It used to fall through
+  to `SERVICE_EMAIL`, the owner's inbox.
+- the **reply-to and the letterhead contact on everything an RS Solutions client
+  receives** (`brands.rs_solutions.contactEmail`), including the hosted invoice
+  page. This is the half no mail rule can do: it decides where the client presses
+  Reply. A redirect rule only catches what has already been sent to the wrong place.
+- the default **From** for RS Solutions mail — but `RESEND_FROM_RS` is set in
+  Production to the Service@ address and overrides it, so that env var has to change
+  too. Resend verifies the DOMAIN, so the dispatch mailbox sends with no new setup.
+**Don't confuse it with `DISPATCH_EMAIL` the constant** (`dispatch@bargainbay.ca`),
+which is the storefront warehouse mailbox that packing slips are sent to. One letter
+apart, different jobs.
+
 ## The books, and accountant access (added 2026-08-27)
 `/admin/reports/books` — every source record for a period, each section
 downloadable, plus the P&L built from them. `lib/books.js`.
