@@ -12,8 +12,11 @@ const PRICE_BANDS = [
   { id: '2000+', label: '$2,000+', min: 2000, max: Infinity }
 ];
 
+// 'Scratch & Dent' and 'Used' are retired but stay listed while live products
+// still carry them — dropping an option hides real stock from the filter.
 const CONDITION_OPTIONS = [
-  'New in Box', 'New Open Box', 'Scratch & Dent', 'Refurbished', 'Used', 'Tested & Working'
+  'New in Box', 'New Open Box', 'New Scratch & Dent', 'Refurbished',
+  'Scratch & Dent', 'Used', 'Tested & Working'
 ];
 
 export default function ShopClient({ units, cats, makes, initialCollection, initialQuery }) {
