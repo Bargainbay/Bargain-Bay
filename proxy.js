@@ -20,6 +20,14 @@ const RS_HOSTS = new Set(
 //   /api             — the board's own calls; blocking these breaks the page
 //   /invoice         — where an RS client lands from their invoice email
 //   /login, /logout  — you can't reach /admin without being able to sign in
+//   /signup, /forgot-password, /reset-password
+//                    — the dispatch coordinator's account is created and recovered
+//                      on THIS host. Without these, the one person whose only
+//                      surface is dispatch has to go to the Bargain Bay storefront
+//                      to make their own login, which is both confusing and the
+//                      wrong company. Signing up grants nothing on its own: what
+//                      an account can reach is decided by the access lists and by
+//                      dispatch_access.
 const ALLOWED = [
   /^\/admin(\/|$)/,
   /^\/driver(\/|$)/,
@@ -27,7 +35,10 @@ const ALLOWED = [
   /^\/api(\/|$)/,
   /^\/invoice(\/|$)/,
   /^\/login$/,
-  /^\/logout$/
+  /^\/logout$/,
+  /^\/signup$/,
+  /^\/forgot-password$/,
+  /^\/reset-password$/
 ];
 
 export function proxy(req) {
