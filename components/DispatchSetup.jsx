@@ -25,7 +25,9 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   // on the default — "we pay" — with no way to correct it. Retiring and
   // re-adding is not the way out: a second `vehicles` row orphans the odometer
   // history and every fill already logged against the first one.
-  const [editVan, setEditVan] = useState(null);   // { id, fuelPaidBy, carrierName }
+  const [editVan, setEditVan] = useState(null);   // { id, fuelPaidBy, carrierName, dayRate }
+  const [vanRate, setVanRate] = useState('');
+  const [editDrv, setEditDrv] = useState(null);   // { id, hourlyRate }
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
@@ -131,13 +133,13 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'vehicle', name: vanName, plate: vanPlate,
-          fuelPaidBy: vanFuel, carrierName: vanCarrier
+          fuelPaidBy: vanFuel, carrierName: vanCarrier, dayRate: vanRate
         })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not save the van.'); return; }
       setOk(`${d.vehicle.name} added.`);
-      setVanName(''); setVanPlate(''); setVanFuel('us'); setVanCarrier('');
+      setVanName(''); setVanPlate(''); setVanFuel('us'); setVanCarrier(''); setVanRate('');
       await loadVans();
     } catch { setErr('Network error — nothing was saved.'); }
     finally { setBusy(''); }
@@ -153,7 +155,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'vehicle', id: v.id, name: v.name, plate: v.plate, active: v.active,
-          fuelPaidBy: editVan.fuelPaidBy, carrierName: editVan.carrierName
+          fuelPaidBy: editVan.fuelPaidBy, carrierName: editVan.carrierName, dayRate: editVan.dayRate
         })
       });
       const d = await res.json();
@@ -167,6 +169,26 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
     finally { setBusy(''); }
   }
 
+  // What an hour of this driver costs. It is what the Profit tab multiplies the
+  // shift clock by, so a driver with no rate makes their whole day read as free.
+  async function saveDriverRate(d) {
+    setBusy(`rate${d.id}`); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'driver_rate', driverId: d.id, hourlyRate: editDrv.hourlyRate })
+      });
+      const j = await res.json();
+      if (!res.ok) { setErr(j.error || 'Could not save that rate.'); return; }
+      setOk(editDrv.hourlyRate === ''
+        ? `${d.name || d.email}: rate cleared — their shifts will count as nothing until one is set.`
+        : `${d.name || d.email}: $${Number(editDrv.hourlyRate).toFixed(2)} an hour.`);
+      setEditDrv(null);
+      await loadRoster();
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(''); }
+  }
+
   async function toggleVan(v) {
     setBusy(`van${v.id}`); setErr('');
     try {
@@ -174,7 +196,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'vehicle', id: v.id, name: v.name, plate: v.plate, active: !v.active,
-          fuelPaidBy: v.fuelPaidBy, carrierName: v.carrierName
+          fuelPaidBy: v.fuelPaidBy, carrierName: v.carrierName, dayRate: v.dayRate
         })
       });
       await loadVans();
@@ -386,12 +408,14 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                   {v.fuelPaidBy === 'carrier'
                     ? ` · fuel billed by ${v.carrierName || 'the carrier'}`
                     : ' · we pay the fuel'}
+                  {v.dayRate ? ` · $${v.dayRate.toFixed(2)}/day` : ' · no day rate'}
                 </span>
                 {!v.active && <span className="hint" style={{ margin: 0 }}> · retired</span>}
                 <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
                   onClick={() => setEditVan(editVan?.id === v.id ? null
-                    : { id: v.id, fuelPaidBy: v.fuelPaidBy || 'us', carrierName: v.carrierName || '' })}>
-                  who pays the fuel
+                    : { id: v.id, fuelPaidBy: v.fuelPaidBy || 'us', carrierName: v.carrierName || '',
+                        dayRate: v.dayRate == null ? '' : String(v.dayRate) })}>
+                  fuel &amp; day rate
                 </button>
                 <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
                   onClick={() => toggleVan(v)}>{v.active ? 'retire' : 'bring back'}</button>
@@ -406,6 +430,9 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                       <input value={editVan.carrierName} placeholder="Carrier name (optional)"
                         onChange={(e) => setEditVan({ ...editVan, carrierName: e.target.value })} />
                     )}
+                    <input value={editVan.dayRate} inputMode="decimal" style={{ width: 150 }}
+                      placeholder="Day rate, e.g. 60"
+                      onChange={(e) => setEditVan({ ...editVan, dayRate: e.target.value })} />
                     <button type="button" className="btn accent" disabled={busy === `van${v.id}`}
                       onClick={() => saveVanFuel(v)}>
                       {busy === `van${v.id}` ? 'Saving…' : 'Save'}
@@ -439,6 +466,11 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
             <input value={vanCarrier} onChange={(e) => setVanCarrier(e.target.value)}
               placeholder="Carrier name (optional)" />
           )}
+          {/* What the truck costs for a day it goes out. Charged once per van
+              per day in the Profit tab, not once per shift — a two-man day on
+              one truck is one truck. */}
+          <input value={vanRate} onChange={(e) => setVanRate(e.target.value)} inputMode="decimal"
+            style={{ width: 150 }} placeholder="Day rate, e.g. 60" />
           <button className="btn accent" disabled={busy === 'van'}>{busy === 'van' ? 'Adding…' : 'Add van'}</button>
         </form>
         <p className="hint">
@@ -472,7 +504,30 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                   {d.lastSeen
                     ? `on their phone ${new Date(d.lastSeen).toLocaleDateString('en-CA')}`
                     : d.linkSentAt ? 'texted, not opened yet' : 'no link sent yet'}
+                  {canManageDrivers && (d.hourlyRate ? ` · $${d.hourlyRate.toFixed(2)}/h` : ' · no hourly rate')}
                 </span>
+                {canManageDrivers && (
+                <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
+                  onClick={() => setEditDrv(editDrv?.id === d.id ? null
+                    : { id: d.id, hourlyRate: d.hourlyRate == null ? '' : String(d.hourlyRate) })}>
+                  hourly rate
+                </button>)}
+                {canManageDrivers && editDrv?.id === d.id && (
+                  <div className="disp-setup-form" style={{ marginTop: 8 }}>
+                    <input value={editDrv.hourlyRate} inputMode="decimal" style={{ width: 150 }}
+                      placeholder="e.g. 25"
+                      onChange={(e) => setEditDrv({ ...editDrv, hourlyRate: e.target.value })} />
+                    <button type="button" className="btn accent" disabled={busy === `rate${d.id}`}
+                      onClick={() => saveDriverRate(d)}>
+                      {busy === `rate${d.id}` ? 'Saving…' : 'Save'}
+                    </button>
+                    <button type="button" className="btn" onClick={() => setEditDrv(null)}>Cancel</button>
+                    <p className="hint" style={{ flexBasis: '100%', margin: 0 }}>
+                      The Profit tab multiplies this by the hours they were clocked on. It applies to shifts
+                      already recorded, not just future ones.
+                    </p>
+                  </div>
+                )}
                 {canManageDrivers && (
                   <>
                     <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}

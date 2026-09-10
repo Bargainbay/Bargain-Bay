@@ -11,8 +11,7 @@ import {
   profitReport, stopTimes, addExpense, listExpenses, deleteExpense, EXPENSE_KINDS
 } from '../../../../lib/dispatch-money';
 import {
-  shiftReport, mileageReport, listVehicles, upsertVehicle
-} from '../../../../lib/shifts';
+  shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate } from '../../../../lib/shifts';
 import { livePositions, driverTrail } from '../../../../lib/driver-location';
 import { sendSms, smsConfigured } from '../../../../lib/sms';
 import { SITE_URL } from '../../../../lib/site';
@@ -272,6 +271,19 @@ export async function POST(req) {
       }
     }
     // The repair for a driver who was already added twice.
+    // What an hour of a driver costs is PAY, so it sits behind the same gate as
+    // the hours and the Profit tab — not the staff-level gate the van rates use.
+    // A truck's day rate is a fact about a truck; a person's rate is their wage.
+    if (body.action === 'driver_rate') {
+      if (!isAdmin(s)) {
+        return NextResponse.json({ error: 'Only an admin can set a driver\'s rate.' }, { status: 403 });
+      }
+      try {
+        return NextResponse.json({ ok: true, driver: await setDriverRate(body.driverId, body.hourlyRate) });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not save that rate.' }, { status: 400 });
+      }
+    }
     if (body.action === 'driver_merge') {
       if (!s.full) return NextResponse.json({ error: 'Only an admin can merge driver accounts.' }, { status: 403 });
       return NextResponse.json({ ok: true, ...(await mergeDrivers(body.keepId, body.dropId)) });
