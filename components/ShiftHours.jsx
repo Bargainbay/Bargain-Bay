@@ -21,8 +21,13 @@ const timeField = (iso) =>
 export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
-  const [editing, setEditing] = useState(null);   // { id, startTime, endTime, startKm, endKm }
+  const [editing, setEditing] = useState(null);   // { id, startTime, endTime, startKm, endKm, vehicleId }
   const [busy, setBusy] = useState(false);
+  const [vans, setVans] = useState([]);
+  useEffect(() => {
+    fetch('/api/admin/dispatch?view=vehicles')
+      .then((r) => r.json()).then((d) => setVans(d.vehicles || [])).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -46,6 +51,7 @@ export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
           action: 'shift_times', shiftId: row.id,
           startTime: editing.startTime, endTime: editing.endTime,
           startKm: editing.startKm, endKm: editing.endKm,
+          vehicleId: editing.vehicleId, clearKm: !!editing.clearKm,
           note: 'hours corrected from the Times tab'
         })
       });
@@ -126,7 +132,9 @@ export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
                         // it would otherwise go hunting for one tab away.
                         endTime: timeField(r.endedAt) || (r.lastStop ? timeField(r.lastStop.at) : ''),
                         startKm: r.startKm == null ? '' : String(r.startKm),
-                        endKm: r.endKm == null ? '' : String(r.endKm)
+                        endKm: r.endKm == null ? '' : String(r.endKm),
+                        vehicleId: r.vehicleId == null ? '' : String(r.vehicleId),
+                        clearKm: false
                       })}>
                       {editing?.id === r.id ? 'close' : 'fix hours'}
                     </button>
@@ -147,6 +155,17 @@ export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
                       </label>
                       {r.driving !== false && (
                         <>
+                          {/* The van, because the mistake this whole guard
+                              exists to catch is a reading typed against the
+                              wrong truck — and leaving it there poisons that
+                              truck's history for everyone after. */}
+                          <label style={{ display: 'grid', fontSize: 12 }}>Van
+                            <select value={editing.vehicleId} style={{ width: 190 }}
+                              onChange={(e) => setEditing({ ...editing, vehicleId: e.target.value })}>
+                              <option value="">No van recorded</option>
+                              {vans.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                            </select>
+                          </label>
                           <label style={{ display: 'grid', fontSize: 12 }}>Km on
                             <input value={editing.startKm} inputMode="numeric" style={{ width: 120 }}
                               onChange={(e) => setEditing({ ...editing, startKm: e.target.value.replace(/\D+/g, '') })} />
@@ -156,6 +175,13 @@ export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
                               onChange={(e) => setEditing({ ...editing, endKm: e.target.value.replace(/\D+/g, '') })} />
                           </label>
                         </>
+                      )}
+                      {r.driving !== false && (
+                        <label style={{ fontSize: 12, alignSelf: 'end', whiteSpace: 'nowrap' }}>
+                          <input type="checkbox" checked={!!editing.clearKm}
+                            onChange={(e) => setEditing({ ...editing, clearKm: e.target.checked })} />
+                          {' '}Clear both readings
+                        </label>
                       )}
                       <button type="button" className="btn accent" disabled={busy} onClick={() => save(r)}>
                         {busy ? 'Saving…' : 'Save hours'}
@@ -172,6 +198,9 @@ export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
                               : ' — the real finish is after that, plus the drive back.'}
                           </>
                         )}
+                        {' '}A reading that belongs to no van at all — a 0, or a stray six-figure number — should be
+                        <b> cleared</b> rather than guessed at: the next real reading on that truck becomes its
+                        baseline again.
                         {r.editedBy && <> Last corrected by {r.editedBy}.</>}
                       </p>
                     </div>
