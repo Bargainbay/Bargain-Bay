@@ -15,6 +15,11 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // the people who take the orders couldn't mark one ready or put it on a
     // driver's day. It is its own tab now, for both roles.
     { key: 'orders', label: 'Orders', href: '/admin/orders', sales: true },
+    // Intake was a fold on the admin-only Operations page, so a rep who took in
+    // a vendor's drop-off could not book it in or put it on the site. On this
+    // tab sales get the vendor drop-off form and the sync button; the
+    // "tested working?" queue stays admin (see app/admin/intake/page.jsx).
+    { key: 'intake', label: 'Intake', href: '/admin/intake', sales: true },
     { key: 'campaigns', label: 'Campaigns', href: '/admin/campaigns' },
     { key: 'coupons', label: 'Coupons', href: '/admin/coupons' },
     { key: 'payroll', label: 'Payroll', href: '/admin/payroll' },

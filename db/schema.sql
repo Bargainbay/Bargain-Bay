@@ -769,3 +769,19 @@ CREATE TABLE IF NOT EXISTS blocklist (
   created_at timestamptz DEFAULT now(),
   UNIQUE (kind, value)
 );
+
+-- Per-unit photos taken by us (a vendor drop-off the sales floor listed itself),
+-- as opposed to the RS Ops inspection gallery which arrives over a feed. Kept in
+-- their OWN table and never on `products`, because every tracker sync rewrites
+-- every column of that row — a photo stored there would be wiped by the next
+-- sync, which is the one thing the rep is told to press afterwards.
+CREATE TABLE IF NOT EXISTS unit_photos (
+  id         serial PRIMARY KEY,
+  sku        text NOT NULL,
+  path       text NOT NULL,          -- blob pathname (products/<sku>-<n>.jpg)
+  url        text NOT NULL,          -- our own proxy path: /api/photo/<key>
+  position   int NOT NULL DEFAULT 0, -- 0 = the one cards and the Meta feed use
+  created_by text,
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_unit_photos_sku ON unit_photos(sku, position, id);

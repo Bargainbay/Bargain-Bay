@@ -1,18 +1,23 @@
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin } from '../../../../lib/auth';
+import { getSession, isStaff } from '../../../../lib/auth';
 import { syncInventoryFromTracker } from '../../../../lib/catalog-sync';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60; // the tracker read (copy temp Sheet) can take a few seconds
 
-async function admin() {
+// Staff, not admin. A rep who has just booked in a vendor drop-off has to be
+// able to put it on the site — sending them to find the owner to press a button
+// is what keeps stock sitting in the warehouse unlisted. The sync only ever
+// COPIES the tracker into the products table: it prices nothing, decides
+// nothing, and publishes nothing the tracker doesn't already say is for sale.
+async function staff() {
   const s = await getSession();
-  return !!(s && isAdmin(s));
+  return !!(s && isStaff(s));
 }
 
 export async function POST() {
-  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   try {
     const result = await syncInventoryFromTracker();
     return NextResponse.json({ ok: true, ...result });

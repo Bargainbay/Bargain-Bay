@@ -72,6 +72,10 @@ See `.env.example` for the full annotated list. The site builds and browses with
     (`/admin/orders`, and `/api/admin/{orders,order-edit,schedule-delivery,order-rep,pod}`)
     including cancelling and refunding an order, and dispatch — scheduling,
     assigning drivers, pulling BB orders onto the board, the run sheet, POD.
+    Plus **vendor drop-off intake** (`/admin/intake`, the consignment path on
+    `/api/admin/{intake,unit-photos,sync-inventory}`) — booking in an appliance a
+    vendor left at the loading bay, photographing it and putting it on the site.
+    NOT the "Pending — tested working?" queue: see the vendor drop-off section.
   - **Admin** — what the business costs and earns, and what it pays people:
     cost and profit anywhere, the dashboards' Profit KPI and Profit column, the
     per-line cost input, `dispatch_expenses`, and on the dispatch board the
@@ -174,6 +178,78 @@ record anywhere. Rules that must hold:
 - status is re-derived from the payment ledger. Paying more than the corrected
   total is reported as `overpaid`; no refund record is invented, because no money
   has physically moved.
+
+## Vendor drop-offs — stock the sales floor lists itself (added 2026-09-10)
+Some vendors just leave appliances with us. **No invoice, a cost agreed out loud,
+and we pay them once the unit sells.** They arrive KNOWN WORKING, which is the
+whole point: there is nothing for the refurb floor to test, so routing them
+through `Untested` parks live, sellable stock in a queue waiting on an inspection
+nobody is going to do.
+
+`/admin/intake` is the tab (staff). `VendorIntake.jsx` → `addConsignmentUnit`
+(lib/intake.js) → `unit_photos` (lib/unit-photos.js) → **Sync inventory from
+tracker**, which is now staff-level too. Operations keeps the whole thing as its
+`intake` fold for the owner's muscle memory — the SAME components, so the two
+cannot drift.
+
+- **This is the ONE path that writes Status itself**, and it is a deliberate,
+  narrow exception to "Condition and Status belong to RS Ops". That rule exists
+  because a machine's state should come from the thing that tested it; here the
+  person filling the form IS the person who took the unit in and looked at it.
+  It is a **separate function**, not a flag on `addIntakeUnits`, so an invoice
+  manifest can never reach it by passing an extra field, and the route refuses
+  any multipart body that isn't `mode: 'consignment'`.
+- **Sales get the intake form and the sync button. They do NOT get the
+  "Pending — tested working?" queue.** That queue is machines off the refurb
+  floor, and calling one fit to sell is RS Ops's judgement, not a selling
+  decision — so a non-admin can reach nothing on `/api/admin/intake` but the
+  consignment POST. Same gate question as everything else: this is a thing a rep
+  does with a vendor at the loading bay, so it is staff.
+- **Condition and retail are REQUIRED here** and optional everywhere else,
+  because the unit is going straight on sale. The tracker prices it as
+  Retail × Condition%, and `lib/csv.js` **drops a priceless row without
+  comment** — the unit would be added, synced, and simply never appear.
+- **Qty is always ONE.** The photos are of a specific machine; stamping one set
+  onto five SKUs shows a buyer a different appliance than the one they get.
+- **The Invoice column is written `CONSIGNMENT`** (plus any note). An empty cell
+  reads as an invoice number nobody has typed in yet; whoever settles up with
+  this vendor has to be able to see off the tracker that the money is owed
+  **on sale**, not already paid. Nothing wires that into payables yet — a
+  consignment liability is not modelled in `lib/ledger.js`.
+
+### The photos, and why they are not on `products`
+`unit_photos` is its own table, keyed by SKU, joined on read by `lib/inventory`.
+**`upsertProducts` rewrites every column of a product row on every sync**, and
+pressing Sync is literally the next thing the rep is told to do — a photo stored
+in `products.image_url` would be gone before the unit was on sale. Kept apart, a
+sync cannot touch them and a unit relisted later still has its pictures.
+
+- Files go to the **private Blob store** at `products/<sku>-<n>.jpg` and are
+  served through the pre-existing `/api/photo/<key>` proxy, so the storefront,
+  the OG tags and the Meta feed all get a stable public URL on our own domain.
+  The key sanitising in `lib/unit-photos.js` and in that route must stay in step.
+- **`imageFor` prefers `unit.photos[0]`** over everything else — for one of these
+  units there IS no manufacturer stock shot to find, so the alternative is a
+  category placeholder and a unit the Meta feed skips. RS Ops photos are
+  deliberately NOT consulted there: that gallery stays additive and the stock
+  image stays primary for units the refurb floor processed.
+- Photos are attached BEFORE `imageFor` runs (`withOwnPhotos`), one query per
+  page, and every read soft-fails to "no photos" — the storefront must render
+  whether or not the table exists yet.
+- `POST /api/admin/unit-photos` adds more to a unit already booked in, because
+  otherwise a photo mistake could only be fixed by deleting the unit and adding
+  it again, which changes the SKU.
+- **No `capture` on the library input** — same rule as the driver app: on iOS it
+  makes an input camera-ONLY and ignores `multiple`. Two buttons.
+
+**LANDMINE — "Synced 43 units" is not an answer to "is my fridge on the site".**
+The tracker's Condition% / Suggested Price cells are formulas that recalculate a
+beat after a row lands, and the importer drops a row with no price silently
+(`markIntakeTested` sleeps and retries for exactly this reason). A rep who adds a
+unit and presses Sync immediately gets a cheerful success message about somebody
+else's stock. So the screen keeps what was added this session and asks
+`intakeLiveStatus` afterwards: **per-unit ✓ live / not live yet**, with what to
+check.
 
 ## The orders board has its own tab (added 2026-09-08)
 `/admin/orders` (staff) renders the same `AdminOrders` the Operations page has
@@ -1147,8 +1223,8 @@ the paper run sheet that replaces it.
   copies the customer, address and appliance onto a new visit against the SAME
   ticket and drops it in "To assign". Without it a second trip opens a second
   ticket and the open-service-call count inflates.
-- **Gate exception:** dispatch uses `isStaff`, making it a FOURTH staff surface
-  beyond the three named in the gate rule below. Intentional — whoever answers
+- **Gate exception:** dispatch uses `isStaff`, making it another staff surface
+  beyond the selling ones named in the gate rule above. Intentional — whoever answers
   the phone has to be able to put the job on the board. Adding a **client** is
   staff too (it's a company name). Adding a **driver** stays `isAdmin` — that one
   is a real access grant.

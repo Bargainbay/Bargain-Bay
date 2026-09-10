@@ -99,6 +99,28 @@ export default async function Product({ params }) {
       <ProductBuyPanel units={units} initialId={u.id} />
 
       <div className="product-desc">
+        {/* Photos we took ourselves — a vendor drop-off the sales floor booked in
+            and photographed on arrival. There is no manufacturer stock shot for a
+            machine like this, so these are also what the card and the Meta feed
+            use (lib/images.js prefers `photos[0]`). Same tile treatment as the RS
+            Ops gallery below: next/image resizes to the tile, the anchor opens
+            the untouched original. */}
+        {u.photos?.length > 0 && (
+          <>
+            <h2>Photos of this exact unit</h2>
+            <p>Taken here at the warehouse — what you see is the unit you get.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+              {u.photos.map((p, i) => (
+                <a key={p.url} href={p.url} target="_blank" rel="noopener"
+                  style={{ position: 'relative', display: 'block', aspectRatio: '1', borderRadius: 8, overflow: 'hidden' }}>
+                  <Image src={p.url} alt={`${u.make} ${u.model} — photo ${i + 1}`} fill
+                    sizes="(max-width: 700px) 45vw, 200px"
+                    style={{ objectFit: 'cover' }} />
+                </a>
+              ))}
+            </div>
+          </>
+        )}
         {u.rsopsPhotos?.length > 0 && (
           <>
             <h2>Photos of this exact unit</h2>

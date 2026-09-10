@@ -17,6 +17,7 @@ import AdminReconcile from '../AdminReconcile';
 import AdminDrivers from '../AdminDrivers';
 import AdminSalvage from '../AdminSalvage';
 import AdminIntake from '../AdminIntake';
+import VendorIntake from '../../../components/VendorIntake';
 import PurchaseIntake from '../../../components/PurchaseIntake';
 import IntakeQueue from '../../../components/IntakeQueue';
 import { listPendingIntake } from '../../../lib/intake-queue';
@@ -115,7 +116,11 @@ export default async function OperationsPage() {
         <PurchaseIntake />
       </OpsSection>
 
+      {/* Both halves of intake, so the owner's fold still holds everything.
+          The vendor drop-off form is also its own staff tab at /admin/intake —
+          one component, so the two can't drift. */}
       <OpsSection id="intake" title="Inventory intake">
+        <VendorIntake />
         <AdminIntake />
       </OpsSection>
 
