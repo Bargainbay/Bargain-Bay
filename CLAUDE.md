@@ -29,6 +29,33 @@ A unit object: `{ id (SKU), make, model, category, title, condition, price, comp
 - `lib/members.js` + `data/member-prices.json` — wholesale/member pricing (see rules below).
 - `lib/inventory.js` — `getAll()`, `getById()`, `getAvailable()` (DB-aware), reads `data/catalog.json`.
 - `lib/images.js` — `imageFor(unit)`, `hasRealImage(unit)`. Manufacturer photos (AJ Madison CDN) keyed by model via `data/images.json`; falls back to branded per-category placeholder SVG in `public/stock/`. `hasRealImage` is false for placeholders.
+
+### Adding to `data/images.json`
+The lookup is `modelImages[model]` — an **exact string match**, no trimming, no
+case folding. Three things follow, all learned filling the gap on 2026-09-10:
+- **Key on the model EXACTLY as the tracker spells it**, typo and all. One range
+  is in the tracker as `YWFE745HOFS` with a letter O where Whirlpool uses a zero.
+  It is keyed BOTH ways: the typo is what the site asks for today, the correct
+  spelling is what it will ask for the moment somebody tidies the row. Same for
+  `ELFG7637AT1`, where the tracker carries a revision suffix the manufacturer
+  doesn't market. A second key costs nothing; a silent placeholder costs a listing.
+- **Verify the URL RENDERS before committing it.** Several manufacturer CDNs
+  (Whirlpool especially) 403 every server-side request including for URLs that
+  are perfectly valid in a browser — so curl cannot tell a good URL from a bad
+  one there, and a guessed filename that looks right can be wrong. A guess that
+  404s is worse than the placeholder it replaced: a placeholder is branded art, a
+  broken `<img>` is nothing. Load it in a real browser and check it is also the
+  RIGHT appliance.
+- **Prefer `assets.ajmadison.com`** where the model exists there: `normalizeImg`
+  rewrites only that host, trimming the baked-in white border and padding every
+  product onto an identical 1000x1000 canvas — which is what keeps a grid of
+  cards from looking ragged. Other hosts are served as-is, so pick something
+  close to square.
+- **Watch for claims baked into the artwork.** Midea's Canadian renders carry a
+  `2 YEARS LIMITED WARRANTY` badge in the corner. Every Canadian retailer uses
+  Midea's own asset, so there is no clean alternative for those models — the four
+  Midea entries added on 2026-09-10 carry it. Fine on a New-in-Box unit, worth a
+  thought on a used one, where our own warranty is one year.
 - `lib/reservations.js` — race-safe 30-min SKU holds in Postgres. `unavailableSkus()`, `isUnavailable()`.
 - `lib/clover.js` — Clover Hosted Checkout. `lib/sheets.js` — read + writeSold via Google service account.
 - `lib/auth.js` — bcryptjs + jose JWT cookie `bb_session`. `lib/db.js` — lazy `pg` pool (build never needs `POSTGRES_URL`).
