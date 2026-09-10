@@ -747,6 +747,25 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   // The times, corrected from the office.
   const onTimes = (jobId, patch) => send('PATCH', { action: 'times', jobId, ...patch });
 
+  async function endAtBase() {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'return_to_base', date: board.date })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not add those.'); return; }
+      if (!d.added.length) {
+        setErr(d.skipped
+          ? 'Every driver out today already has one.'
+          : 'Nobody has stops on this day, so there is nothing to end.');
+      }
+      await refresh();
+    } catch { setErr('Network error — nothing was added.'); }
+    finally { setBusy(false); }
+  }
+
   // Both halves of a stop's money, each through its own guarded action. '' means
   // clear it, which is why the amount is passed through rather than Number()'d
   // here — setJobCharge and setJobPay both read '' as "no figure".
@@ -1039,6 +1058,16 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
             <button type="button" className="btn" disabled={busy}
               title={`Record gas or another cost against ${board.date}`}
               onClick={() => setGassing((v) => !v)}>{gassing ? 'Close' : '⛽ Gas'}</button>
+          )}
+          {/* The last stop of the night, on every driver who is out. Its Done
+              tap is the only independent record of what time the day actually
+              ended — which is exactly what is missing every time somebody
+              forgets to clock off, and what the shift editor then has to
+              guess at. One per driver per day; pressing it twice does nothing. */}
+          {canManageClients && (
+            <button type="button" className="btn" disabled={busy}
+              title="Put a 'return to base' on the end of every driver's run for this day"
+              onClick={endAtBase}>🏁 End runs at base</button>
           )}
           <button type="button" className="btn accent" onClick={() => setAdding((v) => !v)}>
             {adding ? 'Close' : '+ Add job'}

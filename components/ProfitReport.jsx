@@ -177,6 +177,8 @@ export default function ProfitReport({ drivers = [], date }) {
                   <th style={{ textAlign: 'right' }}>Hours</th>
                   <th style={{ textAlign: 'right' }}>Charged</th>
                   <th style={{ textAlign: 'right' }}>Drivers</th>
+                  <th style={{ textAlign: 'right' }}>Crew (hrs)</th>
+                  <th style={{ textAlign: 'right' }}>Truck</th>
                   <th style={{ textAlign: 'right' }}>Gas</th>
                   <th style={{ textAlign: 'right' }}>Carrier fuel</th>
                   <th style={{ textAlign: 'right' }}>Other</th>
@@ -185,9 +187,9 @@ export default function ProfitReport({ drivers = [], date }) {
                 </tr>
               </thead>
               <tbody>
-                {loading && <tr><td colSpan={10} style={{ color: 'var(--muted)' }}>Loading…</td></tr>}
+                {loading && <tr><td colSpan={12} style={{ color: 'var(--muted)' }}>Loading…</td></tr>}
                 {!loading && data.buckets.length === 0 && (
-                  <tr><td colSpan={10} style={{ color: 'var(--muted)' }}>
+                  <tr><td colSpan={12} style={{ color: 'var(--muted)' }}>
                     Nothing finished, and nothing spent, in that period.
                   </td></tr>
                 )}
@@ -203,6 +205,29 @@ export default function ProfitReport({ drivers = [], date }) {
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{b.hours || '—'}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(b.revenue)}</td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(b.driverPay)}</td>
+                    {/* The shift bill: hours actually clocked, at the person's
+                        own rate. Shifts nobody closed are NOT in here and are
+                        called out beneath, because a guess at them would be the
+                        largest number on the row. */}
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      {b.labour ? money(b.labour) : '—'}
+                      {b.shiftHours > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{b.shiftHours}h</div>
+                      )}
+                      {b.unpricedShifts > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--danger, #c0392b)' }}>
+                          {b.unpricedShifts} not clocked off
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                      {b.truck ? money(b.truck) : '—'}
+                      {b.truckDays > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                          {b.truckDays} truck-day{b.truckDays === 1 ? '' : 's'}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(b.gas)}</td>
                     {/* Shown, and NOT added in. It is already inside the
                         carrier's invoice, which arrives as its own cost row. */}
@@ -221,6 +246,31 @@ export default function ProfitReport({ drivers = [], date }) {
                 ))}
               </tbody>
             </table></div>
+            {(data.totals.unpricedShifts > 0 || data.totals.noRateShifts > 0) && (
+              <div className="error-box">
+                {data.totals.unpricedShifts > 0 && (
+                  <>
+                    <b>{data.totals.unpricedShifts} shift{data.totals.unpricedShifts === 1 ? '' : 's'} could not be
+                    costed</b> — nobody clocked off, or the shift ran past 14 hours, which is the same thing with
+                    the tap coming the next morning. Those hours are <b>left out</b> of Crew above rather than
+                    guessed at, so the cost is short by whatever they were. Fix them in <b>Times → Shifts</b> and
+                    the figure corrects itself.{' '}
+                  </>
+                )}
+                {data.totals.noRateShifts > 0 && (
+                  <>{data.totals.noRateShifts} clocked-off shift{data.totals.noRateShifts === 1 ? ' has' : 's have'}
+                    {' '}no hourly rate on the driver, so {data.totals.noRateShifts === 1 ? 'it counts' : 'they count'}
+                    {' '}as nothing. Set it under <b>Clients &amp; drivers</b>.</>
+                )}
+              </div>
+            )}
+            <p className="hint">
+              <b>Crew</b> is the shift clock at each person&apos;s own hourly rate, and <b>Truck</b> is the van&apos;s
+              day rate charged once per van per day it went out — the two halves of the carrier&apos;s invoice, worked
+              out on the night instead of waiting a fortnight for the bill. When that invoice does arrive, it should
+              land near Crew + Truck + Gas for the same period; record it as a <b>Carrier bill</b> and compare, rather
+              than adding it on top.
+            </p>
             <p className="hint">
               Charged is what the client pays: the charge typed on the job, or — for a Bargain Bay delivery — the
               delivery fee on the order. Cost is what the stop paid its driver, plus the gas and anything else
