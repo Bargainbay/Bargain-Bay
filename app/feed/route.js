@@ -19,6 +19,7 @@ export const runtime = 'nodejs';
 const CONDITION_MAP = {
   'New in Box': 'new',
   'New Open Box': 'new',
+  'New Scratch & Dent': 'new',
   'Scratch & Dent': 'new',
   'Refurbished': 'refurbished',
   'Used': 'used',
