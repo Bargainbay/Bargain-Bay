@@ -267,14 +267,25 @@ sync cannot touch them and a unit relisted later still has its pictures.
   served through the pre-existing `/api/photo/<key>` proxy, so the storefront,
   the OG tags and the Meta feed all get a stable public URL on our own domain.
   The key sanitising in `lib/unit-photos.js` and in that route must stay in step.
-- **`imageFor` prefers `unit.photos[0]`** over everything else — for one of these
-  units there IS no manufacturer stock shot to find, so the alternative is a
-  category placeholder and a unit the Meta feed skips. RS Ops photos are
-  deliberately NOT consulted there: that gallery stays additive and the stock
-  image stays primary for units the refurb floor processed.
-- Photos are attached BEFORE `imageFor` runs (`withOwnPhotos`), one query per
-  page, and every read soft-fails to "no photos" — the storefront must render
-  whether or not the table exists yet.
+- **`imageFor` does NOT look at them. The STOCK picture always leads** — card,
+  buy panel, OG tag, Meta feed — and the real photographs come after it on the
+  product page. Same rule RS Ops's gallery has always followed. This is the
+  owner's call (2026-09-10) and it is about how the shop reads: a wall of studio
+  shots at one angle on one background is what makes a listing page look like a
+  shop, and a phone photo taken at the loading bay sitting next to eleven of them
+  looks like a mistake. The real pictures are what close the sale, and they are
+  one scroll down where a buyer is already looking for them.
+  **The cost is real and is not hidden:** a unit with no manufacturer photo for
+  its model falls through to the branded category placeholder, `hasRealImage` is
+  false for a placeholder, and `/feed` therefore skips it — that unit cannot be
+  advertised until a stock photo for the model exists in `data/images.json`. Do
+  not "fix" that by quietly promoting our own photo for placeholder units: the
+  ad would show a real machine and the landing page a placeholder, which is worse
+  than not advertising it.
+- Photos are attached by `withOwnPhotos` in `lib/inventory`, one query per page,
+  and every read soft-fails to "no photos" — the storefront must render whether
+  or not the table exists yet. **Not on the checkout read** (`getMany`): it
+  renders no gallery and would be buying a query it cannot use.
 - `POST /api/admin/unit-photos` adds more to a unit already booked in, because
   otherwise a photo mistake could only be fixed by deleting the unit and adding
   it again, which changes the SKU.

@@ -143,8 +143,9 @@ export default function VendorIntake() {
       <p className="hint" style={{ marginTop: 0 }}>
         For appliances a vendor leaves with us — <b>no invoice</b>, a cost agreed with them, and we pay
         once the unit sells. These arrive already working, so they skip the refurb floor: this writes the
-        unit into the <b>master tracker</b> as <b>Tested Working</b> and your photos become the unit&apos;s
-        pictures on the site. Press <b>Sync inventory</b> underneath when you&apos;re done and it goes live.
+        unit into the <b>master tracker</b> as <b>Tested Working</b>, and your photos go on the product page
+        under <b>&ldquo;Photos of this exact unit&rdquo;</b>. Press <b>Sync inventory</b> underneath when
+        you&apos;re done and it goes live.
       </p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -181,8 +182,8 @@ export default function VendorIntake() {
         </label>
         <span className="hint">
           {photos.length
-            ? `${photos.length} of ${MAX_PHOTOS} — tap one to remove it. The first is the one shoppers see on the card.`
-            : `Up to ${MAX_PHOTOS}. Without them the unit shows a category placeholder — there's no stock photo for a machine like this.`}
+            ? `${photos.length} of ${MAX_PHOTOS} — tap one to remove it. They show in this order on the product page.`
+            : `Up to ${MAX_PHOTOS}. The listing photo stays the manufacturer's stock picture; these go underneath it, and they're what actually sells a used machine.`}
         </span>
       </div>
       {photoWarn && <div className="hint" style={{ color: 'var(--danger, #b00)', marginTop: 6 }}>{photoWarn}</div>}
@@ -190,7 +191,7 @@ export default function VendorIntake() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
           {photos.map((p, i) => (
             <button type="button" key={p.url} onClick={() => dropPhoto(i)} title="Remove"
-              style={{ padding: 0, border: i === 0 ? '2px solid var(--gold, #c8a35a)' : '1px solid var(--line)', borderRadius: 8, background: 'none', cursor: 'pointer', lineHeight: 0 }}>
+              style={{ padding: 0, border: '1px solid var(--line)', borderRadius: 8, background: 'none', cursor: 'pointer', lineHeight: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.url} alt={`Photo ${i + 1}`} style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 6 }} />
             </button>
