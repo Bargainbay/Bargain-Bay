@@ -48,7 +48,7 @@ export default async function DispatchPage({ searchParams }) {
       {loadError && <div className="error-box">{loadError}</div>}
 
       <DispatchBoard initial={board} canManageClients={full} openTickets={openTickets}
-        canConfirmMoney={full} canGrantAccess={!coordinator && full}
+        canConfirmMoney={full} isOwner={!coordinator && full}
         initialView={String(sp?.view || 'board')} />
     </div>
   );

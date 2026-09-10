@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 // Clients and drivers, managed on the dispatch page itself. Everything dispatch
 // needs is here — sending someone to another screen to add a client mid-call is
 // exactly the friction this whole thing exists to remove.
-export default function DispatchSetup({ clients = [], drivers = [], canManageDrivers, canGrantAccess = false, onChanged }) {
+export default function DispatchSetup({ clients = [], drivers = [], canManageDrivers, isOwner = false, onChanged }) {
   const [name, setName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -81,7 +81,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
       if (res.ok) setAccess(data.dispatchers || []);
     } catch {}
   }, []);
-  useEffect(() => { if (canGrantAccess) loadAccess(); }, [canGrantAccess, loadAccess]);
+  useEffect(() => { if (isOwner) loadAccess(); }, [isOwner, loadAccess]);
 
   async function accessAction(action, payload, label) {
     setBusy(label); setErr('');
@@ -135,11 +135,15 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   useEffect(() => {
     fetch('/api/admin/dispatch?view=review_link')
       .then((r) => r.json()).then((d) => setReviewUrl(d.url || '')).catch(() => {});
-    fetch('/api/admin/dispatch?view=imports')
-      .then((r) => r.json())
-      .then((d) => { setCallTo(d.call?.to || ''); setCallReady(!!d.call?.configured); })
-      .catch(() => {});
-  }, []);
+    // Only the owner can see or change where the review rings, so only the owner
+    // needs to know what it is set to.
+    if (isOwner) {
+      fetch('/api/admin/dispatch?view=imports')
+        .then((r) => r.json())
+        .then((d) => { setCallTo(d.call?.to || ''); setCallReady(!!d.call?.configured); })
+        .catch(() => {});
+    }
+  }, [isOwner]);
 
   async function saveCallNumber(e) {
     e.preventDefault();
@@ -439,7 +443,9 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         </section>
       )}
 
-      {canManageDrivers && (
+      {/* Owner only. A coordinator runs the imports and takes the review call —
+          they just can't move where it rings. See the same rule on the route. */}
+      {isOwner && (
         <section className="panel">
           <h3 style={{ marginTop: 0 }}>The number an import review rings</h3>
           <p className="hint" style={{ marginTop: 0 }}>
@@ -704,7 +710,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         )}
       </section>
 
-      {canGrantAccess && (
+      {isOwner && (
         <section className="panel">
           <h3 style={{ marginTop: 0 }}>Dispatch portal access</h3>
           <p className="hint" style={{ marginTop: 0 }}>

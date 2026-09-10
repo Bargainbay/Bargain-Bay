@@ -258,8 +258,13 @@ export async function POST(req) {
       }
       return NextResponse.json({ ok: true, ...(await startImportCall(body.batchId, { by: who(s) })) });
     }
+    // WHERE THE PHONE RINGS IS THE OWNER'S, not the coordinator's. `s.full` is
+    // true for a coordinator, and everything else on this page is deliberately
+    // theirs — but this one decides who the company's outbound caller dials, and
+    // whoever holds it can move the review off the owner's phone without anyone
+    // being told. Kept beside granting portal access for the same reason.
     if (body.action === 'call_number') {
-      if (!s.full) return NextResponse.json({ error: 'Only an admin can set the number dispatch rings.' }, { status: 403 });
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only the owner can change the number dispatch rings.' }, { status: 403 });
       const raw = String(body.number || '').trim();
       // E.164 only. A number the phone system can't dial is a call that fails
       // silently at Twilio rather than on the screen somebody is looking at.
