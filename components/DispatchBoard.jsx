@@ -765,22 +765,48 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   }
 
   // The times, corrected from the office.
+  const [basing, setBasing] = useState(null);   // { bases, rows:[{id,name,baseId,on}] }
+
   const onTimes = (jobId, patch) => send('PATCH', { action: 'times', jobId, ...patch });
 
-  async function endAtBase() {
+  // Opening the picker is a READ. Nothing is written until the office says who
+  // is going back to which yard — with two bases there is no sensible default
+  // to apply silently, and guessing would put a driver's last stop in the wrong
+  // city.
+  async function openBasePicker() {
+    setErr('');
+    try {
+      const [b, o] = await Promise.all([
+        fetch('/api/admin/dispatch?view=bases').then((r) => r.json()),
+        fetch(`/api/admin/dispatch?view=drivers_out&date=${board.date}`).then((r) => r.json())
+      ]);
+      if (!(b.bases || []).length) {
+        setErr('No yards set yet — add them under Clients & drivers.'); return;
+      }
+      const out = (o.drivers || []).filter((d) => !d.hasOne);
+      if (!out.length) {
+        setErr((o.drivers || []).length
+          ? 'Everybody out today already has a return to base.'
+          : 'Nobody has stops on this day, so there is nothing to end.');
+        return;
+      }
+      setBasing({ bases: b.bases, rows: out.map((d) => ({ ...d, baseId: b.bases[0].id, on: true })) });
+    } catch { setErr('Could not load the yards.'); }
+  }
+
+  async function addReturnStops() {
     setBusy(true); setErr('');
     try {
       const res = await fetch('/api/admin/dispatch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'return_to_base', date: board.date })
+        body: JSON.stringify({
+          action: 'return_to_base', date: board.date,
+          assignments: basing.rows.filter((r) => r.on).map((r) => ({ driverId: r.id, baseId: r.baseId }))
+        })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not add those.'); return; }
-      if (!d.added.length) {
-        setErr(d.skipped
-          ? 'Every driver out today already has one.'
-          : 'Nobody has stops on this day, so there is nothing to end.');
-      }
+      setBasing(null);
       await refresh();
     } catch { setErr('Network error — nothing was added.'); }
     finally { setBusy(false); }
@@ -1092,7 +1118,8 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
           {canManageClients && (
             <button type="button" className="btn" disabled={busy}
               title="Put a 'return to base' on the end of every driver's run for this day"
-              onClick={endAtBase}>🏁 End runs at base</button>
+              onClick={() => (basing ? setBasing(null) : openBasePicker())}>
+              {basing ? 'Close' : '🏁 End runs at base'}</button>
           )}
           <button type="button" className="btn accent" onClick={() => setAdding((v) => !v)}>
             {adding ? 'Close' : '+ Add job'}
@@ -1101,6 +1128,40 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
       </div>
 
       {err && <div className="error-box">{err}</div>}
+
+      {basing && (
+        <div className="panel">
+          <h3 style={{ marginTop: 0 }}>End runs at base</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            Puts a <b>Return to base</b> stop at the end of each run. It sits after everything else on the
+            driver&apos;s phone, and their Done tap on it is what tells you when the day actually ended.
+          </p>
+          {basing.rows.map((r, i) => (
+            <div key={r.id} className="disp-setup-form" style={{ marginBottom: 6 }}>
+              <label style={{ minWidth: 190 }}>
+                <input type="checkbox" checked={r.on}
+                  onChange={(e) => setBasing((b) => ({ ...b,
+                    rows: b.rows.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)) }))} />
+                {' '}<b>{r.name}</b>
+              </label>
+              <select value={r.baseId} disabled={!r.on} style={{ minWidth: 220 }}
+                onChange={(e) => setBasing((b) => ({ ...b,
+                  rows: b.rows.map((x, j) => (j === i ? { ...x, baseId: Number(e.target.value) } : x)) }))}>
+                {basing.bases.map((bs) => (
+                  <option key={bs.id} value={bs.id}>{bs.name} — {bs.address}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+          <div className="disp-setup-form">
+            <button type="button" className="btn accent" disabled={busy || !basing.rows.some((r) => r.on)}
+              onClick={addReturnStops}>
+              {busy ? 'Adding…' : `Add to ${basing.rows.filter((r) => r.on).length} driver(s)`}
+            </button>
+            <button type="button" className="btn" onClick={() => setBasing(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {bulking && (
         <BulkClient jobs={board.jobs} clients={board.clients} busy={busy}
