@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, isStaff } from '../../../../../lib/auth';
+import { dispatchAccess } from '../../../../../lib/dispatch-access';
 import { hasDb, query } from '../../../../../lib/db';
 import { BUSINESS_LEGAL, torontoDate } from '../../../../../lib/constants';
 import PrintButton from '../../../../../components/PrintButton';
@@ -36,9 +36,10 @@ const TICK = (on) => (on ? '☑' : '☐');
 
 export default async function PodPage({ params }) {
   const { id } = await params;
-  const session = await getSession();
+  // The coordinator prints the run sheet every morning; this is their page too.
+  const { session, allowed } = await dispatchAccess();
   if (!session) redirect('/login?next=/admin/dispatch');
-  if (!isStaff(session)) return <div style={{ padding: 24 }}>Not authorized.</div>;
+  if (!allowed) return <div style={{ padding: 24 }}>Not authorized.</div>;
   if (!hasDb()) return <div style={{ padding: 24 }}>Database not configured.</div>;
 
   const { rows } = await query(

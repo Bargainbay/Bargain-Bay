@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 // Clients and drivers, managed on the dispatch page itself. Everything dispatch
 // needs is here — sending someone to another screen to add a client mid-call is
 // exactly the friction this whole thing exists to remove.
-export default function DispatchSetup({ clients = [], drivers = [], canManageDrivers, onChanged }) {
+export default function DispatchSetup({ clients = [], drivers = [], canManageDrivers, canGrantAccess = false, onChanged }) {
   const [name, setName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -60,6 +60,35 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   }, []);
 
   useEffect(() => { if (canManageDrivers) loadRoster(); }, [canManageDrivers, loadRoster]);
+
+  // Who can sign into this portal. Owner only — the API refuses the list to a
+  // coordinator, so don't ask for it unless we're allowed to have it.
+  const [access, setAccess] = useState(null);
+  const [accEmail, setAccEmail] = useState('');
+  const [accName, setAccName] = useState('');
+  const loadAccess = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/dispatch?view=access');
+      const data = await res.json();
+      if (res.ok) setAccess(data.dispatchers || []);
+    } catch {}
+  }, []);
+  useEffect(() => { if (canGrantAccess) loadAccess(); }, [canGrantAccess, loadAccess]);
+
+  async function accessAction(action, payload, label) {
+    setBusy(label); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...payload })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'That did not save.');
+      setAccess(data.dispatchers || []);
+      setAccEmail(''); setAccName('');
+    } catch (e) { setErr(e.message); }
+    setBusy('');
+  }
 
   // The vans. An odometer reading that doesn't say which truck it came off is
   // not a mileage figure — it's two trucks' numbers in one column.
@@ -527,6 +556,55 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
           </form>
         )}
       </section>
+
+      {canGrantAccess && (
+        <section className="panel">
+          <h3 style={{ marginTop: 0 }}>Dispatch portal access</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            A dispatch coordinator signs in with their own email and sees this page and nothing else —
+            no storefront orders, no payroll, no marketing, no books. Inside dispatch they can do
+            everything you can. They create their own password at{' '}
+            <code>/signup</code>; the address below is what decides what they get, so it has to match
+            the one they sign up with. Take it away here the hour they leave — it stops immediately,
+            no deploy.
+          </p>
+          <ul className="disp-setup-list">
+            {(access || []).filter((a) => a.active).map((a) => (
+              <li key={a.email}>
+                <b>{a.name || a.email}</b>
+                {a.name ? <span className="hint"> · {a.email}</span> : null}
+                <span className="hint"> · added {a.grantedAt ? a.grantedAt.slice(0, 10) : ''}{a.grantedBy ? ` by ${a.grantedBy}` : ''}</span>
+                <button type="button" className="disp-toggle" disabled={busy === 'acc-' + a.email}
+                  onClick={() => {
+                    if (!confirm(`Remove dispatch access for ${a.email}? They lose the board immediately.`)) return;
+                    accessAction('access_revoke', { email: a.email }, 'acc-' + a.email);
+                  }}>remove</button>
+              </li>
+            ))}
+            {access && !access.some((a) => a.active) && (
+              <li className="hint">Nobody yet — only you can open dispatch.</li>
+            )}
+          </ul>
+          <form className="disp-setup-form" onSubmit={(e) => {
+            e.preventDefault();
+            accessAction('access_grant', { email: accEmail, name: accName }, 'acc-new');
+          }}>
+            <input value={accName} onChange={(e) => setAccName(e.target.value)}
+              placeholder="Their name (optional)" autoComplete="off" />
+            <input value={accEmail} onChange={(e) => setAccEmail(e.target.value)}
+              placeholder="dispatch@rssolutions.ca" inputMode="email" autoComplete="off" />
+            <button className="btn accent" disabled={busy === 'acc-new'}>
+              {busy === 'acc-new' ? 'Giving access…' : 'Give dispatch access'}
+            </button>
+          </form>
+          {(access || []).some((a) => !a.active) && (
+            <p className="hint" style={{ marginBottom: 0 }}>
+              Previously had access: {access.filter((a) => !a.active).map((a) => a.email).join(', ')}.
+              Adding the same address again restores it.
+            </p>
+          )}
+        </section>
+      )}
     </div>
   );
 }
