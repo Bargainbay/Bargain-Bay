@@ -17,7 +17,7 @@ import { sendSms, smsConfigured } from '../../../../lib/sms';
 import { SITE_URL } from '../../../../lib/site';
 import { hasDb } from '../../../../lib/db';
 import { getSetting, setSetting } from '../../../../lib/settings';
-import { addReturnToBase, setBaseAddress, getBaseAddress } from '../../../../lib/return-to-base';
+import { addReturnToBase, saveBases, listBases, driversOut } from '../../../../lib/return-to-base';
 import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
   upsertClient, importReadyBargainBayOrders, importOneBargainBayOrder, dispatchBoard,
@@ -35,6 +35,7 @@ import {
   listOpenBatches, addClientAlias, openQuestions
 } from '../../../../lib/import-batches';
 import { startImportCall, callConfigured, callTarget } from '../../../../lib/import-call';
+import { watchFreightcom } from '../../../../lib/freightcom-watch';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -153,8 +154,13 @@ export async function GET(req) {
       if (!s.full) return NextResponse.json({ error: 'Only an admin can see running costs.' }, { status: 403 });
       return NextResponse.json(await mileageReport({ from: sp.get('from'), to: sp.get('to') }));
     }
-    if (sp.get('view') === 'base_address') {
-      return NextResponse.json({ base: await getBaseAddress() });
+    if (sp.get('view') === 'bases') {
+      return NextResponse.json({ bases: await listBases() });
+    }
+    // Who is out today, and who already has a return-to-base on them — the
+    // board's picker needs both to avoid offering a driver twice.
+    if (sp.get('view') === 'drivers_out') {
+      return NextResponse.json({ drivers: await driversOut(sp.get('date')) });
     }
     if (sp.get('view') === 'review_link') {
       return NextResponse.json({ url: (await getSetting('google_review_url', '')) || '' });
@@ -257,6 +263,11 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Calling is not set up on this deployment.' }, { status: 400 });
       }
       return NextResponse.json({ ok: true, ...(await startImportCall(body.batchId, { by: who(s) })) });
+    }
+    // "Check now" on the Import tab. The same function the cron runs, so there
+    // is one code path and the button can never disagree with the schedule.
+    if (body.action === 'freightcom_check') {
+      return NextResponse.json(await watchFreightcom({ max: 15 }));
     }
     // WHERE THE PHONE RINGS IS THE OWNER'S, not the coordinator's. `s.full` is
     // true for a coordinator, and everything else on this page is deliberately
@@ -374,17 +385,20 @@ export async function POST(req) {
       }
     }
     // The yard, and the stop that ends a run there.
-    if (body.action === 'base_address') {
+    if (body.action === 'bases') {
       try {
-        return NextResponse.json({ ok: true, base: await setBaseAddress(body) });
+        return NextResponse.json({ ok: true, bases: await saveBases(body.bases) });
       } catch (e) {
-        return NextResponse.json({ error: e?.message || 'Could not save that address.' }, { status: 400 });
+        return NextResponse.json({ error: e?.message || 'Could not save those.' }, { status: 400 });
       }
     }
     if (body.action === 'return_to_base') {
       try {
         return NextResponse.json({
-          ok: true, ...(await addReturnToBase({ date: body.date, driverIds: body.driverIds, createdBy: who(s) }))
+          ok: true,
+          ...(await addReturnToBase({
+            date: body.date, assignments: body.assignments, createdBy: s?.name || s?.email || null
+          }))
         });
       } catch (e) {
         return NextResponse.json({ error: e?.message || 'Could not add that.' }, { status: 400 });

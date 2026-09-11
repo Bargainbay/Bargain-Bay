@@ -30,6 +30,29 @@ A unit object: `{ id (SKU), make, model, category, title, condition, price, comp
 - `lib/inventory.js` — `getAll()`, `getById()`, `getAvailable()` (DB-aware), reads `data/catalog.json`.
 - `lib/images.js` — `imageFor(unit)`, `hasRealImage(unit)`. Manufacturer photos (AJ Madison CDN) keyed by model via `data/images.json`; falls back to branded per-category placeholder SVG in `public/stock/`. `hasRealImage` is false for placeholders.
 
+### The product tile is square; the photo is not
+`.thumb` (app/globals.css) is `aspect-ratio: 1/1` **plus `min-height: 0`**, and
+its image is **absolutely positioned**. All three are load-bearing and the reason
+is worth keeping, because the bug they fix is invisible in testing:
+
+`aspect-ratio` alone did NOT produce a square tile. `.thumb` is a flex item of
+`.card` (column flex), so its automatic minimum size is its CONTENT height, which
+overrides the ratio — and `height: 100%` on the image could not resolve against a
+parent whose height came from `aspect-ratio`, so the image fell back to its
+intrinsic height and pushed the tile taller again.
+
+**Square sources came out right by coincidence**, which is why this survived
+months of AJ Madison photos (all padded to 1000x1000 by `normalizeImg`). It only
+appeared once the catalogue gained stock photos from other hosts: a 721x1128
+Whirlpool range gave itself a 233x365 tile and rendered half again the size of the
+fridge next to it. Measured live 2026-09-10: tiles were 233x233, 233x324, 233x365
+and 233x339 in one row.
+
+So: **a non-square stock photo is fine.** Do not go hunting for square-only
+sources, and do not reach for an image pipeline to trim and pad them — the tile
+normalises presentation now. `normalizeImg` stays useful for AJ Madison because
+it also strips their baked-in white border.
+
 ### Adding to `data/images.json`
 The lookup is `modelImages[model]` — an **exact string match**, no trimming, no
 case folding. Three things follow, all learned filling the gap on 2026-09-10:
@@ -328,6 +351,38 @@ else's stock. So the screen keeps what was added this session and asks
 `intakeLiveStatus` afterwards: **per-unit ✓ live / not live yet**, with what to
 check.
 
+### The sync says what it SKIPPED (added 2026-09-10)
+`readAvailableReport()` (lib/sheets.js) returns `parseTrackerCsv`'s report
+alongside the units; `syncInventoryFromTracker` passes it through; both sync
+buttons render it via `syncSummary` (lib/sync-report.js — **no imports, it runs
+in the browser**).
+
+This exists because of a live outage. The Settings tab's pricing tiers were
+renamed to the current four condition labels, 61 rows still carried the retired
+`Scratch and Dent` / `Used`, and with no matching tier their Condition % and
+Suggested Sale Price went blank. `parseTrackerCsv` drops a priceless row **in
+silence**, `upsertProducts` then deactivates anything absent from the import, and
+the sync reported "synced 65" while half the storefront went dark. The number
+that explained it — `skippedNoPrice` — had been computed all along and thrown
+away at `readAvailable`.
+
+- **`skippedNoPrice` is the one that matters**: rows the tracker calls Tested
+  Working that the site will not show.
+- **`skippedNotTested` is deliberately NOT surfaced.** It counts every sold,
+  untested and salvage row — most of the tracker — so showing it would be a large
+  alarming number that means nothing is wrong.
+- The 60%-deactivation guard reports itself too: if it fired, the read was
+  probably partial and the site is showing stale stock.
+
+### The intake screen says when a model has no stock photo
+`GET /api/admin/model-photo?model=` (staff) → `modelImage()`, asked debounced as
+the rep types. A vendor drop-off is usually a model we have never carried, so it
+usually has no `data/images.json` entry — and since the stock picture leads, the
+card is then a category placeholder AND `/feed` skips the unit entirely
+(`hasRealImage` is false for placeholder art). The rep could not tell from the
+form; the first drop-off shipped exactly this way and was noticed days later.
+It **warns, never blocks** — the unit is perfectly sellable without one.
+
 ## The orders board has its own tab (added 2026-09-08)
 `/admin/orders` (staff) renders the same `AdminOrders` the Operations page has
 always folded away, and `lib/order-board.js` is the ONE loader behind both — the
@@ -607,6 +662,37 @@ sheet, GL detail as CSV.
   missing (unrecorded cash, credit purchases, owner draws). The page says this.
   When Plaid is live, wire the real balance in and make the comparison automatic.
 - `SALE` now exists in four files. Still deliberate, still: change one, change all.
+
+## Freightcom auto-staging (added 2026-09-10)
+
+Parallel forwards a Freightcom "Pick Up Notification" and asks, in prose, for RS to collect it and
+bring it to SecondShop. Three of those went missing on 2026-09-10 — confirmed to the client by reply
+and on nobody's board — because the only thing that turned one into a stop was a person reading the
+mail. `lib/freightcom-watch.js` now reads them.
+
+- **It stages; it never boards.** Same rule as every other import: a batch waits on the Import tab
+  until somebody approves it. An address a model read out of a PDF is a guess until a human agrees.
+- **The BOL's consignee IS the drop** (owner, 2026-09-10): an Ontario delivery is driven to the
+  address on the BOL. The one exception is a **Quebec-bound** load — pickup only, cross-docked at
+  Burlington — and that is the EXISTING `quebecRule` in `lib/stop-import.js`, on by default for every
+  staged batch. The watcher deliberately rewrites no addresses. A first draft redirected every row to
+  SecondShop's warehouse on the strength of the covering email's prose ("bring it to SecondShop");
+  that is wrong for every Ontario stop, which is most of them. **Don't infer the routing rule from one
+  client's covering note.**
+- **Dedupe is on the BOL number, not the Gmail message id.** The thread fills with replies carrying the
+  same subject AND the same forwarded PDF; `source_msg_id` on `import_batches` (partial unique index,
+  NULLs don't collide) holds `bol:PSC10392`. `alreadyStaged()` **fails CLOSED** — if it cannot tell, it
+  does not stage, because a duplicate stop is worse than one that waits for the next run. A CANCELLED
+  batch counts as staged: throwing one away is a decision, and re-staging would undo it every 15 min.
+- **No `jobDate` is set.** The notification's shipment date is when the CARRIER wanted it moved, which
+  is routinely not the day RS runs it. Left open it becomes the batch's first question.
+- Trigger: `/api/cron/freightcom` every 15 min 06:00–22:00, plus **📥 Check Freightcom mail** on the
+  Import tab — the same function, so the button and the schedule can never disagree. `?dry=1` reads and
+  redirects without writing a batch.
+- **Setup it needs:** the watched mailbox must be on `SARAH_EMAIL_INBOXES` (`resolveInbox` THROWS
+  otherwise) and domain-wide delegation must cover **rssolutions.ca**, which the existing Sarah setup
+  only proves for bargainbay.ca. The watcher returns `{ok:false, reason}` naming the mailbox rather
+  than an empty result, so a delegation gap doesn't read as a quiet day.
 
 ## The dispatch coordinator's portal (added 2026-09-09)
 

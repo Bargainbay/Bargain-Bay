@@ -32,7 +32,10 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   // history and every fill already logged against the first one.
   const [editVan, setEditVan] = useState(null);   // { id, fuelPaidBy, carrierName, dayRate }
   const [vanRate, setVanRate] = useState('');
-  const [base, setBase] = useState({ address: '', city: '', postal: '' });
+  // A LIST, not one address. There are two yards — Milner Ave in Scarborough
+  // and Squires Beach Rd in Pickering — and a run ends at whichever one the van
+  // lives in, which is a per-driver answer on the night.
+  const [bases, setBases] = useState([]);
   const [editDrv, setEditDrv] = useState(null);   // { id, hourlyRate }
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
@@ -102,25 +105,28 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   // not a mileage figure — it's two trucks' numbers in one column.
   const loadBase = useCallback(async () => {
     try {
-      const d = await fetch('/api/admin/dispatch?view=base_address').then((r) => r.json());
-      if (d.base) setBase({ address: d.base.address || '', city: d.base.city || '', postal: d.base.postal || '' });
-    } catch { /* leave the form empty */ }
+      const d = await fetch('/api/admin/dispatch?view=bases').then((r) => r.json());
+      setBases(d.bases || []);
+    } catch { /* leave it empty */ }
   }, []);
 
-  async function saveBase(e) {
+  async function saveBases(e) {
     e.preventDefault();
     setBusy('base'); setErr(''); setOk('');
     try {
       const res = await fetch('/api/admin/dispatch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'base_address', ...base })
+        body: JSON.stringify({ action: 'bases', bases })
       });
       const d = await res.json();
-      if (!res.ok) { setErr(d.error || 'Could not save the yard.'); return; }
-      setOk('Yard saved — "End runs at base" on the board will use it.');
+      if (!res.ok) { setErr(d.error || 'Could not save the yards.'); return; }
+      setBases(d.bases || []);
+      setOk(`${d.bases.length} base${d.bases.length === 1 ? '' : 's'} saved.`);
     } catch { setErr('Network error — nothing was saved.'); }
     finally { setBusy(''); }
   }
+  const setBaseField = (i, k, v) =>
+    setBases((xs) => xs.map((b, j) => (j === i ? { ...b, [k]: v } : b)));
 
   const loadVans = useCallback(async () => {
     try {
@@ -554,21 +560,38 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         {/* Where the vans end up. It is here rather than in general settings
             because the only thing that uses it is the stop at the end of a run,
             and that is a dispatch idea. */}
-        <h3 style={{ marginBottom: 4 }}>The yard</h3>
+        <h3 style={{ marginBottom: 4 }}>The yards</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Where a run ends. <b>🏁 End runs at base</b> on the board puts a <b>Return to base</b> stop on every
-          driver who is out that day; their Done tap when the van is parked is what tells you the time they
-          actually finished — which is the number the shift editor needs whenever somebody forgets to clock off.
-          It is never billed and never counts as a delivery.
+          Where a run ends. <b>🏁 End runs at base</b> on the board puts a <b>Return to base</b> stop on the
+          drivers you pick, each going back to whichever yard you choose for them; their Done tap when the van
+          is parked is what tells you the time they actually finished — the number the shift editor needs
+          whenever somebody forgets to clock off. It is never billed and never counts as a delivery.
         </p>
-        <form onSubmit={saveBase} className="disp-setup-form">
-          <input value={base.address} onChange={(e) => setBase({ ...base, address: e.target.value })}
-            placeholder="Yard address *" style={{ minWidth: 240 }} />
-          <input value={base.city} onChange={(e) => setBase({ ...base, city: e.target.value })}
-            placeholder="City" style={{ width: 150 }} />
-          <input value={base.postal} onChange={(e) => setBase({ ...base, postal: e.target.value })}
-            placeholder="Postal" style={{ width: 110 }} />
-          <button className="btn accent" disabled={busy === 'base'}>{busy === 'base' ? 'Saving…' : 'Save yard'}</button>
+        <form onSubmit={saveBases} className="disp-setup-form" style={{ display: 'block' }}>
+          {bases.map((b, i) => (
+            <div key={b.id || i} className="disp-setup-form" style={{ marginBottom: 6 }}>
+              <input value={b.name || ''} onChange={(e) => setBaseField(i, 'name', e.target.value)}
+                placeholder="Name, e.g. Scarborough" style={{ width: 170 }} />
+              <input value={b.address || ''} onChange={(e) => setBaseField(i, 'address', e.target.value)}
+                placeholder="Address *" style={{ minWidth: 230 }} />
+              <input value={b.city || ''} onChange={(e) => setBaseField(i, 'city', e.target.value)}
+                placeholder="City" style={{ width: 140 }} />
+              <input value={b.postal || ''} onChange={(e) => setBaseField(i, 'postal', e.target.value)}
+                placeholder="Postal" style={{ width: 100 }} />
+              <button type="button" className="disp-toggle"
+                onClick={() => setBases((xs) => xs.filter((_, j) => j !== i))}>remove</button>
+            </div>
+          ))}
+          <div className="disp-setup-form">
+            <button type="button" className="btn"
+              onClick={() => setBases((xs) => [...xs, {
+                id: Math.max(0, ...xs.map((x) => Number(x.id) || 0)) + 1,
+                name: '', address: '', city: '', postal: ''
+              }])}>+ Add a yard</button>
+            <button className="btn accent" disabled={busy === 'base'}>
+              {busy === 'base' ? 'Saving…' : 'Save yards'}
+            </button>
+          </div>
         </form>
 
         <p className="hint">

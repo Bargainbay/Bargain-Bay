@@ -1,7 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { INTAKE_CATEGORIES as CATEGORIES, INTAKE_CONDITIONS as CONDITIONS } from '../lib/constants';
 import { compressPhotos } from './photo-pick';
+import { syncSummary } from '../lib/sync-report';
 
 // Vendor drop-off — a unit that goes on the site without passing RS Ops.
 //
@@ -30,9 +31,30 @@ export default function VendorIntake() {
   const [added, setAdded] = useState([]);     // { sku, title, photos, live, price, note }
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
+  const [syncWarn, setSyncWarn] = useState([]);
+  // null = not asked yet / no model typed. Drives the no-stock-photo warning.
+  const [stockPhoto, setStockPhoto] = useState(null);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const inp = { padding: '7px 9px', borderRadius: 8, border: '1px solid var(--line)', fontSize: 13.5 };
+
+  // Has this model got a stock photo? Asked as the rep types, debounced, because
+  // the answer changes what the listing will look like and they can do something
+  // about it now — hand the model to whoever curates data/images.json — rather
+  // than discovering a placeholder on the site next week. Never blocks the form.
+  useEffect(() => {
+    const model = form.model.trim();
+    if (!model) { setStockPhoto(null); return; }
+    let live = true;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/admin/model-photo?model=${encodeURIComponent(model)}`);
+        const d = await res.json();
+        if (live && d.asked && d.model === model) setStockPhoto(!!d.hasStock);
+      } catch { /* a failed lookup must not nag about a photo that may exist */ }
+    }, 450);
+    return () => { live = false; clearTimeout(t); };
+  }, [form.model]);
 
   async function pick(e) {
     const files = [...(e.target.files || [])];
@@ -122,8 +144,10 @@ export default function VendorIntake() {
     try {
       const res = await fetch('/api/admin/sync-inventory', { method: 'POST' });
       const d = await res.json();
-      if (!res.ok) { setSyncMsg(`✗ ${d.error || 'Sync failed.'}`); return; }
-      setSyncMsg(`✓ Synced ${d.synced} available units${d.deactivated ? `, removed ${d.deactivated} no longer in stock` : ''}.`);
+      if (!res.ok) { setSyncMsg(`✗ ${d.error || 'Sync failed.'}`); setSyncWarn([]); return; }
+      const { ok, warnings } = syncSummary(d);
+      setSyncMsg(`✓ ${ok}`);
+      setSyncWarn(warnings);
       const skus = added.map((u) => u.sku);
       if (skus.length) {
         const r = await fetch(`/api/admin/intake?skus=${encodeURIComponent(skus.join(','))}`);
@@ -132,7 +156,7 @@ export default function VendorIntake() {
         setAdded((a) => a.map((u) => ({ ...u, live: by.get(u.sku)?.live, price: by.get(u.sku)?.price })));
       }
     } catch {
-      setSyncMsg('✗ Network error.');
+      setSyncMsg('✗ Network error.'); setSyncWarn([]);
     } finally { setSyncing(false); }
   }
 
@@ -166,6 +190,14 @@ export default function VendorIntake() {
         <input placeholder="Note for the tracker (optional)" value={form.note} onChange={set('note')} style={{ ...inp, width: 220 }}
           title="Goes in the Invoice column beside CONSIGNMENT — e.g. the terms, or who dropped it off." />
       </div>
+
+      {stockPhoto === false && (
+        <div className="hint" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)' }}>
+          ⚠ <b>No stock photo on file for {form.model.trim()}.</b> The unit will still list and sell, but its card
+          will show a category placeholder until somebody adds one — and Meta ads skip a unit whose card is a
+          placeholder. Your photos below appear underneath either way. Worth passing the model on.
+        </div>
+      )}
 
       {/* TWO buttons, not one input. `capture` makes an input camera-ONLY on
           iOS — no library, and `multiple` ignored — so a rep who shot the unit
@@ -245,6 +277,11 @@ export default function VendorIntake() {
           silently. The list above tells you which ones made it.
         </p>
         {syncMsg && <div className="hint" style={{ marginTop: 6 }}>{syncMsg}</div>}
+        {/* The number that would have explained the 2026-09-10 outage. A sync
+            that imports fewer units than the tracker holds must say so. */}
+        {syncWarn.map((w) => (
+          <div key={w} className="error-box" style={{ marginTop: 8 }}>⚠ {w}</div>
+        ))}
       </div>
     </div>
   );
