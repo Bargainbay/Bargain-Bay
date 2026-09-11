@@ -30,6 +30,29 @@ A unit object: `{ id (SKU), make, model, category, title, condition, price, comp
 - `lib/inventory.js` — `getAll()`, `getById()`, `getAvailable()` (DB-aware), reads `data/catalog.json`.
 - `lib/images.js` — `imageFor(unit)`, `hasRealImage(unit)`. Manufacturer photos (AJ Madison CDN) keyed by model via `data/images.json`; falls back to branded per-category placeholder SVG in `public/stock/`. `hasRealImage` is false for placeholders.
 
+### The product tile is square; the photo is not
+`.thumb` (app/globals.css) is `aspect-ratio: 1/1` **plus `min-height: 0`**, and
+its image is **absolutely positioned**. All three are load-bearing and the reason
+is worth keeping, because the bug they fix is invisible in testing:
+
+`aspect-ratio` alone did NOT produce a square tile. `.thumb` is a flex item of
+`.card` (column flex), so its automatic minimum size is its CONTENT height, which
+overrides the ratio — and `height: 100%` on the image could not resolve against a
+parent whose height came from `aspect-ratio`, so the image fell back to its
+intrinsic height and pushed the tile taller again.
+
+**Square sources came out right by coincidence**, which is why this survived
+months of AJ Madison photos (all padded to 1000x1000 by `normalizeImg`). It only
+appeared once the catalogue gained stock photos from other hosts: a 721x1128
+Whirlpool range gave itself a 233x365 tile and rendered half again the size of the
+fridge next to it. Measured live 2026-09-10: tiles were 233x233, 233x324, 233x365
+and 233x339 in one row.
+
+So: **a non-square stock photo is fine.** Do not go hunting for square-only
+sources, and do not reach for an image pipeline to trim and pad them — the tile
+normalises presentation now. `normalizeImg` stays useful for AJ Madison because
+it also strips their baked-in white border.
+
 ### Adding to `data/images.json`
 The lookup is `modelImages[model]` — an **exact string match**, no trimming, no
 case folding. Three things follow, all learned filling the gap on 2026-09-10:
