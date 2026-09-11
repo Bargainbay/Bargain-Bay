@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getById, getSiblings } from '../../../lib/inventory';
 import { decorateOne, decorate } from '../../../lib/pricing';
@@ -49,6 +48,11 @@ function forPanel(x, sold) {
     onClearance: !!x.onClearance,
     isMemberPrice: !!x.isMemberPrice,
     image: x.image,
+    // The gallery lives in the buy panel, so the photos have to travel with the
+    // unit — picking a different one of the same model has to swap its photos
+    // along with its price and condition.
+    photos: x.photos || [],
+    rsopsPhotos: x.rsopsPhotos || [],
     sold: !!sold
   };
 }
@@ -99,50 +103,10 @@ export default async function Product({ params }) {
       <ProductBuyPanel units={units} initialId={u.id} />
 
       <div className="product-desc">
-        {/* Photos we took ourselves — a vendor drop-off the sales floor booked in
-            and photographed on arrival. There is no manufacturer stock shot for a
-            machine like this, so these are also what the card and the Meta feed
-            use (lib/images.js prefers `photos[0]`). Same tile treatment as the RS
-            Ops gallery below: next/image resizes to the tile, the anchor opens
-            the untouched original. */}
-        {u.photos?.length > 0 && (
-          <>
-            <h2>Photos of this exact unit</h2>
-            <p>Taken here at the warehouse — what you see is the unit you get.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-              {u.photos.map((p, i) => (
-                <a key={p.url} href={p.url} target="_blank" rel="noopener"
-                  style={{ position: 'relative', display: 'block', aspectRatio: '1', borderRadius: 8, overflow: 'hidden' }}>
-                  <Image src={p.url} alt={`${u.make} ${u.model} — photo ${i + 1}`} fill
-                    sizes="(max-width: 700px) 45vw, 200px"
-                    style={{ objectFit: 'cover' }} />
-                </a>
-              ))}
-            </div>
-          </>
-        )}
-        {u.rsopsPhotos?.length > 0 && (
-          <>
-            <h2>Photos of this exact unit</h2>
-            <p>Taken by our technicians during inspection — what you see is the unit you get.</p>
-            {/* These tiles are ~160px wide, but RS Ops stores the sale photos at
-                1600px so they stay sharp when a buyer opens one full-size. Served
-                raw that was a ~10x oversized download per tile, six times over, on
-                a page most people reach from a phone. next/image resizes and
-                re-encodes them to the tile — the anchor still links the untouched
-                original for anyone who wants the full-size shot. */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-              {u.rsopsPhotos.map((p) => (
-                <a key={p.url} href={p.url} target="_blank" rel="noopener"
-                  style={{ position: 'relative', display: 'block', aspectRatio: '1', borderRadius: 8, overflow: 'hidden' }}>
-                  <Image src={p.url} alt={`${u.make} ${u.model} — ${p.slot}`} fill
-                    sizes="(max-width: 700px) 45vw, 200px"
-                    style={{ objectFit: 'cover' }} />
-                </a>
-              ))}
-            </div>
-          </>
-        )}
+        {/* The photo grids that used to sit here — ours and RS Ops's — are now
+            slides in the gallery at the top of the page (components/ProductGallery).
+            Leaving them here as well would show every photograph twice and bury
+            the spec table another screen down. */}
         <h2>About this unit</h2>
         <p>{leadSentence(u)}</p>
         <p>

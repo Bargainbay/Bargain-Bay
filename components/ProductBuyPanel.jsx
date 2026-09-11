@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { money, pctOff, PICKUP_ADDRESS } from '../lib/constants';
 import ConditionPill from './ConditionPill';
 import AddToCartButton from './AddToCartButton';
+import ProductGallery from './ProductGallery';
 
 // Buy panel for a model that may have several identical in-stock units.
 // `units` is every available unit of the same make+model (cheapest first),
@@ -23,12 +24,22 @@ export default function ProductBuyPanel({ units, initialId }) {
     }
   }
 
+  // Stock photo first, then every real photograph of THIS unit: the ones the
+  // sales floor took at intake (`photos`), then RS Ops's inspection set. Same
+  // order rule the cards and the Meta feed follow.
+  const slides = [
+    { url: sel.image, kind: 'stock', label: 'stock photo' },
+    ...(sel.photos || []).map((p, n) => ({ url: p.url, kind: 'own', label: `photo ${n + 1}` })),
+    ...(sel.rsopsPhotos || []).map((p) => ({ url: p.url, kind: 'rsops', label: p.slot || 'inspection' }))
+  ].filter((x, n, all) => x.url && all.findIndex((y) => y.url === x.url) === n);
+
   return (
     <div className="product-layout">
-      <div className="product-img">
-        {sel.onClearance && <span className="clearance-badge product-clearance-badge">Clearance</span>}
-        <img src={sel.image} alt={name} />
-      </div>
+      <ProductGallery
+        images={slides}
+        alt={name}
+        badge={sel.onClearance ? <span className="clearance-badge product-clearance-badge">Clearance</span> : null}
+      />
       <div>
         <ConditionPill condition={sel.condition} />
         {sel.onClearance && <span className="pill clearance-pill" style={{ marginLeft: 8 }}>Clearance</span>}

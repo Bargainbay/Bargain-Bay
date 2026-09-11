@@ -32,6 +32,37 @@ A unit object: `{ id (SKU), make, model, category, title, condition, price, comp
 - `lib/inventory.js` — `getAll()`, `getById()`, `getAvailable()` (DB-aware), reads `data/catalog.json`.
 - `lib/images.js` — `imageFor(unit)`, `hasRealImage(unit)`. Manufacturer photos (AJ Madison CDN) keyed by model via `data/images.json`; falls back to branded per-category placeholder SVG in `public/stock/`. `hasRealImage` is false for placeholders.
 
+### The product page is a gallery (added 2026-09-11)
+`components/ProductGallery.jsx`, rendered by `ProductBuyPanel`. One square
+viewer, arrows, swipe, a thumbnail strip, and a caption per slide. It REPLACED
+the two photo grids that used to sit further down the product page (ours and
+RS Ops's) — keeping both would show every photograph twice and push the spec
+table another screen down.
+
+- **Slide 0 is always the stock photo**, then our own intake photos, then RS Ops's
+  inspection set. Same order rule `imageFor` follows for cards and the feed.
+- **Every slide says which kind it is**, and that caption is load-bearing, not
+  decoration: on a one-of-a-kind used appliance "this is the actual unit" is the
+  most valuable sentence on the page, and a buyer cannot tell a stock render from
+  a warehouse photo of a clean machine unless told.
+- **Photos travel with the UNIT** (`forPanel` passes `photos` / `rsopsPhotos`),
+  so picking a different unit of the same model swaps its photos along with its
+  price and condition, and the gallery resets to slide 0.
+- **Thumbnails are `contain`, never `cover`.** A cropped thumbnail of the actual
+  unit hides the very blemish the buyer opened the photo to look at.
+- **Plain `<img>`, not `next/image`, on purpose.** Stock photos come from a dozen
+  manufacturer and retailer CDNs and `data/images.json` is meant to be editable
+  without a deploy; `next/image` needs every host named in `next.config.mjs` and
+  an unlisted one throws at runtime and takes the product page down. A gallery
+  needs the full-size file the moment somebody opens a photo anyway, so one
+  download serves both the thumbnail and the large view. (This knowingly gives up
+  the resizing added in #225 — that traded against a crash risk on a page that
+  sells things.)
+- `.product-img` carries **`align-self: start`**. It is a grid item of
+  `.product-layout` and was stretching to the height of the info column beside
+  it — a 534x717 frame around a 532px square photo, with 185px of dead white
+  underneath. Same family of bug as the tile one below.
+
 ### The product tile is square; the photo is not
 `.thumb` (app/globals.css) is `aspect-ratio: 1/1` **plus `min-height: 0`**, and
 its image is **absolutely positioned**. All three are load-bearing and the reason
