@@ -11,7 +11,7 @@ import {
   profitReport, stopTimes, addExpense, listExpenses, deleteExpense, EXPENSE_KINDS
 } from '../../../../lib/dispatch-money';
 import {
-  shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate, setShiftTimes } from '../../../../lib/shifts';
+  shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate, setShiftTimes, createShift } from '../../../../lib/shifts';
 import { livePositions, driverTrail } from '../../../../lib/driver-location';
 import { sendSms, smsConfigured } from '../../../../lib/sms';
 import { SITE_URL } from '../../../../lib/site';
@@ -402,6 +402,20 @@ export async function POST(req) {
         });
       } catch (e) {
         return NextResponse.json({ error: e?.message || 'Could not add that.' }, { status: 400 });
+      }
+    }
+    // A shift for somebody who never clocked on. Same gate as the hours: it is
+    // pay, not a board setting.
+    if (body.action === 'shift_create') {
+      if (!isAdmin(s)) {
+        return NextResponse.json({ error: 'Only an admin can add shift hours.' }, { status: 403 });
+      }
+      try {
+        return NextResponse.json({
+          ok: true, shift: await createShift(body, s?.name || s?.email || null)
+        });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not add that shift.' }, { status: 400 });
       }
     }
     // Correcting a shift the driver's taps got wrong.

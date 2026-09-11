@@ -24,6 +24,7 @@ export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
   const [editing, setEditing] = useState(null);   // { id, startTime, endTime, startKm, endKm, vehicleId }
   const [busy, setBusy] = useState(false);
   const [vans, setVans] = useState([]);
+  const [adding, setAdding] = useState(null);   // a shift being typed in from scratch
   useEffect(() => {
     fetch('/api/admin/dispatch?view=vehicles')
       .then((r) => r.json()).then((d) => setVans(d.vehicles || [])).catch(() => {});
@@ -39,6 +40,25 @@ export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
     } catch { setErr('Could not load shifts.'); }
   }, [from, to, driverId]);
   useEffect(() => { load(); }, [load]);
+
+  // A shift for somebody whose phone never recorded one. Nicholas Carter ran
+  // five stops on 10 September and has never started a shift in this system —
+  // his day has no hours at all, so it cannot be costed and cannot even be
+  // flagged, because there is no row to flag.
+  async function create() {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'shift_create', ...adding })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not add that shift.'); return; }
+      setAdding(null);
+      await load();
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(false); }
+  }
 
   // Correcting what the taps got wrong. The report refuses to cost a shift
   // nobody closed and says "fix them in Times" — this is where that happens.
@@ -69,7 +89,76 @@ export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
 
   return (
     <div className="panel">
-      <h3 style={{ marginTop: 0 }}>Shifts</h3>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+        <h3 style={{ marginTop: 0, marginBottom: 6 }}>Shifts</h3>
+        <button type="button" className="disp-toggle" disabled={busy}
+          onClick={() => setAdding(adding ? null : {
+            driverId: '', date: to, startTime: '', endTime: '',
+            driving: true, vehicleId: '', startKm: '', endKm: ''
+          })}>
+          {adding ? 'close' : '+ add a shift'}
+        </button>
+      </div>
+
+      {adding && (
+        <div className="disp-setup-form" style={{ marginBottom: 10 }}>
+          <label style={{ display: 'grid', fontSize: 12 }}>Driver
+            <select value={adding.driverId} style={{ width: 170 }}
+              onChange={(e) => setAdding({ ...adding, driverId: e.target.value })}>
+              <option value="">Pick one…</option>
+              {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </label>
+          <label style={{ display: 'grid', fontSize: 12 }}>Day
+            <input type="date" value={adding.date} style={{ width: 150 }}
+              onChange={(e) => setAdding({ ...adding, date: e.target.value })} />
+          </label>
+          <label style={{ display: 'grid', fontSize: 12 }}>On
+            <input value={adding.startTime} placeholder="07:30" style={{ width: 100 }}
+              onChange={(e) => setAdding({ ...adding, startTime: e.target.value })} />
+          </label>
+          <label style={{ display: 'grid', fontSize: 12 }}>Off
+            <input value={adding.endTime} placeholder="19:00" style={{ width: 100 }}
+              onChange={(e) => setAdding({ ...adding, endTime: e.target.value })} />
+          </label>
+          {/* Driving or riding is the first question here too — a passenger has
+              no van and no odometer, and asking gets a guess. */}
+          <label style={{ display: 'grid', fontSize: 12 }}>Driving?
+            <select value={adding.driving ? 'yes' : 'no'} style={{ width: 130 }}
+              onChange={(e) => setAdding({ ...adding, driving: e.target.value === 'yes' })}>
+              <option value="yes">Driving a van</option>
+              <option value="no">Riding along</option>
+            </select>
+          </label>
+          {adding.driving && (
+            <>
+              <label style={{ display: 'grid', fontSize: 12 }}>Van
+                <select value={adding.vehicleId} style={{ width: 180 }}
+                  onChange={(e) => setAdding({ ...adding, vehicleId: e.target.value })}>
+                  <option value="">No van recorded</option>
+                  {vans.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                </select>
+              </label>
+              <label style={{ display: 'grid', fontSize: 12 }}>Km on
+                <input value={adding.startKm} inputMode="numeric" style={{ width: 110 }}
+                  onChange={(e) => setAdding({ ...adding, startKm: e.target.value.replace(/\D+/g, '') })} />
+              </label>
+              <label style={{ display: 'grid', fontSize: 12 }}>Km off
+                <input value={adding.endKm} inputMode="numeric" style={{ width: 110 }}
+                  onChange={(e) => setAdding({ ...adding, endKm: e.target.value.replace(/\D+/g, '') })} />
+              </label>
+            </>
+          )}
+          <button type="button" className="btn accent" disabled={busy || !adding.driverId || !adding.startTime}
+            onClick={create}>{busy ? 'Adding…' : 'Add shift'}</button>
+          <button type="button" className="btn" onClick={() => setAdding(null)}>Cancel</button>
+          <p className="hint" style={{ flexBasis: '100%', margin: 0 }}>
+            For somebody who never clocked on. 24-hour times on the day chosen; leave <b>Off</b> blank only if
+            they are genuinely still out. It is marked as entered by the office, because a shift no phone ever
+            saw is a different kind of record.
+          </p>
+        </div>
+      )}
       <p className="hint" style={{ marginTop: 0 }}>
         {t.shifts || 0} shift{t.shifts === 1 ? '' : 's'} · <b>{t.hours || 0}h</b> clocked
         {t.km > 0 && <> · <b>{t.km.toLocaleString('en-CA')} km</b> driven</>}
