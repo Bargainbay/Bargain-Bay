@@ -35,7 +35,7 @@ import {
   listOpenBatches, addClientAlias, openQuestions
 } from '../../../../lib/import-batches';
 import { startImportCall, callConfigured, callTarget } from '../../../../lib/import-call';
-import { watchFreightcom, secondshopDrop } from '../../../../lib/freightcom-watch';
+import { watchFreightcom } from '../../../../lib/freightcom-watch';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -123,9 +123,6 @@ export async function GET(req) {
       const batch = await resolveBatch(sp.get('batchId'));
       if (!batch) return NextResponse.json({ error: 'That import is no longer here.' }, { status: 404 });
       return NextResponse.json({ batch, questions: openQuestions(batch) });
-    }
-    if (sp.get('view') === 'secondshop_drop') {
-      return NextResponse.json({ drop: await secondshopDrop() });
     }
     if (sp.get('view') === 'imports') {
       return NextResponse.json({
@@ -271,16 +268,6 @@ export async function POST(req) {
     // is one code path and the button can never disagree with the schedule.
     if (body.action === 'freightcom_check') {
       return NextResponse.json(await watchFreightcom({ max: 15 }));
-    }
-    // Where Parallel's pickups are dropped. A dispatch fact, so the coordinator
-    // owns it — unlike the review number, which is the owner's.
-    if (body.action === 'secondshop_drop') {
-      const parts = [body.address, body.city, body.postal].map((x) => String(x || '').trim());
-      if (parts[0] && !/\d/.test(parts[0])) {
-        return NextResponse.json({ error: 'That needs a street number — a warehouse name alone is not somewhere a van can go.' }, { status: 400 });
-      }
-      await setSetting('secondshop_drop', parts.join('|').replace(/\|+$/, '').slice(0, 300));
-      return NextResponse.json({ ok: true, drop: await secondshopDrop() });
     }
     if (body.action === 'call_number') {
       if (!s.full) return NextResponse.json({ error: 'Only an admin can set the number dispatch rings.' }, { status: 403 });

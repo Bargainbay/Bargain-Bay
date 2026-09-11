@@ -672,15 +672,13 @@ mail. `lib/freightcom-watch.js` now reads them.
 
 - **It stages; it never boards.** Same rule as every other import: a batch waits on the Import tab
   until somebody approves it. An address a model read out of a PDF is a guess until a human agrees.
-- **THE TRAP, and the whole reason the file is more than "read the BOL": a BOL names the FINAL-MILE
-  consignee, and RS does not drive there.** RS collects from the shipper and drops at SecondShop; VA
-  Transport takes the last leg. A straight read produces a stop pointed at the customer's house — the
-  wrong door, and completely plausible on the board. `redirectToHub()` rewrites the drop to the
-  SecondShop warehouse, keeps the consignee in the note as `FINAL MILE (not ours)`, and keeps the
-  pickup end. This mirrors the Quebec rule in `lib/stop-import.js`, which exists for the same reason.
-- **The drop is a SETTING (`secondshop_drop`), not a constant** — one company's warehouse, and it will
-  move. Unset is not an error: the row stages with an empty delivery end and the question on it, which
-  beats inventing an address or refusing the email.
+- **The BOL's consignee IS the drop** (owner, 2026-09-10): an Ontario delivery is driven to the
+  address on the BOL. The one exception is a **Quebec-bound** load — pickup only, cross-docked at
+  Burlington — and that is the EXISTING `quebecRule` in `lib/stop-import.js`, on by default for every
+  staged batch. The watcher deliberately rewrites no addresses. A first draft redirected every row to
+  SecondShop's warehouse on the strength of the covering email's prose ("bring it to SecondShop");
+  that is wrong for every Ontario stop, which is most of them. **Don't infer the routing rule from one
+  client's covering note.**
 - **Dedupe is on the BOL number, not the Gmail message id.** The thread fills with replies carrying the
   same subject AND the same forwarded PDF; `source_msg_id` on `import_batches` (partial unique index,
   NULLs don't collide) holds `bol:PSC10392`. `alreadyStaged()` **fails CLOSED** — if it cannot tell, it

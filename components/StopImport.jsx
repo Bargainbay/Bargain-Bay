@@ -241,9 +241,6 @@ export default function StopImport({ clients = [], date, onDone }) {
               {checked.failed?.length ? <><br /><span style={{ color: 'var(--danger)' }}>
                 {checked.failed.length} could not be read: {checked.failed.map((f) => `${f.bol || f.subject} (${f.why})`).join('; ')}
               </span></> : null}
-              {checked.dropSet === false && <><br /><span style={{ color: 'var(--danger)' }}>
-                No SecondShop drop address is set, so these have no delivery end — set it under Clients &amp; drivers.
-              </span></>}
             </p>
           )}
 
