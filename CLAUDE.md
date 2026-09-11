@@ -663,6 +663,37 @@ sheet, GL detail as CSV.
   When Plaid is live, wire the real balance in and make the comparison automatic.
 - `SALE` now exists in four files. Still deliberate, still: change one, change all.
 
+## Freightcom auto-staging (added 2026-09-10)
+
+Parallel forwards a Freightcom "Pick Up Notification" and asks, in prose, for RS to collect it and
+bring it to SecondShop. Three of those went missing on 2026-09-10 — confirmed to the client by reply
+and on nobody's board — because the only thing that turned one into a stop was a person reading the
+mail. `lib/freightcom-watch.js` now reads them.
+
+- **It stages; it never boards.** Same rule as every other import: a batch waits on the Import tab
+  until somebody approves it. An address a model read out of a PDF is a guess until a human agrees.
+- **The BOL's consignee IS the drop** (owner, 2026-09-10): an Ontario delivery is driven to the
+  address on the BOL. The one exception is a **Quebec-bound** load — pickup only, cross-docked at
+  Burlington — and that is the EXISTING `quebecRule` in `lib/stop-import.js`, on by default for every
+  staged batch. The watcher deliberately rewrites no addresses. A first draft redirected every row to
+  SecondShop's warehouse on the strength of the covering email's prose ("bring it to SecondShop");
+  that is wrong for every Ontario stop, which is most of them. **Don't infer the routing rule from one
+  client's covering note.**
+- **Dedupe is on the BOL number, not the Gmail message id.** The thread fills with replies carrying the
+  same subject AND the same forwarded PDF; `source_msg_id` on `import_batches` (partial unique index,
+  NULLs don't collide) holds `bol:PSC10392`. `alreadyStaged()` **fails CLOSED** — if it cannot tell, it
+  does not stage, because a duplicate stop is worse than one that waits for the next run. A CANCELLED
+  batch counts as staged: throwing one away is a decision, and re-staging would undo it every 15 min.
+- **No `jobDate` is set.** The notification's shipment date is when the CARRIER wanted it moved, which
+  is routinely not the day RS runs it. Left open it becomes the batch's first question.
+- Trigger: `/api/cron/freightcom` every 15 min 06:00–22:00, plus **📥 Check Freightcom mail** on the
+  Import tab — the same function, so the button and the schedule can never disagree. `?dry=1` reads and
+  redirects without writing a batch.
+- **Setup it needs:** the watched mailbox must be on `SARAH_EMAIL_INBOXES` (`resolveInbox` THROWS
+  otherwise) and domain-wide delegation must cover **rssolutions.ca**, which the existing Sarah setup
+  only proves for bargainbay.ca. The watcher returns `{ok:false, reason}` naming the mailbox rather
+  than an empty result, so a delegation gap doesn't read as a quiet day.
+
 ## The dispatch coordinator's portal (added 2026-09-09)
 
 The owner hired someone to run deliveries. They get dispatch and nothing else.

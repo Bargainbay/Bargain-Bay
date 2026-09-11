@@ -35,6 +35,7 @@ import {
   listOpenBatches, addClientAlias, openQuestions
 } from '../../../../lib/import-batches';
 import { startImportCall, callConfigured, callTarget } from '../../../../lib/import-call';
+import { watchFreightcom } from '../../../../lib/freightcom-watch';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -262,6 +263,11 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Calling is not set up on this deployment.' }, { status: 400 });
       }
       return NextResponse.json({ ok: true, ...(await startImportCall(body.batchId, { by: who(s) })) });
+    }
+    // "Check now" on the Import tab. The same function the cron runs, so there
+    // is one code path and the button can never disagree with the schedule.
+    if (body.action === 'freightcom_check') {
+      return NextResponse.json(await watchFreightcom({ max: 15 }));
     }
     if (body.action === 'call_number') {
       if (!s.full) return NextResponse.json({ error: 'Only an admin can set the number dispatch rings.' }, { status: 403 });
