@@ -3,7 +3,9 @@
 Context for Claude Code working in this repo. Read this first.
 
 ## What this is
-Bargain Bay is RS Solutions' customer-facing **liquidation appliance storefront** (Pickering/Durham Region/Scarborough/GTA, Ontario, Canada). **Warehouse + pickup: 1135 Squires Beach Rd, Pickering, ON L1W 3T9, open 10am–8pm** (moved from Lynden/Hamilton Jul 2026 — `PICKUP_ADDRESS` / `BUSINESS_ADDRESS` / `BUSINESS_HOURS` in `lib/constants.js` are the source of truth; pickup slot hours live in `lib/pickup.js`). Every unit is **one-of-a-kind (qty 1)** — open-box, scratch & dent, refurbished, tested-working appliances. Custom e-commerce site, **not** Shopify (the Shopify store exists but is under review; this custom build is the live store).
+Bargain Bay is RS Solutions' customer-facing **liquidation appliance storefront** (Pickering/Durham Region/Scarborough/GTA, Ontario, Canada). **Warehouse + pickup: 1135 Squires Beach Rd, Pickering, ON L1W 3T9, open 10am–8pm** (moved from Lynden/Hamilton Jul 2026 — `PICKUP_ADDRESS` / `BUSINESS_ADDRESS` / `BUSINESS_HOURS` in `lib/constants.js` are the source of truth; pickup slot hours live in `lib/pickup.js`). Every unit is **one-of-a-kind (qty 1)** — open-box, scratch & dent, refurbished, tested-working appliances. Custom e-commerce site, **not** Shopify. **The Shopify store is not in use at all** (owner, 2026-09-11) — this custom build is the only storefront.
+
+One consequence worth knowing before you touch the tracker: the master tracker has a **`Shopify Export (Grouped)` tab** carrying its own condition labels in `Option1 Value` — 37 `Scratch & Dent`, 12 `Tested & Working`, 8 `Used` as of 2026-09-11, all retired terms. **Leave it alone.** It feeds nothing, it looks generated, and a find-and-replace run across *All sheets* will land in it. Scope every label pass to **Main** — which is also where the Condition column that actually prices a unit lives.
 
 - **Live site:** https://bargainbay.ca (canonical Vercel URL: bargain-bay-two.vercel.app)
 - **Repo:** `Bargainbay/Bargain-Bay` (public), default branch `main`, auto-deploys to Vercel on push.
