@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { syncSummary } from '../../lib/sync-report';
 
 // Reservations panel + one-click schema migration for the /admin page.
 export default function AdminTools({ initialReservations }) {
@@ -14,6 +15,7 @@ export default function AdminTools({ initialReservations }) {
   // working Bargain Bay send proves nothing about RS Solutions.
   const [emailBrand, setEmailBrand] = useState('bargain_bay');
   const [syncMsg, setSyncMsg] = useState('');
+  const [syncWarn, setSyncWarn] = useState([]);
   const [syncing, setSyncing] = useState(false);
   const [repairMsg, setRepairMsg] = useState('');
   const [repairing, setRepairing] = useState(false);
@@ -56,11 +58,12 @@ export default function AdminTools({ initialReservations }) {
     try {
       const res = await fetch('/api/admin/sync-inventory', { method: 'POST' });
       const d = await res.json();
-      setSyncMsg(res.ok
-        ? `✓ Synced ${d.synced} available units${d.deactivated ? `, removed ${d.deactivated} no longer in stock` : ''}.`
-        : `✗ ${d.error || 'Sync failed'}`);
+      if (!res.ok) { setSyncMsg(`✗ ${d.error || 'Sync failed'}`); setSyncWarn([]); return; }
+      const { ok, warnings } = syncSummary(d);
+      setSyncMsg(`✓ ${ok}`);
+      setSyncWarn(warnings);
     } catch {
-      setSyncMsg('✗ Network error');
+      setSyncMsg('✗ Network error'); setSyncWarn([]);
     } finally {
       setSyncing(false);
     }
@@ -192,6 +195,12 @@ export default function AdminTools({ initialReservations }) {
           and removes anything no longer in stock. Needs <code>GOOGLE_CREDENTIALS</code> + <code>SHEET_ID</code>.
         </span>
         {syncMsg && <span style={{ fontSize: 13.5, fontWeight: 600, flexBasis: '100%' }}>{syncMsg}</span>}
+        {/* Rows the tracker calls Tested Working that the importer refused. This
+            is the number whose absence delisted 61 units on 2026-09-10 with
+            nothing on screen to say so. */}
+        {syncWarn.map((w) => (
+          <div key={w} className="error-box" style={{ flexBasis: '100%', marginTop: 0 }}>⚠ {w}</div>
+        ))}
         <div style={{ flexBasis: '100%', borderTop: '1px solid var(--line-soft)', paddingTop: 12, marginTop: 2 }}>
           <button className="btn" disabled={repairing} onClick={repairFormulas}>
             {repairing ? 'Repairing\u2026' : 'Repair tracker formulas'}

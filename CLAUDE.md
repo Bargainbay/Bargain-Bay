@@ -328,6 +328,38 @@ else's stock. So the screen keeps what was added this session and asks
 `intakeLiveStatus` afterwards: **per-unit ✓ live / not live yet**, with what to
 check.
 
+### The sync says what it SKIPPED (added 2026-09-10)
+`readAvailableReport()` (lib/sheets.js) returns `parseTrackerCsv`'s report
+alongside the units; `syncInventoryFromTracker` passes it through; both sync
+buttons render it via `syncSummary` (lib/sync-report.js — **no imports, it runs
+in the browser**).
+
+This exists because of a live outage. The Settings tab's pricing tiers were
+renamed to the current four condition labels, 61 rows still carried the retired
+`Scratch and Dent` / `Used`, and with no matching tier their Condition % and
+Suggested Sale Price went blank. `parseTrackerCsv` drops a priceless row **in
+silence**, `upsertProducts` then deactivates anything absent from the import, and
+the sync reported "synced 65" while half the storefront went dark. The number
+that explained it — `skippedNoPrice` — had been computed all along and thrown
+away at `readAvailable`.
+
+- **`skippedNoPrice` is the one that matters**: rows the tracker calls Tested
+  Working that the site will not show.
+- **`skippedNotTested` is deliberately NOT surfaced.** It counts every sold,
+  untested and salvage row — most of the tracker — so showing it would be a large
+  alarming number that means nothing is wrong.
+- The 60%-deactivation guard reports itself too: if it fired, the read was
+  probably partial and the site is showing stale stock.
+
+### The intake screen says when a model has no stock photo
+`GET /api/admin/model-photo?model=` (staff) → `modelImage()`, asked debounced as
+the rep types. A vendor drop-off is usually a model we have never carried, so it
+usually has no `data/images.json` entry — and since the stock picture leads, the
+card is then a category placeholder AND `/feed` skips the unit entirely
+(`hasRealImage` is false for placeholder art). The rep could not tell from the
+form; the first drop-off shipped exactly this way and was noticed days later.
+It **warns, never blocks** — the unit is perfectly sellable without one.
+
 ## The orders board has its own tab (added 2026-09-08)
 `/admin/orders` (staff) renders the same `AdminOrders` the Operations page has
 always folded away, and `lib/order-board.js` is the ONE loader behind both — the
