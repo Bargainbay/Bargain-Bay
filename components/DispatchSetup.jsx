@@ -447,6 +447,29 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
 
       {canManageDrivers && (
         <section className="panel">
+          <h3 style={{ marginTop: 0 }}>Where Parallel pickups get dropped</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            When Parallel send a Freightcom pickup, we collect it and take it to SecondShop — we do
+            <b> not</b> drive to the customer named on the BOL, VA Transport does that leg. This is the
+            warehouse we drop at, and it becomes the delivery end of every one of those stops.
+            {drop.set ? '' : ' Until it is set, those stops stage with no delivery address and have to be filled in one at a time.'}
+          </p>
+          <form onSubmit={saveDrop} className="disp-setup-form">
+            <input value={drop.address} onChange={(e) => setDrop({ ...drop, address: e.target.value })}
+              placeholder="Street address *" style={{ minWidth: 240 }} />
+            <input value={drop.city} onChange={(e) => setDrop({ ...drop, city: e.target.value })}
+              placeholder="City" style={{ minWidth: 120 }} />
+            <input value={drop.postal} onChange={(e) => setDrop({ ...drop, postal: e.target.value })}
+              placeholder="Postal" style={{ minWidth: 90 }} />
+            <button className="btn accent" disabled={busy === 'drop'}>
+              {busy === 'drop' ? 'Saving…' : 'Save drop address'}
+            </button>
+          </form>
+        </section>
+      )}
+
+      {canManageDrivers && (
+        <section className="panel">
           <h3 style={{ marginTop: 0 }}>The number an import review rings</h3>
           <p className="hint" style={{ marginTop: 0 }}>
             A client&apos;s sheet arrives the night before the run and somebody has to check it. Press

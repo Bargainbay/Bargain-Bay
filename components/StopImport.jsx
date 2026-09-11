@@ -30,6 +30,8 @@ export default function StopImport({ clients = [], date, onDone }) {
   const [result, setResult] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const [fixing, setFixing] = useState(null);         // row index being corrected
+  const [checking, setChecking] = useState(false);    // pulling Freightcom mail
+  const [checked, setChecked] = useState(null);       // what the last pull found
 
   // Tomorrow, not today. A sheet arrives the day before the run — defaulting to
   // the board's current day put a whole client's next-day stops on the wrong
@@ -115,6 +117,23 @@ export default function StopImport({ clients = [], date, onDone }) {
     setBusy(true); setErr('');
     try { await loadSheet(sheetInfo.file, name); }
     catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+
+  // Parallel's Freightcom notifications, read out of the delivery inbox. The
+  // schedule does this on its own; the button is for when somebody is standing
+  // there and does not want to wait for the next run.
+  async function checkFreightcom() {
+    setChecking(true); setErr(''); setChecked(null);
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'freightcom_check' })
+      });
+      const d = await res.json();
+      if (!res.ok || d.ok === false) { setErr(d.error || d.reason || 'Could not check the inbox.'); }
+      else { setChecked(d); loadDrafts(); }
+    } catch { setErr('Network error.'); }
+    setChecking(false);
   }
 
   // Pasted rows take the same road: parsed here only to split them into a grid,
@@ -208,7 +227,25 @@ export default function StopImport({ clients = [], date, onDone }) {
                 Read these rows
               </button>
             )}
+            <button type="button" className="btn" disabled={checking || busy} onClick={checkFreightcom}
+              title="Read Parallel's Freightcom pickup notifications out of the delivery inbox and stage them">
+              {checking ? 'Checking the inbox…' : '📥 Check Freightcom mail'}
+            </button>
           </div>
+
+          {checked && (
+            <p className="hint" style={{ marginTop: 8 }}>
+              {checked.staged?.length
+                ? <>Staged <b>{checked.staged.length}</b> — {checked.staged.map((x) => x.bol || x.subject).join(', ')}. They are below, waiting to be checked.</>
+                : <>Nothing new. {checked.scanned || 0} notification{checked.scanned === 1 ? '' : 's'} looked at{checked.skipped?.length ? `, ${checked.skipped.length} already staged` : ''}.</>}
+              {checked.failed?.length ? <><br /><span style={{ color: 'var(--danger)' }}>
+                {checked.failed.length} could not be read: {checked.failed.map((f) => `${f.bol || f.subject} (${f.why})`).join('; ')}
+              </span></> : null}
+              {checked.dropSet === false && <><br /><span style={{ color: 'var(--danger)' }}>
+                No SecondShop drop address is set, so these have no delivery end — set it under Clients &amp; drivers.
+              </span></>}
+            </p>
+          )}
 
           {drafts.length > 0 && (
             <div className="imp-drafts">
