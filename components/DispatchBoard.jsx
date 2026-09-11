@@ -1138,11 +1138,17 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
           </p>
           {basing.rows.map((r, i) => (
             <div key={r.id} className="disp-setup-form" style={{ marginBottom: 6 }}>
-              <label style={{ minWidth: 190 }}>
+              <label style={{ minWidth: 240 }}>
                 <input type="checkbox" checked={r.on}
                   onChange={(e) => setBasing((b) => ({ ...b,
                     rows: b.rows.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)) }))} />
                 {' '}<b>{r.name}</b>
+                {/* Somebody on the clock with no stops of their own is riding
+                    with another crew. Worth saying out loud: it is also the
+                    driver whose day has nothing else to date-stamp it. */}
+                {!r.hasStops && (
+                  <span className="hint" style={{ margin: 0 }}> · on shift, no stops of their own</span>
+                )}
               </label>
               <select value={r.baseId} disabled={!r.on} style={{ minWidth: 220 }}
                 onChange={(e) => setBasing((b) => ({ ...b,
