@@ -663,6 +663,38 @@ sheet, GL detail as CSV.
   When Plaid is live, wire the real balance in and make the comparison automatic.
 - `SALE` now exists in four files. Still deliberate, still: change one, change all.
 
+## CDA's live workbook (added 2026-09-11)
+
+Canadian Discount Appliances do not email their work — they edit one shared Microsoft workbook
+("RS Solutions Delivery") in place. So there is **no event**: rows appear on a Tuesday and the only
+thing that ever surfaced them was somebody deciding to look. `lib/onedrive.js` reads it,
+`lib/cda-watch.js` diffs it, `/api/cron/cda` runs every 3 hours, and anything new STAGES.
+
+- **"This link will work for anyone" is no longer true.** The July sharing email says exactly that,
+  and it is why the first plan was a plain HTTPS fetch. The share has since been **migrated to
+  SharePoint** (`migratedtospo=true` on the redirect chain) and now ends at a login page: anonymous
+  GET is 403, OneDrive's public `shares/u!<base64>/root/content` is 401. Verified 2026-09-11. Hence
+  OAuth. Don't re-litigate it by trying the link again — trace the redirects if in doubt.
+- **THE INTERESTING PART IS THE DIFF, NOT THE DOWNLOAD.** A row's identity is a hash of its own
+  normalised CONTENTS, never its position: a client sorting the sheet or deleting a cancelled line
+  would otherwise renumber everything below it and re-stage the whole workbook as new work.
+- **The first run is a BASELINE, not an import.** An empty seen-set means the sheet's existing
+  history is remembered and NOTHING is staged. Without it, switching this on stages a year of
+  long-delivered rows as today's work.
+- **Rows are remembered only AFTER the batch is safely staged.** Remembering first and failing to
+  stage drops those rows forever, silently — the one outcome worse than a duplicate.
+- A row needs **two populated cells** to count. Spreadsheets are full of spacer rows and half-typed
+  lines; which columns matter is the mapper's job, not this one's.
+- **It only ever reads.** The workbook is the client's; a bug here must not be able to edit it.
+- The client is NOT forced onto the rows — `client_sheet_profiles` learns it from the first approval,
+  keyed on the heading row. A wrong client on every row is worse than a question.
+- Setup: `MS_CLIENT_ID` / `MS_CLIENT_SECRET`, then **Connect Microsoft** on the dispatch page and
+  sign in once as the account CDA shared the file with. The workbook is then **picked from a list**
+  of what Graph says is shared with us — the ids in a OneDrive share URL are not the ids Graph
+  wants, and pasting one is half an hour of nobody's time well spent. `Files.Read.All` is the
+  narrowest scope Microsoft offers for a file somebody else shared; there is no per-file scope,
+  which is why this wants a dedicated account rather than a personal Microsoft login.
+
 ## Freightcom auto-staging (added 2026-09-10)
 
 Parallel forwards a Freightcom "Pick Up Notification" and asks, in prose, for RS to collect it and
