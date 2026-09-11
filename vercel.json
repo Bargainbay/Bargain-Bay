@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/freightcom",
       "schedule": "*/15 6-22 * * *"
+    },
+    {
+      "path": "/api/cron/cda",
+      "schedule": "5 */3 * * *"
     }
   ]
 }

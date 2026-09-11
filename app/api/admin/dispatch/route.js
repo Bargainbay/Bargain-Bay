@@ -36,6 +36,8 @@ import {
 } from '../../../../lib/import-batches';
 import { startImportCall, callConfigured, callTarget } from '../../../../lib/import-call';
 import { watchFreightcom } from '../../../../lib/freightcom-watch';
+import { oneDriveStatus, listShared, setCdaFile, oneDriveDisconnect } from '../../../../lib/onedrive';
+import { watchCdaSheet } from '../../../../lib/cda-watch';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -123,6 +125,18 @@ export async function GET(req) {
       const batch = await resolveBatch(sp.get('batchId'));
       if (!batch) return NextResponse.json({ error: 'That import is no longer here.' }, { status: 404 });
       return NextResponse.json({ batch, questions: openQuestions(batch) });
+    }
+    // The CDA connection: whether Microsoft is linked, and which workbook.
+    if (sp.get('view') === 'cda') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can see the CDA connection.' }, { status: 403 });
+      const status = await oneDriveStatus();
+      // The file list is only fetched when asked for — it is a round trip to
+      // Microsoft and the panel renders without it.
+      if (sp.get('files') === '1' && status.connected) {
+        try { return NextResponse.json({ ...status, files: await listShared() }); }
+        catch (e) { return NextResponse.json({ ...status, filesError: e.message }); }
+      }
+      return NextResponse.json(status);
     }
     if (sp.get('view') === 'imports') {
       return NextResponse.json({
@@ -266,6 +280,23 @@ export async function POST(req) {
     }
     // "Check now" on the Import tab. The same function the cron runs, so there
     // is one code path and the button can never disagree with the schedule.
+    // Which shared workbook is CDA's. Chosen from what Microsoft says is shared
+    // with us rather than typed: the ids in a OneDrive share URL are not the ids
+    // Graph wants, and pasting one is half an hour of nobody's time well spent.
+    if (body.action === 'cda_file') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can change the CDA workbook.' }, { status: 403 });
+      await setCdaFile({ fileId: body.fileId, driveId: body.driveId, name: body.name });
+      return NextResponse.json({ ok: true, ...(await oneDriveStatus()) });
+    }
+    if (body.action === 'cda_disconnect') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only the owner can disconnect Microsoft.' }, { status: 403 });
+      await oneDriveDisconnect();
+      return NextResponse.json({ ok: true, ...(await oneDriveStatus()) });
+    }
+    // "Check now" for the sheet. Same function the schedule runs.
+    if (body.action === 'cda_check') {
+      return NextResponse.json(await watchCdaSheet({ dryRun: body.dry === true }));
+    }
     if (body.action === 'freightcom_check') {
       return NextResponse.json(await watchFreightcom({ max: 15 }));
     }

@@ -20,6 +20,8 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   // browser at call time — a review call that can be pointed at an arbitrary
   // number is a robocaller with our name on it.
   const [callTo, setCallTo] = useState('');
+  const [cda, setCda] = useState(null);      // { configured, connected, account, fileId, files? }
+  const [cdaMsg, setCdaMsg] = useState('');
   const [callReady, setCallReady] = useState(false);
   const [vanName, setVanName] = useState('');
   const [vanPlate, setVanPlate] = useState('');
@@ -150,6 +152,35 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         .catch(() => {});
     }
   }, [isOwner]);
+
+  const loadCda = useCallback(async (withFiles) => {
+    try {
+      const res = await fetch('/api/admin/dispatch?view=cda' + (withFiles ? '&files=1' : ''));
+      const d = await res.json();
+      if (res.ok) setCda(d);
+    } catch {}
+  }, []);
+  useEffect(() => { if (canManageDrivers) loadCda(false); }, [canManageDrivers, loadCda]);
+
+  async function cdaPost(body, label) {
+    setBusy(label); setErr(''); setCdaMsg('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'That did not work.'); }
+      else if (body.action === 'cda_check') {
+        setCdaMsg(d.ok === false ? `Could not read it: ${d.reason}`
+          : d.baseline ? `Remembered ${d.rows} rows already on the sheet. From now on only NEW lines are staged.`
+          : d.fresh ? `${d.fresh} new row${d.fresh === 1 ? '' : 's'} staged \u2014 check them on the Import tab.`
+          : `Nothing new. ${d.rows} rows on the sheet.`);
+        loadCda(false);
+      } else { setCda(d); }
+    } catch { setErr('Network error.'); }
+    setBusy('');
+  }
 
   async function saveCallNumber(e) {
     e.preventDefault();
@@ -445,6 +476,69 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
               Drivers see <b>⭐ Ask for a Google review</b> on a stop once it&apos;s finished.{' '}
               <a href={reviewUrl} target="_blank" rel="noopener noreferrer">Check the link goes to the right page ↗</a>
             </p>
+          )}
+        </section>
+      )}
+
+      {canManageDrivers && cda && (
+        <section className="panel">
+          <h3 style={{ marginTop: 0 }}>Canadian Discount Appliances&apos; sheet</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            CDA don&apos;t email their work — they edit one shared Microsoft workbook, so nothing tells
+            us when rows appear. Connected, it is read every three hours and anything <b>new</b> is
+            staged on the Import tab. It only ever reads.
+          </p>
+
+          {!cda.configured && (
+            <p className="hint" style={{ color: 'var(--danger)' }}>
+              Microsoft keys aren&apos;t set on this deployment yet (<code>MS_CLIENT_ID</code> and
+              <code> MS_CLIENT_SECRET</code>).
+            </p>
+          )}
+
+          {cda.configured && !cda.connected && (
+            <p style={{ margin: '8px 0' }}>
+              <a className="btn accent" href="/api/admin/onedrive/connect">Connect Microsoft</a>
+              <span className="hint" style={{ marginLeft: 10 }}>
+                Sign in once as the account CDA shared the file with.
+              </span>
+            </p>
+          )}
+
+          {cda.connected && (
+            <>
+              <p className="hint" style={{ margin: '6px 0' }}>
+                Connected{cda.account ? <> as <b>{cda.account}</b></> : null}
+                {cda.fileId ? <> · workbook chosen</> : <> · <b>no workbook chosen yet</b></>}
+              </p>
+              <div className="disp-setup-form">
+                <button type="button" className="btn" disabled={!!busy}
+                  onClick={() => loadCda(true)}>Show files shared with us</button>
+                {cda.fileId && (
+                  <button type="button" className="btn accent" disabled={busy === 'cdacheck'}
+                    onClick={() => cdaPost({ action: 'cda_check' }, 'cdacheck')}>
+                    {busy === 'cdacheck' ? 'Reading the sheet…' : 'Check the sheet now'}
+                  </button>
+                )}
+              </div>
+              {cda.filesError && <p className="hint" style={{ color: 'var(--danger)' }}>{cda.filesError}</p>}
+              {cda.files && (
+                <ul className="disp-setup-list">
+                  {cda.files.length === 0 && <li className="hint">Nothing is shared with that account yet.</li>}
+                  {cda.files.map((f) => (
+                    <li key={f.id}>
+                      <strong>{f.name}</strong>
+                      {f.by ? <span className="hint"> · from {f.by}</span> : null}
+                      <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
+                        onClick={() => cdaPost({ action: 'cda_file', fileId: f.id, driveId: f.driveId, name: f.name }, 'cdafile')}>
+                        {cda.fileId === f.id ? 'chosen' : 'use this one'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {cdaMsg && <p className="hint" style={{ marginBottom: 0 }}>{cdaMsg}</p>}
+            </>
           )}
         </section>
       )}
