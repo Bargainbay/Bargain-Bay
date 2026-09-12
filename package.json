@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "lint": "npx --yes eslint@9 .",
     "sync": "node scripts/sync-sheet.mjs"
   },
   "dependencies": {
