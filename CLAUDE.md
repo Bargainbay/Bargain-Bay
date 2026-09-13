@@ -136,7 +136,20 @@ case folding. Three things follow, all learned filling the gap on 2026-09-10:
 
 ## Pricing rules (don't break these)
 - **HST 13%**, $79 delivery / free Pickering pickup. CAD throughout. Delivery zones in `/policies/shipping` are distance-from-Pickering (re-anchored Jul 2026; fees unchanged).
-- **Member/wholesale:** 55% of retail on regular items (floored at cost+10% via `data/member-prices.json` to keep cost private), and 10% off the clearance price on clearance items. Approval-gated (`role=member`, `member_status=approved`).
+- **Member/wholesale:** 55% of retail on regular items, and 10% off the clearance
+  price on clearance items. Approval-gated (`role=member`, `member_status=approved`).
+  **Both are floored at cost + 10%, and the floor is in `lib/pricing.js`, not in the
+  data.** It used to be pre-computed into `data/member-prices.json` — a hand-built
+  table of 139 SKUs, last written 2026-06-15, that nothing regenerates — so every
+  unit taken in after that date missed the lookup and sold to members at a bare 55%
+  of retail with no floor at all. `costFloorOf` / `boundMemberPrice` are the one
+  definition; the table is now just an override for the SKUs it happens to name.
+  **The public price is the CEILING and is applied last, so it beats the floor:**
+  where cost + 10% is already at or above what we list a unit at, a member gets no
+  discount rather than a higher price — a member must never pay more than a regular
+  shopper. That also means a deliberate below-cost clearance markdown still stands
+  for members; only the extra 10% underneath it is floored. A cost of 0 (haul-away)
+  is a real answer and floors nothing.
 - **Clearance keeps the standard ONE-YEAR warranty** (`warranty_months` default 12 — NOT the 3 months that was originally spec'd). Clearance threshold = units aged > 45 days.
 - A real bug we already fixed: checkout/cart once charged full catalog price on clearance units. `lib/pricing.js` is now authoritative for both display AND checkout. Keep it that way.
 
