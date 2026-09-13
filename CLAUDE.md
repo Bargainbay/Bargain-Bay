@@ -138,8 +138,13 @@ case folding. Three things follow, all learned filling the gap on 2026-09-10:
 - **HST 13%**, $79 delivery / free Pickering pickup. CAD throughout. Delivery zones in `/policies/shipping` are distance-from-Pickering (re-anchored Jul 2026; fees unchanged).
 - **Member/wholesale:** 55% of retail on regular items, and 10% off the clearance
   price on clearance items. Approval-gated (`role=member`, `member_status=approved`).
-  **Both are floored at cost + 10%, and the floor is in `lib/pricing.js`, not in the
-  data.** It used to be pre-computed into `data/member-prices.json` — a hand-built
+  **Both are floored at the HIGHER of cost + 10% and $200 clear, and the floor is in
+  `lib/pricing.js`, not in the data.** The $200 is only asked for where the unit can
+  carry it — if the public price is less than $200 above cost, no member price can
+  produce $200, so the percentage floor stands alone and the member keeps a real
+  discount. Applying it unconditionally was measured against the 132 live units and
+  would have stripped the member discount from 69 of them (from 22) while reaching
+  $200 on none of the extra 47. It used to be pre-computed into `data/member-prices.json` — a hand-built
   table of 139 SKUs, last written 2026-06-15, that nothing regenerates — so every
   unit taken in after that date missed the lookup and sold to members at a bare 55%
   of retail with no floor at all. `costFloorOf` / `boundMemberPrice` are the one
