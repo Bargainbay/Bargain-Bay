@@ -172,9 +172,14 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'That did not work.'); }
       else if (body.action === 'cda_check') {
+        // `stagedCount`, not `fresh` — they are different numbers whenever a
+        // batch is capped, and saying "12 staged" when 60 lines are new is how
+        // the other 48 went unnoticed.
         setCdaMsg(d.ok === false ? `Could not read it: ${d.reason}`
-          : d.baseline ? `Remembered ${d.rows} rows already on the sheet. From now on only NEW lines are staged.`
-          : d.fresh ? `${d.fresh} new row${d.fresh === 1 ? '' : 's'} staged \u2014 check them on the Import tab.`
+          : d.baseline ? `Remembered ${d.rows} rows already on the sheet.${d.rekeyed ? ' (Re-read after a change to how rows are identified.)' : ''} From now on only NEW lines are staged.`
+          : d.stagedCount ? `${d.stagedCount} new row${d.stagedCount === 1 ? '' : 's'} staged \u2014 check them on the Import tab.`
+              + (d.skipped ? ` ${d.skipped} more did not fit and will come through on the next run.` : '')
+              + (d.warning ? ` Note: ${d.warning}.` : '')
           : `Nothing new. ${d.rows} rows on the sheet.`);
         loadCda(false);
       } else { setCda(d); }
