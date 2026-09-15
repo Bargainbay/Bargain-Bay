@@ -60,6 +60,40 @@ const serviceWorker = ['caches', 'clients', 'skipWaiting', 'registration', 'Serv
 
 const readonly = (names) => Object.fromEntries(names.map((n) => [n, 'readonly']));
 
+// PLACEHOLDER PLUGINS — rules that exist and never report.
+//
+// The repo carries `eslint-disable` comments for Next's and React's lint rules
+// (`@next/next/no-img-element` on every deliberate <img>, `react/no-danger`,
+// `react-hooks/exhaustive-deps`), written back when `next lint` ran them.
+// ESLint 9 treats a comment naming a rule it has never heard of as an ERROR —
+// "Definition for rule ... was not found" — so without these, the first run
+// failed ten times on correct code and not once on the bug this file is for.
+//
+// Loading the real plugins would mean devDependencies and a lockfile change
+// (see above), and would switch on rules this config deliberately doesn't run.
+// So each is a name and nothing else: enough for a disable comment to resolve,
+// never enabled, never able to report. The lists are generous for the same
+// reason the globals are: a missing name is a red build on correct code.
+const silent = { meta: { type: 'problem', schema: false }, create: () => ({}) };
+const plugin = (names) => ({ rules: Object.fromEntries(names.map((n) => [n, silent])) });
+
+const placeholders = {
+  '@next/next': plugin([
+    'no-img-element', 'no-html-link-for-pages', 'no-sync-scripts', 'no-page-custom-font',
+    'google-font-display', 'google-font-preconnect', 'inline-script-id', 'next-script-for-ga',
+    'no-assign-module-variable', 'no-async-client-component', 'no-before-interactive-script-outside-document',
+    'no-css-tags', 'no-document-import-in-page', 'no-duplicate-head', 'no-head-element',
+    'no-head-import-in-document', 'no-script-component-in-head', 'no-styled-jsx-in-document',
+    'no-title-in-document-head', 'no-typos', 'no-unwanted-polyfillio'
+  ]),
+  react: plugin([
+    'no-danger', 'no-danger-with-children', 'no-unescaped-entities', 'no-unknown-property',
+    'no-array-index-key', 'no-children-prop', 'jsx-key', 'jsx-no-target-blank',
+    'display-name', 'prop-types', 'react-in-jsx-scope'
+  ]),
+  'react-hooks': plugin(['rules-of-hooks', 'exhaustive-deps'])
+};
+
 export default [
   {
     // .next is generated, data/ is JSON the tracker writes, node_modules is not ours.
@@ -69,8 +103,16 @@ export default [
     // .jsx is listed explicitly: flat config only walks a directory for the
     // extensions some config block actually claims, and the components are jsx.
     files: ['**/*.js', '**/*.jsx', '**/*.mjs'],
+    // Off, not warn: a bare `/* eslint-disable-next-line */` guarding a
+    // useEffect, or one naming a rule this config doesn't run, is "unused" by
+    // definition here. Seven warnings about rules nobody is running is noise
+    // that teaches people to scroll past the output.
+    linterOptions: { reportUnusedDisableDirectives: 'off' },
+    plugins: placeholders,
     languageOptions: {
-      ecmaVersion: 2024,
+      // 'latest', not a year: import attributes (`with { type: 'json' }`) need
+      // it, and a parse error fails the run exactly like a real finding.
+      ecmaVersion: 'latest',
       sourceType: 'module',
       parserOptions: { ecmaFeatures: { jsx: true } },
       globals: { ...readonly(browser), ...readonly(node), ...readonly(serviceWorker) }
