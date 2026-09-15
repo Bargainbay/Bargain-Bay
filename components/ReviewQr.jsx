@@ -45,7 +45,16 @@ export default function ReviewQr({ url, onClose, onAsked }) {
   // Asking is the thing worth recording — not whether they left one, which
   // Google never tells us. "We asked on 12 of 15 deliveries" is a question the
   // office can act on; "we got 3 reviews" is not.
-  useEffect(() => { onAsked?.(); }, [onAsked]);
+  // ONCE per showing. The parent passes a fresh arrow on every render, and the
+  // stop list re-renders on its timers while the code is up — keyed on
+  // `onAsked` alone this would queue another request every few seconds. The
+  // parent keys this component on the stop, so a different stop still records.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (asked.current) return;
+    asked.current = true;
+    onAsked?.();
+  }, [onAsked]);
 
   return (
     <div className="drv-qr" role="dialog" aria-label="Google review code">
