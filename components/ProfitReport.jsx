@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Mileage from './Mileage';
+import { MAX_SHIFT_HOURS } from '../lib/constants';
 
 // What the delivery side of the business actually makes, day by day, week by
 // week, month by month.
@@ -251,8 +252,8 @@ export default function ProfitReport({ drivers = [], date }) {
                 {data.totals.unpricedShifts > 0 && (
                   <>
                     <b>{data.totals.unpricedShifts} shift{data.totals.unpricedShifts === 1 ? '' : 's'} could not be
-                    costed</b> — nobody clocked off, or the shift ran past 14 hours, which is the same thing with
-                    the tap coming the next morning. Those hours are <b>left out</b> of Crew above rather than
+                    costed</b> — nobody clocked off, or the shift ran past {MAX_SHIFT_HOURS} hours, which is the same
+                    thing with the tap coming the next morning. Those hours are <b>left out</b> of Crew above rather than
                     guessed at, so the cost is short by whatever they were. Fix them in <b>Times → Shifts</b> and
                     the figure corrects itself.{' '}
                   </>
