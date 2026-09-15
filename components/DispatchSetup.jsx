@@ -22,6 +22,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   const [callTo, setCallTo] = useState('');
   const [cda, setCda] = useState(null);      // { configured, connected, account, fileId, files? }
   const [cdaMsg, setCdaMsg] = useState('');
+  const [cdaLink, setCdaLink] = useState('');
   const [callReady, setCallReady] = useState(false);
   const [vanName, setVanName] = useState('');
   const [vanPlate, setVanPlate] = useState('');
@@ -171,6 +172,15 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'That did not work.'); }
+      else if (body.action === 'cda_link') {
+        setCda(d);
+        setCdaMsg(d.resolved?.resolveError
+          ? `Saved the link, but Microsoft would not resolve it yet: ${d.resolved.resolveError}`
+          : d.resolved?.name
+            ? `That link is “${d.resolved.name}”. It will be read from here on.`
+            : 'Link saved.');
+        setCdaLink('');
+      }
       else if (body.action === 'cda_check') {
         // `stagedCount`, not `fresh` — they are different numbers whenever a
         // batch is capped, and saying "12 staged" when 60 lines are new is how
@@ -516,6 +526,24 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                 Connected{cda.account ? <> as <b>{cda.account}</b></> : null}
                 {cda.fileId ? <> · workbook chosen</> : <> · <b>no workbook chosen yet</b></>}
               </p>
+              {/* The link is offered FIRST and works on its own. The picker below
+                  needs the signed-in account to own a OneDrive of its own, which
+                  a desk mailbox generally does not — so a list that comes back
+                  empty is the expected case, not a fault. */}
+              <div className="disp-setup-form">
+                <input type="url" value={cdaLink} placeholder="Paste the OneDrive share link CDA sent"
+                  style={{ flex: '1 1 320px' }} disabled={!!busy}
+                  onChange={(e) => setCdaLink(e.target.value)} />
+                <button type="button" className="btn accent" disabled={!!busy || !cdaLink.trim()}
+                  onClick={() => cdaPost({ action: 'cda_link', url: cdaLink.trim() }, 'cdalink')}>
+                  {busy === 'cdalink' ? 'Asking Microsoft…' : 'Use this link'}
+                </button>
+              </div>
+              {cda.fileName && (
+                <p className="hint" style={{ margin: '6px 0' }}>
+                  Reading <b>{cda.fileName}</b>{cda.shareUrl ? ' — from the share link, re-resolved if the id ever stops working' : ''}.
+                </p>
+              )}
               <div className="disp-setup-form">
                 <button type="button" className="btn" disabled={!!busy}
                   onClick={() => loadCda(true)}>Show files shared with us</button>
