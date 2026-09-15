@@ -83,9 +83,40 @@ export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
     finally { setBusy(false); }
   }
 
+  // Two shifts that were really one day — clocked off and straight back on,
+  // usually to swap onto the right truck. The server checks all of this again.
+  async function merge(first, second) {
+    const span = (x) => `${hhmm(x.startedAt)}–${hhmm(x.endedAt)}`;
+    if (!window.confirm(
+      `Merge ${first.driverName || 'this driver'}'s ${span(first)} and ${span(second)} into one shift? ` +
+      'The second row is removed; its times are kept in the note.'
+    )) return;
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'shift_merge', firstId: first.id, secondId: second.id })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not merge those shifts.'); return; }
+      setEditing(null);
+      await load();
+    } catch { setErr('Network error — nothing was merged.'); }
+    finally { setBusy(false); }
+  }
+
   if (err) return <div className="error-box">{err}</div>;
   if (!data) return null;
   const t = data.totals || {};
+
+  // The shift that follows this one closely enough to be the same day.
+  const mergeableAfter = (r) => (!r.endedAt ? null : data.rows.find((o) =>
+    o.id !== r.id && o.driverId === r.driverId && o.endedAt
+    && o.startedAt > r.startedAt
+    && (o.driving === false) === (r.driving === false)
+    && (r.driving === false ? o.ridingWith === r.ridingWith : o.vehicleId === r.vehicleId)
+    && new Date(o.startedAt) - new Date(r.endedAt) <= 60 * 60000
+  ) || null);
 
   return (
     <div className="panel">
@@ -211,7 +242,14 @@ export default function ShiftHours({ from, to, driverId = '', drivers = [] }) {
                           : 'needs an odometer reading at both ends'}>—</span>
                     )}
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {mergeableAfter(r) && (
+                      <button type="button" className="disp-toggle" disabled={busy}
+                        title="Combine with the shift that starts right after this one"
+                        onClick={() => merge(r, mergeableAfter(r))}>
+                        merge with next
+                      </button>
+                    )}{' '}
                     <button type="button" className="disp-toggle" disabled={busy}
                       onClick={() => setEditing(editing?.id === r.id ? null : {
                         id: r.id,

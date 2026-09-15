@@ -11,7 +11,7 @@ import {
   profitReport, stopTimes, addExpense, listExpenses, deleteExpense, EXPENSE_KINDS
 } from '../../../../lib/dispatch-money';
 import {
-  shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate, setShiftTimes, createShift } from '../../../../lib/shifts';
+  shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate, setShiftTimes, createShift, mergeShifts } from '../../../../lib/shifts';
 import { livePositions, driverTrail } from '../../../../lib/driver-location';
 import { sendSms, smsConfigured } from '../../../../lib/sms';
 import { SITE_URL } from '../../../../lib/site';
@@ -472,6 +472,19 @@ export async function POST(req) {
         });
       } catch (e) {
         return NextResponse.json({ error: e?.message || 'Could not save that shift.' }, { status: 400 });
+      }
+    }
+    // Two shifts that were one day. Same gate as correcting the hours: it is pay.
+    if (body.action === 'shift_merge') {
+      if (!s.full) {
+        return NextResponse.json({ error: 'Only an admin can merge shifts.' }, { status: 403 });
+      }
+      try {
+        return NextResponse.json({
+          ok: true, shift: await mergeShifts(body.firstId, body.secondId, s?.name || s?.email || null)
+        });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not merge those shifts.' }, { status: 400 });
       }
     }
     if (body.action === 'driver_merge') {
