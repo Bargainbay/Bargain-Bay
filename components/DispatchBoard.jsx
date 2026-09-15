@@ -4,6 +4,7 @@ import JobForm from './JobForm';
 import ServiceVisitForm from './ServiceVisitForm';
 import TicketQueue from './TicketQueue';
 import DispatchSetup from './DispatchSetup';
+import DispatchTour from './DispatchTour';
 import StaleStops from './StaleStops';
 import StopImport from './StopImport';
 import BulkClient from './BulkClient';
@@ -252,7 +253,10 @@ function MoneyToConfirm({ rows, busy, canConfirm, onConfirm, onReject }) {
   if (!rows?.length) return null;
   const total = rows.reduce((a, r) => a + Number(r.amount || 0), 0);
   return (
-    <div className="disp-confirm">
+    // data-tour is the walkthrough's anchor and lives here rather than on a
+    // wrapper outside, so it appears exactly when this panel does — the rule for
+    // "is there money to confirm" stays written once, on the line above.
+    <div className="disp-confirm" data-tour="money">
       <div className="disp-confirm-head">
         <b>Money to confirm — ${total.toFixed(2)}</b>
         <span className="hint" style={{ margin: 0 }}>
@@ -681,7 +685,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
   );
 }
 
-export default function DispatchBoard({ initial, canManageClients, canConfirmMoney, isOwner = false, openTickets, initialView = 'board' }) {
+export default function DispatchBoard({ initial, canManageClients, canConfirmMoney, isOwner = false, openTickets, initialView = 'board', showTour = false, tourName = '' }) {
   const [board, setBoard] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -696,6 +700,10 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   const [addNum, setAddNum] = useState('');      // order number typed into "add by number"
   const [gassing, setGassing] = useState(false); // the day-cost box, open on the bar
   const [bulking, setBulking] = useState(false); // "these are all for X"
+  // The walkthrough. Opens by itself the first time a coordinator lands here
+  // (the server decides that, off dispatch_access.tour_seen_at — never the
+  // browser, which is shared) and is replayable from the tab row afterwards.
+  const [touring, setTouring] = useState(!!showTour);
 
   async function refresh(date = board.date) {
     setErr('');
@@ -1024,6 +1032,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
 
   const Tab = ({ id, children }) => (
     <button type="button" className={'disp-tab' + (view === id ? ' is-on' : '')}
+      data-tour={'tab-' + id}
       aria-current={view === id} onClick={() => setView(id)}>{children}</button>
   );
 
@@ -1046,7 +1055,20 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
         {canManageClients && <Tab id="pay">Pay</Tab>}
         {canManageClients && <Tab id="profit">Profit</Tab>}
         <Tab id="setup">Clients &amp; drivers</Tab>
+        <button type="button" className="tour-open" onClick={() => setTouring(true)}
+          title="Walk through what everything on this page does">Take the tour</button>
       </div>
+
+      <DispatchTour open={touring} name={tourName} onClose={() => {
+        setTouring(false);
+        // Best-effort and deliberately unawaited: if this never lands she is
+        // offered the walkthrough once more tomorrow, which is a far better
+        // failure than a close button that hangs on a request.
+        fetch('/api/admin/dispatch', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'tour_done' })
+        }).catch(() => {});
+      }} />
 
       {view === 'tickets' && <TicketQueue onChanged={() => refresh()} />}
 
@@ -1076,7 +1098,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
       {view !== 'board' ? null : (
       <div>
       <div className="disp-bar">
-        <div className="disp-nav">
+        <div className="disp-nav" data-tour="date">
           <button type="button" className="btn" onClick={() => refresh(shiftDate(board.date, -1))}>←</button>
           <input type="date" value={board.date} onChange={(e) => e.target.value && refresh(e.target.value)} />
           <button type="button" className="btn" onClick={() => refresh(shiftDate(board.date, 1))}>→</button>
@@ -1087,6 +1109,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
 
           <button type="button" className="btn" disabled={busy}
             title="Pull in Bargain Bay delivery orders that aren't on the board yet"
+            data-tour="pull"
             onClick={pullBargainBay}>Pull Bargain Bay orders</button>
           <form className="disp-addnum" onSubmit={addByNumber}>
             <input value={addNum} onChange={(e) => setAddNum(e.target.value)}

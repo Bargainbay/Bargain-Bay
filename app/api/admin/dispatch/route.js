@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { dispatchAccess } from '../../../../lib/dispatch-access';
-import { listDispatchers, grantDispatcher, revokeDispatcher } from '../../../../lib/dispatchers';
+import { listDispatchers, grantDispatcher, revokeDispatcher, markTourSeen } from '../../../../lib/dispatchers';
 import {
   setDriverByEmail, addDriverByPhone, createDriverSignInLink,
   listDriversForOffice, driverSmsNumber, changeDriverPhone, mergeDrivers
@@ -527,6 +527,17 @@ export async function POST(req) {
       if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can take dispatch access away.' }, { status: 403 });
       await revokeDispatcher(body.email, s.email);
       return NextResponse.json({ ok: true, dispatchers: await listDispatchers() });
+    }
+    // The walkthrough is finished (or was skipped). Written for the person whose
+    // session this is and nobody else, and it only ever moves forward.
+    //
+    // THIS SITS ABOVE THE FALL-THROUGH ON PURPOSE. Everything below is
+    // `createJob`, so an action this handler does not recognise does not 400 —
+    // it silently books a stop. A new setup-style action added underneath would
+    // put a nameless job on the board every time somebody closed a welcome card.
+    if (body.action === 'tour_done') {
+      await markTourSeen(s);
+      return NextResponse.json({ ok: true });
     }
     const job = await createJob({ ...body, createdBy: who(s) });
     return NextResponse.json({ ok: true, job });

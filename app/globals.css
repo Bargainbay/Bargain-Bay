@@ -1497,3 +1497,70 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 /* Driving or riding — the first question on a shift, because the answer decides
    whether the rest of the form exists. */
 .drv-form-q { font-size: 17px; font-weight: 700; color: var(--charcoal); }
+
+/* ---- The dispatch walkthrough (components/DispatchTour.jsx) --------------
+   A spotlight cut out of a dim overlay. The hole is drawn with a very large
+   spread box-shadow rather than four positioned panels or an SVG mask: one
+   element, no seams between panels at fractional device pixels, and it moves
+   with a single style update as the tour steps along.
+   `pointer-events: none` on the hole matters — the point of a spotlight is
+   that she can SEE the real control underneath it, and a transparent block
+   sitting over the board would swallow the scroll. ------------------------ */
+.tour-root { position: fixed; inset: 0; z-index: 80; }
+.tour-veil,
+.tour-spot { position: fixed; pointer-events: none; }
+.tour-veil { inset: 0; background: rgba(46, 45, 43, .62); }
+.tour-spot {
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(46, 45, 43, .62);
+  outline: 2px solid var(--card);
+  outline-offset: 0;
+  transition: top .18s ease, left .18s ease, width .18s ease, height .18s ease;
+}
+.tour-card {
+  position: fixed;
+  max-width: calc(100vw - 32px);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 34px rgba(46, 45, 43, .28);
+  padding: 16px 18px 14px;
+  z-index: 81;
+}
+.tour-card:focus { outline: none; }
+.tour-step {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--taupe-dark); margin-bottom: 6px;
+}
+.tour-title {
+  font-family: var(--font-head);
+  font-size: 18px; line-height: 1.25; color: var(--charcoal);
+  margin: 0 0 6px; text-wrap: balance;
+}
+.tour-body { font-size: 14px; line-height: 1.55; color: var(--ink); margin: 0 0 14px; }
+.tour-dots { display: flex; gap: 5px; margin-bottom: 12px; }
+.tour-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--line-soft); }
+.tour-dot.is-on { background: var(--taupe-dark); }
+.tour-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tour-move { display: flex; gap: 8px; }
+.tour-skip {
+  background: none; border: 0; padding: 4px 2px;
+  font: inherit; font-size: 13px; color: var(--muted);
+  text-decoration: underline; cursor: pointer;
+}
+.tour-skip:hover { color: var(--charcoal); }
+/* The replay button. Quiet on purpose: it sits in the tab row all day for a
+   person who needs it twice. */
+.tour-open {
+  margin-left: auto; align-self: center;
+  background: none; border: 1px solid var(--line-soft); border-radius: 999px;
+  padding: 3px 11px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer;
+}
+.tour-open:hover { color: var(--charcoal); border-color: var(--line); }
+@media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } }
+@media (max-width: 560px) {
+  /* Anchoring a card to a control is pointless on a phone, where the card is
+     nearly the width of the screen. Pin it to the bottom instead. */
+  .tour-card { left: 16px !important; right: 16px; width: auto !important;
+               top: auto !important; bottom: 16px !important; }
+}

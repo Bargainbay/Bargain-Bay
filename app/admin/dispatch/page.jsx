@@ -13,7 +13,7 @@ export default async function DispatchPage({ searchParams }) {
   // admin | dispatch coordinator | sales — see lib/dispatch-access.js. `full` is
   // what the money controls hang off; `coordinator` only changes the nav, because
   // this page is the coordinator's whole portal and must not offer them a way out.
-  const { session, allowed, full, coordinator } = await dispatchAccess();
+  const { session, allowed, full, coordinator, tourSeen } = await dispatchAccess();
   if (!session) redirect('/login?next=/admin/dispatch');
   if (!allowed) {
     return (<div className="narrow"><div className="panel">
@@ -47,8 +47,15 @@ export default async function DispatchPage({ searchParams }) {
       )}
       {loadError && <div className="error-box">{loadError}</div>}
 
+      {/* The walkthrough opens by itself only for a coordinator who has never
+          finished it. `tourSeen` is true for the owner and for sales, so nobody
+          who has been running this board for a year is greeted by a tour — and
+          it is answered from the database rather than the browser, because the
+          warehouse machine is shared. Everyone keeps the replay button. */}
       <DispatchBoard initial={board} canManageClients={full} openTickets={openTickets}
         canConfirmMoney={full} isOwner={!coordinator && full}
+        showTour={coordinator && !tourSeen}
+        tourName={String(session.name || '').trim().split(/\s+/)[0] || ''}
         initialView={String(sp?.view || 'board')} />
     </div>
   );
