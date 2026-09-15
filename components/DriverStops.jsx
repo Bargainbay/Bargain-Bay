@@ -207,8 +207,11 @@ export default function DriverStops({ initial, driverName }) {
   // office can act on in a way "we got 3 reviews" is not.
   function askedForReview(stop) {
     if (!stop?.id) return;
-    queueAction({
-      kind: 'patch', ref: newRef(),
+    // queueOrSend, not queueAction — same reason as DriverFinish: a phone whose
+    // storage refuses the write still sends it. And never let recording this
+    // get in the way of showing the code to a customer standing at the door.
+    queueOrSend({
+      kind: 'patch', jobId: stop.id, ref: newRef(),
       body: { jobId: stop.id, action: 'review_asked' }
     }).then(push).catch(() => {});
   }
@@ -355,7 +358,7 @@ export default function DriverStops({ initial, driverName }) {
       )}
 
       {reviewFor && reviewUrl && (
-        <ReviewQr url={reviewUrl} onClose={() => setReviewFor(null)}
+        <ReviewQr key={reviewFor.id} url={reviewUrl} onClose={() => setReviewFor(null)}
           onAsked={() => askedForReview(reviewFor)} />
       )}
 
