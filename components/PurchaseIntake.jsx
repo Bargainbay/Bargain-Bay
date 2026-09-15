@@ -117,6 +117,12 @@ export default function PurchaseIntake() {
         <div className="notice-box" style={{ marginTop: 10 }}>
           ✓ Added <b>{done.count}</b> unit{done.count === 1 ? '' : 's'} to the tracker{done.addedSkus?.length ? ` (${done.addedSkus.join(', ')})` : ''}.
           They&apos;re held off the storefront until confirmed tested-working.
+          {done.addedSkus?.length > 0 && (
+            <> <a target="_blank" rel="noopener noreferrer" style={{ fontWeight: 700 }}
+              href={`/admin/warehouse/labels?${new URLSearchParams({ type: 'units', skus: done.addedSkus.join(',') })}`}>
+              Print their SKU stickers
+            </a></>
+          )}
           {done.tax > 0 && (
             <div style={{ marginTop: 6 }}>
               {money(done.tax)} recorded as an input tax credit{done.taxUpdated ? ' (this invoice was already on file — its figures were corrected)' : ''}.

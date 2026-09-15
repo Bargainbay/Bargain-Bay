@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { getPackingSlip } from '../../../../lib/invoices';
+import { currentLocations } from '../../../../lib/locations';
 import {
   BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, PICKUP_ADDRESS, DISPATCH_EMAIL, isUnitLine } from '../../../../lib/constants';
 import PackingSlipActions from '../../../../components/PackingSlipActions';
@@ -34,6 +35,9 @@ export default async function PackingSlipPage({ params }) {
   // What we're taking away, not bringing. The slip travels with the delivery, so
   // it is the last piece of paper anyone reads before the van leaves.
   const tradeIns = (slip.items || []).filter((it) => it.kind === 'trade_in');
+  // Where to pick each one from. A slip that can't reach the warehouse records
+  // still prints — the serials are what the pick is checked against.
+  const where = await currentLocations(units.map((it) => it.sku)).catch(() => new Map());
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto', padding: '16px' }}>
@@ -84,6 +88,7 @@ export default async function PackingSlipPage({ params }) {
             <tr className="ps-th" style={{ textAlign: 'left', borderBottom: '1px solid #ddd' }}>
               <th style={{ padding: '4px 6px', width: 28 }}>#</th>
               <th style={{ padding: '4px 6px' }}>Item</th>
+              <th style={{ padding: '4px 6px' }}>Where</th>
               <th style={{ padding: '4px 6px' }}>Serial #</th>
               <th style={{ padding: '4px 6px', textAlign: 'center', width: 60 }}>Picked</th>
             </tr>
@@ -98,13 +103,14 @@ export default async function PackingSlipPage({ params }) {
                     <div style={{ fontSize: 14 }}>{it.description}</div>
                     {sub && <div style={{ fontSize: 11.5, color: '#888' }}>{sub}</div>}
                   </td>
+                  <td><span className="ps-serial">{where.get(it.sku)?.code || '—'}</span></td>
                   <td><span className="ps-serial">{it.serial || '(no serial on file)'}</span></td>
                   <td style={{ textAlign: 'center', fontSize: 18 }}>☐</td>
                 </tr>
               );
             })}
             {units.length === 0 && (
-              <tr><td colSpan={4} style={{ padding: 12, color: '#999' }}>No physical units on this invoice (services only).</td></tr>
+              <tr><td colSpan={5} style={{ padding: 12, color: '#999' }}>No physical units on this invoice (services only).</td></tr>
             )}
           </tbody>
         </table>

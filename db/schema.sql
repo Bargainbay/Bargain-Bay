@@ -873,3 +873,46 @@ CREATE TABLE IF NOT EXISTS consignment_units (
   created_at  timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_consignment_unpaid ON consignment_units(paid_on) WHERE paid_on IS NULL;
+
+-- Where a unit is standing in the warehouse. See lib/locations.js, which also
+-- provisions these on first use and seeds the owner's layout into an empty table.
+-- A unit's location is its LATEST move — never a column on products, which every
+-- tracker sync rewrites whole.
+CREATE TABLE IF NOT EXISTS warehouse_locations (
+  code       text PRIMARY KEY,          -- L3-2 (left rack, section 3, shelf 2) · V4 · RECEIVING
+  kind       text NOT NULL,             -- rack | lane | zone
+  area       text NOT NULL,             -- left | back | right | front | rear | zone
+  section    int,
+  level      int,                       -- rack shelf, counted up from the floor
+  purpose    text,                      -- free text: Overstock, Waiting for parts…
+  note       text,
+  active     boolean NOT NULL DEFAULT true,
+  sort       int NOT NULL DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS unit_moves (
+  id            bigserial PRIMARY KEY,
+  sku           text NOT NULL,          -- as the site spells it; any SKU, known to the site or not
+  location      text,                   -- NULL = recorded as having left the building
+  moved_by      text,
+  moved_by_name text,
+  via           text,                   -- scan | count | out | rsops
+  note          text,
+  title         text,                   -- what RS Ops called a unit the site doesn't know yet
+  moved_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_unit_moves_sku ON unit_moves(sku, moved_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_unit_moves_sku_upper ON unit_moves(upper(sku));
+CREATE INDEX IF NOT EXISTS idx_unit_moves_location ON unit_moves(location);
+CREATE TABLE IF NOT EXISTS location_audits (
+  id              bigserial PRIMARY KEY,
+  location        text NOT NULL,
+  counted_by      text,
+  counted_by_name text,
+  expected        int,
+  confirmed       int,
+  missing         jsonb,                -- SKUs recorded there and not found
+  found           jsonb,                -- SKUs found there that were recorded elsewhere
+  counted_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_location_audits_loc ON location_audits(location, counted_at DESC);

@@ -2296,6 +2296,57 @@ overrides). DNS: CNAME `dispatch` → `c07d32108fe1e3a0.vercel-dns-017.com.` at
 GoDaddy, plus a `_vercel` TXT that only existed for ownership verification and
 can be deleted.
 
+## The warehouse — where every unit is standing (added 2026-09-15)
+`/admin/warehouse` (staff), `lib/locations.js`, `lib/location-codes.js`, tables
+`warehouse_locations` / `unit_moves` / `location_audits`. Printable labels at
+`/admin/warehouse/labels`. RS Ops reads and writes through `/api/ops/warehouse`.
+
+**The layout is the owner's (2026-09-15)** and is seeded into an EMPTY table only:
+racking round the perimeter — 7 sections on the left wall (`L1`–`L7`), 2 on the
+back (`B1`–`B2`), 6 on the right (`R1`–`R6`), each 3 shelves high, so a rack spot
+is `L3-2` (section 3, shelf 2 **counted up from the floor**). The front half of
+the floor is 4 vertical lanes in two back-to-back pairs (`V1`–`V4`), the back half
+6 horizontal lanes (`H1`–`H6`), plus `RECEIVING`, `DELIVERY-STAGING` and
+`PICKUP-STAGING`. The racks hold overstock, units waiting for parts, and skids of
+multiples. Admins add and retire spots on the Spots tab; after the first boot the
+table IS the layout — do not "fix" it by editing `defaultLayout()`.
+
+- **A unit's location is its LATEST move, never a stored field.** "Where was it
+  Tuesday" and "who moved it" are the questions asked the day it can't be found.
+- **Never on `products`.** `upsertProducts` rewrites every column on every sync —
+  same reason `unit_photos` is its own table.
+- **Leaving is derived, not recorded.** A unit stops being in its spot when an
+  order carrying it is `delivered`, or its salvage row `disposed`, AFTER its last
+  move. Nothing hangs off the delivery or pickup paths, and a return scanned back
+  into a spot is simply in stock again. `delivered_at` is stamped only by the
+  driver app, so a pickup marked delivered from the board (no `delivered_at`)
+  counts as gone immediately. "It left the warehouse…" on a unit writes a move
+  with a NULL location for everything else (returned to vendor, scrapped).
+- **Any SKU is accepted**, including ones the site has never seen: untested stock
+  and units waiting for parts live only in the tracker, and they are exactly what
+  sits in a lane for weeks. SKUs are stored in the site's own spelling
+  (`canonicalSkus`, case-insensitive) so every join is plain equality.
+- **Labels carry URLs** — `SITE_URL/w/u/<SKU>` and `SITE_URL/w/l/<CODE>` — not bare
+  codes. A phone camera opens the right page with no app, and the scan screen can
+  tell a spot from a SKU by what the label says rather than by its shape. The host
+  is ignored when parsing, so stickers survive a domain change. Typed input and
+  keyboard-wedge scanners resolve against the list of spots.
+- **A count never invents a location.** Units found in a spot that were recorded
+  elsewhere are moved there (`via: 'count'`); units recorded there and not found
+  stay recorded there and are reported missing — putting them "somewhere" would
+  send the next person to the wrong place.
+- **The camera fires once per label.** `QrScanner` ignores the same payload for as
+  long as it stays in view; scans are handled strictly in order.
+- **Printing hides everything that is not the label sheet** (`:has()`), rather
+  than depending on the site chrome — a roll of 1.25in stickers with a header on
+  it is six blank stickers.
+- **`/api/ops/warehouse` authenticates with `RSOPS_INTAKE_KEY`**, the secret both
+  apps already hold for manifests. It cannot know which person scanned, so a move
+  is recorded as `<name> (RS Ops)`.
+- Locations are shown on the orders board (`lib/order-board.js`) and the packing
+  slip. Both degrade to showing nothing if the tables can't be read. SKU stickers
+  are offered straight after vendor drop-off intake and invoice intake.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
