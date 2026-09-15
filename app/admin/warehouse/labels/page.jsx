@@ -33,8 +33,19 @@ const qrSvg = (text) => {
 };
 const list = (v) => String(v || '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 
+// Roll sizes a shop actually stocks, biggest first. The small ones exist because
+// a control board or a valve is not a fridge: a 2.25in sticker wraps round a part
+// and covers the very number somebody needs to read.
+//
+// **The QR is ~33 modules across** (see lib/location-codes.js — the payload is a
+// URL). At 300 dpi a 0.6in code gives it about 5 printer dots per module, which
+// scans; at 203 dpi the same code is under 4 and starts failing at an angle. So
+// the two smallest sizes want a 300 dpi printer, and the picker says so.
 const UNIT_FORMATS = {
-  roll: { label: 'Label roll — 2.25 × 1.25 in', page: '2.25in 1.25in', margin: '0' },
+  roll: { label: 'Roll — 2.25 × 1.25 in', page: '2.25in 1.25in', margin: '0' },
+  '2x1': { label: 'Roll — 2 × 1 in', page: '2in 1in', margin: '0' },
+  small: { label: 'Small parts — 1.5 × 1 in (300 dpi)', page: '1.5in 1in', margin: '0' },
+  tiny: { label: 'Smallest — 1 × 1 in (300 dpi)', page: '1in 1in', margin: '0' },
   sheet: { label: 'Letter sheet — 30 per page (Avery 5160)', page: 'letter', margin: '0.5in 0.19in' }
 };
 const SPOT_FORMATS = {
@@ -55,11 +66,27 @@ const CSS = `
   .lbl-unit .sku.is-longer { font-size: 8pt; }
   .lbl-unit .what { font-size: 7pt; line-height: 1.2; max-height: 3.6em; overflow: hidden; margin-top: 2pt; }
   .lbl-unit .cond { font-size: 6.5pt; margin-top: 1pt; text-transform: uppercase; letter-spacing: .03em; }
-  .roll .lbl-unit { width: 2.25in; height: 1.25in; padding: .08in; gap: .08in; }
-  .roll .lbl-unit .q { width: 1.05in; height: 1.05in; }
-  .sheet { display: grid; grid-template-columns: repeat(3, 2.625in); grid-auto-rows: 1in; column-gap: .125in; row-gap: 0; }
-  .sheet .lbl-unit { width: 2.625in; height: 1in; padding: .06in .1in; gap: .08in; }
-  .sheet .lbl-unit .q { width: .86in; height: .86in; }
+  .f-roll .lbl-unit { width: 2.25in; height: 1.25in; padding: .08in; gap: .08in; }
+  .f-roll .lbl-unit .q { width: 1.05in; height: 1.05in; }
+  .f-2x1 .lbl-unit { width: 2in; height: 1in; padding: .06in; gap: .06in; }
+  .f-2x1 .lbl-unit .q { width: .86in; height: .86in; }
+  /* Stacked: on a label this narrow, a QR beside the text leaves the text a
+     column too thin to read a SKU out of. */
+  .f-small .lbl-unit, .f-tiny .lbl-unit { flex-direction: column; justify-content: center; text-align: center; }
+  .f-small .lbl-unit .t, .f-tiny .lbl-unit .t { width: 100%; }
+  .f-small .lbl-unit { width: 1.5in; height: 1in; padding: .05in; gap: .02in; }
+  .f-small .lbl-unit .q { width: .62in; height: .62in; }
+  .f-small .lbl-unit .sku { font-size: 7.5pt; }
+  .f-small .lbl-unit .sku.is-long { font-size: 6.5pt; }
+  .f-small .lbl-unit .sku.is-longer { font-size: 5.5pt; }
+  .f-tiny .lbl-unit { width: 1in; height: 1in; padding: .04in; gap: .02in; }
+  .f-tiny .lbl-unit .q { width: .62in; height: .62in; }
+  .f-tiny .lbl-unit .sku { font-size: 6.5pt; }
+  .f-tiny .lbl-unit .sku.is-long { font-size: 5.5pt; }
+  .f-tiny .lbl-unit .sku.is-longer { font-size: 4.5pt; }
+  .f-sheet { display: grid; grid-template-columns: repeat(3, 2.625in); grid-auto-rows: 1in; column-gap: .125in; row-gap: 0; }
+  .f-sheet .lbl-unit { width: 2.625in; height: 1in; padding: .06in .1in; gap: .08in; }
+  .f-sheet .lbl-unit .q { width: .86in; height: .86in; }
   .lbl-spot { background: #fff; outline: 1px dashed #bbb; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
   .lbl-spot .code { font-weight: 800; line-height: 1; letter-spacing: .02em; }
   .lbl-spot .sub { font-size: 12pt; }
@@ -73,8 +100,8 @@ const CSS = `
     body, body *:has(.lbl-sheet) { margin: 0 !important; padding: 0 !important; border: 0 !important; max-width: none !important; background: #fff !important; box-shadow: none !important; }
     .lbl-sheet { gap: 0 !important; }
     .lbl-unit, .lbl-spot { outline: none !important; }
-    .roll .lbl-unit, .lbl-spot { break-after: page; page-break-after: always; }
-    .roll .lbl-unit:last-child, .lbl-spot:last-child { break-after: auto; page-break-after: auto; }
+    .lbl-sheet:not(.f-sheet) .lbl-unit, .lbl-spot { break-after: page; page-break-after: always; }
+    .lbl-sheet:not(.f-sheet) .lbl-unit:last-child, .lbl-spot:last-child { break-after: auto; page-break-after: auto; }
   }
 `;
 
@@ -97,6 +124,7 @@ export default async function LabelsPage({ searchParams }) {
 
   if (type === 'units') {
     const format = UNIT_FORMATS[sp?.format] ? sp.format : 'roll';
+    const small = format === 'small' || format === 'tiny';
     const skus = list(sp?.skus).slice(0, 300);
     let units = [];
     let err = '';
@@ -124,17 +152,20 @@ export default async function LabelsPage({ searchParams }) {
         </p>
         {err && <div className="error-box">{err}</div>}
         {!units.length && <div className="panel">No SKUs given. Pick units on the Warehouse page and print from there.</div>}
-        <div className={`lbl-sheet ${format}`}>
+        <div className={`lbl-sheet f-${format}`}>
           {units.map((u) => (
             <div key={u.sku} className="lbl-unit">
+              {/* The smallest two sizes carry the code and the SKU and nothing
+                  else — there is no room for a description, and the QR is what
+                  gets scanned anyway. */}
               {/* eslint-disable-next-line react/no-danger */}
               <div className="q" dangerouslySetInnerHTML={{ __html: qrSvg(unitScanUrl(SITE_URL, u.sku)) }} />
               <div className="t">
                 {/* Breaks at the dashes before it breaks inside a number: someone
                     reads this aloud over the phone, and "IN-TEST-0 / 01" is two SKUs. */}
                 <div className={'sku' + (u.sku.length > 22 ? ' is-longer' : u.sku.length > 13 ? ' is-long' : '')}>{u.sku}</div>
-                {u.title && <div className="what">{u.title}</div>}
-                {u.condition && <div className="cond">{u.condition}</div>}
+                {u.title && !small && <div className="what">{u.title}</div>}
+                {u.condition && !small && <div className="cond">{u.condition}</div>}
               </div>
             </div>
           ))}
