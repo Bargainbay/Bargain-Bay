@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 
-// Clients and drivers, managed on the dispatch page itself. Everything dispatch
+// Clients, drivers and who holds a dispatch login — the People & access tab,
+// managed on the dispatch page itself. Everything dispatch
 // needs is here — sending someone to another screen to add a client mid-call is
 // exactly the friction this whole thing exists to remove.
 export default function DispatchSetup({ clients = [], drivers = [], canManageDrivers, isOwner = false, onChanged }) {

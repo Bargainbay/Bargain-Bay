@@ -73,9 +73,19 @@ const STEPS = [
     body: 'Finished jobs per client that have not been invoiced yet. One button raises the invoice. Set what a job charges on its own card as you go — it is much harder to reconstruct a fortnight later.'
   },
   {
+    key: 'tab-pay',
+    title: 'What the drivers are owed',
+    body: 'Totalled per person for today, this week and this month. It counts finished stops only, and says how many are still unpriced — so a total that looks light is explained rather than a mystery.'
+  },
+  {
+    key: 'tab-profit',
+    title: 'What the runs made',
+    body: 'What the clients paid against what the day cost in driver pay and fuel. A stop that could not be completed still counts as a cost, because it was one — the van and the driver went out either way.'
+  },
+  {
     key: 'tab-setup',
-    title: 'Clients and drivers',
-    body: 'Add a client company, add a van, add a driver and text them their sign-in link. New logistics work starts here: add the company, then put their stops on the board.'
+    title: 'People and access',
+    body: 'Client companies, vans, and drivers — adding a driver here texts them their sign-in link. New logistics work starts on this tab: add the company first, then put their stops on the board. Dispatch logins are granted here too, but only the owner can do that one.'
   },
   {
     key: null,

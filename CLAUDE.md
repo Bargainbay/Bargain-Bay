@@ -784,7 +784,7 @@ The owner hired someone to run deliveries. They get dispatch and nothing else.
 - **The role is DATABASE-backed** (`dispatch_access`, `lib/dispatchers.js`), for the
   same reason accountant access is: a hire starts on a Monday and might be gone by
   Friday, and revoking has to be two clicks, not a redeploy. Granted and revoked
-  from the **Clients & drivers tab on the dispatch page itself** (the one-page
+  from the **People & access tab on the dispatch page itself** (the one-page
   rule), by an admin only.
 - **Access was added, never widened.** `isStaff` / `isSales` / `isAdmin` in
   `lib/auth.js` are UNCHANGED, and a coordinator is on none of them — which is
@@ -2048,7 +2048,7 @@ and half a history in each.
 `lib/shifts.js`, tables `vehicles` / `driver_shifts`, plus fuel columns on
 `dispatch_expenses`. Driver side: `components/DriverShift.jsx`,
 `/api/driver/shift` + `/api/driver/fuel`. Office side: the Shifts panel on the
-**Times** tab, Kilometres & fuel on **Profit**, vans under Clients & drivers.
+**Times** tab, Kilometres & fuel on **Profit**, vans under People & access.
 
 - **Shift hours are NOT time on site, and the two must never be added.** A shift
   runs from picking the van up to parking it; `jobs.time_in`/`time_out` is the

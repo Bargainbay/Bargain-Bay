@@ -789,7 +789,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
         fetch(`/api/admin/dispatch?view=drivers_out&date=${board.date}`).then((r) => r.json())
       ]);
       if (!(b.bases || []).length) {
-        setErr('No yards set yet — add them under Clients & drivers.'); return;
+        setErr('No yards set yet — add them under People & access.'); return;
       }
       const out = (o.drivers || []).filter((d) => !d.hasOne);
       if (!out.length) {
@@ -1054,7 +1054,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
         {canManageClients && <Tab id="billing">Billing</Tab>}
         {canManageClients && <Tab id="pay">Pay</Tab>}
         {canManageClients && <Tab id="profit">Profit</Tab>}
-        <Tab id="setup">Clients &amp; drivers</Tab>
+        <Tab id="setup">People &amp; access</Tab>
         <button type="button" className="tour-open" onClick={() => setTouring(true)}
           title="Walk through what everything on this page does">Take the tour</button>
       </div>

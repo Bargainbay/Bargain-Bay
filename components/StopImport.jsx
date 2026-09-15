@@ -440,7 +440,7 @@ export default function StopImport({ clients = [], date, onDone }) {
               <button type="button" className="btn" disabled={busy || calling === 'ringing'}
                 title={call.to
                   ? `Ring ${call.to} and go through this sheet out loud`
-                  : 'Set the number to ring under Clients & drivers first'}
+                  : 'Set the number to ring under People & access first'}
                 onClick={ringMe}>
                 {call.to ? '📞 Call me about this' : '📞 Call me (no number set)'}
               </button>

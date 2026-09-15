@@ -261,7 +261,7 @@ export default function ProfitReport({ drivers = [], date }) {
                 {data.totals.noRateShifts > 0 && (
                   <>{data.totals.noRateShifts} clocked-off shift{data.totals.noRateShifts === 1 ? ' has' : 's have'}
                     {' '}no hourly rate on the driver, so {data.totals.noRateShifts === 1 ? 'it counts' : 'they count'}
-                    {' '}as nothing. Set it under <b>Clients &amp; drivers</b>.</>
+                    {' '}as nothing. Set it under <b>People &amp; access</b>.</>
                 )}
               </div>
             )}
