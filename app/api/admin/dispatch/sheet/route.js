@@ -43,7 +43,10 @@ async function stage(rows, meta, session) {
 
 export async function POST(req) {
   // Reading a client's sheet or BOL is the coordinator's morning — lib/dispatch-access.js.
-  const { allowed } = await dispatchAccess();
+  // `session` is destructured because `stage()` stamps who uploaded the batch;
+  // it used to be a bare `s` from getSession(), and the two call sites below
+  // kept referring to that name after this line stopped defining it.
+  const { allowed, session } = await dispatchAccess();
   if (!allowed) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 
   let form;
@@ -68,7 +71,7 @@ export async function POST(req) {
         mediaType: type || (/\.pdf$/i.test(name) ? 'application/pdf' : 'image/jpeg')
       });
       if (!out.rows.length) return NextResponse.json({ error: 'No delivery stops found in that document.' }, { status: 400 });
-      const staged = await stage([out.headers, ...out.rows].slice(0, 1000), { name: name || 'document.pdf', read: 'ai' }, s);
+      const staged = await stage([out.headers, ...out.rows].slice(0, 1000), { name: name || 'document.pdf', read: 'ai' }, session);
       return NextResponse.json({
         ok: true, read: 'ai', name: name || 'document.pdf',
         sheets: [], sheet: null,
@@ -80,7 +83,7 @@ export async function POST(req) {
     if (!rows.length) return NextResponse.json({ error: 'That sheet is empty.' }, { status: 400 });
     // 1000 rows is far past a delivery day and stops a stray export from
     // freezing the browser it lands in.
-    const staged = await stage(rows.slice(0, 1000), { name: file.name || 'sheet.xlsx', read: 'sheet' }, s);
+    const staged = await stage(rows.slice(0, 1000), { name: file.name || 'sheet.xlsx', read: 'sheet' }, session);
     return NextResponse.json({ ok: true, read: 'sheet', sheets, sheet, name: file.name || 'sheet.xlsx', ...staged });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not read that file.' }, { status: 400 });
