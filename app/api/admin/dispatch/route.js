@@ -36,7 +36,7 @@ import {
 } from '../../../../lib/import-batches';
 import { startImportCall, callConfigured, callTarget } from '../../../../lib/import-call';
 import { watchFreightcom } from '../../../../lib/freightcom-watch';
-import { oneDriveStatus, listShared, setCdaFile, oneDriveDisconnect } from '../../../../lib/onedrive';
+import { oneDriveStatus, listShared, setCdaFile, setCdaShareLink, oneDriveDisconnect } from '../../../../lib/onedrive';
 import { watchCdaSheet } from '../../../../lib/cda-watch';
 
 export const dynamic = 'force-dynamic';
@@ -287,6 +287,15 @@ export async function POST(req) {
       if (!s.full) return NextResponse.json({ error: 'Only an admin can change the CDA workbook.' }, { status: 403 });
       await setCdaFile({ fileId: body.fileId, driveId: body.driveId, name: body.name });
       return NextResponse.json({ ok: true, ...(await oneDriveStatus()) });
+    }
+    // The workbook named by the LINK CDA sent, rather than picked off a list.
+    // The picker needs /me/drive/sharedWithMe, which needs the signed-in account
+    // to own a OneDrive; the dispatch desk's does not. Graph resolves the link
+    // itself — lib/onedrive.js.
+    if (body.action === 'cda_link') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can change the CDA workbook.' }, { status: 403 });
+      const out = await setCdaShareLink(body.url);
+      return NextResponse.json({ ok: true, ...(await oneDriveStatus()), resolved: out });
     }
     if (body.action === 'cda_disconnect') {
       if (!isAdmin(s)) return NextResponse.json({ error: 'Only the owner can disconnect Microsoft.' }, { status: 403 });
