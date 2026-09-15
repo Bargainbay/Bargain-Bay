@@ -122,6 +122,12 @@ export default function AdminOrders({ initialOrders, drivers = [], reps = [] }) 
                   {o.items.map((it) => (
                     <div key={it.id} style={{ marginBottom: 2 }}>
                       <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{it.sku}</span> {it.title}
+                      {it.location && (
+                        <a href={`/admin/warehouse?loc=${encodeURIComponent(it.location)}`} title="Where it is in the warehouse"
+                          style={{ marginLeft: 6, fontFamily: 'monospace', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                          @ {it.location}
+                        </a>
+                      )}
                     </div>
                   ))}
                 </td>

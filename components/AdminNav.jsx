@@ -20,6 +20,9 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // tab sales get the vendor drop-off form and the sync button; the
     // "tested working?" queue stays admin (see app/admin/intake/page.jsx).
     { key: 'intake', label: 'Intake', href: '/admin/intake', sales: true },
+    // Where every unit is standing, and the stickers that say so. Staff: finding
+    // the fridge for the customer at the counter is a selling job.
+    { key: 'warehouse', label: 'Warehouse', href: '/admin/warehouse', sales: true },
     { key: 'campaigns', label: 'Campaigns', href: '/admin/campaigns' },
     { key: 'coupons', label: 'Coupons', href: '/admin/coupons' },
     { key: 'payroll', label: 'Payroll', href: '/admin/payroll' },

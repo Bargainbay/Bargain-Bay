@@ -239,7 +239,15 @@ export default function VendorIntake() {
 
       {added.length > 0 && (
         <>
-          <h3 style={{ color: 'var(--charcoal)', margin: '20px 0 8px' }}>Added just now ({added.length})</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', margin: '20px 0 8px' }}>
+            <h3 style={{ color: 'var(--charcoal)', margin: 0 }}>Added just now ({added.length})</h3>
+            {/* The sticker goes on the appliance before it leaves the loading bay —
+                after that it is one of forty fridges in a lane. */}
+            <a className="btn" target="_blank" rel="noopener noreferrer" style={{ padding: '4px 10px', fontSize: 13 }}
+              href={`/admin/warehouse/labels?${new URLSearchParams({ type: 'units', skus: added.map((u) => u.sku).join(',') })}`}>
+              Print SKU stickers
+            </a>
+          </div>
           <div className="table-wrap"><table className="admin">
             <thead><tr><th>Unit</th><th>SKU</th><th>Photos</th><th>On the site</th></tr></thead>
             <tbody>
