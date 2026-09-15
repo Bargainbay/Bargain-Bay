@@ -2,7 +2,7 @@
 // "Bargain Bay Images" folder, so the team can drop live photos into each.
 // Usage: BB_IMAGES_FOLDER_ID=<folderId> node scripts/make-image-folders.mjs
 import { google } from 'googleapis';
-import catalog from '../data/catalog.json' assert { type: 'json' };
+import catalog from '../data/catalog.json' with { type: 'json' };
 
 const parent = process.env.BB_IMAGES_FOLDER_ID;
 if (!parent) throw new Error('Set BB_IMAGES_FOLDER_ID');
