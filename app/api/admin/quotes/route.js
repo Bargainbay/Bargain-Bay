@@ -56,7 +56,11 @@ export async function POST(req) {
       addHst: body.addHst !== false,
       daysValid: body.daysValid,
       memo: body.memo,
-      sourceQuoteId: body.sourceQuoteId ? Number(body.sourceQuoteId) : null
+      sourceQuoteId: body.sourceQuoteId ? Number(body.sourceQuoteId) : null,
+      // Where the lead came from. Normalised in the lib (an unrecognised source
+      // becomes NULL rather than its own bucket), so nothing is refused here.
+      leadSource: body.leadSource,
+      leadBy: body.leadBy
     });
     return NextResponse.json({ ok: true, quote });
   } catch (e) {
@@ -97,7 +101,11 @@ export async function PATCH(req) {
         freeDelivery: !!body.freeDelivery,
         addHst: body.addHst !== false,
         daysValid: body.daysValid,
-        memo: body.memo
+        memo: body.memo,
+        // Only forwarded when present, so a caller that doesn't know about them
+        // can't blank what the quote already records.
+        ...(Object.prototype.hasOwnProperty.call(body, 'leadSource') ? { leadSource: body.leadSource } : {}),
+        ...(Object.prototype.hasOwnProperty.call(body, 'leadBy') ? { leadBy: body.leadBy } : {})
       });
       return NextResponse.json({ ok: true, quote });
     }

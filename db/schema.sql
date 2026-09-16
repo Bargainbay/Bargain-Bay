@@ -314,6 +314,12 @@ CREATE TABLE IF NOT EXISTS quote_items (
 );
 -- 'admin' = owner-built; 'customer' = assembled on /bundle (a quote request).
 ALTER TABLE quotes ADD COLUMN IF NOT EXISTS source text;
+-- Where the LEAD came from, captured when the quote is raised (that is when the
+-- lead arrived) and carried onto the invoice when it converts — and so onto the
+-- order, which is what the lead report reads. NOT the same column as `source`
+-- directly above, which records who ASSEMBLED the quote.
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS lead_source text;
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS lead_by     text;
 CREATE INDEX IF NOT EXISTS idx_quotes_status ON quotes(status);
 CREATE INDEX IF NOT EXISTS idx_quote_items_quote ON quote_items(quote_id);
 

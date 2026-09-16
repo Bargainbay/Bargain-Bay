@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import { getSession, isAdmin, isStaff } from '../../../../../lib/auth';
 import { hasDb } from '../../../../../lib/db';
 import { getQuoteByNumber } from '../../../../../lib/quotes';
+import { listLeadSenders } from '../../../../../lib/invoices';
 import { contactsForAutofill } from '../../../../../lib/customers';
 import { getAll } from '../../../../../lib/inventory';
 import AdminNav from '../../../../../components/AdminNav';
@@ -75,8 +76,12 @@ export default async function EditQuotePage({ params }) {
     freeDelivery: !!quote.free_delivery,
     addHst: Number(quote.hst) > 0,
     daysValid: 14,
-    memo: quote.memo || ''
+    memo: quote.memo || '',
+    // Blank on a quote raised before these existed, which is the honest answer.
+    leadSource: quote.lead_source || '',
+    leadBy: quote.lead_by || ''
   };
+  const senders = await listLeadSenders().catch(() => []);
 
   return (
     <div>
@@ -90,7 +95,7 @@ export default async function EditQuotePage({ params }) {
           Same quote number, updated numbers — the customer gets the revised quote by email and their existing
           link shows the new version. Validity restarts from today.
         </p>
-        <QuoteBuilder inventory={inventory} customers={customers} initial={initial} editQuote={editQuote} />
+        <QuoteBuilder inventory={inventory} customers={customers} initial={initial} editQuote={editQuote} senders={senders} />
       </div>
     </div>
   );

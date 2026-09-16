@@ -23,7 +23,7 @@ export function leadSenderRequired(source) {
 
 // The one message both screens show, so the rule is stated once.
 export function whatsWrongWithLead(source, by) {
-  if (!source) return 'Pick where this sale came from — walk-in, website, referral, and so on. It is the one thing nobody can add later from memory.';
+  if (!source) return 'Pick where this customer came from — walk-in, website, referral, and so on. It is the one thing nobody can add later from memory.';
   if (leadSenderRequired(source) && !String(by || '').trim()) {
     return `A ${String(LEAD_SOURCES[source] || source).toLowerCase()} needs a name — who sent them? That is the whole point of recording it.`;
   }
@@ -38,7 +38,9 @@ export default function LeadSource({ source, setSource, by, setBy, senders = [] 
   const listId = useId();
   return (
     <div className="field">
-      <label>Where did this sale come from? *</label>
+      {/* "customer", not "sale": this same field is on the quote builder now,
+          where nothing has been sold yet. */}
+      <label>Where did this customer come from? *</label>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <select
           value={source || ''}
