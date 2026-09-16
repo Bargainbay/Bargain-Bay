@@ -916,3 +916,63 @@ CREATE TABLE IF NOT EXISTS location_audits (
   counted_at      timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_location_audits_loc ON location_audits(location, counted_at DESC);
+-- Parts. See lib/parts.js. A part is a CATALOGUE row (this part number, this
+-- name); how many we have is the SUM of its ledger, never a stored count.
+CREATE TABLE IF NOT EXISTS parts (
+  id          serial PRIMARY KEY,
+  part_number text,                  -- OEM number as printed on the part; may be absent
+  name        text NOT NULL,
+  brand       text,
+  category    text,
+  fits        text[],                -- appliance models this part fits
+  note        text,
+  created_by  text,
+  created_at  timestamptz DEFAULT now()
+);
+-- One catalogue row per real part number. Parts with no number are named only.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_parts_number ON parts (upper(part_number))
+  WHERE part_number IS NOT NULL AND part_number <> '';
+CREATE INDEX IF NOT EXISTS idx_parts_name ON parts (lower(name));
+
+-- Every movement, in or out. On-hand is SUM(qty) — the same rule as the general
+-- ledger: derive it, never type it.
+CREATE TABLE IF NOT EXISTS part_moves (
+  id        bigserial PRIMARY KEY,
+  part_id   int NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
+  qty       int NOT NULL,                          -- + in, - out
+  condition text NOT NULL DEFAULT 'used',          -- new | used
+  location  text,                                  -- warehouse spot code (warehouse_locations)
+  cost      numeric(10,2),                         -- per piece, on the way in
+  est_value numeric(10,2),                         -- harvester's estimate; splits the salvage unit's cost
+  reason    text NOT NULL,                         -- harvest | purchase | use_unit | use_job | sale | count | adjust
+  ref       text,                                  -- salvage SKU it came out of / unit SKU or job it went into
+  note      text,
+  by        text,
+  by_name   text,
+  at        timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_part_moves_part ON part_moves(part_id, at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_part_moves_ref  ON part_moves(ref);
+
+-- A service tech asks; an admin answers. The refurb floor takes parts directly
+-- (and marks it), so this queue is only ever the road crew's.
+CREATE TABLE IF NOT EXISTS part_requests (
+  id                serial PRIMARY KEY,
+  part_id           int NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
+  qty               int NOT NULL DEFAULT 1,
+  reason            text,
+  job_ref           text,                          -- RS-1021 / BB-1179 when there is one
+  status            text NOT NULL DEFAULT 'pending', -- pending | approved | rejected | picked | cancelled
+  requested_by      text,
+  requested_by_name text,
+  decided_by        text,
+  decided_by_name   text,
+  decided_at        timestamptz,
+  picked_at         timestamptz,
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_part_requests_open ON part_requests(status, created_at DESC);
+
+-- How a salvage unit left: sold on an invoice, or stripped for parts. Without
+-- it a parted-out unit reads as a disposal nobody invoiced.
+ALTER TABLE salvage_units ADD COLUMN IF NOT EXISTS disposal text;
