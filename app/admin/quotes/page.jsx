@@ -3,6 +3,7 @@ import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
 import { listQuotes, getQuoteForBuilder } from '../../../lib/quotes';
+import { listLeadSenders } from '../../../lib/invoices';
 import { contactsForAutofill } from '../../../lib/customers';
 import { getAll } from '../../../lib/inventory';
 import AdminNav from '../../../components/AdminNav';
@@ -41,6 +42,9 @@ export default async function QuotesPage({ searchParams }) {
     }));
   } catch { customers = []; }
 
+  // Names already used as "sent by", shared with the invoice screens so one
+  // referrer is spelled the same way wherever they are recorded.
+  const senders = await listLeadSenders().catch(() => []);
   let initial = null;
   if (sParams?.from) {
     try { initial = await getQuoteForBuilder(sParams.from); } catch { initial = null; }
@@ -72,7 +76,7 @@ export default async function QuotesPage({ searchParams }) {
           Build a bundle, apply a discount, and email the customer a shareable quote. Nothing is reserved —
           the units stay live until you convert the quote to an invoice.
         </p>
-        <QuoteBuilder inventory={inventory} customers={customers} initial={initial} />
+        <QuoteBuilder inventory={inventory} customers={customers} initial={initial} senders={senders} />
       </div>
 
       <div className="panel">

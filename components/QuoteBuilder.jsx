@@ -1,12 +1,13 @@
 'use client';
 import { useState } from 'react';
+import LeadSource, { whatsWrongWithLead } from './LeadSource';
 
 const blankItem = () => ({ description: '', retail: '', amount: '', sku: '' });
 const fmt = (n) => '$' + (Number(n) || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// editQuote = { quoteId, number, bundlePct, cashDeal, freeDelivery, addHst, daysValid, memo }
+// editQuote = { quoteId, number, bundlePct, cashDeal, freeDelivery, addHst, daysValid, memo, leadSource, leadBy }
 // switches the builder into edit-in-place mode: same Q- number, PATCH instead of create.
-export default function QuoteBuilder({ inventory = [], customers = [], initial = null, editQuote = null }) {
+export default function QuoteBuilder({ inventory = [], customers = [], initial = null, editQuote = null, senders = [] }) {
   const [name, setName] = useState(initial?.name || '');
   const [email, setEmail] = useState(initial?.email || '');
   const [items, setItems] = useState(
@@ -23,6 +24,12 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
   const [addHst, setAddHst] = useState(editQuote ? editQuote.addHst !== false : true);
   const [daysValid, setDaysValid] = useState(editQuote?.daysValid ?? 14);
   const [memo, setMemo] = useState(editQuote?.memo || '');
+  // Where the lead came from, asked HERE rather than at conversion. This is when
+  // the lead actually arrived — by the time somebody converts the quote, the rep
+  // who took the call is a fortnight away from the question. It rides onto the
+  // invoice, and so onto the order the report reads.
+  const [leadSource, setLeadSource] = useState(editQuote?.leadSource || initial?.leadSource || '');
+  const [leadBy, setLeadBy] = useState(editQuote?.leadBy || initial?.leadBy || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(null);
@@ -70,19 +77,30 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
 
   async function submit(e) {
     e.preventDefault();
+    // Same rule as the new-invoice form on a NEW quote. On an edit it only
+    // refuses to clear one that was recorded — a quote raised before this
+    // existed has no answer, and making somebody guess produces a guess that
+    // then counts.
+    const hadSource = !!(editQuote?.leadSource);
+    if (editQuote && hadSource && !leadSource) {
+      setErr('This quote already says where it came from — pick a source rather than clearing it.');
+      return;
+    }
+    const leadWrong = (editQuote && !hadSource && !leadSource) ? '' : whatsWrongWithLead(leadSource, leadBy);
+    if (leadWrong) { setErr(leadWrong); return; }
     setBusy(true); setErr(''); setDone(null);
     try {
       const res = await fetch('/api/admin/quotes', {
         method: editQuote ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editQuote
-          ? { action: 'update', quoteId: editQuote.quoteId, name, email, items, bundlePct: pct, cashDeal, freeDelivery, addHst, daysValid, memo }
-          : { name, email, items, bundlePct: pct, cashDeal, freeDelivery, addHst, daysValid, memo, sourceQuoteId })
+          ? { action: 'update', quoteId: editQuote.quoteId, name, email, items, bundlePct: pct, cashDeal, freeDelivery, addHst, daysValid, memo, leadSource, leadBy }
+          : { name, email, items, bundlePct: pct, cashDeal, freeDelivery, addHst, daysValid, memo, sourceQuoteId, leadSource, leadBy })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || (editQuote ? 'Could not update the quote.' : 'Could not create the quote.')); return; }
       setDone(d.quote);
-      if (!editQuote) { setName(''); setEmail(''); setItems([blankItem()]); setMemo(''); setCashDeal(''); setFreeDelivery(false); }
+      if (!editQuote) { setName(''); setEmail(''); setItems([blankItem()]); setMemo(''); setCashDeal(''); setFreeDelivery(false); setLeadSource(''); setLeadBy(''); }
     } catch {
       setErr('Network error — please try again.');
     } finally {
@@ -194,6 +212,8 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
           <input style={{ width: 70 }} type="number" min="1" max="120" value={daysValid} onChange={(e) => setDaysValid(e.target.value)} /> days
         </label>
       </div>
+
+      <LeadSource source={leadSource} setSource={setLeadSource} by={leadBy} setBy={setLeadBy} senders={senders} />
 
       <div className="field">
         <label>Note to customer (optional)</label>

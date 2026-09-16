@@ -104,7 +104,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [] })
     // that needs a name still needs one.
     const hadSource = !!invoice.leadSource;
     if (hadSource && !leadSource) {
-      setErr('This sale already says where it came from — pick a source rather than clearing it. If it was recorded wrongly, choose the right one.');
+      setErr('This sale already says where the customer came from — pick a source rather than clearing it. If it was recorded wrongly, choose the right one.');
       return;
     }
     const leadWrong = leadSource ? whatsWrongWithLead(leadSource, leadBy) : '';
