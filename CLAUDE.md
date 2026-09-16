@@ -2476,11 +2476,31 @@ screens need the labels and must not pull `./db` into the browser, same split as
   holding `pg_advisory_xact_lock(part_id)` — append-only rows cannot be locked
   against an insert that does not exist yet, and a count that can go negative is
   a count nobody believes.
-- **Gate:** staff, like the warehouse. **Admin only:** what a part COST (stripped
-  server-side from every response, never hidden in the browser) and **answering a
-  request** — the owner's instruction.
+- **The floor works in RS Ops; `/admin/parts` is the OFFICE's screen** (owner,
+  2026-09-16: "what's the point of it being in Bargain Bay"). The records stay
+  HERE — the spots they sit in, the salvage units they come out of and the books
+  they are costed in are all here — and RS Ops' Parts tab reads and writes them
+  through **`/api/ops/parts`**, on `RSOPS_INTAKE_KEY`, exactly like
+  `/api/ops/warehouse`. Two floor screens for one shelf is how they drift.
+  - `/admin/parts` and `/api/admin/parts` are **ADMIN only**: prices, answering a
+    road tech's request, history. It used to be staff.
+  - `/api/ops/parts` can find, book in (`bookInPart`), put more on and take off.
+    It **never sends or accepts cost** and cannot answer a request. It requires a
+    spot on every movement (the office screen does not): a piece with no spot is
+    a piece nobody can find, and a take from no spot leaves every spot list
+    overstating what is in the bin. New/Used is required, not defaulted.
+  - Floor corrections are booked as `adjust`, not `use_unit` — "used on a repair"
+    for a mistyped count is a history that lies.
+  - **Pricing:** the floor books in with no cost, so `priceParts` prices the
+    UNPRICED incoming pieces of a part in one go (`unpriced` on `describeParts`,
+    admin-only like `valueAtCost`). It never touches a price already set, or a
+    harvested piece — `finishPartOut` costs those from their unit.
+- **Admin only, everywhere:** what a part COST (stripped server-side from every
+  response, never hidden in the browser) and **answering a request** — the
+  owner's instruction.
 - Not built yet: photos per part, the driver app's own request screen, RS Ops
-  taking a part against the unit on its bench, and the parts website.
+  taking a part against the unit on its bench, parting out a salvage unit from
+  RS Ops, and the parts website.
 
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)

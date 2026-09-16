@@ -170,6 +170,7 @@ function PartCard({ id, admin, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [use, setUse] = useState({ qty: '1', location: '', ref: '' });
   const [req, setReq] = useState({ qty: '1', jobRef: '', reason: '' });
+  const [price, setPrice] = useState('');
   const [more, setMore] = useState({ qty: '1', condition: 'used', location: '', why: 'count', cost: '', note: '' });
 
   const load = useCallback(async () => {
@@ -214,6 +215,24 @@ function PartCard({ id, admin, onClose, onChanged }) {
         ))}
         {admin && <span className="hint">· {money(part.valueAtCost || 0)} at cost</span>}
       </div>
+
+      {/* The floor books parts in from RS Ops with no price — cost is the office's.
+          Pricing them here is what stops the shelf reading $0 forever. Only the
+          unpriced pieces move; anything already priced was somebody's decision. */}
+      {admin && part.unpriced > 0 && (
+        <div className="notice-box" style={{ marginBottom: 12 }}>
+          <b>{plural(part.unpriced, 'piece')} booked in with no price.</b>
+          <div className="pt-row" style={{ marginTop: 8 }}>
+            <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="decimal"
+              placeholder="Cost each $" style={{ width: 120 }} aria-label="Cost each" />
+            <button type="button" className="btn primary" disabled={busy || !(Number(price) >= 0) || price === ''}
+              onClick={async () => {
+                const ok = await act({ action: 'price', cost: Number(price) }, `Priced at ${money(Number(price))} each.`);
+                if (ok) setPrice('');
+              }}>Price them</button>
+          </div>
+        </div>
+      )}
 
       <h3>Take one off the shelf</h3>
       <p className="hint" style={{ marginTop: 0 }}>
