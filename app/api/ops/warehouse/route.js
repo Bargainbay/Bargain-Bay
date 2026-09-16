@@ -11,7 +11,7 @@
 // RS Ops, not which person was holding the phone — so it is labelled for what it is.
 import { NextResponse } from 'next/server';
 import { hasDb } from '../../../../lib/db';
-import { listLocations, moveUnits, unitWhere } from '../../../../lib/locations';
+import { countSpot, listLocations, locationContents, moveUnits, unitWhere } from '../../../../lib/locations';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -38,8 +38,13 @@ function fail(e) {
 export async function GET(req) {
   const problem = keyProblem(req);
   if (problem) return problem;
-  const sku = (new URL(req.url).searchParams.get('sku') || '').trim();
+  const sp = new URL(req.url).searchParams;
+  const sku = (sp.get('sku') || '').trim();
+  const code = (sp.get('code') || '').trim();
   try {
+    // What is standing in one spot — the refurb floor's put-away screen shows it
+    // so somebody can see the shelf they are loading without walking to it.
+    if (code) return NextResponse.json(await locationContents(code));
     if (!sku) return NextResponse.json({ spots: await spotList() });
     const [unit, spots] = await Promise.all([unitWhere(sku), spotList()]);
     return NextResponse.json({ unit, spots });
@@ -53,9 +58,25 @@ export async function POST(req) {
   if (problem) return problem;
   let body;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }); }
-  if (body.action !== 'move') return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
+  if (!['move', 'count'].includes(body.action)) return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   const skus = Array.isArray(body.skus) ? body.skus : body.sku ? [body.sku] : [];
   const name = String(body.by || '').trim().slice(0, 80);
+
+  // Counting a spot is the same function the office's screen calls, so the two
+  // can never disagree about what a count does: units found here are moved here,
+  // and units recorded here and not found stay recorded and are reported.
+  if (body.action === 'count') {
+    try {
+      const out = await countSpot({
+        code: body.code, skus,
+        by: null, byName: name ? `${name} (RS Ops)` : 'RS Ops'
+      });
+      return NextResponse.json({ ok: true, ...out });
+    } catch (e) {
+      return fail(e);
+    }
+  }
+
   // A unit RS Ops knows and the site doesn't yet (untested, waiting on parts)
   // would otherwise show as a bare SKU on every screen here.
   const titles = body.titles && typeof body.titles === 'object'
