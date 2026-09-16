@@ -170,6 +170,7 @@ function PartCard({ id, admin, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [use, setUse] = useState({ qty: '1', location: '', ref: '' });
   const [req, setReq] = useState({ qty: '1', jobRef: '', reason: '' });
+  const [more, setMore] = useState({ qty: '1', condition: 'used', location: '', why: 'count', cost: '', note: '' });
 
   const load = useCallback(async () => {
     try { setPart((await get({ view: 'part', id })).part); setErr(''); } catch (e) { setErr(e.message); }
@@ -183,7 +184,8 @@ function PartCard({ id, admin, onClose, onChanged }) {
       setMsg(done);
       await load();
       onChanged?.();
-    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+      return true;
+    } catch (e) { setErr(e.message); return false; } finally { setBusy(false); }
   }
 
   if (!part) {
@@ -240,6 +242,48 @@ function PartCard({ id, admin, onClose, onChanged }) {
         <button type="button" className="btn" disabled={busy || !(Number(req.qty) > 0)}
           onClick={() => act({ action: 'request', qty: Number(req.qty), jobRef: req.jobRef, reason: req.reason },
             'Asked — an admin has to approve it.')}>Request it</button>
+      </div>
+
+      {/* More of THIS part, onto THIS record. Book parts in finds an existing
+          part only by its number, so a part with no number booked in twice
+          became two parts with the stock split between them — this is the way
+          to add to the one that exists. "Was already here" books it as a count,
+          not a purchase, so a shelf stocked from what was lying around doesn't
+          read as bought in. */}
+      <h3>Put more on the shelf</h3>
+      <p className="hint" style={{ marginTop: 0 }}>
+        More of this same part — found on another shelf, or a new box arrived. Adds to this one instead of making a second.
+      </p>
+      <div className="pt-row">
+        <input value={more.qty} onChange={(e) => setMore({ ...more, qty: e.target.value })} inputMode="numeric"
+          style={{ width: 70 }} aria-label="How many" />
+        <select value={more.condition} onChange={(e) => setMore({ ...more, condition: e.target.value })} style={{ width: 'auto' }}
+          aria-label="Condition">
+          {Object.entries(PART_CONDITIONS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+        </select>
+        <input value={more.location} onChange={(e) => setMore({ ...more, location: e.target.value.toUpperCase() })}
+          placeholder="Into spot" style={{ width: 120 }} aria-label="Into spot" />
+        <select value={more.why} onChange={(e) => setMore({ ...more, why: e.target.value })} style={{ width: 'auto' }}
+          aria-label="Where they came from">
+          <option value="count">Was already here</option>
+          <option value="purchase">Bought in</option>
+        </select>
+        {admin && more.why === 'purchase' && (
+          <input value={more.cost} onChange={(e) => setMore({ ...more, cost: e.target.value })} inputMode="decimal"
+            placeholder="Cost each $" style={{ width: 110 }} aria-label="Cost each" />
+        )}
+        <input value={more.note} onChange={(e) => setMore({ ...more, note: e.target.value })}
+          placeholder="Note (optional)" style={{ width: 160 }} aria-label="Note" />
+        <button type="button" className="btn primary" disabled={busy || !(Number(more.qty) > 0)}
+          onClick={async () => {
+            const n = Number(more.qty);
+            const ok = await act({
+              action: more.why === 'count' ? 'count' : 'receive',
+              qty: n, condition: more.condition, location: more.location || undefined, note: more.note,
+              cost: admin && more.why === 'purchase' && more.cost ? Number(more.cost) : undefined
+            }, `Put ${n} more on the shelf${more.location ? ` in ${more.location}` : ''}.`);
+            if (ok) setMore((m) => ({ ...m, qty: '1', cost: '', note: '' }));
+          }}>Put on shelf</button>
       </div>
 
       {part.moves?.length > 0 && (

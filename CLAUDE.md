@@ -2466,6 +2466,12 @@ screens need the labels and must not pull `./db` into the browser, same split as
 - **`finishPartOut` disposes the unit** with `disposal = 'parted_out'`, which is
   why that column exists: an empty `invoice_number` on a disposed unit otherwise
   reads as a sale nobody invoiced.
+- **More of an existing part goes on through the part's card** ("Put more on the
+  shelf" → `receive`, or `count` for "Was already here"). **Book parts in** can
+  only recognise an existing part by its NUMBER, so a no-number part booked in
+  there twice becomes two catalogue rows with the stock split between them. The
+  `count` reason is what keeps a shelf stocked from what was already lying about
+  from reading as "bought in" in the history.
 - **Stock cannot go negative.** `usePart` checks the shelf inside a transaction
   holding `pg_advisory_xact_lock(part_id)` — append-only rows cannot be locked
   against an insert that does not exist yet, and a count that can go negative is
