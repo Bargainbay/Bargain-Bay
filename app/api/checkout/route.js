@@ -196,6 +196,11 @@ export async function POST(req) {
 
   // ---- create order + items + reservations atomically ----
   // First-touch marketing attribution from the bb_attr cookie (best-effort).
+  // ensureAttributionColumns also provisions lead_source, which this insert
+  // stamps as 'website' — a storefront checkout IS a website lead, and stamping
+  // it here means the lead report needs no inference at read time and every
+  // sale carries its own answer. `source` beside it stays the AD channel (Meta,
+  // Google, Direct …), so an ad-driven order is both, and neither is lost.
   const attr = readAttribution(req);
   try { await ensureAttributionColumns(); } catch (e) { console.error('attribution columns', e.message); }
   // Unconditional: the INSERT below names coupon_code/discount whether or not a
@@ -215,8 +220,8 @@ export async function POST(req) {
       const { rows } = await client.query(
         `INSERT INTO orders (user_id, email, name, phone, delivery_method, address, city, postal,
                              status, subtotal, hst, total, payment_method, source, utm_campaign, referrer,
-                             coupon_code, discount, ip, user_agent, verify_token, verified_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+                             coupon_code, discount, ip, user_agent, verify_token, verified_at, lead_source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'website')
          RETURNING id`,
         [userId, email, name, phone || null, deliveryMethod,
          address || null, city || null, postal || null, subtotal, hst, total,
@@ -277,6 +282,10 @@ export async function POST(req) {
         ...(discount ? [{ description: `Promo code ${coupon.code}`, amount: -discount, kind: 'discount' }] : [])
       ],
       addHst: hst > 0,
+      // The order it attaches to was already stamped 'website' at insert; saying
+      // it on the invoice too keeps the invoice list readable. stampLead uses
+      // COALESCE on an attach, so this can never overwrite the order's own answer.
+      leadSource: 'website',
       deliveryMethod, address, city, postal,
       memo: `Online order ${order.orderNumber}.`,
       sendEmail: false,
