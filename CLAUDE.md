@@ -280,6 +280,70 @@ record anywhere. Rules that must hold:
   total is reported as `overpaid`; no refund record is invented, because no money
   has physically moved.
 
+## Where the sale came from (added 2026-09-15)
+Every sale now records **how the customer reached us** and, where a person sent
+them, **who**. `LEAD_SOURCES` in `lib/constants.js` is the fixed list;
+`components/LeadSource.jsx` is the one field editor; `leadReport()` in
+`lib/analytics.js` is the view, rendered by `components/LeadSources.jsx` on
+`/admin/dashboard` under the per-salesperson table — that one says who CLOSED
+it, this one says who SENT it.
+
+- **`lead_source` is NOT `orders.source`, and merging them loses one of them.**
+  `source` is first-touch WEB attribution (utm / referrer, `lib/attribution.js`)
+  — machine-read, and it only exists for a storefront visit. `lead_source` is a
+  human's answer, and it is the only thing that can ever describe a walk-in.
+  Separate columns, so an ad-driven web order keeps its ad channel AND reads as
+  a website lead. Both live on `orders`; the marketing dashboard's ROAS table
+  still reads `source` and is untouched.
+- **The report reads ORDERS, not invoices.** Revenue lives on orders (so the
+  table agrees with the Revenue KPI on the same screen to the cent), and a
+  storefront sale has no manual invoice anybody typed an answer into. The
+  invoice carries its own copy because it is the document the rep filled in —
+  reopening shows what they said, and an edit corrects it — and
+  `createAndSendInvoice` pushes it onto the bridged order via `stampLead`, which
+  **COALESCEs on an attach** so a web order's own answer is never overwritten.
+- **Nothing is inferred at read time.** Checkout stamps `lead_source='website'`
+  at insert (a checkout IS a website lead) and Sarah stamps `'phone'` (that is
+  what she is). Both are facts about the channel, not guesses about the
+  customer — `leadBy` is deliberately left empty rather than invented.
+- **A fixed list, so the buckets stay countable** (same reasoning as
+  `jobs.services`). `normalizeLeadSource` stores an unrecognised answer as NULL
+  rather than as its own bucket: one free-text answer spelled four ways is four
+  buckets. The "sent by" field CAN'T be a list — the point is finding out who
+  they are — so both invoice screens offer a **datalist of names already used**.
+  That suggestion list is the only thing stopping "Dave", "dave" and "Dave S."
+  from becoming three referrers who are one person.
+- **Required on CREATE, never forced on an EDIT.** The new-invoice form refuses
+  to submit without a source (and without a name on a referral or a trade lead —
+  "a referral" from nobody in particular is exactly the row the owner opens this
+  report to chase). The EDITOR only refuses to CLEAR one: an invoice raised
+  before this existed has no source, and making somebody fixing a typo on a
+  three-month-old sale guess where that lead came from produces a guess that
+  then counts. **The SERVER accepts a blank source from every path** — quote
+  conversions, salvage, dispatch client billing and Sarah must keep raising
+  invoices — so the insistence lives on the screen where a person is sitting in
+  front of the answer.
+- **UNRECORDED IS A ROW, NOT A GAP.** The panel leads with how much of the
+  period nobody answered for, and prints "Not recorded" with its revenue. On the
+  day this shipped that is everything: a report showing only the marked sales
+  would have read as a complete picture of the month from its first hour. Every
+  source is listed even at zero for the same reason — "no walk-ins this week" is
+  a real answer and an absent row is not.
+- `lead_by` is searchable from the admin search box, so a name on the referrals
+  panel can be typed straight in to see that person's actual sales.
+- **LANDMINE — `.dash-2col` could not shrink, and it was the whole page.** Fixed
+  here because this panel found it: a `1fr` track's automatic minimum is its
+  CONTENT, and `table.admin` carries `min-width: 760px`, so two tables side by
+  side sized their own tracks to 804px each and blew a 1400px viewport out to
+  1660px — the right-hand panel's Revenue column simply off the screen, with
+  `.table-wrap`'s `overflow-x: auto` standing by and never asked to scroll.
+  `.dash-2col > * { min-width: 0 }` is now in `app/globals.css`; it also fixes
+  the four pre-existing dashboard panels (Top sellers, Sales by category, Top
+  customers, Recent orders) that had it all along. Same family as the `.thumb`
+  bug below. These two panels are nonetheless **full width**, because at half
+  width the table only scrolls its own Revenue and Share columns out of sight,
+  and those are the numbers the panel exists to show.
+
 ## Vendor drop-offs — stock the sales floor lists itself (added 2026-09-10)
 Some vendors just leave appliances with us. **No invoice, a cost agreed out loud,
 and we pay them once the unit sells.** They arrive KNOWN WORKING, which is the

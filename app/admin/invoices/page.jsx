@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin, isStaff } from '../../../lib/auth';
-import { money } from '../../../lib/constants';
+import { money, leadSourceLabel } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
-import { listInvoices, listInvoiceAuthors, INVOICE_FILTERS } from '../../../lib/invoices';
+import { listInvoices, listInvoiceAuthors, listLeadSenders, INVOICE_FILTERS } from '../../../lib/invoices';
 import { pendingCollectionsForInvoices } from '../../../lib/door-money';
 import { contactsForAutofill } from '../../../lib/customers';
 import { getAll } from '../../../lib/inventory';
@@ -92,6 +92,10 @@ export default async function InvoicesPage({ searchParams }) {
     }));
   } catch { inventory = []; }
 
+  // Names already used as "sent by", offered as suggestions so one referrer
+  // doesn't become three spellings in the report.
+  const senders = await listLeadSenders().catch(() => []);
+
   return (
     <div>
       <AdminNav active="invoices" salesOnly={!isAdmin(session)} />
@@ -109,7 +113,7 @@ export default async function InvoicesPage({ searchParams }) {
           straight away</b>, dated to the invoice — take a deposit now and collect the balance on delivery.
           Mark it paid here when the rest of the money lands.
         </p>
-        <InvoiceForm inventory={inventory} customers={customers} hideCost={!isAdmin(session)} />
+        <InvoiceForm inventory={inventory} customers={customers} senders={senders} hideCost={!isAdmin(session)} />
       </div>
 
       <div className="panel">
@@ -186,6 +190,15 @@ export default async function InvoicesPage({ searchParams }) {
                          title={`Show every invoice raised by ${inv.createdByName}`}
                          style={{ textDecoration: 'underline' }}>{inv.createdByName}</a>
                     : <span style={{ color: 'var(--muted)' }} title="Raised before invoices recorded who created them">—</span>}
+                  {/* Where the sale came from, under whoever raised it — the two
+                      halves of the same question (who closed it, who sent it).
+                      Shown here so a missing source is visible on the list a rep
+                      already scans, rather than only in a month-end report. */}
+                  {leadSourceLabel(inv.leadSource) && (
+                    <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+                      {leadSourceLabel(inv.leadSource)}{inv.leadBy ? ` · ${inv.leadBy}` : ''}
+                    </div>
+                  )}
                 </td>
                 <td>
                   <span className={'pill ' + statusClass(inv.status)}>{inv.status}</span>

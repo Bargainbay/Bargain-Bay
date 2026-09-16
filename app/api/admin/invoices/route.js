@@ -66,6 +66,11 @@ export async function POST(req) {
   const phone = String(body.phone || '').trim();
   const sendEmail = body.sendEmail !== false; // default true; only false explicitly skips the email
   const invoiceDate = String(body.invoiceDate || '').trim(); // optional 'YYYY-MM-DD' backdate (validated in lib)
+  // Where the lead came from, and who sent it. Normalised in the lib (an
+  // unrecognised source becomes NULL rather than its own bucket), so nothing is
+  // validated here — a rejected sale over a reporting field is the wrong trade.
+  const leadSource = String(body.leadSource || '').trim();
+  const leadBy = String(body.leadBy || '').trim();
 
   if (!validEmail(email)) return NextResponse.json({ error: 'Enter a valid customer email.' }, { status: 400 });
   if (!items.some((it) => String(it?.description || '').trim() && Number(it?.amount) > 0)) {
@@ -82,7 +87,8 @@ export async function POST(req) {
   try {
     const invoice = await createAndSendInvoice({
       name, email, items, addHst, taxInclusive, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate,
-      createdBy: { email: session?.email, name: session?.name }
+      createdBy: { email: session?.email, name: session?.name },
+      leadSource, leadBy
     });
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
@@ -161,7 +167,9 @@ export async function PATCH(req) {
         ...(has('deliveryMethod') ? { deliveryMethod: body.deliveryMethod } : {}),
         ...(has('address') ? { address: body.address } : {}),
         ...(has('city') ? { city: body.city } : {}),
-        ...(has('postal') ? { postal: body.postal } : {})
+        ...(has('postal') ? { postal: body.postal } : {}),
+        ...(has('leadSource') ? { leadSource: body.leadSource } : {}),
+        ...(has('leadBy') ? { leadBy: body.leadBy } : {})
       });
       // Optionally re-email the customer the updated invoice. The save already
       // succeeded, so a mail failure is reported as a warning, not an error.
