@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { getSession, isAdmin, isStaff } from '../../../../../lib/auth';
 import { hasDb } from '../../../../../lib/db';
-import { getInvoiceByNumber } from '../../../../../lib/invoices';
+import { getInvoiceByNumber, listLeadSenders } from '../../../../../lib/invoices';
 import { getAll } from '../../../../../lib/inventory';
 import { money } from '../../../../../lib/constants';
 import AdminNav from '../../../../../components/AdminNav';
@@ -71,8 +71,13 @@ export default async function EditInvoicePage({ params }) {
     // sale that was rung up late.
     invoiceDate: invoice.created_at
       ? new Date(invoice.created_at).toLocaleDateString('en-CA', { timeZone: 'America/Toronto' })
-      : null
+      : null,
+    // Where the sale came from. Blank on an invoice raised before this existed,
+    // which is the honest answer — nobody has said yet.
+    leadSource: invoice.lead_source || '',
+    leadBy: invoice.lead_by || ''
   };
+  const senders = await listLeadSenders().catch(() => []);
 
   return (
     <div>
@@ -87,7 +92,7 @@ export default async function EditInvoicePage({ params }) {
         )}
       </p>
       <div className="panel">
-        <InvoiceEditor invoice={editorInvoice} inventory={inventory} />
+        <InvoiceEditor invoice={editorInvoice} inventory={inventory} senders={senders} />
       </div>
     </div>
   );

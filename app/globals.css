@@ -448,6 +448,14 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .dash-filter:disabled { opacity: .55; cursor: default; }
 
 .dash-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+/* min-width: 0 is load-bearing, and the bug it fixes is the whole page, not the
+   panel. A 1fr track's automatic minimum is its CONTENT, and table.admin carries
+   min-width: 760px — so two tables side by side sized their own tracks to 804px
+   each, blew a 1400px viewport out to 1660px, and pushed the right-hand panel's
+   Sales and Revenue columns off the screen. Nothing said so: .table-wrap has
+   overflow-x: auto and was ready to scroll the table, but it could never be
+   asked to while the track was growing to fit it. Measured 2026-09-15. */
+.dash-2col > * { min-width: 0; }
 @media (max-width: 760px) { .dash-2col { grid-template-columns: 1fr; } }
 .prose { max-width: 760px; }
 .prose h2 { margin-top: 28px; font-size: 17px; }

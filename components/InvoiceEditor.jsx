@@ -4,6 +4,7 @@ import InvoiceLines, { fromInvoice, toPayload } from './InvoiceLines';
 import TaxMode, { previewTotals, modeOf, NO_TAX } from './TaxMode';
 import { toInclusiveLines } from '../lib/tax';
 import { isCreditLine } from '../lib/invoice-lines';
+import LeadSource, { whatsWrongWithLead } from './LeadSource';
 
 // Edit an invoice: the customer's details, the line items (add, remove, reprice,
 // change warranty, add a service or a unit from stock), HST, memo and issue date.
@@ -13,7 +14,7 @@ import { isCreditLine } from '../lib/invoice-lines';
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 const fmtMoney = (n) => '$' + (Number(n) || 0).toFixed(2);
 
-export default function InvoiceEditor({ invoice, inventory = [] }) {
+export default function InvoiceEditor({ invoice, inventory = [], senders = [] }) {
   const status = invoice.status || 'open';
   const settled = status === 'paid';
   const paidSoFar = Number(invoice.amountPaid) || 0;
@@ -54,6 +55,11 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   // must not quietly add 13% to a sale that's already been settled.
   const addHst = taxMode !== NO_TAX;
   const [memo, setMemo] = useState(invoice.memo || '');
+  // Correcting where a sale came from is ordinary — the answer often arrives
+  // after the fact ("that was Dave's customer"). An invoice raised before this
+  // existed opens blank, which is correct: nobody has answered for it yet.
+  const [leadSource, setLeadSource] = useState(invoice.leadSource || '');
+  const [leadBy, setLeadBy] = useState(invoice.leadBy || '');
   const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate || '');
   const todayToronto = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
   const [q, setQ] = useState('');
@@ -90,6 +96,19 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
   const overpaid = Math.max(0, paidSoFar - total);
 
   async function save() {
+    // Deliberately NOT the new-invoice rule. An invoice raised before this
+    // existed has no source, and forcing one here would make somebody fixing a
+    // typo on a three-month-old sale guess where that lead came from — and a
+    // guessed source is worse than a blank one, because it counts. So: adding
+    // one is welcome, clearing one that was recorded is refused, and a source
+    // that needs a name still needs one.
+    const hadSource = !!invoice.leadSource;
+    if (hadSource && !leadSource) {
+      setErr('This sale already says where it came from — pick a source rather than clearing it. If it was recorded wrongly, choose the right one.');
+      return;
+    }
+    const leadWrong = leadSource ? whatsWrongWithLead(leadSource, leadBy) : '';
+    if (leadWrong) { setErr(leadWrong); return; }
     setBusy(true); setErr('');
     try {
       const res = await fetch('/api/admin/invoices', {
@@ -99,6 +118,7 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
           taxInclusive: taxMode === 'inclusive', memo,
           resend: resend && !settled,
           name, email, phone, deliveryMethod, address, city, postal,
+          leadSource, leadBy,
           // Only send a date the owner actually changed — sending the original
           // back unchanged would still re-stamp created_at to noon that day.
           invoiceDate: invoiceDate !== (invoice.invoiceDate || '') ? invoiceDate : '' })
@@ -198,6 +218,8 @@ export default function InvoiceEditor({ invoice, inventory = [] }) {
           <input style={{ width: 150 }} type="date" max={todayToronto} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
         </label>
       </div>
+
+      <LeadSource source={leadSource} setSource={setLeadSource} by={leadBy} setBy={setLeadBy} senders={senders} />
 
       <div className="field">
         <label>Memo / notes (optional)</label>

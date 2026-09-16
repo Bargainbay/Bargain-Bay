@@ -3,12 +3,13 @@ import { useState, useRef } from 'react';
 import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
 import InvoiceLines, { blankItem, toPayload } from './InvoiceLines';
 import TaxMode, { previewTotals } from './TaxMode';
+import LeadSource, { whatsWrongWithLead } from './LeadSource';
 
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 // Business days run on Toronto time (same as the dashboard's buckets).
 const todayToronto = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
 
-export default function InvoiceForm({ inventory = [], customers = [], hideCost = false }) {
+export default function InvoiceForm({ inventory = [], customers = [], senders = [], hideCost = false }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [items, setItems] = useState([blankItem()]);
@@ -22,6 +23,11 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
   const [daysUntilDue, setDaysUntilDue] = useState(14);
   const [invoiceDate, setInvoiceDate] = useState(todayToronto());
   const [memo, setMemo] = useState('');
+  // Where the sale came from. Deliberately starts EMPTY rather than defaulting to
+  // walk-in: a default is what gets left in place, and a report where nine sales
+  // in ten say walk-in because nobody looked is worse than no report.
+  const [leadSource, setLeadSource] = useState('');
+  const [leadBy, setLeadBy] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('pickup');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
@@ -131,6 +137,12 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
       const missing = [!address.trim() && 'street address', !city.trim() && 'city', !postal.trim() && 'postal code'].filter(Boolean);
       if (missing.length) return `Delivery needs a ${missing.join(', a ')}. Type it in if the address lookup didn’t fill it.`;
     }
+    // Asked for here and not on the server: the server accepts a blank source so
+    // that Sarah's phone orders, quote conversions and the storefront can keep
+    // raising invoices without one. This is the screen where a person is sitting
+    // in front of the answer, so this is where it's insisted on.
+    const lead = whatsWrongWithLead(leadSource, leadBy);
+    if (lead) return lead;
     return '';
   }
 
@@ -144,13 +156,17 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, items: toPayload(items), addHst, taxInclusive: taxMode === 'inclusive',
-          daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate })
+          daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate,
+          leadSource, leadBy })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not create the invoice.'); return; }
       setDone(d.invoice);
       setName(''); setEmail(''); setItems([blankItem()]); setMemo(''); setInvoiceDate(todayToronto());
       setDeliveryMethod('pickup'); setAddress(''); setCity(''); setPostal(''); setPhone('');
+      // Cleared like every other field: the next customer is a different lead,
+      // and a source left over from the last sale is a wrong answer nobody typed.
+      setLeadSource(''); setLeadBy('');
     } catch {
       setErr('Network error — please try again.');
     } finally {
@@ -270,6 +286,8 @@ export default function InvoiceForm({ inventory = [], customers = [], hideCost =
         )}
         <input style={{ marginTop: 8 }} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Customer phone (optional)" />
       </div>
+
+      <LeadSource source={leadSource} setSource={setLeadSource} by={leadBy} setBy={setLeadBy} senders={senders} />
 
       <div className="field">
         <label>Memo / notes (optional)</label>

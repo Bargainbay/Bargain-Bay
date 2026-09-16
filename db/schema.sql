@@ -262,6 +262,22 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by      text;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by_name text;
 CREATE INDEX IF NOT EXISTS idx_invoices_created_by ON invoices(lower(created_by));
 
+-- ── Where the sale came from ────────────────────────────────────────────────
+-- How the CUSTOMER reached us, as answered by the person who took the sale —
+-- walk_in / website / referral / … (LEAD_SOURCES in lib/constants.js) — plus
+-- lead_by, the name of whoever sent them. Held on the invoice (the document the
+-- rep filled in) AND on the order, which is what the report reads: revenue
+-- lives on orders, and a storefront sale has no manual invoice to read from.
+-- NOT the same thing as orders.source, which is first-touch WEB attribution
+-- (utm / referrer, lib/attribution.js) and exists only for a storefront visit.
+-- Two columns, so an ad-driven web order keeps its ad channel and still reads
+-- as a website lead. NULL = nobody said, which the report counts and shows.
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS lead_source text;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS lead_by     text;
+ALTER TABLE orders   ADD COLUMN IF NOT EXISTS lead_source text;
+ALTER TABLE orders   ADD COLUMN IF NOT EXISTS lead_by     text;
+CREATE INDEX IF NOT EXISTS idx_orders_lead_source ON orders(lead_source);
+
 -- ── Quotes ──────────────────────────────────────────────────────────────────
 -- Non-binding package quotes the owner builds in /admin/quotes and shares with a
 -- client (hosted page + email). A quote reserves NOTHING — the units stay live
@@ -916,6 +932,7 @@ CREATE TABLE IF NOT EXISTS location_audits (
   counted_at      timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_location_audits_loc ON location_audits(location, counted_at DESC);
+
 -- Parts. See lib/parts.js. A part is a CATALOGUE row (this part number, this
 -- name); how many we have is the SUM of its ledger, never a stored count.
 CREATE TABLE IF NOT EXISTS parts (
