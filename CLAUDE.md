@@ -2347,6 +2347,49 @@ table IS the layout — do not "fix" it by editing `defaultLayout()`.
   slip. Both degrade to showing nothing if the tables can't be read. SKU stickers
   are offered straight after vendor drop-off intake and invoice intake.
 
+## Parts — the shelf, and what came out of what (added 2026-09-15)
+`/admin/parts` (staff), `lib/parts.js`, `lib/parts-labels.js` (no imports — the
+screens need the labels and must not pull `./db` into the browser, same split as
+`location-codes`), tables `parts` / `part_moves` / `part_requests`, plus
+`salvage_units.disposal`.
+
+- **On-hand is SUM(`part_moves.qty`), never a stored count** — the general
+  ledger's rule. Two people cannot quietly disagree about stock, and "where did
+  the last one go" is always answerable.
+- **`parts` is a CATALOGUE row, not a piece.** A part NUMBER is the identity when
+  there is one (unique index on `upper(part_number)`), so booking the same number
+  in twice adds to one shelf record instead of splitting stock across two. A part
+  with no number is named only.
+- **Parts are always OURS** (owner, 2026-09-15), whichever machine they came out
+  of — RS Ops refurbishes other companies' lots, but nothing here is keyed to a
+  client.
+- **Who may take one:** the refurb floor takes a part straight off the shelf and
+  MARKS it (`usePart`); a service tech on the road **requests**, and an **admin**
+  answers. Asking permission to fix the machine in front of you is friction
+  nobody keeps up; a van emptying the shelf unseen is the thing the queue exists
+  to stop. A request HOLDS the part from the moment it is asked for, so the same
+  last igniter can't be promised twice, and **approving moves no stock** — the
+  shelf changes when somebody physically picks it up (`pickRequest`).
+- **Cost of a harvested part is decided when the unit is FINISHED**, not per part:
+  until then nobody knows what else is coming off it. A **purchased** salvage
+  unit's cost is spread across what came out of it, weighted by the estimated
+  value the person cutting it out typed; with no estimates it splits evenly, and
+  the last part carries the rounding so the pennies add to exactly the unit cost.
+  A **haul-away** (cost 0) yields parts at zero cost — the owner's rule, and also
+  just arithmetic.
+- **`finishPartOut` disposes the unit** with `disposal = 'parted_out'`, which is
+  why that column exists: an empty `invoice_number` on a disposed unit otherwise
+  reads as a sale nobody invoiced.
+- **Stock cannot go negative.** `usePart` checks the shelf inside a transaction
+  holding `pg_advisory_xact_lock(part_id)` — append-only rows cannot be locked
+  against an insert that does not exist yet, and a count that can go negative is
+  a count nobody believes.
+- **Gate:** staff, like the warehouse. **Admin only:** what a part COST (stripped
+  server-side from every response, never hidden in the browser) and **answering a
+  request** — the owner's instruction.
+- Not built yet: photos per part, the driver app's own request screen, RS Ops
+  taking a part against the unit on its bench, and the parts website.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
