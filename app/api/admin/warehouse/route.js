@@ -8,7 +8,7 @@ import { getSession, isAdmin, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import {
   listLocations, locationContents, unitWhere, findUnits, unplacedUnits,
-  moveUnits, countSpot, addSpots, updateSpot
+  moveUnits, moveSpotContents, countSpot, addSpots, updateSpot
 } from '../../../../lib/locations';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +55,9 @@ export async function POST(req) {
       case 'move':
         if (!String(body.code || '').trim()) throw new Error('Pick a spot to move it to.');
         return NextResponse.json({ ok: true, ...(await moveUnits({ skus, code: body.code, note: body.note, via: 'scan', ...who(s) })) });
+      case 'move_all':
+        // One spot emptied into another. `from` is the spot being cleared.
+        return NextResponse.json({ ok: true, ...(await moveSpotContents({ from: body.from, to: body.code, ...who(s) })) });
       case 'out':
         return NextResponse.json({ ok: true, ...(await moveUnits({ skus, code: null, note: body.note, via: 'out', ...who(s) })) });
       case 'count':

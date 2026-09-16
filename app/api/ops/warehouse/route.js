@@ -11,7 +11,7 @@
 // RS Ops, not which person was holding the phone — so it is labelled for what it is.
 import { NextResponse } from 'next/server';
 import { hasDb } from '../../../../lib/db';
-import { countSpot, listLocations, locationContents, moveUnits, unitWhere } from '../../../../lib/locations';
+import { countSpot, listLocations, locationContents, moveSpotContents, moveUnits, unitWhere } from '../../../../lib/locations';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -58,7 +58,7 @@ export async function POST(req) {
   if (problem) return problem;
   let body;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }); }
-  if (!['move', 'count'].includes(body.action)) return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
+  if (!['move', 'count', 'move_all'].includes(body.action)) return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   const skus = Array.isArray(body.skus) ? body.skus : body.sku ? [body.sku] : [];
   const name = String(body.by || '').trim().slice(0, 80);
 
@@ -70,6 +70,20 @@ export async function POST(req) {
       const out = await countSpot({
         code: body.code, skus,
         by: null, byName: name ? `${name} (RS Ops)` : 'RS Ops'
+      });
+      return NextResponse.json({ ok: true, ...out });
+    } catch (e) {
+      return fail(e);
+    }
+  }
+
+  // A whole bay going to one place. The floor carries them together; this is the
+  // record catching up, which is why the screen there names the count and asks.
+  if (body.action === 'move_all') {
+    try {
+      const out = await moveSpotContents({
+        from: body.from, to: body.code,
+        by: null, byName: name ? `${name} (RS Ops)` : 'RS Ops', via: 'rsops'
       });
       return NextResponse.json({ ok: true, ...out });
     } catch (e) {
