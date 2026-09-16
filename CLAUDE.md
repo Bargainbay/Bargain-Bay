@@ -9,7 +9,11 @@ One consequence worth knowing before you touch the tracker: the master tracker h
 
 - **Live site:** https://bargainbay.ca (canonical Vercel URL: bargain-bay-two.vercel.app)
 - **Repo:** `Bargainbay/Bargain-Bay` (public), default branch `main`, auto-deploys to Vercel on push.
-- **Vercel project:** `rs-solutions-inc-s-projects/bargain-bay` (Hobby plan).
+- **Vercel project:** `rs-solutions-inc-s-projects/bargain-bay` (**Pro** — checked
+  against the Vercel API 2026-09-15; this file said Hobby for months and it is
+  the kind of stale fact that costs a session: a plan limit is the first thing
+  anybody blames when a cron looks like it is not firing, and on Pro it is
+  never the answer).
 - **Stack:** Next.js 14 (App Router), **plain JavaScript/JSX** (no TypeScript), React 18, Postgres (`pg`), Clover Hosted Checkout, `bcryptjs` + `jose` auth, `googleapis` for sheet sync.
 
 ## Source of truth & the catalog pipeline
@@ -657,11 +661,20 @@ try/log/carry-on scaffolding.
   (`expire-reservations`, `sync-inventory`, `sync-ads`). Do not merge them into
   one entry: each scheduled invocation gets its own function time budget, so one
   combined pass would give all three what one of them gets alone — and the
-  finance pass is already the long one. Checked on the live project 2026-08-27:
-  all three are registered and enabled on **Hobby**, so the cron *count* is not
-  a constraint. What Hobby does impose is a **1-hour flexible window** — a job
-  scheduled for 06:00 UTC may run any time in that hour, which is why nothing
-  here may depend on one job finishing before another starts.
+  finance pass is already the long one.
+
+  **Checked against the Vercel API on 2026-09-15: the project is on Pro, crons
+  are enabled (since 2026-06-12), and all SEVEN entries are registered against
+  the current production deployment** — including `freightcom` at `*/15 6-22`
+  and `cda` at `5 */3`, both of which Pro allows. So **a cron that looks like it
+  is not running is not a plan limit and not a schedule Vercel refused.** Look at
+  what the job itself does instead; on 2026-09-15 the answer was a missing
+  environment variable failing silently on every run. Note that the crons API
+  exposes no per-run history, so "is it firing" and "is it working" are different
+  questions and only the second one is worth asking.
+
+  A scheduled job may still run anywhere inside its minute, so nothing here may
+  depend on one job finishing before another starts.
 - **`/api/cron/nightly` runs all three back to back** in one request. It is NOT
   scheduled — it's the catch-up path after an outage.
 - **Order and timeouts are deliberate.** Cheapest and most time-sensitive first
@@ -739,6 +752,15 @@ thing that ever surfaced them was somebody deciding to look. `lib/onedrive.js` r
 - **It only ever reads.** The workbook is the client's; a bug here must not be able to edit it.
 - The client is NOT forced onto the rows — `client_sheet_profiles` learns it from the first approval,
   keyed on the heading row. A wrong client on every row is worse than a question.
+- **THE WATCHER WAS NEVER ONCE ABLE TO READ THE WORKBOOK.** Found 2026-09-15:
+  `MS_CLIENT_ID` is set in Production and **`MS_CLIENT_SECRET` is not**.
+  `oneDriveConfigured()` requires BOTH, so `downloadCdaWorkbook()` threw on the
+  first step of every run, every three hours, since the day this shipped — and
+  returned quietly to a cron nobody reads. The feature exists because CDA edit
+  their sheet in place and there is no event to notice; the feature itself then
+  failed the same way, invisibly, for the same reason. Both watchers now mail the
+  dispatch desk when a run fails (throttled), which is what makes this findable
+  next time. **Check the env var before debugging the code.**
 - Setup: `MS_CLIENT_ID` / `MS_CLIENT_SECRET`, then **Connect Microsoft** on the dispatch page and
   sign in once as the account CDA shared the file with. The workbook is then **picked from a list**
   of what Graph says is shared with us — the ids in a OneDrive share URL are not the ids Graph
