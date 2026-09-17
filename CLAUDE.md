@@ -2684,6 +2684,56 @@ screens need the labels and must not pull `./db` into the browser, same split as
   taking a part against the unit on its bench, parting out a salvage unit from
   RS Ops, and the parts website.
 
+## RS Manager — the crew's AI assistant (added 2026-09-17)
+`lib/assistant/` → `POST/GET /api/assistant` (signed-in drivers + staff, cookie
+OR `Authorization: Bearer <session token>` for the native app) and
+`/api/ops/assistant` (RS Ops, `x-rsops-key` + the person's name). The widget is
+`components/TeamAssistant.jsx`, mounted once in `SiteChrome` on every portal and
+`/driver` page; it renders nothing for anyone the endpoint refuses. Chat or voice,
+in whatever language the person speaks (asked for: Tamil, Punjabi, Hindi/Urdu,
+Spanish). Owner's decision on 2026-09-17: all three teams at once, "guide + safe
+actions, confirmed", and a **native app with a wake word** as the hands-free door.
+
+- **It is NOT Sarah.** Sarah runs on the owner's authority with a binary
+  read-only switch; this runs on the crew's, with per-person identity. Same
+  playbook sections (`delivery_dispatch`, `sales`, `technical_manager`), same
+  library functions — a separate engine so Sarah's permission model is untouched.
+- **Identity comes from the sign-in, never the conversation** (`people.js`).
+  driver = `users.is_driver`; sales = `isSales`; warehouse = any staff, or RS Ops.
+  A coordinator gets nothing yet — adding them is a decision, not a side effect.
+  Tools are filtered per team AND re-checked server-side when called.
+- **THE CONFIRMATION IS ENFORCED IN THE DATABASE, not the prompt.** A write tool
+  only `prepare`s: it stores an `assistant_pending` row carrying the id of the
+  request that proposed it, and `takeAction` refuses to run it from that same
+  request. So nothing changes without a SECOND message from the person — the
+  read-back has to be heard and answered. Also refused: another person's action,
+  a replayed yes, and anything older than `PENDING_MINUTES`. A new proposal
+  supersedes the old one, so "yes" only ever means the question just asked.
+  Tested against real Postgres (PGlite) with the model scripted to try to
+  confirm its own proposal.
+- **Writes wrap the functions the screens already call** — `setJobStatus`,
+  `moveUnits` (`via: 'assistant'`), `requestPart`, and a dispatch-desk email +
+  `job_events` note. No second path, so the voice and the screens never disagree.
+- **Deliberately not available by voice:** closing a stop (signature, photos
+  and damage answers are a signed form), raising/editing/refunding an invoice
+  (emails a customer, holds stock, lead source required — `price_sale` works a
+  sale out and creates nothing), and anything that moves money. Cost is never in
+  a non-admin tool result (`decorate()` strips it; part cost only for admin).
+- **Cash read out of a client's notes is returned `certain: false`** — the voice
+  has to say "check it before you ask", same as the run sheet.
+- **Voice:** Scribe returns the language it heard (`transcribeWithLanguage`),
+  the model answers in it, and TTS speaks it. **Punjabi is only in ElevenLabs
+  `eleven_v3`**, so `synthesizeSpeech({ lang: 'pa' })` switches model; everything
+  else stays on multilingual_v2. Scribe's Punjabi accuracy was not verified.
+- **The web widget cannot listen while the phone is locked or another app is in
+  front** — same OS rule as live tracking. "Conversation" mode keeps listening
+  between replies only while the page is on screen. The wake word is the native
+  app's job. Replies play through Web Audio, unlocked inside the tap, because
+  iOS refuses an `<audio>` started after a network round trip.
+- Conversations live in `assistant_threads` / `assistant_messages` (text only,
+  last 24 turns sent back; a thread idle 4h starts fresh). Rate limit counts rows
+  in Postgres, not memory.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
