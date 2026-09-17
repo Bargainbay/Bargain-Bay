@@ -31,7 +31,8 @@ export async function GET() {
 }
 
 // { action: 'link', itemId, skus } — tie a typed sale line to the unit(s) it sold;
-//                                   several units split the line (`sku` still works for one)
+//                                   several units split the line (`sku` still works for one);
+//                                   `alreadyLinked` = the SKU a line carries when adding more to it
 // { action: 'check_rsops' }        — run the RS Ops → tracker pass now (no email)
 // { action: 'approve_fills', ids }  — ADMIN: write the invoice's cost onto booked-in units
 // { action: 'reject_fills', ids, note } — ADMIN: not the same appliance; add the line as new
@@ -49,7 +50,7 @@ export async function POST(req) {
         : await rejectFillRequests(ids, { by: s.email, note: body.note });
       return NextResponse.json({ ok: true, ...r });
     }
-    if (body.action === 'link') return NextResponse.json({ ok: true, ...(await linkSaleLine(body.itemId, Array.isArray(body.skus) ? body.skus : body.sku)) });
+    if (body.action === 'link') return NextResponse.json({ ok: true, ...(await linkSaleLine(body.itemId, Array.isArray(body.skus) ? body.skus : body.sku, { alreadyLinked: body.alreadyLinked })) });
     if (body.action === 'check_rsops') return NextResponse.json({ ok: true, ...(await runStockReconcile({ email: false })) });
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (e) {
