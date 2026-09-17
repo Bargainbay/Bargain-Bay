@@ -1,3 +1,5 @@
+import { DELIVERY_FEE } from '../../../lib/constants';
+
 export const metadata = { title: 'Shipping & Delivery Policy — Bargain Bay' };
 
 export default function ShippingPage() {
@@ -20,13 +22,17 @@ export default function ShippingPage() {
       <h2>Local delivery</h2>
       <p>
         We deliver throughout Durham Region, the GTA, and surrounding areas. Online checkout offers flat-rate{' '}
-        <b>$75 local delivery</b> for addresses within roughly 50 km of our Pickering warehouse. Farther out is
-        priced by distance:
+        <b>${DELIVERY_FEE} local delivery</b> for addresses within roughly 50 km of our Pickering warehouse. Farther
+        out is priced by distance:
       </p>
+      {/* The local rate is read from DELIVERY_FEE, the same constant app/api/checkout charges — it is
+          NOT typed in here. This page advertised $75 for months while checkout took $79, which is the
+          kind of gap a customer finds at the worst possible moment: after they have already agreed to
+          the price. The by-arrangement rows below are quoted by hand and have no constant to track. */}
       <table>
         <thead><tr><th>Distance from Pickering</th><th>Delivery fee</th></tr></thead>
         <tbody>
-          <tr><td>0–50 km</td><td><b>$75</b></td></tr>
+          <tr><td>0–50 km</td><td><b>${DELIVERY_FEE}</b></td></tr>
           <tr><td>51–100 km</td><td><b>$125</b> (by arrangement — email us)</td></tr>
           <tr><td>101–150 km</td><td><b>$175</b> (by arrangement — email us)</td></tr>
         </tbody>
