@@ -3,6 +3,7 @@ import { getSession } from '../../lib/auth';
 import { decorate } from '../../lib/pricing';
 import { money } from '../../lib/constants';
 import ProductCard from '../../components/ProductCard';
+import { groupByModel } from '../../lib/group-units';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +43,7 @@ export default async function ClearancePage() {
             {units.length} clearance {units.length === 1 ? 'unit' : 'units'} · {money(totalSaved)} in total savings off retail
           </div>
           <div className="grid">
-            {units.map((u) => <ProductCard key={u.id} unit={u} />)}
+            {groupByModel(units).map((g) => <ProductCard key={g.rep.id} unit={g.rep} count={g.count} />)}
           </div>
         </>
       )}

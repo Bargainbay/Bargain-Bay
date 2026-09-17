@@ -67,6 +67,17 @@ table another screen down.
   it — a 534x717 frame around a 532px square photo, with 185px of dead white
   underneath. Same family of bug as the tile one below.
 
+### One card per model, on EVERY grid (fixed 2026-09-17)
+`lib/group-units.js` (no imports) — `groupByModel` / `newestModels`. Identical
+make + model collapse into one card ("N available", "from" the cheapest), and
+the product page lists every unit to pick from (`getSiblings`). **Every grid of
+product cards must group through it.** The grouping used to be written inline in
+`app/shop/ShopClient.jsx` only, so `/shop` showed one "4 available" Hisense
+RQ22A4CSD card while the home page's New arrivals (and Clearance) showed the same
+four fridges as four identical tiles — which read as the feature breaking every
+time a lot of identical units arrived. A unit with no model number is never
+grouped: nothing says it is the same appliance.
+
 ### The product tile is square; the photo is not
 `.thumb` (app/globals.css) is `aspect-ratio: 1/1` **plus `min-height: 0`**, and
 its image is **absolutely positioned**. All three are load-bearing and the reason

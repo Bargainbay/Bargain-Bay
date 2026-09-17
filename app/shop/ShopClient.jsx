@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import ProductCard from '../../components/ProductCard';
 import { COLLECTIONS, collectionFilter } from '../../lib/constants';
 import { matchesQuery } from '../../lib/search-terms';
+import { groupByModel } from '../../lib/group-units';
 
 const PRICE_BANDS = [
   { id: '', label: 'Any price' },
@@ -62,17 +63,8 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
       // Refrigerators) — see lib/search-terms.
       l = l.filter((u) => matchesQuery(u.kw || '', q));
     }
-    // Group by make+model in filtered (catalog) order.
-    const map = new Map();
-    for (const u of l) {
-      const key = `${u.make}|${u.model}`.toLowerCase();
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(u);
-    }
-    let g = [...map.values()].map((arr) => {
-      const sorted = [...arr].sort((a, b) => a.price - b.price);
-      return { rep: sorted[0], count: sorted.length, minPrice: sorted[0].price, maxPrice: sorted[sorted.length - 1].price };
-    });
+    // One card per make+model (lib/group-units — shared with the home page and clearance).
+    let g = groupByModel(l);
     if (sort === 'lo') g.sort((a, b) => a.minPrice - b.minPrice);
     else if (sort === 'hi') g.sort((a, b) => b.maxPrice - a.maxPrice);
     else g.reverse(); // newest = most recently added models first
