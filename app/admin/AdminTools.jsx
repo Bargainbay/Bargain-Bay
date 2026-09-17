@@ -37,7 +37,7 @@ export default function AdminTools({ initialReservations }) {
       const why = rep
         ? ` of ${rep.dataRows} rows` +
           [
-            rep.skippedNotTested ? `${rep.skippedNotTested} not "Tested Working"` : '',
+            rep.skippedNotTested ? `${rep.skippedNotTested} not tested working` : '',
             rep.skippedNoPrice ? `${rep.skippedNoPrice} no price` : '',
             rep.skippedNoId ? `${rep.skippedNoId} no item ID` : ''
           ].filter(Boolean).reduce((s, p, i) => s + (i === 0 ? ` — skipped ${p}` : `, ${p}`), '')
@@ -191,7 +191,7 @@ export default function AdminTools({ initialReservations }) {
           {syncing ? 'Syncing…' : 'Sync inventory from tracker'}
         </button>
         <span style={{ fontSize: 13.5, color: 'var(--muted)' }}>
-          Pulls every "Tested Working" unit from the master tracker into the live storefront (price, cost, serial),
+          Pulls every priced "Tested Working" unit (including ones still in cleaning or QA) from the master tracker into the live storefront (price, cost, serial),
           and removes anything no longer in stock. Needs <code>GOOGLE_CREDENTIALS</code> + <code>SHEET_ID</code>.
         </span>
         {syncMsg && <span style={{ fontSize: 13.5, fontWeight: 600, flexBasis: '100%' }}>{syncMsg}</span>}

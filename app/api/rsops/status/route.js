@@ -59,8 +59,11 @@ export async function POST(req) {
       const r = await markIntakeTested(sku, { condition });
       return NextResponse.json({ ok: true, sku, status, condition, live: r.live });
     }
-    // Every other status just keeps it off the site: the storefront sync only
-    // ever imports rows reading exactly "tested working".
+    // Every other status is written as it stands. "Tested Working - Needs
+    // Cleaning" and "- Needs QA" are sellable too (lib/csv.js SELLABLE_STATUSES)
+    // but only if the row already has a Condition, i.e. a price — they carry
+    // none from here, so they never race the price formulas the way publishing
+    // with a new condition does.
     await setTrackerStatus(sku, { status, condition, clearCondition: Boolean(body.clearCondition) });
     return NextResponse.json({ ok: true, sku, status, condition: condition || null, live: false });
   } catch (e) {
