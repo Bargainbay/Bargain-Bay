@@ -2741,6 +2741,17 @@ actions, confirmed", and a **native app with a wake word** as the hands-free doo
   between replies only while the page is on screen. The wake word is the native
   app's job. Replies play through Web Audio, unlocked inside the tap, because
   iOS refuses an `<audio>` started after a network round trip.
+- **The driver's version swears and takes the piss** (`BANTER` in engine.js,
+  owner's call 2026-09-17). A driver is alone in a van for hours, and a manager
+  that only recites addresses is one they stop talking to — which means they
+  stop marking stops and asking questions too. Two limits are in the prompt
+  because only the model can judge them in the moment: **never** at the expense
+  of a customer, a colleague, or anyone's race/religion/sex/sexuality/body, and
+  **the job is said straight** — an address, an amount, a safety step or a
+  read-back gets no joke in the same breath. It also goes quiet once they have
+  arrived: the reply is READ ALOUD with the customer three feet away. On by
+  default, per driver, off from their own phone (`assistant_prefs.banter`);
+  nobody else's prompt has it.
 - Conversations live in `assistant_threads` / `assistant_messages` (text only,
   last 24 turns sent back; a thread idle 4h starts fresh). Rate limit counts rows
   in Postgres, not memory.
