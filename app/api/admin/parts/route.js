@@ -1,22 +1,22 @@
 // Parts — the shelf, and everything that moves on or off it. See lib/parts.js.
 //
-// Staff-level, like the warehouse: finding a part for the machine on the bench
-// is the work, not a permission. Two things are ADMIN, both following the gate
-// rule in CLAUDE.md — what a part COST us, and answering a tech's request, which
-// is the owner's call by his own instruction.
+// ADMIN only (owner, 2026-09-16): this is the office's view of the shelf —
+// prices, answering a road tech's request, the history. The floor works in RS
+// Ops through /api/ops/parts. The cost stripping below is kept so that widening
+// this gate again can never quietly start sending cost to a non-admin.
 import { NextResponse } from 'next/server';
-import { getSession, isAdmin, isStaff } from '../../../../lib/auth';
+import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import {
   partsOverview, searchParts, getPart, addPart, receiveParts, usePart,
   partOutState, harvestPart, removeHarvested, finishPartOut,
-  requestPart, listRequests, decideRequest, pickRequest, cancelRequest
+  requestPart, listRequests, decideRequest, pickRequest, cancelRequest, priceParts
 } from '../../../../lib/parts';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-async function staff() { const s = await getSession(); return s && isStaff(s) ? s : null; }
+async function staff() { const s = await getSession(); return s && isAdmin(s) ? s : null; }
 const denied = () => NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 const who = (s) => ({ by: s.email || null, byName: s.name || s.email || null });
 
@@ -29,7 +29,7 @@ function fail(e) {
 // Cost is the one thing sales never see (CLAUDE.md gate rule), so it is stripped
 // on the way OUT rather than hidden in the browser — a hidden field is not a
 // permission.
-const stripCost = (part) => (part && { ...part, valueAtCost: undefined });
+const stripCost = (part) => (part && { ...part, valueAtCost: undefined, unpriced: undefined });
 
 export async function GET(req) {
   const s = await staff();
@@ -89,6 +89,9 @@ export async function POST(req) {
         return NextResponse.json({ ok: true, ...(await removeHarvested(body.moveId)) });
       case 'finish_part_out':
         return NextResponse.json({ ok: true, ...(await finishPartOut({ salvageSku: body.sku, ...who(s) })) });
+      case 'price':
+        if (!admin) return denied();
+        return NextResponse.json({ ok: true, ...(await priceParts({ partId: body.partId, cost: body.cost })) });
       case 'request':
         return NextResponse.json({ ok: true, ...(await requestPart({ ...body, ...who(s) })) });
       case 'decide':
