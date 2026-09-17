@@ -348,6 +348,29 @@ it, this one says who SENT it.
   width the table only scrolls its own Revenue and Share columns out of sight,
   and those are the numbers the panel exists to show.
 
+## An invoice's lot IS its order number (changed 2026-09-17)
+`lotForInvoice` in `lib/intake.js`, used by `addIntakeLines` (the purchase-invoice
+upload and the intake queue both land there). **The owner does not want a lot
+renamed.** It used to be a minted `IN-<clock>`, so SecondShop's S-ORD115612 went
+into the tracker as `IN-MU4H8DGQ`, RS Ops opened a second lot under that name for
+appliances it had already booked in as SS-117082, and both had to be untangled by
+hand.
+
+- **Lot cell = the number as typed. SKU prefix = the same number made safe**
+  (anything outside `[A-Za-z0-9._-]` becomes a dash — SKUs go into product URLs,
+  photo keys and stickers). A minted `IN-…` is only the fallback for no number.
+- **Numbering carries on** (`highestSkuNumber`). The 300-unit cap tells people to
+  split an invoice into two commits; restarting at `-001` would have given the
+  second half the first half's SKUs.
+- **`appendTrackerUnits` refuses a SKU already on Main.** Everything downstream
+  takes the FIRST matching row, so a duplicate is never an error anywhere — it is
+  just invisible. The whole commit is refused, so nothing is half-added.
+- RS Ops's manifest route reuses a lot that already exists by that id, so a
+  second commit against the same order lands in the same RS Ops lot.
+- **Not covered:** stock RS Ops booked in by hand first (its own `SS-<number>`
+  lot) still arrives as a second lot when the invoice is committed afterwards.
+  Nothing links the two automatically; that is a data fix, not a naming one.
+
 ## Vendor drop-offs — stock the sales floor lists itself (added 2026-09-10)
 Some vendors just leave appliances with us. **No invoice, a cost agreed out loud,
 and we pay them once the unit sells.** They arrive KNOWN WORKING, which is the
