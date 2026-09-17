@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { extractPurchaseInvoice } from '../../../../lib/purchase-intake';
 import { addIntakeLines, lotForInvoice } from '../../../../lib/intake';
-import { matchInvoiceLines, fillWaitingRows } from '../../../../lib/stock-reconcile';
+import { matchInvoiceLines, requestFills } from '../../../../lib/stock-reconcile';
 import { recordPurchaseInvoice } from '../../../../lib/finance';
 import { pushManifestToRsOps } from '../../../../lib/rsops-push';
 
@@ -52,21 +52,32 @@ export async function POST(req) {
     const items = Array.isArray(body.items) ? body.items : [];
     if (!items.length) return NextResponse.json({ error: 'No units to add.' }, { status: 400 });
     try {
-      // Rows already waiting for this invoice are filled first; only what's left
-      // over on each line is added as new units. `matches` = [{ line, skus }],
-      // exactly what the review screen was shown and left ticked.
+      // Units already waiting for this invoice are held back for admin approval;
+      // only what's left over on each line is added as new units. `matches` =
+      // [{ line, skus }], exactly what the review screen was shown and left ticked.
       const matches = (Array.isArray(body.matches) ? body.matches : [])
         .filter((m) => Number.isInteger(m?.line) && items[m.line] && Array.isArray(m.skus) && m.skus.length);
-      let filled = [], refused = [];
+      // Matched units are NOT written here: each becomes a request an admin
+      // approves on Stock gaps (requestFills). They still come off the line's
+      // quantity — they are the appliances this line bought, if approved, and a
+      // rejection adds the line as a new unit then.
+      let pending = [];
+      let pendingError = null;
       if (matches.length) {
-        const f = await fillWaitingRows(
-          matches.map((m) => ({ line: items[m.line], skus: m.skus })),
-          { vendor: body.vendor || null, invoice: body.invoice || null, lot: lotForInvoice(body.invoice).lot }
-        );
-        filled = f.filled; refused = f.refused;
+        try {
+          const session = await getSession();
+          const r = await requestFills(
+            matches.map((m) => ({ line: items[m.line], skus: m.skus })),
+            { vendor: body.vendor || null, invoice: body.invoice || null, lot: lotForInvoice(body.invoice).lot, by: session?.email }
+          );
+          pending = r.requested;
+        } catch (e) {
+          // No approval queue means no way to hold the match — add every line as new instead.
+          pendingError = e?.message || 'Could not file the approval requests.';
+        }
       }
       const filledPerLine = new Map();
-      for (const m of matches) filledPerLine.set(m.line, m.skus.filter((s) => filled.includes(s)).length);
+      if (!pendingError) for (const m of matches) filledPerLine.set(m.line, m.skus.filter((s) => pending.includes(s)).length);
       const remaining = items
         .map((it, i) => ({ ...it, qty: Math.max(1, Math.round(Number(it.qty) || 1)) - (filledPerLine.get(i) || 0) }))
         .filter((it) => it.qty > 0);
@@ -76,7 +87,7 @@ export async function POST(req) {
       const added = remaining.length
         ? await addIntakeLines(remaining, { vendor: body.vendor || null, invoice: body.invoice || null })
         : { created: [], count: 0, lot: null, units: [] };
-      const r = { ...added, count: added.count + filled.length };
+      const r = { ...added, count: added.count };
 
       // The tax half. Recorded AFTER the units are safely in the tracker and
       // never allowed to fail the intake: getting the stock on the books is the
@@ -101,7 +112,7 @@ export async function POST(req) {
       // invoice bought before the truck arrives. Like the tax record: written
       // AFTER the units are safely in the tracker, and never allowed to fail the
       // intake — RS Ops being unreachable is not a reason to lose the stock.
-      // Only the NEW units: the filled ones are appliances RS Ops already has.
+      // Only the NEW units: the matched ones are appliances RS Ops already has.
       const manifest = r.units?.length
         ? await pushManifestToRsOps({
           lot: r.lot, vendor: body.vendor || null, invoice: body.invoice || null,
@@ -110,7 +121,7 @@ export async function POST(req) {
         : { ok: true, createdCount: 0, lot: null };
 
       return NextResponse.json({
-        ok: true, addedSkus: r.created, filledSkus: filled, refused, count: r.count, failed: [], tax, taxUpdated, taxError,
+        ok: true, addedSkus: r.created, pendingSkus: pending, pendingError, count: r.count, failed: [], tax, taxUpdated, taxError,
         rsops: manifest.ok
           ? { seeded: manifest.createdCount ?? 0, lot: manifest.lot }
           : { seeded: 0, error: manifest.error || manifest.skipped || null }

@@ -52,6 +52,33 @@ export default function InventoryGaps() {
     load();
   }
 
+  async function decide(action, ids, label) {
+    const key = `${action}:${ids.join(',')}`;
+    if (armed !== key) { setArmed(key); return; }
+    const d = await post({ action, ids }, key);
+    if (!d) return;
+    if (action === 'approve_fills') {
+      setMsg(`${label}: ${d.approved.length} approved — cost and invoice are on the tracker.`
+        + (d.refused.length ? ` Not filled: ${d.refused.map((r) => `${r.sku} (${r.reason})`).join('; ')}.` : ''));
+    } else {
+      setMsg(`${label}: ${d.rejected.length} rejected — the booked-in unit is left waiting for its own invoice`
+        + (d.added?.length ? `, and the invoice line was added as ${d.added.join(', ')}.` : '.')
+        + (d.addErrors?.length ? ` Couldn't add the line: ${d.addErrors.join('; ')}.` : ''));
+    }
+    load();
+  }
+
+  // Requests grouped by the invoice they came from — an admin reads one delivery at a time.
+  const fillGroups = (() => {
+    const m = new Map();
+    for (const r of data?.fillRequests || []) {
+      const k = `${r.invoice || '(no invoice number)'} · ${r.vendor || 'no vendor'}`;
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(r);
+    }
+    return [...m.entries()];
+  })();
+
   async function checkRsOps() {
     const d = await post({ action: 'check_rsops' }, 'rsops');
     if (!d) return;
@@ -79,14 +106,71 @@ export default function InventoryGaps() {
 
       {data && (
         <>
+          {data.canApprove && (
+            <>
+              <h2 style={{ fontSize: 17, margin: '20px 0 4px' }}>
+                Waiting for your approval {data.fillRequests?.length ? `(${data.fillRequests.length})` : ''}
+              </h2>
+              {!data.fillRequests?.length ? <p className="hint">Nothing to approve.</p> : (
+                <>
+                  <p className="hint" style={{ marginTop: 0 }}>
+                    A purchase invoice was uploaded for units RS Ops had already booked in. Approving puts the invoice&apos;s
+                    cost, retail and number on that unit. <b>Reject</b> if it isn&apos;t the same appliance — the unit keeps waiting
+                    for its own invoice, and the invoice line is added as a new unit. Tap twice to confirm.
+                  </p>
+                  {fillGroups.map(([label, reqs]) => (
+                    <div key={label} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                        <b>{label}</b>
+                        <span style={{ display: 'flex', gap: 6 }}>
+                          {reqs.length > 1 && (
+                            <button className={'btn' + (armed === `approve_fills:${reqs.map((r) => r.id).join(',')}` ? ' accent' : '')} disabled={!!busy}
+                              onClick={() => decide('approve_fills', reqs.map((r) => r.id), label)}>
+                              {armed === `approve_fills:${reqs.map((r) => r.id).join(',')}` ? `Approve all ${reqs.length}?` : `Approve all ${reqs.length}`}
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      <div className="hint" style={{ margin: '2px 0 8px' }}>
+                        sent by {reqs[0].requestedBy || 'unknown'} · {new Date(reqs[0].requestedAt).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' })}
+                      </div>
+                      <div className="table-wrap"><table className="admin">
+                        <thead><tr><th style={th}>Booked-in unit</th><th style={th}>Invoice line</th><th style={{ ...th, textAlign: 'right' }}>Cost</th><th style={{ ...th, textAlign: 'right' }}>Retail</th><th style={th}></th></tr></thead>
+                        <tbody>
+                          {reqs.map((r) => {
+                            const ak = `approve_fills:${r.id}`, rk = `reject_fills:${r.id}`;
+                            return (
+                              <tr key={r.id}>
+                                <td><span style={{ fontFamily: 'monospace' }}>{r.sku}</span></td>
+                                <td>{[r.line.make, r.line.model].filter(Boolean).join(' ')}{r.line.description ? <div className="hint" style={{ margin: 0 }}>{r.line.description}</div> : null}</td>
+                                <td style={{ textAlign: 'right' }}>{r.line.cost !== '' && r.line.cost != null ? money(Number(r.line.cost)) : '—'}</td>
+                                <td style={{ textAlign: 'right' }}>{r.line.retail !== '' && r.line.retail != null ? money(Number(r.line.retail)) : '—'}</td>
+                                <td style={{ whiteSpace: 'nowrap' }}>
+                                  <button className={'btn' + (armed === ak ? ' accent' : '')} disabled={!!busy} style={{ fontSize: 12.5 }}
+                                    onClick={() => decide('approve_fills', [r.id], r.sku)}>{armed === ak ? 'Approve?' : 'Approve'}</button>{' '}
+                                  <button className={'btn' + (armed === rk ? ' accent' : '')} disabled={!!busy} style={{ fontSize: 12.5 }}
+                                    onClick={() => decide('reject_fills', [r.id], r.sku)}>{armed === rk ? 'Reject?' : 'Reject'}</button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table></div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+
           <h2 style={{ fontSize: 17, margin: '20px 0 4px' }}>
             Waiting for a purchase invoice {data.waitingCount ? `(${data.waitingCount})` : ''}
           </h2>
           {data.waiting.length === 0 ? <p className="hint">Nothing — every unit on the tracker has its invoice.</p> : (
             <>
               <p className="hint" style={{ marginTop: 0 }}>
-                These are on the tracker with <b>no cost</b>. Upload each lot&apos;s purchase invoice on the{' '}
-                <a href="/admin/intake">Intake</a> tab — its lines fill these rows in instead of adding the appliances again.
+                These are on the tracker with <b>no cost</b>. Upload each lot&apos;s purchase invoice (Operations → purchase invoice)
+                — its matching lines come to an admin for approval here, instead of adding the appliances again.
               </p>
               <div className="table-wrap"><table className="admin">
                 <thead><tr><th style={th}>Lot</th><th style={th}>Waiting since</th><th style={th}>Units</th></tr></thead>

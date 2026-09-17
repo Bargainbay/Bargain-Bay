@@ -399,11 +399,25 @@ still in cleaning or repair — most of them — could only be typed.
   is in its Invoice cell, the model matches, it is unsold, RS Ops doesn't already
   use that SKU, and **no invoice line or reservation points at it** (`skusInUse`
   fails CLOSED). The old SKU is written into Tested Notes.
-- **The purchase invoice arriving later FILLS those rows** (`matchInvoiceLines` /
-  `fillWaitingRows`): cost, retail, vendor, invoice number, and Lot = the order
-  number. Only what's left over on a line is added as new units, and only those go
-  to RS Ops as a manifest. The upload screen shows the matches with a tick per
-  line; the email queue applies them. **A row whose lot is named after a
+- **The purchase invoice arriving later fills those rows — ONLY ONCE AN ADMIN
+  APPROVES** (owner, 2026-09-17). Committing (upload screen or email queue) does
+  not write matched rows: `requestFills` files one `stock_fill_requests` row per
+  unit carrying the whole invoice line, and they come off the line's quantity;
+  only the unmatched remainder is added as new units and sent to RS Ops. An admin
+  answers on Stock gaps:
+  - **approve** → `approveFillRequests` → `fillWaitingRows` writes cost, retail,
+    vendor, invoice number and Lot = order number, re-checking each row against a
+    fresh read. A row that stopped waiting or changed model is marked `refused`
+    with the reason, never overwritten.
+  - **reject** → the unit stays NEEDS INVOICE untouched, and the invoice LINE is
+    added as a new unit (plus manifest) — commit held it back on the match, so
+    rejecting must not lose the appliance the invoice paid for.
+  - One open request per SKU (partial unique index); filing again replaces it.
+    A unit with an open request is not offered to another upload
+    (`pendingFillSkus`). The requests carry COST, so they are listed and answered
+    by admins only — stripped server-side for staff on `/api/admin/inventory-gaps`.
+  - If the approval table can't be written, commit adds every line as new and
+    says so on screen, rather than holding appliances nowhere. **A row whose lot is named after a
   DIFFERENT invoice is never offered** (`pointsElsewhere`) — RS Ops typing
   MRU217BST for MRU21C7BST put another delivery's fridge at the top of the list.
 - **Model matching tolerates exactly three things** (`modelsMatch`): case and
@@ -425,8 +439,8 @@ still in cleaning or repair — most of them — could only be typed.
   ONLY — quote conversion, salvage, dispatch billing and Sarah keep their own
   paths. On an edit, lines already on the invoice (matched by description) pass,
   so old typed sales stay correctable; the editor marks them `legacy`.
-- **The daily email** goes to `SERVICE_EMAIL` only when something is waiting or
-  unlinked, or the RS Ops call failed. "Check RS Ops now" on Stock gaps runs the
+- **The daily email** goes to `SERVICE_EMAIL` only when something is waiting,
+  unlinked or awaiting approval, or the RS Ops call failed. "Check RS Ops now" on Stock gaps runs the
   same pass without the email.
 
 ## Vendor drop-offs — stock the sales floor lists itself (added 2026-09-10)

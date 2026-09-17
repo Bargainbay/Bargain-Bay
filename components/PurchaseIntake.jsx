@@ -152,10 +152,10 @@ export default function PurchaseIntake() {
         <div className="notice-box" style={{ marginTop: 10 }}>
           ✓ <b>{done.count}</b> unit{done.count === 1 ? '' : 's'} on the tracker from this invoice
           {done.addedSkus?.length ? <> — {done.addedSkus.length} added ({done.addedSkus.join(', ')})</> : ''}
-          {done.filledSkus?.length ? <> — {done.filledSkus.length} already booked in at RS Ops, now costed ({done.filledSkus.join(', ')})</> : ''}.
-          {done.refused?.length > 0 && (
+          {done.pendingSkus?.length ? <> — {done.pendingSkus.length} already booked in at RS Ops ({done.pendingSkus.join(', ')}), <b>waiting for admin approval</b> on <a href="/admin/inventory-gaps">Stock gaps</a> before their cost goes on the tracker</> : ''}.
+          {done.pendingError && (
             <div style={{ color: 'var(--danger)', marginTop: 6 }}>
-              Not filled: {done.refused.map((r) => `${r.sku} ${r.reason}`).join('; ')}.
+              Couldn&apos;t send the matches for approval ({done.pendingError}) — every line was added as new instead. Check Stock gaps for doubles.
             </div>
           )}
           They&apos;re held off the storefront until confirmed tested-working.
@@ -199,8 +199,9 @@ export default function PurchaseIntake() {
           {matchedCount > 0 && (
             <div className="notice-box" style={{ marginBottom: 10 }}>
               {matchedCount} unit{matchedCount === 1 ? ' on this invoice is' : 's on this invoice are'} already on the tracker —
-              RS Ops booked {matchedCount === 1 ? 'it' : 'them'} in before the invoice was uploaded. Committing fills in their
-              cost, retail and this invoice number instead of adding them a second time. Untick a line if the match is wrong.
+              RS Ops booked {matchedCount === 1 ? 'it' : 'them'} in before the invoice was uploaded. Committing sends each match to
+              an <b>admin for approval</b> on Stock gaps; its cost, retail and this invoice number go on the tracker only once approved,
+              and a rejected match is added as a new unit instead. Untick a line if the match is plainly wrong.
             </div>
           )}
           <div className="table-wrap"><table className="admin">
@@ -226,7 +227,7 @@ export default function PurchaseIntake() {
                         <input type="checkbox" style={{ width: 'auto', marginTop: 2 }} checked={!!useMatch[i]}
                           onChange={(e) => setUseMatch((m) => ({ ...m, [i]: e.target.checked }))} />
                         <span>
-                          {useMatch[i] ? 'Fill in' : 'Ignore'} {matches[i].map((u) => u.sku).join(', ')}
+                          {useMatch[i] ? 'Send for approval:' : 'Ignore'} {matches[i].map((u) => u.sku).join(', ')}
                           <span style={{ display: 'block', color: 'var(--muted)' }}>
                             booked in {matches[i][0].dateReceived || '—'}, no invoice yet
                           </span>
@@ -243,7 +244,7 @@ export default function PurchaseIntake() {
             <button className="btn accent" disabled={busy === 'commit' || !items.length} onClick={commit}>
               {busy === 'commit' ? 'Adding…'
                 : matchedCount
-                  ? `Fill in ${matchedCount} booked-in unit${matchedCount === 1 ? '' : 's'}${unitCount - matchedCount > 0 ? `, add ${unitCount - matchedCount} new` : ''}`
+                  ? `Send ${matchedCount} match${matchedCount === 1 ? '' : 'es'} for approval${unitCount - matchedCount > 0 ? `, add ${unitCount - matchedCount} new` : ''}`
                   : `Add ${unitCount} unit${unitCount === 1 ? '' : 's'} to tracker`}
             </button>
             <button className="btn" disabled={!!busy} onClick={() => findMatches(items, head.invoice)}
