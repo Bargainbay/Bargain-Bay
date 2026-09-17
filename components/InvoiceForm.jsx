@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef } from 'react';
 import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
-import InvoiceLines, { blankItem, toPayload } from './InvoiceLines';
+import InvoiceLines, { blankItem, toPayload, stockLineProblem } from './InvoiceLines';
 import TaxMode, { previewTotals } from './TaxMode';
 import LeadSource, { whatsWrongWithLead } from './LeadSource';
 
@@ -94,9 +94,10 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
   }
   function pickInventory(u) {
     // Keep the SKU on the line so the server can delist the unit when paid.
-    const filled = { description: u.description, amount: String(u.price), sku: u.id, kind: 'unit', warrantyMonths: 12 };
+    // A unit still in cleaning or repair has no list price yet — the rep types what it sold for.
+    const filled = { description: u.description, amount: u.price > 0 ? String(u.price) : '', sku: u.id, kind: 'unit', warrantyMonths: 12 };
     setItems((xs) => {
-      const empty = xs.findIndex((it) => !it.description && !it.amount);
+      const empty = xs.findIndex((it) => !it.description && !it.amount && !it.q);
       return empty >= 0 ? xs.map((it, j) => (j === empty ? filled : it)) : [...xs, filled];
     });
     setQ('');
@@ -133,6 +134,8 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
         ? `“${String(named.description).trim()}” has no price on it. Every invoice needs at least one line with a description AND an amount.`
         : 'Add at least one line item with a description and a positive amount.';
     }
+    const stockWrong = stockLineProblem(items);
+    if (stockWrong) return stockWrong;
     if (deliveryMethod === 'delivery') {
       const missing = [!address.trim() && 'street address', !city.trim() && 'city', !postal.trim() && 'postal code'].filter(Boolean);
       if (missing.length) return `Delivery needs a ${missing.join(', a ')}. Type it in if the address lookup didn’t fill it.`;
@@ -228,24 +231,24 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
 
       {inventory.length > 0 && (
         <div className="field">
-          <label>Add from inventory</label>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your stock by model, name, or SKU…" />
+          <label>Add from stock</label>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search everything we hold — model, name, SKU, serial…" />
           {matches.length > 0 && (
             <div style={{ border: '1px solid var(--line)', borderRadius: 8, marginTop: 4, maxHeight: 230, overflowY: 'auto' }}>
               {matches.map((u) => (
                 <button type="button" key={u.id} onClick={() => pickInventory(u)}
                   style={{ display: 'flex', justifyContent: 'space-between', gap: 12, width: '100%', textAlign: 'left', padding: '8px 11px', background: 'none', border: 'none', borderBottom: '1px solid var(--line-soft)', cursor: 'pointer', fontSize: 13.5, color: 'var(--ink)' }}>
-                  <span>{u.description}</span>
-                  <span style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontWeight: 600 }}>${u.price.toFixed(2)}</span>
+                  <span>{u.description}{u.status && <span style={{ display: 'block', fontSize: 12, color: 'var(--muted)' }}>{u.status}</span>}</span>
+                  <span style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontWeight: 600 }}>{u.price > 0 ? `$${u.price.toFixed(2)}` : 'no list price'}</span>
                 </button>
               ))}
             </div>
           )}
-          <div className="hint">Picking a unit fills a line below with its name, SKU, and price — you can still edit the amount.</div>
+          <div className="hint">Everything on the tracker that isn&apos;t sold — including units still in cleaning or repair. Picking one fills a line with its name, SKU and price (if it has one); you can change the amount.</div>
         </div>
       )}
 
-      <InvoiceLines items={items} setItems={setItems} services={SERVICES} showCost={!hideCost} />
+      <InvoiceLines items={items} setItems={setItems} services={SERVICES} showCost={!hideCost} stock={inventory} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
         <TaxMode mode={taxMode} onChange={changeTaxMode} />

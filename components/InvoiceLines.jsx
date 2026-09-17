@@ -1,6 +1,6 @@
 'use client';
 import { isCreditLine, isUnitLine } from '../lib/constants';
-import { blankItem, serviceItem, creditItem, subtotalOf, goodsOf, toPayload, fromInvoice } from '../lib/invoice-lines';
+import { blankItem, serviceItem, creditItem, subtotalOf, goodsOf, toPayload, fromInvoice, stockLineProblem } from '../lib/invoice-lines';
 
 // The line-item editor shared by the invoice FORM (new) and the invoice EDITOR
 // (existing). It was copy-pasted between the two, which is how they drifted —
@@ -14,8 +14,24 @@ const PLACEHOLDER = {
   trade_in: 'Their old unit — make, model, condition'
 };
 
-export default function InvoiceLines({ items, setItems, showCost = false, services = [] }) {
+// Every query word must appear somewhere in the unit's text, so "kitchenaid
+// dishwasher" matches with the brand and the type far apart in the string.
+function searchStock(stock, q, exclude) {
+  const tokens = String(q || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!tokens.length || String(q).trim().length < 2) return [];
+  return stock.filter((u) => !exclude.has(u.id) && tokens.every((t) => u.search.includes(t))).slice(0, 8);
+}
+
+export default function InvoiceLines({ items, setItems, showCost = false, services = [], stock = [] }) {
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
+  const patchItem = (i, patch) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, ...patch } : it)));
+  // A unit already on another line can't be picked twice.
+  const onLines = new Set(items.map((it) => it.sku).filter(Boolean));
+  const pick = (i, u) => patchItem(i, {
+    sku: u.id, description: u.description, q: '', offStock: false, offStockReason: null,
+    // Keep a price the rep already typed; otherwise take the list price when there is one.
+    amount: String(items[i]?.amount || '') || (u.price > 0 ? String(u.price) : '')
+  });
   const addRow = () => setItems((xs) => [...xs, blankItem()]);
   const removeRow = (i) => setItems((xs) => (xs.length > 1 ? xs.filter((_, j) => j !== i) : xs));
 
@@ -39,11 +55,21 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
     <>
       <label style={{ fontSize: 13, fontWeight: 500, display: 'block', margin: '4px 0 6px' }}>Line items</label>
       {items.map((it, i) => (
-        <div key={i} className="inv-line">
-          <input className="inv-desc" value={it.description}
-            onChange={(e) => setItem(i, 'description', e.target.value)}
-            autoComplete="off" autoCorrect="off" autoCapitalize="sentences" spellCheck={false}
-            placeholder={PLACEHOLDER[it.kind] || PLACEHOLDER.unit} />
+        <div key={i} style={{ marginBottom: 2 }}>
+        <div className="inv-line">
+          {isUnitLine(it.kind) && !it.sku && !it.legacy && !it.offStock ? (
+            // An appliance is PICKED, never typed: the line gets its SKU from here, which
+            // is what lets the sale mark the unit sold. See lib/stock-reconcile.js.
+            <input className="inv-desc" value={it.q || ''}
+              onChange={(e) => setItem(i, 'q', e.target.value)}
+              autoComplete="off" autoCorrect="off" spellCheck={false}
+              placeholder="Find the appliance in stock — model, brand, SKU or serial…" />
+          ) : (
+            <input className="inv-desc" value={it.description}
+              onChange={(e) => setItem(i, 'description', e.target.value)}
+              autoComplete="off" autoCorrect="off" autoCapitalize="sentences" spellCheck={false}
+              placeholder={PLACEHOLDER[it.kind] || PLACEHOLDER.unit} />
+          )}
           {isUnitLine(it.kind) ? (
             <select className="inv-warr" value={it.warrantyMonths == null ? '' : it.warrantyMonths}
               onChange={(e) => setItem(i, 'warrantyMonths', e.target.value === '' ? null : Number(e.target.value))}
@@ -67,6 +93,52 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
             placeholder={isCreditLine(it.kind) ? 'amount off' : 'price'}
             aria-label={isCreditLine(it.kind) ? 'Amount to take off' : 'Price'} />
           <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
+        </div>
+
+        {isUnitLine(it.kind) && it.sku && (
+          <div className="hint" style={{ margin: '-4px 0 8px' }}>
+            From stock: <b style={{ fontFamily: 'monospace' }}>{it.sku}</b>
+            {!it.id && <> · <button type="button" className="linkish" style={{ background: 'none', border: 0, padding: 0, color: 'var(--link, #0a58ca)', cursor: 'pointer', fontSize: 'inherit' }}
+              onClick={() => patchItem(i, { sku: null, description: '', q: '' })}>pick a different unit</button></>}
+          </div>
+        )}
+        {isUnitLine(it.kind) && it.legacy && (
+          <div className="hint" style={{ margin: '-4px 0 8px' }}>
+            Typed before appliances were picked from stock — tie it to its unit on <a href="/admin/inventory-gaps">Stock gaps</a>.
+          </div>
+        )}
+        {isUnitLine(it.kind) && !it.sku && !it.legacy && !it.offStock && (
+          <div style={{ margin: '-4px 0 8px' }}>
+            {searchStock(stock, it.q, onLines).map((u) => (
+              <button type="button" key={u.id} onClick={() => pick(i, u)}
+                style={{ display: 'flex', justifyContent: 'space-between', gap: 12, width: '100%', textAlign: 'left', padding: '7px 10px', background: 'var(--card, #fff)', border: '1px solid var(--line)', borderTop: 0, cursor: 'pointer', fontSize: 13.5, color: 'var(--ink)' }}>
+                <span>{u.description}<span style={{ display: 'block', fontSize: 12, color: 'var(--muted)' }}>{u.status}</span></span>
+                <span style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontWeight: 600 }}>{u.price > 0 ? `$${u.price.toFixed(2)}` : 'no list price'}</span>
+              </button>
+            ))}
+            {String(it.q || '').trim().length >= 2 && !searchStock(stock, it.q, onLines).length && (
+              <div className="hint" style={{ margin: '4px 0' }}>Nothing in stock matches “{it.q}”. If it&apos;s on the tracker under another spelling, try the SKU or serial.</div>
+            )}
+            <button type="button" style={{ background: 'none', border: 0, padding: 0, marginTop: 4, color: 'var(--muted)', cursor: 'pointer', fontSize: 12.5, textDecoration: 'underline' }}
+              onClick={() => patchItem(i, { offStock: true, description: it.q || '', q: '' })}>
+              Not from our stock?
+            </button>
+          </div>
+        )}
+        {isUnitLine(it.kind) && !it.sku && !it.legacy && it.offStock && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '-4px 0 8px' }}>
+            <input style={{ flex: '1 1 260px' }} value={it.offStockReason || ''}
+              onChange={(e) => setItem(i, 'offStockReason', e.target.value)}
+              placeholder="Why isn't this from our stock? e.g. special order from supplier" />
+            <button type="button" className="btn" style={{ fontSize: 12.5 }}
+              onClick={() => patchItem(i, { offStock: false, offStockReason: null, q: it.description, description: '' })}>
+              Pick from stock instead
+            </button>
+            <span className="hint" style={{ margin: 0, flexBasis: '100%' }}>
+              It will be listed on Stock gaps every day until it is tied to a unit — nothing on the tracker is marked sold by it.
+            </span>
+          </div>
+        )}
         </div>
       ))}
 
@@ -100,4 +172,4 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
   );
 }
 
-export { blankItem, serviceItem, creditItem, subtotalOf, goodsOf, toPayload, fromInvoice };
+export { blankItem, serviceItem, creditItem, subtotalOf, goodsOf, toPayload, fromInvoice, stockLineProblem };

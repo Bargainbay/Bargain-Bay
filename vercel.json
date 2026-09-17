@@ -27,6 +27,10 @@
     {
       "path": "/api/cron/cda",
       "schedule": "5 */3 * * *"
+    },
+    {
+      "path": "/api/cron/inventory-gaps",
+      "schedule": "0 12 * * *"
     }
   ]
 }

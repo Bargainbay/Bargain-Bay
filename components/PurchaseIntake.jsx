@@ -49,6 +49,30 @@ export default function PurchaseIntake() {
   const [head, setHead] = useState({ vendor: '', invoice: '', date: '', subtotal: '', tax: '', total: '' });
   const [items, setItems] = useState(null);
   const [done, setDone] = useState(null);
+  // Units RS Ops booked in before this invoice arrived, per line: { [line]: units[] }.
+  // Ticked lines FILL those tracker rows instead of adding the appliances again.
+  const [matches, setMatches] = useState({});
+  const [useMatch, setUseMatch] = useState({});
+  const [matchNote, setMatchNote] = useState('');
+
+  async function findMatches(list, invoice) {
+    setMatchNote('');
+    try {
+      const res = await fetch('/api/admin/purchase-intake', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'match', items: list, invoice })
+      });
+      const d = await res.json();
+      const byLine = {};
+      for (const m of d.matches || []) byLine[m.line] = m.units;
+      setMatches(byLine);
+      setUseMatch(Object.fromEntries(Object.keys(byLine).map((k) => [k, true])));
+      if (d.error) setMatchNote(`Couldn't check for units already booked in (${d.error}) — committing will add every line as new.`);
+    } catch {
+      setMatches({}); setUseMatch({});
+      setMatchNote("Couldn't check for units already booked in — committing will add every line as new.");
+    }
+  }
 
   async function onFile(e) {
     const file = e.target.files?.[0];
@@ -66,7 +90,9 @@ export default function PurchaseIntake() {
         vendor: d.vendor || '', invoice: d.invoiceNumber || '', date: d.date || today(),
         subtotal: d.subtotal ?? '', tax: d.tax ?? '', total: d.total ?? ''
       });
-      setItems((d.items || []).map((it) => ({ ...it, retail: it.retail ?? '', cost: it.cost ?? '' })));
+      const read = (d.items || []).map((it) => ({ ...it, retail: it.retail ?? '', cost: it.cost ?? '' }));
+      setItems(read);
+      if (read.length) findMatches(read, d.invoiceNumber || '');
       if (d.truncated) setWarn(`That invoice was too long to read in one pass — only the first ${d.items?.length || 0} items were read. Check the list against the invoice and upload the remaining pages separately.`);
       if (!d.items?.length) setErr('No product line items found — try a clearer scan.');
     } catch {
@@ -77,7 +103,15 @@ export default function PurchaseIntake() {
   }
 
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
-  const removeItem = (i) => setItems((xs) => xs.filter((_, j) => j !== i));
+  // Removing a line renumbers everything after it, so the matches are asked again
+  // rather than left pointing at the wrong rows.
+  const removeItem = (i) => {
+    const next = items.filter((_, j) => j !== i);
+    setItems(next);
+    findMatches(next, head.invoice);
+  };
+  const matchedCount = Object.entries(matches).reduce((a, [k, u]) => a + (useMatch[k] ? u.length : 0), 0);
+  const unitCount = (items || []).reduce((a, it) => a + Math.max(1, Math.round(Number(it.qty) || 1)), 0);
 
   async function commit() {
     setBusy('commit'); setErr('');
@@ -86,12 +120,13 @@ export default function PurchaseIntake() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'commit', vendor: head.vendor, invoice: head.invoice, items,
+          matches: Object.entries(matches).filter(([k]) => useMatch[k]).map(([k, u]) => ({ line: Number(k), skus: u.map((x) => x.sku) })),
           date: head.date, subtotal: head.subtotal, tax: head.tax, total: head.total
         })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not add to tracker.'); return; }
-      setDone(d); setItems(null);
+      setDone(d); setItems(null); setMatches({}); setUseMatch({});
     } catch {
       setErr('Network error.');
     } finally {
@@ -115,7 +150,14 @@ export default function PurchaseIntake() {
       {warn && <div className="notice-box" style={{ marginTop: 10 }}>⚠ {warn}</div>}
       {done && (
         <div className="notice-box" style={{ marginTop: 10 }}>
-          ✓ Added <b>{done.count}</b> unit{done.count === 1 ? '' : 's'} to the tracker{done.addedSkus?.length ? ` (${done.addedSkus.join(', ')})` : ''}.
+          ✓ <b>{done.count}</b> unit{done.count === 1 ? '' : 's'} on the tracker from this invoice
+          {done.addedSkus?.length ? <> — {done.addedSkus.length} added ({done.addedSkus.join(', ')})</> : ''}
+          {done.filledSkus?.length ? <> — {done.filledSkus.length} already booked in at RS Ops, now costed ({done.filledSkus.join(', ')})</> : ''}.
+          {done.refused?.length > 0 && (
+            <div style={{ color: 'var(--danger)', marginTop: 6 }}>
+              Not filled: {done.refused.map((r) => `${r.sku} ${r.reason}`).join('; ')}.
+            </div>
+          )}
           They&apos;re held off the storefront until confirmed tested-working.
           {done.addedSkus?.length > 0 && (
             <> <a target="_blank" rel="noopener noreferrer" style={{ fontWeight: 700 }}
@@ -153,8 +195,16 @@ export default function PurchaseIntake() {
               <div style={{ fontSize: 12.5, color: 'var(--muted)', alignSelf: 'center' }}>{taxNote(head)}</div>
             </div>
           </div>
+          {matchNote && <div className="notice-box" style={{ marginBottom: 10 }}>⚠ {matchNote}</div>}
+          {matchedCount > 0 && (
+            <div className="notice-box" style={{ marginBottom: 10 }}>
+              {matchedCount} unit{matchedCount === 1 ? ' on this invoice is' : 's on this invoice are'} already on the tracker —
+              RS Ops booked {matchedCount === 1 ? 'it' : 'them'} in before the invoice was uploaded. Committing fills in their
+              cost, retail and this invoice number instead of adding them a second time. Untick a line if the match is wrong.
+            </div>
+          )}
           <div className="table-wrap"><table className="admin">
-            <thead><tr><th>Description</th><th>Make</th><th>Model</th><th>Serial</th><th>Category</th><th style={{ textAlign: 'right' }}>Retail</th><th style={{ textAlign: 'right' }}>Cost</th><th>Qty</th><th></th></tr></thead>
+            <thead><tr><th>Description</th><th>Make</th><th>Model</th><th>Serial</th><th>Category</th><th style={{ textAlign: 'right' }}>Retail</th><th style={{ textAlign: 'right' }}>Cost</th><th>Qty</th><th>Already at RS Ops</th><th></th></tr></thead>
             <tbody>
               {items.map((it, i) => (
                 <tr key={i}>
@@ -170,6 +220,20 @@ export default function PurchaseIntake() {
                   <td><input style={{ width: 80, textAlign: 'right' }} type="number" step="0.01" value={it.retail} onChange={(e) => setItem(i, 'retail', e.target.value)} /></td>
                   <td><input style={{ width: 80, textAlign: 'right' }} type="number" step="0.01" value={it.cost} onChange={(e) => setItem(i, 'cost', e.target.value)} placeholder="cost" /></td>
                   <td><input style={{ width: 48 }} type="number" min="1" value={it.qty} onChange={(e) => setItem(i, 'qty', e.target.value)} /></td>
+                  <td style={{ fontSize: 12, minWidth: 170 }}>
+                    {matches[i]?.length ? (
+                      <label style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontWeight: 400 }}>
+                        <input type="checkbox" style={{ width: 'auto', marginTop: 2 }} checked={!!useMatch[i]}
+                          onChange={(e) => setUseMatch((m) => ({ ...m, [i]: e.target.checked }))} />
+                        <span>
+                          {useMatch[i] ? 'Fill in' : 'Ignore'} {matches[i].map((u) => u.sku).join(', ')}
+                          <span style={{ display: 'block', color: 'var(--muted)' }}>
+                            booked in {matches[i][0].dateReceived || '—'}, no invoice yet
+                          </span>
+                        </span>
+                      </label>
+                    ) : <span style={{ color: 'var(--muted)' }}>—</span>}
+                  </td>
                   <td><button type="button" className="btn" style={{ padding: '0 10px' }} onClick={() => removeItem(i)}>×</button></td>
                 </tr>
               ))}
@@ -177,8 +241,13 @@ export default function PurchaseIntake() {
           </table></div>
           <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
             <button className="btn accent" disabled={busy === 'commit' || !items.length} onClick={commit}>
-              {busy === 'commit' ? 'Adding…' : `Add ${items.length} unit${items.length === 1 ? '' : 's'} to tracker`}
+              {busy === 'commit' ? 'Adding…'
+                : matchedCount
+                  ? `Fill in ${matchedCount} booked-in unit${matchedCount === 1 ? '' : 's'}${unitCount - matchedCount > 0 ? `, add ${unitCount - matchedCount} new` : ''}`
+                  : `Add ${unitCount} unit${unitCount === 1 ? '' : 's'} to tracker`}
             </button>
+            <button className="btn" disabled={!!busy} onClick={() => findMatches(items, head.invoice)}
+              title="Ask again after changing a model number">Re-check RS Ops units</button>
             <button className="btn" disabled={!!busy} onClick={() => { setItems(null); setErr(''); }}>Cancel</button>
           </div>
         </div>
