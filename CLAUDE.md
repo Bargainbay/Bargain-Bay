@@ -430,6 +430,41 @@ still in cleaning or repair — most of them — could only be typed.
   `markUnitsSold` (tracker Sold via the write-back) and an unpaid one holds the
   unit. **Nothing picks the unit automatically** — which of three identical
   dishwashers left is only known on the floor.
+- **One typed line can sell several appliances, and linking SPLITS it**
+  (added 2026-09-17). "2x Frigidaire … PRFS2883AFG/H" at $1,858.40 is one line
+  for two fridges, and a line carries ONE SKU — every reader downstream (payment,
+  refunds, the editor's stock diff, the order bridge, the packing slip, dispatch
+  cargo) assumes it. Linking one fridge used to take the line off the list with
+  the other still in stock. Stock gaps now takes ticks, and `linkSaleLine(itemId,
+  skus[])` turns the line into one line per unit, in one transaction:
+  - **The money adds back to the cent.** `splitAmount` (lib/stock-match.js, so
+    the screen previews the exact figures) divides in whole cents with the
+    leftover on the LAST line; `typed_amount` on a tax-in invoice and `cost` are
+    split the same way, independently. Subtotal, HST and total are not touched
+    and cannot move — which is why this is NOT an `updateInvoice` edit: nothing
+    is relisted or re-sold except the units being linked.
+  - **The bridged order line is split the same way** (found as before: same
+    order, no SKU, same title and price). If it has drifted and can't be found,
+    the invoice is still split and the screen says to check the order.
+  - **The line keeps its place.** Copies land at the end in id order, so every
+    line after it is re-inserted behind them (`moveLinesAfter`) — the invoice
+    still reads fridge, fridge, Delivery. That changes those lines' ids, which is
+    safe because nothing stores a line id (`updateInvoice` rewrites them all on
+    every save). Columns are read from `information_schema`, so a column added
+    later is copied rather than silently dropped.
+  - A leading "2x " comes off the split lines' description (each IS one
+    appliance); nothing else in the text changes. `quantityHint` shows "the line
+    says 2x / 6 sets" as a HINT only — it never caps the count, because a
+    washer/dryer "set" is two units and typed quantities are what's wrong here.
+  - Refused: a SKU picked twice, sold on the tracker, or on any live invoice —
+    re-checked under an advisory lock inside the transaction, so two screens
+    can't put one unit on two invoices. One unit still works exactly as before
+    (description untouched). Candidates per line went 8 → 24 for "6 sets".
+  - `modelTokens` reads `PRFS2883AFG/H` as BOTH `PRFS2883AFG` and
+    `PRFS2883AFH` (an ending of ≤3 characters after a slash replaces the same
+    number at the end of the model). It split on the slash and offered only the
+    first, so the owner's own example line could not find its AFH fridge. A
+    token still only counts when it matches a unit actually in stock.
 - **The invoice form: appliances are PICKED, not typed.** `stockForInvoicing` is
   everything on the tracker not Sold/salvage and not on a live invoice, priced
   from the catalogue when live. A unit line has a stock search instead of a text
