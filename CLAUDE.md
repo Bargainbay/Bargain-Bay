@@ -634,6 +634,33 @@ away at `readAvailable`.
 - The 60%-deactivation guard reports itself too: if it fired, the read was
   probably partial and the site is showing stale stock.
 
+### Units sell while they are still being cleaned (added 2026-09-17)
+`SELLABLE_STATUSES` in `lib/csv.js`: **"Tested Working", "Tested Working - Needs
+Cleaning" and "Tested Working - Needs QA"** all reach the storefront (owner,
+2026-09-17: stock that works shouldn't wait on a cloth). Everything else stays
+off — untested, not working, waiting for parts, sold, salvage.
+
+- **Still gated on a price.** A row in cleaning with no Condition has no price
+  and does not list. That is the normal state of an ungraded unit, so it is
+  counted as `skippedUngraded`, NOT `skippedNoPrice` — the warning that exists
+  for the 61-unit outage below must only ever count finished "Tested Working"
+  rows, or it becomes noise. On the day this shipped: 13 cleaning rows had a
+  Condition (all set on purpose), 35 did not.
+- **Know what you're publishing when you write a Condition.** Purchase-invoice
+  intake can carry a condition off the supplier's invoice; with this rule a unit
+  RS Ops then moves to cleaning is on sale from that moment, before QA. RS Ops
+  routes a unit to cleaning even when its assessment says "Partially working",
+  so a condition on such a row is a decision to sell it.
+- **Photos: stock first, then the real ones after QA.** Nothing new was needed.
+  `lib/rsops.js` reads RS Ops's `/api/storefront` feed, which only lists a unit
+  that is `listed` — set when QA/admin approve its sale photos AND the unit has
+  `publishIntent` (set by the admin decision for sellable decisions on our own
+  stock; "clean, order parts, fix" does NOT set it, so such a unit needs
+  "publish to website" ticked in RS Ops or its photos never arrive).
+- The sync message says how many listed units are still in cleaning or QA.
+- RS Ops's `lib/tracker.js` comment still says only bare "Tested Working"
+  publishes — that is now out of date on its side.
+
 ### The intake screen says when a model has no stock photo
 `GET /api/admin/model-photo?model=` (staff) → `modelImage()`, asked debounced as
 the rep types. A vendor drop-off is usually a model we have never carried, so it
