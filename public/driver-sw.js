@@ -12,7 +12,7 @@
 // activation. It is the one lever that reaches a driver's home screen: an
 // installed app that has been in a pocket since Tuesday is otherwise holding
 // whatever it last saw.
-const CACHE = 'bb-driver-v2';
+const CACHE = 'bb-driver-v3';
 const SHELL = '/driver';
 
 self.addEventListener('install', (e) => {
