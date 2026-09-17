@@ -1,4 +1,5 @@
-import { getAvailable, newestArrivals } from '../lib/inventory';
+import { getAvailable } from '../lib/inventory';
+import { newestModels } from '../lib/group-units';
 import { getSession } from '../lib/auth';
 import { decorate } from '../lib/pricing';
 import { COLLECTIONS, collectionFilter, money } from '../lib/constants';
@@ -37,7 +38,8 @@ function tileImage(slug, units) {
 export default async function Home() {
   const session = await getSession();
   const units = await decorate(await getAvailable(), session);
-  const newest = newestArrivals(units, 12);
+  // One card per model — four of the same fridge are one listing, not four tiles.
+  const newest = newestModels(units, 12);
   const clearance = units.filter((u) => u.onClearance);
   const tileImages = Object.fromEntries(COLLECTIONS.map((c) => [c.slug, tileImage(c.slug, units)]));
   const topClearanceOff = clearance.reduce(
@@ -103,7 +105,7 @@ export default async function Home() {
         <a href="/shop">View all →</a>
       </div>
       <div className="grid">
-        {newest.map((u) => <ProductCard key={u.id} unit={u} />)}
+        {newest.map((g) => <ProductCard key={g.rep.id} unit={g.rep} count={g.count} />)}
       </div>
 
       <div className="panel" style={{ marginTop: 32 }}>
