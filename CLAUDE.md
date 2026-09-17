@@ -2420,6 +2420,20 @@ the floor is 4 vertical lanes in two back-to-back pairs (`V1`–`V4`), the back 
 multiples. Admins add and retire spots on the Spots tab; after the first boot the
 table IS the layout — do not "fix" it by editing `defaultLayout()`.
 
+- **Areas are a table too** (`warehouse_areas`, added 2026-09-16 for a new parts
+  area). They were the `AREAS` constant, which meant a new part of the building
+  needed a deploy — and every screen that grouped spots by `AREAS` silently HID a
+  spot in any area it didn't list. `AREAS` now only seeds an empty table and is the
+  browser's fallback until the list loads. **Anything that groups spots by area
+  must take the list from the server and give an unknown area its own heading**
+  (`groupAreas` in `components/Warehouse.jsx`, and RS Ops' pickers do the same).
+  A holding area is no longer forced into `zone`: it goes in the area it is given,
+  so a named spot can live inside the parts room.
+- **RS Ops admins set up the map** from RS Ops Admin → Locations (owner,
+  2026-09-16), through `/api/ops/warehouse` actions `add_area` / `add_spots` /
+  `set_active`. The key can't know who is admin, so **the admin check is RS Ops'**
+  (its `/api/locations`). Same functions and rules as the Spots tab here —
+  including refusing to retire a spot that still has something recorded in it.
 - **A unit's location is its LATEST move, never a stored field.** "Where was it
   Tuesday" and "who moved it" are the questions asked the day it can't be found.
 - **Never on `products`.** `upsertProducts` rewrites every column on every sync —

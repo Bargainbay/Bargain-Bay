@@ -14,7 +14,7 @@
 // proves the request came from RS Ops, not which person was holding the phone.
 import { NextResponse } from 'next/server';
 import { hasDb } from '../../../../lib/db';
-import { listLocations } from '../../../../lib/locations';
+import { listAreas, listLocations } from '../../../../lib/locations';
 import { bookInPart, getPart, receiveParts, searchParts, usePart } from '../../../../lib/parts';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +53,10 @@ export async function GET(req) {
   const sp = new URL(req.url).searchParams;
   try {
     if (sp.get('id')) return NextResponse.json({ part: floorPart(await getPart(Number(sp.get('id')))) });
-    if (sp.get('spots')) return NextResponse.json({ spots: await spotList() });
+    if (sp.get('spots')) {
+      const [spots, areas] = await Promise.all([spotList(), listAreas()]);
+      return NextResponse.json({ spots, areas });
+    }
     const parts = await searchParts(sp.get('q') || '', { limit: 40 });
     return NextResponse.json({ parts: parts.map(floorPart) });
   } catch (e) {

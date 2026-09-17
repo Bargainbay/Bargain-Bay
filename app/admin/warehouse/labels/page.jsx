@@ -3,8 +3,8 @@ import qrcode from 'qrcode-generator';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { SITE_URL } from '../../../../lib/site';
-import { canonicalSkus, describeUnits, listLocations } from '../../../../lib/locations';
-import { AREAS, normCode, spotScanUrl, unitScanUrl } from '../../../../lib/location-codes';
+import { canonicalSkus, describeUnits, listAreas, listLocations } from '../../../../lib/locations';
+import { normCode, spotScanUrl, unitScanUrl } from '../../../../lib/location-codes';
 import PrintButton from '../../../../components/PrintButton';
 
 export const dynamic = 'force-dynamic';
@@ -179,7 +179,8 @@ export default async function LabelsPage({ searchParams }) {
   const codes = list(sp?.codes).map(normCode);
   const spots = (await listLocations()).filter((s) => s.active
     && (codes.length ? codes.includes(s.code) : (!areas.length || areas.includes(s.area))));
-  const areaLabel = (k) => AREAS.find((a) => a.key === k)?.label || '';
+  const allAreas = await listAreas();
+  const areaLabel = (k) => allAreas.find((a) => a.key === k)?.label || '';
   return (
     <div style={{ padding: 16 }}>
       <style>{`${CSS} @page { size: ${SPOT_FORMATS[format].page}; margin: ${SPOT_FORMATS[format].margin}; }`}</style>
