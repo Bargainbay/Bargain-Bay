@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
-import { hasDb } from '../../../../lib/db';
+import { hasDb, query } from '../../../../lib/db';
+import { stockRuleProblem } from '../../../../lib/stock-reconcile';
 import { createAndSendInvoice, listInvoices, listInvoiceAuthors, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, refundInvoiceAmount, deleteInvoice,
          updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, voidInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 import { confirmDoorCollection, rejectDoorCollection } from '../../../../lib/door-money';
@@ -80,6 +81,13 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Delivery requires a street address, city, and postal code.' }, { status: 400 });
   }
 
+  // Appliances are picked from stock, not typed. Checked here — the manual
+  // invoice screens' route — and nowhere else: quote conversion, salvage,
+  // dispatch client billing and Sarah raise invoices through their own paths and
+  // must keep working. Anything they type still surfaces on Stock gaps.
+  const stockWrong = await stockRuleProblem(items).catch(() => null);
+  if (stockWrong) return NextResponse.json({ error: stockWrong }, { status: 400 });
+
   // Stamp the invoice with whoever is signed in. Taken from the session, never
   // from the request body — otherwise one rep could raise an invoice in another's
   // name, and the whole point is knowing who actually did it.
@@ -154,6 +162,15 @@ export async function PATCH(req) {
         if (need.length) {
           return NextResponse.json({ error: 'Delivery requires a street address, city, and postal code.' }, { status: 400 });
         }
+      }
+      // Same stock rule as creating, except lines already on the invoice pass —
+      // an old sale typed before the rule existed must stay correctable.
+      if (Array.isArray(body.items)) {
+        const { rows: previous } = await query(
+          'SELECT description, sku FROM invoice_items WHERE invoice_id = $1', [invoiceId]
+        ).catch(() => ({ rows: [] }));
+        const stockWrong = await stockRuleProblem(body.items, { previous }).catch(() => null);
+        if (stockWrong) return NextResponse.json({ error: stockWrong }, { status: 400 });
       }
       const updated = await updateInvoice(invoiceId, {
         items: Array.isArray(body.items) ? body.items : [],

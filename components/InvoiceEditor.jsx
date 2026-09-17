@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import InvoiceLines, { fromInvoice, toPayload } from './InvoiceLines';
+import InvoiceLines, { fromInvoice, toPayload, stockLineProblem } from './InvoiceLines';
 import TaxMode, { previewTotals, modeOf, NO_TAX } from './TaxMode';
 import { toInclusiveLines } from '../lib/tax';
 import { isCreditLine } from '../lib/invoice-lines';
@@ -109,6 +109,10 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [] })
     }
     const leadWrong = leadSource ? whatsWrongWithLead(leadSource, leadBy) : '';
     if (leadWrong) { setErr(leadWrong); return; }
+    // New appliance lines are picked from stock. Lines typed before that rule
+    // existed are marked legacy and pass untouched.
+    const stockWrong = stockLineProblem(items);
+    if (stockWrong) { setErr(stockWrong); return; }
     setBusy(true); setErr('');
     try {
       const res = await fetch('/api/admin/invoices', {
@@ -192,7 +196,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [] })
 
       {inventory.length > 0 && (
         <div className="field">
-          <label>Add a unit from inventory</label>
+          <label>Add a unit from stock</label>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search stock by model, name, or SKU…" />
           {matches.length > 0 && (
             <div style={{ border: '1px solid var(--line)', borderRadius: 8, marginTop: 4, maxHeight: 230, overflowY: 'auto' }}>
@@ -208,7 +212,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [] })
         </div>
       )}
 
-      <InvoiceLines items={items} setItems={setItems} services={SERVICES} />
+      <InvoiceLines items={items} setItems={setItems} services={SERVICES} stock={inventory} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
         <TaxMode mode={taxMode} onChange={changeTaxMode} />

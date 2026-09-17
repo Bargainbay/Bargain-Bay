@@ -23,6 +23,9 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // Where every unit is standing, and the stickers that say so. Staff: finding
     // the fridge for the customer at the counter is a selling job.
     { key: 'warehouse', label: 'Warehouse', href: '/admin/warehouse', sales: true },
+    // Where RS Ops, the tracker and the sales invoices disagree about stock.
+    // Staff: pointing a sale at the unit that went out is invoice work.
+    { key: 'gaps', label: 'Stock gaps', href: '/admin/inventory-gaps', sales: true },
     // The parts shelf — the OFFICE's view (prices, requests, history). Admin: the
     // floor works in RS Ops' own Parts tab against the same records.
     { key: 'parts', label: 'Parts', href: '/admin/parts' },

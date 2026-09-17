@@ -371,6 +371,64 @@ hand.
   lot) still arrives as a second lot when the invoice is committed afterwards.
   Nothing links the two automatically; that is a data fix, not a naming one.
 
+## Stock that doesn't add up — RS Ops, the tracker and the sales (added 2026-09-17)
+`lib/stock-reconcile.js` (server), `lib/stock-match.js` (NO imports — the invoice
+form uses it too), `/admin/inventory-gaps` (**Stock gaps**, staff),
+`/api/rsops/units`, `/api/cron/inventory-gaps` (daily, 12:00 UTC). RS Ops's half:
+`/api/intake/own-units`, `/api/intake/linked`, `sendUnitsToTracker` in its
+`lib/tracker.js`.
+
+**Why:** on 2026-09-17, 64 of the 114 appliances RS Ops held were not on the
+tracker. Purchase invoices were never uploaded, so nothing put them there; they
+sold anyway on invoices with TYPED lines, so nothing marked them sold. The invoice
+form's stock picker only listed units live on the website, so anything sold while
+still in cleaning or repair — most of them — could only be typed.
+
+- **RS Ops → tracker, immediately.** A hand-booked unit is sent when its
+  assessment is SUBMITTED; the daily cron sweeps everything RS Ops holds for our
+  own stock (not drafts, not shipped, never a client's lot). Each unit comes back
+  `on-tracker`, `re-keyed`, `added` or `skipped`; RS Ops marks the first three
+  `trackerLinkedAt`, and from then on its status changes reach the tracker like a
+  manifest unit's (`fromTracker`).
+- **`added` = a row marked `NEEDS INVOICE` in the Invoice column**, no cost, no
+  retail, so it cannot reach the website. `isWaitingForInvoice` is a prefix test
+  — the cell may carry "(lot name says PS-INV117057)".
+- **`re-keyed`** is the S-ORD115612 / PS-INV116968 case: the invoice DID reach the
+  tracker under intake-minted SKUs while RS Ops booked the same appliances in by
+  hand. A row is renamed to the RS Ops number only when the lot's invoice number
+  is in its Invoice cell, the model matches, it is unsold, RS Ops doesn't already
+  use that SKU, and **no invoice line or reservation points at it** (`skusInUse`
+  fails CLOSED). The old SKU is written into Tested Notes.
+- **The purchase invoice arriving later FILLS those rows** (`matchInvoiceLines` /
+  `fillWaitingRows`): cost, retail, vendor, invoice number, and Lot = the order
+  number. Only what's left over on a line is added as new units, and only those go
+  to RS Ops as a manifest. The upload screen shows the matches with a tick per
+  line; the email queue applies them. **A row whose lot is named after a
+  DIFFERENT invoice is never offered** (`pointsElsewhere`) — RS Ops typing
+  MRU217BST for MRU21C7BST put another delivery's fridge at the top of the list.
+- **Model matching tolerates exactly three things** (`modelsMatch`): case and
+  punctuation, O/0 and I/1, and a revision suffix of ≤3 characters on a model of
+  ≥7. GRFS2853AF ≠ GRFN2853AF and MLTW ≠ MLTE on purpose.
+- **Sales without a stock unit** (`unlinkedSaleLines`): appliance lines with no
+  SKU, and SERVICE lines naming a model we hold, last 120 days, web invoices
+  excluded. Stock gaps offers the unsold units of that model; `linkSaleLine` sets
+  the SKU on the invoice and order line, then a paid invoice runs
+  `markUnitsSold` (tracker Sold via the write-back) and an unpaid one holds the
+  unit. **Nothing picks the unit automatically** — which of three identical
+  dishwashers left is only known on the floor.
+- **The invoice form: appliances are PICKED, not typed.** `stockForInvoicing` is
+  everything on the tracker not Sold/salvage and not on a live invoice, priced
+  from the catalogue when live. A unit line has a stock search instead of a text
+  box; "Not from our stock?" allows an exception WITH a reason
+  (`invoice_items.off_stock_reason`), and every such line is listed on Stock gaps
+  daily. `stockRuleProblem` enforces it in `/api/admin/invoices` POST and edit
+  ONLY — quote conversion, salvage, dispatch billing and Sarah keep their own
+  paths. On an edit, lines already on the invoice (matched by description) pass,
+  so old typed sales stay correctable; the editor marks them `legacy`.
+- **The daily email** goes to `SERVICE_EMAIL` only when something is waiting or
+  unlinked, or the RS Ops call failed. "Check RS Ops now" on Stock gaps runs the
+  same pass without the email.
+
 ## Vendor drop-offs — stock the sales floor lists itself (added 2026-09-10)
 Some vendors just leave appliances with us. **No invoice, a cost agreed out loud,
 and we pay them once the unit sells.** They arrive KNOWN WORKING, which is the

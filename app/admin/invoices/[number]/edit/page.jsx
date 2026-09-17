@@ -3,6 +3,7 @@ import { getSession, isAdmin, isStaff } from '../../../../../lib/auth';
 import { hasDb } from '../../../../../lib/db';
 import { getInvoiceByNumber, listLeadSenders } from '../../../../../lib/invoices';
 import { getAll } from '../../../../../lib/inventory';
+import { stockForInvoicing } from '../../../../../lib/stock-reconcile';
 import { money } from '../../../../../lib/constants';
 import AdminNav from '../../../../../components/AdminNav';
 import InvoiceEditor from '../../../../../components/InvoiceEditor';
@@ -41,14 +42,12 @@ export default async function EditInvoicePage({ params }) {
     );
   }
 
+  // Everything on the tracker that isn't sold — not just what's live on the
+  // website. A unit sold while it is still in cleaning or repair has to be
+  // pickable, or the rep types it and the sale never reaches stock.
   let inventory = [];
   try {
-    inventory = (await getAll()).map((u) => ({
-      id: u.id,
-      description: `${u.title || `${u.make} ${u.model}`} (${u.id})`,
-      price: Number(u.price) || 0,
-      search: `${u.make || ''} ${u.model || ''} ${u.title || ''} ${u.category || ''} ${u.id || ''}`.toLowerCase()
-    }));
+    inventory = await stockForInvoicing({ catalog: await getAll().catch(() => []) });
   } catch { inventory = []; }
 
   const editorInvoice = {

@@ -6,6 +6,7 @@ import { listInvoices, listInvoiceAuthors, listLeadSenders, INVOICE_FILTERS } fr
 import { pendingCollectionsForInvoices } from '../../../lib/door-money';
 import { contactsForAutofill } from '../../../lib/customers';
 import { getAll } from '../../../lib/inventory';
+import { stockForInvoicing } from '../../../lib/stock-reconcile';
 import AdminNav from '../../../components/AdminNav';
 import InvoiceForm from '../../../components/InvoiceForm';
 import MarkPaidControl from '../../../components/MarkPaidControl';
@@ -82,14 +83,12 @@ export default async function InvoicesPage({ searchParams }) {
     }));
   } catch { customers = []; }
 
+  // Everything on the tracker that isn't sold — not just what's live on the
+  // website. A unit sold while it is still in cleaning or repair has to be
+  // pickable, or the rep types it and the sale never reaches stock.
   let inventory = [];
   try {
-    inventory = (await getAll()).map((u) => ({
-      id: u.id,
-      description: `${u.title || `${u.make} ${u.model}`} (${u.id})`,
-      price: Number(u.price) || 0,
-      search: `${u.make || ''} ${u.model || ''} ${u.title || ''} ${u.category || ''} ${u.id || ''}`.toLowerCase()
-    }));
+    inventory = await stockForInvoicing({ catalog: await getAll().catch(() => []) });
   } catch { inventory = []; }
 
   // Names already used as "sent by", offered as suggestions so one referrer
