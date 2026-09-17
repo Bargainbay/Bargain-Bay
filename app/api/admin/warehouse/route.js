@@ -8,7 +8,7 @@ import { getSession, isAdmin, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import {
   listLocations, locationContents, unitWhere, findUnits, unplacedUnits,
-  moveUnits, moveSpotContents, countSpot, addSpots, updateSpot
+  moveUnits, moveSpotContents, countSpot, addSpots, updateSpot, listAreas, addArea
 } from '../../../../lib/locations';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +36,10 @@ export async function GET(req) {
       case 'unit': return NextResponse.json({ unit: await unitWhere(sp.get('sku') || '') });
       case 'find': return NextResponse.json({ units: await findUnits(sp.get('q') || '') });
       case 'unplaced': return NextResponse.json(await unplacedUnits());
-      default: return NextResponse.json({ locations: await listLocations() });
+      default: {
+        const [locations, areas] = await Promise.all([listLocations(), listAreas()]);
+        return NextResponse.json({ locations, areas });
+      }
     }
   } catch (e) {
     return fail(e);
@@ -62,6 +65,9 @@ export async function POST(req) {
         return NextResponse.json({ ok: true, ...(await moveUnits({ skus, code: null, note: body.note, via: 'out', ...who(s) })) });
       case 'count':
         return NextResponse.json({ ok: true, ...(await countSpot({ code: body.code, skus, ...who(s) })) });
+      case 'add_area':
+        if (!isAdmin(s)) return denied();
+        return NextResponse.json({ ok: true, ...(await addArea({ label: body.label, by: s.email || null })) });
       case 'add':
         if (!isAdmin(s)) return denied();
         return NextResponse.json({ ok: true, ...(await addSpots(body)) });

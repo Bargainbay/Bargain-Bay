@@ -11,7 +11,9 @@
 // RS Ops, not which person was holding the phone — so it is labelled for what it is.
 import { NextResponse } from 'next/server';
 import { hasDb } from '../../../../lib/db';
-import { countSpot, listLocations, locationContents, moveSpotContents, moveUnits, unitWhere } from '../../../../lib/locations';
+import {
+  addArea, addSpots, countSpot, listAreas, listLocations, locationContents, moveSpotContents, moveUnits, unitWhere, updateSpot
+} from '../../../../lib/locations';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -45,7 +47,16 @@ export async function GET(req) {
     // What is standing in one spot — the refurb floor's put-away screen shows it
     // so somebody can see the shelf they are loading without walking to it.
     if (code) return NextResponse.json(await locationContents(code));
-    if (!sku) return NextResponse.json({ spots: await spotList() });
+    // `all` is RS Ops' admin Locations screen: retired spots too, with what is in
+    // them, because retiring is refused while something is still recorded there.
+    if (!sku && sp.get('all')) {
+      const [spots, areas] = await Promise.all([listLocations(), listAreas()]);
+      return NextResponse.json({ spots, areas });
+    }
+    if (!sku) {
+      const [spots, areas] = await Promise.all([spotList(), listAreas()]);
+      return NextResponse.json({ spots, areas });
+    }
     const [unit, spots] = await Promise.all([unitWhere(sku), spotList()]);
     return NextResponse.json({ unit, spots });
   } catch (e) {
@@ -58,9 +69,35 @@ export async function POST(req) {
   if (problem) return problem;
   let body;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }); }
-  if (!['move', 'count', 'move_all'].includes(body.action)) return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
+  if (!['move', 'count', 'move_all', 'add_area', 'add_spots', 'set_active'].includes(body.action)) {
+    return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
+  }
   const skus = Array.isArray(body.skus) ? body.skus : body.sku ? [body.sku] : [];
   const name = String(body.by || '').trim().slice(0, 80);
+
+  // Changing the map: a new area, new spots, retiring or restoring one. These are
+  // ADMIN actions, and the admin check is RS Ops' — the key proves the request
+  // came from RS Ops' server, which only sends these for a signed-in admin (its
+  // app/api/locations). Same functions and the same rules as the Spots tab here:
+  // a spot with something recorded in it cannot be retired.
+  if (body.action === 'add_area') {
+    try {
+      return NextResponse.json({ ok: true, ...(await addArea({ label: body.label, by: name ? `${name} (RS Ops)` : 'RS Ops' })) });
+    } catch (e) { return fail(e); }
+  }
+  if (body.action === 'add_spots') {
+    try {
+      return NextResponse.json({
+        ok: true,
+        ...(await addSpots({ kind: body.kind, area: body.area, code: body.code, levels: body.levels, purpose: body.purpose, note: body.note }))
+      });
+    } catch (e) { return fail(e); }
+  }
+  if (body.action === 'set_active') {
+    try {
+      return NextResponse.json({ ok: true, spot: await updateSpot(body.code, { active: body.active !== false }, { admin: true }) });
+    } catch (e) { return fail(e); }
+  }
 
   // Counting a spot is the same function the office's screen calls, so the two
   // can never disagree about what a count does: units found here are moved here,

@@ -900,6 +900,17 @@ CREATE INDEX IF NOT EXISTS idx_consignment_unpaid ON consignment_units(paid_on) 
 -- provisions these on first use and seeds the owner's layout into an empty table.
 -- A unit's location is its LATEST move — never a column on products, which every
 -- tracker sync rewrites whole.
+-- The parts of the building. Seeded from AREAS (lib/location-codes.js) into an
+-- empty table; after that, admins add them (lib/locations.js addArea).
+CREATE TABLE IF NOT EXISTS warehouse_areas (
+  key        text PRIMARY KEY,
+  label      text NOT NULL,
+  sort       int NOT NULL DEFAULT 0,
+  active     boolean NOT NULL DEFAULT true,
+  created_by text,
+  created_at timestamptz DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS warehouse_locations (
   code       text PRIMARY KEY,          -- L3-2 (left rack, section 3, shelf 2) · V4 · RECEIVING
   kind       text NOT NULL,             -- rack | lane | zone

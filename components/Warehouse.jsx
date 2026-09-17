@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import QrScanner from './QrScanner';
 import { AREAS, PURPOSES, UNIT_STATUS, normCode, parseScan } from '../lib/location-codes';
 
@@ -47,7 +47,18 @@ function ago(iso) {
   if (d < 45) return `${d}d ago`;
   return new Date(iso).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-const areaLabel = (key) => AREAS.find((a) => a.key === key)?.label || key || '';
+// The parts of the building come from the server now (warehouse_areas) so an
+// admin can add one without a deploy. AREAS is only the fallback until the first
+// load answers. A spot whose area isn't in the list still gets a heading: an
+// unknown area must never make a spot disappear from a screen that groups by area.
+const AreasContext = createContext(AREAS);
+const useAreas = () => useContext(AreasContext);
+function groupAreas(areas, spots) {
+  const known = new Set(areas.map((a) => a.key));
+  const stray = [...new Set(spots.map((s) => s.area).filter((k) => k && !known.has(k)))];
+  return [...areas, ...stray.map((key) => ({ key, label: key }))];
+}
+const areaLabelIn = (areas, key) => areas.find((a) => a.key === key)?.label || key || '';
 const labelsHref = (params) => `/admin/warehouse/labels?${new URLSearchParams(params)}`;
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -134,11 +145,12 @@ function UnitTable({ units, onOpenUnit, onOpenSpot, extra, selectable, selected,
 }
 
 function SpotSelect({ spots, value, onChange, placeholder = 'Pick a spot…' }) {
+  const areas = useAreas();
   const active = spots.filter((s) => s.active);
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} style={{ width: 'auto', maxWidth: '100%' }}>
       <option value="">{placeholder}</option>
-      {AREAS.map((a) => {
+      {groupAreas(areas, active).map((a) => {
         const inArea = active.filter((s) => s.area === a.key);
         return inArea.length ? (
           <optgroup key={a.key} label={a.label}>
@@ -153,6 +165,7 @@ function SpotSelect({ spots, value, onChange, placeholder = 'Pick a spot…' }) 
 export default function Warehouse({ admin = false, initialUnit = '', initialSpot = '' }) {
   const [tab, setTab] = useState(initialSpot && !initialUnit ? 'spots' : 'scan');
   const [spots, setSpots] = useState([]);
+  const [areas, setAreas] = useState(AREAS);
   const [spotsErr, setSpotsErr] = useState('');
   const [unit, setUnit] = useState(initialUnit);
   const [spot, setSpot] = useState(initialSpot ? normCode(initialSpot) : '');
@@ -162,6 +175,7 @@ export default function Warehouse({ admin = false, initialUnit = '', initialSpot
     try {
       const d = await get({ view: 'locations' });
       setSpots(d.locations || []);
+      if (d.areas?.length) setAreas(d.areas);
       setSpotsErr('');
     } catch (e) {
       setSpotsErr(e.message);
@@ -174,6 +188,7 @@ export default function Warehouse({ admin = false, initialUnit = '', initialSpot
   const startCount = useCallback((code) => { setCounting(code); setTab('scan'); }, []);
 
   return (
+    <AreasContext.Provider value={areas}>
     <div className="wh">
       <style>{CSS}</style>
       <h1>Warehouse</h1>
@@ -205,6 +220,7 @@ export default function Warehouse({ admin = false, initialUnit = '', initialSpot
       {tab === 'unplaced' && <UnplacedTab onOpenUnit={openUnit} />}
       {tab === 'labels' && <LabelsTab />}
     </div>
+    </AreasContext.Provider>
   );
 }
 
@@ -543,6 +559,7 @@ function SpotTile({ s, open, onOpen }) {
 }
 
 function SpotsTab({ admin, spots, open, onOpen, onCount, onOpenUnit, onChanged }) {
+  const areas = useAreas();
   const [showRetired, setShowRetired] = useState(false);
   const shown = spots.filter((s) => s.active || s.count > 0 || showRetired);
   const total = spots.reduce((n, s) => n + s.count, 0);
@@ -554,7 +571,7 @@ function SpotsTab({ admin, spots, open, onOpen, onCount, onOpenUnit, onChanged }
           onOpenUnit={onOpenUnit} onOpenSpot={onOpen} onChanged={onChanged} />
       )}
       <p className="hint" style={{ marginTop: 0 }}>{plural(total, 'unit')} recorded across {plural(spots.filter((s) => s.active).length, 'spot')}.</p>
-      {AREAS.map((a) => {
+      {groupAreas(areas, shown).map((a) => {
         const inArea = shown.filter((s) => s.area === a.key);
         if (!inArea.length) return null;
         const racks = inArea.filter((s) => s.kind === 'rack');
@@ -597,6 +614,8 @@ function SpotsTab({ admin, spots, open, onOpen, onCount, onOpenUnit, onChanged }
 }
 
 function SpotPanel({ code, admin, onClose, onCount, onOpenUnit, onOpenSpot, onChanged }) {
+  const areas = useAreas();
+  const areaLabel = (key) => areaLabelIn(areas, key);
   const [d, setD] = useState(null);
   const [err, setErr] = useState('');
   const [purpose, setPurpose] = useState('');
@@ -668,11 +687,21 @@ function SpotPanel({ code, admin, onClose, onCount, onOpenUnit, onOpenSpot, onCh
 }
 
 function AddSpot({ onAdded }) {
+  const areas = useAreas().filter((a) => a.active !== false);
   const [f, setF] = useState({ kind: 'rack', area: 'left', code: '', levels: '3', purpose: '' });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
-  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
+  // A holding area defaults into Holding areas, and a rack or lane out of it —
+  // but any of them can be put in any area, a new one included.
+  const set = (k) => (e) => {
+    const v = e.target.value;
+    setF((x) => {
+      if (k !== 'kind') return { ...x, [k]: v };
+      if (v === 'zone') return { ...x, kind: v, area: 'zone' };
+      return { ...x, kind: v, area: x.area === 'zone' ? 'left' : x.area };
+    });
+  };
 
   async function add(e) {
     e.preventDefault();
@@ -703,11 +732,9 @@ function AddSpot({ onAdded }) {
           <option value="lane">Floor lane</option>
           <option value="zone">Holding area</option>
         </select>
-        {f.kind !== 'zone' && (
-          <select value={f.area} onChange={set('area')} style={{ width: 'auto' }}>
-            {AREAS.filter((a) => a.key !== 'zone').map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
-          </select>
-        )}
+        <select value={f.area} onChange={set('area')} style={{ width: 'auto' }} aria-label="Area">
+          {areas.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+        </select>
         <input value={f.code} onChange={set('code')} placeholder={f.kind === 'rack' ? 'Code, e.g. R7' : f.kind === 'lane' ? 'Code, e.g. V5' : 'Code, e.g. RETURNS'}
           style={{ width: 170 }} aria-label="Code" />
         {f.kind === 'rack' && (
@@ -788,7 +815,15 @@ function UnplacedTab({ onOpenUnit }) {
 
 // ── Labels ──────────────────────────────────────────────────────────────────
 function LabelsTab() {
-  const [areas, setAreas] = useState(() => AREAS.map((a) => a.key));
+  const allAreas = useAreas();
+  const [areas, setAreas] = useState(() => allAreas.map((a) => a.key));
+  // The list arrives after first render; a new area should start ticked too.
+  const seen = useRef(new Set(areas));
+  useEffect(() => {
+    const fresh = allAreas.map((a) => a.key).filter((k) => !seen.current.has(k));
+    fresh.forEach((k) => seen.current.add(k));
+    if (fresh.length) setAreas((a) => [...a, ...fresh]);
+  }, [allAreas]);
   const [spotFormat, setSpotFormat] = useState('4x6');
   const [skuText, setSkuText] = useState('');
   const [unitFormat, setUnitFormat] = useState('roll');
@@ -800,7 +835,7 @@ function LabelsTab() {
       <div className="panel">
         <h3 style={{ marginTop: 0 }}>Spot labels</h3>
         <p className="hint">One per spot: the code in large type and a QR code. Racks get one per shelf; lanes get a sign for the end of the lane.</p>
-        {AREAS.map((a) => (
+        {allAreas.map((a) => (
           <label key={a.key} style={{ display: 'block', fontSize: 14 }}>
             <input type="checkbox" checked={areas.includes(a.key)} onChange={() => flip(a.key)} /> {a.label}
           </label>
