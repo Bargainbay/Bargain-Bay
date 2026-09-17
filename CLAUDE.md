@@ -460,7 +460,18 @@ still in cleaning or repair — most of them — could only be typed.
     re-checked under an advisory lock inside the transaction, so two screens
     can't put one unit on two invoices. One unit still works exactly as before
     (description untouched). Candidates per line went 8 → 24 for "6 sets".
-  - `modelTokens` reads `PRFS2883AFG/H` as BOTH `PRFS2883AFG` and
+  - **Lines linked to ONE unit before splitting existed are listed too**, in
+    their own table ("Linked to one unit, but the line sold more"). INV-1204's
+    two-fridge and two-stove lines had each been linked to their first unit, so
+    they were not "unlinked" and never appeared. A linked line is listed only when
+    its text names a quantity (`quantityHint`) and no other line on the invoice
+    carries the same text (i.e. it hasn't been split). `linkSaleLine(id, skus,
+    { alreadyLinked })` adds units to it: the unit already there stays first on
+    its own row, and must match what the screen saw or it asks for a reload. On a
+    paid invoice only the NEW units go through `markUnitsSold` — the existing one
+    just has its sold price corrected (`products.sold_price` + the tracker's Sold
+    Price cell), because re-selling it would re-stamp Date Sold with today.
+ `PRFS2883AFG` and
     `PRFS2883AFH` (an ending of ≤3 characters after a slash replaces the same
     number at the end of the model). It split on the slash and offered only the
     first, so the owner's own example line could not find its AFH fridge. A
