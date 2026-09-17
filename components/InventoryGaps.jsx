@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { money } from '../lib/constants';
+import { splitAmount, quantityHint, singleUnitDescription } from '../lib/stock-match';
 
 // The two ways stock stops adding up, each with the button that fixes it.
 //
@@ -12,13 +13,24 @@ import { money } from '../lib/constants';
 //   which one, so it still reads as in stock. The fix is picking the unit that
 //   went out. The candidates are unsold units of the model the line names; which
 //   of two identical fridges left is something only the floor knows, so nothing
-//   here picks for you.
+//   here picks for you. A line that sold several ("2x …", "6 sets") takes several
+//   units: it is split into one line per unit, the amount divided to the cent.
+
+// "$929.20 each", or "$33.33, $33.33 and $33.34" when the last carries a cent.
+function splitText(amounts = []) {
+  if (amounts.length <= 1) return money(amounts[0] || 0);
+  if (amounts.every((a) => a === amounts[0])) return `${money(amounts[0])} each`;
+  return `${amounts.slice(0, -1).map(money).join(', ')} and ${money(amounts[amounts.length - 1])}`;
+}
+
 export default function InventoryGaps() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState('');
   const [armed, setArmed] = useState('');
+  // itemId → the SKUs ticked for that line, in the order they were ticked.
+  const [picked, setPicked] = useState({});
 
   async function load() {
     setErr('');
@@ -43,12 +55,31 @@ export default function InventoryGaps() {
     } catch (e) { setErr(e.message); return null; } finally { setBusy(''); setArmed(''); }
   }
 
-  async function link(line, sku) {
-    const key = `${line.itemId}:${sku}`;
+  function toggle(line, sku) {
+    setArmed('');
+    setPicked((p) => {
+      const cur = p[line.itemId] || [];
+      const next = cur.includes(sku) ? cur.filter((x) => x !== sku) : [...cur, sku];
+      return { ...p, [line.itemId]: next };
+    });
+  }
+
+  async function link(line) {
+    const skus = picked[line.itemId] || [];
+    if (!skus.length) return;
+    const key = `link:${line.itemId}`;
     if (armed !== key) { setArmed(key); return; }
-    const d = await post({ action: 'link', itemId: line.itemId, sku }, key);
+    const d = await post({ action: 'link', itemId: line.itemId, skus }, key);
     if (!d) return;
-    setMsg(`${d.number}: “${line.description}” is now ${d.sku} — ${d.stock === 'sold' ? 'marked sold' : d.stock === 'held' ? 'held off the website until it’s paid' : 'linked, but another order is holding it — check'}.`);
+    const list = (d.skus || [d.sku]).join(', ');
+    const what = d.stock === 'sold' ? 'marked sold'
+      : d.stock === 'held' ? 'held off the website until it’s paid'
+      : `linked, but another order is holding ${d.contested?.length ? d.contested.join(', ') : 'one'} — check`;
+    setMsg(`${d.number}: “${line.description}” is now ${list}`
+      + (d.skus?.length > 1 ? `, one line each at ${splitText(d.amounts)}` : '')
+      + ` — ${what}.`
+      + (d.orderLineFound === false ? ' The order behind it had no matching line, so only the invoice was split — check the order.' : ''));
+    setPicked((p) => ({ ...p, [line.itemId]: [] }));
     load();
   }
 
@@ -197,8 +228,10 @@ export default function InventoryGaps() {
           {data.unlinked.length === 0 ? <p className="hint">Nothing — every appliance sold in the last 120 days names its unit.</p> : (
             <>
               <p className="hint" style={{ marginTop: 0 }}>
-                Each of these sold an appliance without saying which one. Tap the unit that actually went out (tap twice to confirm).
-                A paid invoice marks it sold on the tracker; an unpaid one holds it off the website.
+                Each of these sold an appliance without saying which one. Tick the unit that actually went out — or every unit, when
+                one line sold several — then <b>Link</b> (tap twice to confirm). Several units split the line into one line per unit,
+                with the amount divided so the invoice total doesn&apos;t move. A paid invoice marks them sold on the tracker; an unpaid
+                one holds them off the website.
               </p>
               <div className="table-wrap"><table className="admin">
                 <thead><tr><th style={th}>Invoice</th><th style={th}>What was sold</th><th style={{ ...th, textAlign: 'right' }}>Amount</th><th style={th}>Which unit went out?</th></tr></thead>
@@ -217,21 +250,39 @@ export default function InventoryGaps() {
                       <td style={{ verticalAlign: 'top', textAlign: 'right' }}>{money(s.amount)}</td>
                       <td style={{ fontSize: 13 }}>
                         {s.candidates.length === 0 && <span className="hint" style={{ margin: 0 }}>No unsold unit of this model on the tracker.</span>}
+                        {s.candidates.length > 0 && quantityHint(s.description) && (
+                          <div className="hint" style={{ margin: '0 0 4px' }}>The line says “{quantityHint(s.description)}” — tick every unit it sold.</div>
+                        )}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                           {s.candidates.map((c) => {
-                            const key = `${s.itemId}:${c.sku}`;
+                            const on = (picked[s.itemId] || []).includes(c.sku);
                             return (
-                              <button key={c.sku} className={'btn' + (armed === key ? ' accent' : '')} style={{ fontSize: 12.5, textAlign: 'left' }}
-                                disabled={!!busy} onClick={() => link(s, c.sku)}
+                              <button key={c.sku} className={'btn' + (on ? ' accent' : '')} style={{ fontSize: 12.5, textAlign: 'left' }}
+                                disabled={!!busy} onClick={() => toggle(s, c.sku)} aria-pressed={on}
                                 title={`${c.model}${c.serial ? ` · serial ${c.serial}` : ''} · ${c.status || 'no status'} · received ${c.dateReceived || '—'}`}>
-                                {busy === key ? 'Linking…' : armed === key ? `Link ${c.sku}?` : <>
-                                  <span style={{ fontFamily: 'monospace' }}>{c.sku}</span>
-                                  <span style={{ display: 'block', color: 'var(--muted)', fontSize: 11.5 }}>{c.status || 'no status'}{c.waitingForInvoice ? ' · no invoice yet' : ''}</span>
-                                </>}
+                                <span style={{ fontFamily: 'monospace' }}>{on ? '☑' : '☐'} {c.sku}</span>
+                                <span style={{ display: 'block', color: on ? 'inherit' : 'var(--muted)', fontSize: 11.5 }}>{c.model} · {c.status || 'no status'}{c.waitingForInvoice ? ' · no invoice yet' : ''}</span>
                               </button>
                             );
                           })}
                         </div>
+                        {(picked[s.itemId] || []).length > 0 && (() => {
+                          const n = picked[s.itemId].length;
+                          const key = `link:${s.itemId}`;
+                          const renamed = n > 1 && singleUnitDescription(s.description) !== s.description;
+                          return (
+                            <div style={{ marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                              <button className={'btn' + (armed === key ? ' accent' : '')} disabled={!!busy} onClick={() => link(s)}>
+                                {busy === key ? 'Linking…' : armed === key ? `Confirm: link ${n} unit${n === 1 ? '' : 's'}?` : `Link ${n} unit${n === 1 ? '' : 's'}`}
+                              </button>
+                              <span className="hint" style={{ margin: 0 }}>
+                                {n === 1
+                                  ? <>the line stays {money(s.amount)}</>
+                                  : <>splits into {n} lines at {splitText(splitAmount(s.amount, n))} — still {money(s.amount)} together{renamed ? <>, each reading “{singleUnitDescription(s.description)}”</> : null}</>}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}
