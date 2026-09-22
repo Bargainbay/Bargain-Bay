@@ -560,9 +560,16 @@ when S-ORD115612 had already put three there.
   case- and punctuation-insensitively (`Abi` and `abi ` are one vendor) and the
   first spelling seen is the one shown. **Cost is stripped server-side**
   (`withoutCost`) for a non-admin, same rule as the invoice form's cost box.
-- **Still open:** quote → invoice conversion (`convertQuoteToInvoice`) does not run
-  `stockRuleProblem`, and the quote builder only offers units live on the website,
-  so a quote can still carry typed appliance lines onto an invoice.
+- **Quotes pick from stock too** (closed 2026-09-22). The builder's list is
+  `stockForInvoicing` — everything on the tracker that isn't sold, not just
+  what's live on the website, which is what made typing the only option for a
+  unit in cleaning. Every line that isn't tied to a unit offers a per-line search,
+  and submitting names those lines and asks for a yes. **It is a warning, not a
+  refusal**: a quote is routinely written for something that hasn't arrived, and
+  a quote reserves nothing. `convertQuoteToInvoice` returns `untied`, and the
+  Convert button says how many lines reached the invoice with no unit, with a
+  link to Stock gaps. `stockRuleProblem` is still NOT run on conversion — an
+  accepted quote can't be edited, so refusing there would be a dead end.
 
 ## Vendor drop-offs — stock the sales floor lists itself (added 2026-09-10)
 Some vendors just leave appliances with us. **No invoice, a cost agreed out loud,

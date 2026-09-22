@@ -4,6 +4,44 @@ import LeadSource, { whatsWrongWithLead } from './LeadSource';
 import { searchStockUnits } from '../lib/stock-match';
 
 const blankItem = () => ({ description: '', retail: '', amount: '', sku: '' });
+
+// Tie one quote line to the unit it sells. Same search as the invoice form
+// (lib/stock-match.js): stove finds ranges, 24" is a size, a word nothing in
+// stock has is set aside and said rather than emptying the list.
+function LineStock({ inventory, exclude, initial, onPick }) {
+  const [q, setQ] = useState('');
+  const [open, setOpen] = useState(false);
+  const r = searchStockUnits(inventory, q || initial, { exclude, limit: 6 });
+  if (!open) {
+    return (
+      <div className="hint" style={{ margin: '-4px 0 8px' }}>
+        Not tied to a unit ·{' '}
+        <button type="button" onClick={() => setOpen(true)}
+          style={{ background: 'none', border: 0, padding: 0, color: 'var(--link, #0a58ca)', cursor: 'pointer', fontSize: 'inherit' }}>
+          find it in stock{r.units.length ? ` (${r.units.length} match${r.units.length === 1 ? '' : 'es'})` : ''}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ margin: '-2px 0 10px' }}>
+      <input value={q} onChange={(e) => setQ(e.target.value)} autoFocus
+        placeholder="Find the appliance in stock — model, brand, SKU or serial…" />
+      {r.ignored.length > 0 && r.units.length > 0 && (
+        <div className="hint" style={{ margin: '4px 0' }}>Nothing in stock says “{r.ignored.join('”, “')}” — showing matches for the rest.</div>
+      )}
+      {r.units.map((u) => (
+        <button type="button" key={u.id} onClick={() => { onPick(u); setOpen(false); }}
+          style={{ display: 'flex', justifyContent: 'space-between', gap: 12, width: '100%', textAlign: 'left', padding: '7px 10px', background: 'var(--card, #fff)', border: '1px solid var(--line)', borderTop: 0, cursor: 'pointer', fontSize: 13.5, color: 'var(--ink)' }}>
+          <span>{u.description}<span style={{ display: 'block', fontSize: 12, color: 'var(--muted)' }}>{u.status}</span></span>
+          <span style={{ whiteSpace: 'nowrap', color: 'var(--muted)', fontWeight: 600 }}>{u.price > 0 ? fmt(u.price) : 'no list price'}</span>
+        </button>
+      ))}
+      {!r.units.length && <div className="hint" style={{ margin: '4px 0' }}>Nothing matches. It may not be booked in yet — ask the warehouse.</div>}
+      <button type="button" className="btn" style={{ fontSize: 12.5, marginTop: 6 }} onClick={() => setOpen(false)}>Quote it without a unit</button>
+    </div>
+  );
+}
 const fmt = (n) => '$' + (Number(n) || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // editQuote = { quoteId, number, bundlePct, cashDeal, freeDelivery, addHst, daysValid, memo, leadSource, leadBy }
@@ -87,6 +125,15 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
     }
     const leadWrong = (editQuote && !hadSource && !leadSource) ? '' : whatsWrongWithLead(leadSource, leadBy);
     if (leadWrong) { setErr(leadWrong); return; }
+    // A line with no unit is allowed — a quote is often for something that
+    // hasn't arrived — but it is never the DEFAULT. Say which lines they are,
+    // because at conversion they become invoice lines that mark nothing sold.
+    const untied = items.filter((it) => !it.sku && it.description.trim() && Number(it.amount) > 0);
+    if (untied.length && !window.confirm(
+      `${untied.length} line${untied.length === 1 ? " isn't" : "s aren't"} tied to a unit in stock:\n\n`
+      + untied.map((it) => `  • ${it.description.trim()}`).join('\n')
+      + '\n\nWhen this quote becomes an invoice, nothing will be marked sold for them and they will sit on Stock gaps.'
+      + '\n\nSend it anyway?')) return;
     setBusy(true); setErr(''); setDone(null);
     try {
       const res = await fetch('/api/admin/quotes', {
@@ -168,7 +215,7 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
               ))}
             </div>
           )}
-          <div className="hint">Adds a line with the unit&apos;s name, SKU, retail and our price. You can also type ad-hoc lines for items not yet in stock.</div>
+          <div className="hint">Everything on the tracker that isn&apos;t sold — including units still in cleaning or repair. Adds a line with the unit&apos;s name, SKU, retail and our price. A line you type by hand can be tied to its unit underneath.</div>
         </div>
       )}
 
@@ -180,11 +227,31 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
         <span style={{ width: 34 }} />
       </div>
       {items.map((it, i) => (
-        <div key={i} className="inv-line">
-          <input className="inv-desc" value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} autoComplete="off" autoCorrect="off" spellCheck={false} placeholder="e.g. 24&quot; Whirlpool WRT112CZJZ fridge" />
-          <input className="inv-cost" type="number" inputMode="decimal" min="0" step="0.01" value={it.retail} onChange={(e) => setItem(i, 'retail', e.target.value)} placeholder="retail" />
-          <input className="inv-amt" type="number" inputMode="decimal" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="price" />
-          <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
+        <div key={i}>
+          <div className="inv-line">
+            <input className="inv-desc" value={it.description} onChange={(e) => setItem(i, 'description', e.target.value)} autoComplete="off" autoCorrect="off" spellCheck={false} placeholder="e.g. 24&quot; Whirlpool WRT112CZJZ fridge" />
+            <input className="inv-cost" type="number" inputMode="decimal" min="0" step="0.01" value={it.retail} onChange={(e) => setItem(i, 'retail', e.target.value)} placeholder="retail" />
+            <input className="inv-amt" type="number" inputMode="decimal" min="0" step="0.01" value={it.amount} onChange={(e) => setItem(i, 'amount', e.target.value)} placeholder="price" />
+            <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
+          </div>
+          {/* The SKU is what carries through to the invoice at conversion and
+              marks the unit sold. A typed quote line becomes a typed invoice
+              line, which is the gap this closes. */}
+          {it.sku ? (
+            <div className="hint" style={{ margin: '-4px 0 8px' }}>
+              From stock: <b style={{ fontFamily: 'monospace' }}>{it.sku}</b> ·{' '}
+              <button type="button" onClick={() => setItem(i, 'sku', '')}
+                style={{ background: 'none', border: 0, padding: 0, color: 'var(--link, #0a58ca)', cursor: 'pointer', fontSize: 'inherit' }}>
+                untie it
+              </button>
+            </div>
+          ) : (it.description.trim() || Number(it.amount) > 0) && (
+            <LineStock inventory={inventory} exclude={new Set(items.map((x) => x.sku).filter(Boolean))}
+              initial={it.description}
+              onPick={(u) => setItems((xs) => xs.map((x, j) => (j === i
+                ? { ...x, sku: u.id, description: u.description, retail: u.retail ? String(u.retail) : x.retail, amount: x.amount || (u.price > 0 ? String(u.price) : '') }
+                : x)))} />
+          )}
         </div>
       ))}
       <button type="button" className="btn" onClick={addRow} style={{ marginBottom: 12 }}>+ Add line</button>
