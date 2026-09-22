@@ -10,6 +10,7 @@ import {
   listLocations, locationContents, unitWhere, findUnits, unplacedUnits,
   moveUnits, moveSpotContents, countSpot, addSpots, updateSpot, listAreas, addArea
 } from '../../../../lib/locations';
+import { stockByVendor, withoutCost } from '../../../../lib/stock-vendors';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -27,9 +28,23 @@ function fail(e) {
 }
 
 export async function GET(req) {
-  if (!(await staff())) return denied();
-  if (!hasDb()) return NextResponse.json({ error: 'Database not configured (POSTGRES_URL).' }, { status: 503 });
+  const session = await staff();
+  if (!session) return denied();
   const sp = new URL(req.url).searchParams;
+
+  // Stock by vendor is read from the TRACKER, so it answers with no database —
+  // it is the one view here that says nothing about where a unit is standing.
+  // Cost is stripped for a non-admin on the server, never hidden in the browser.
+  if (sp.get('view') === 'vendors') {
+    try {
+      const report = await stockByVendor();
+      return NextResponse.json(isAdmin(session) ? report : withoutCost(report));
+    } catch (e) {
+      return NextResponse.json({ error: e?.message || 'Could not read the tracker.' }, { status: 502 });
+    }
+  }
+
+  if (!hasDb()) return NextResponse.json({ error: 'Database not configured (POSTGRES_URL).' }, { status: 503 });
   try {
     switch (sp.get('view')) {
       case 'location': return NextResponse.json(await locationContents(sp.get('code') || ''));

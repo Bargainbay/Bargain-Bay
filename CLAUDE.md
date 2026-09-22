@@ -500,6 +500,70 @@ still in cleaning or repair — most of them — could only be typed.
   unlinked or awaiting approval, or the RS Ops call failed. "Check RS Ops now" on Stock gaps runs the
   same pass without the email.
 
+## Finding the unit, and not adding it twice (added 2026-09-22)
+Written after INV-1236: six appliances, one picked from stock, five typed through
+"Not from our stock?" with the reason **"Already delivered"** — and after a
+vendor drop-off put a fourth Hisense RQ22A4CSD on the tracker (VD-MU7671R18FL)
+when S-ORD115612 had already put three there.
+
+- **One stock search, `searchStockUnits` in `lib/stock-match.js` (no imports),**
+  behind every picker: the invoice line, the invoice form's "Add from stock", the
+  editor, the quote builder, and Stock gaps' suggestions. The floor says stove and
+  fridge, the tracker says Range and Refrigerator — "LG stove" found 0 units live
+  while "LG range" found 18. Appliance words have synonyms and match at the start
+  of a word (so "washer" doesn't find dishwashers, and an over-the-range microwave
+  doesn't answer "stove"); two appliance words are EITHER-OR ("washer dryer set");
+  a size must agree with a size the unit states; a model matches with
+  `modelsMatch`'s tolerance. **A word nothing in stock contains is set aside and
+  SHOWN**, not allowed to empty the list — an empty list is what sends reps to the
+  escape hatch.
+- **"Not from our stock?" is a fixed list** (`OFF_STOCK_REASONS`) plus "Other:"
+  with an explanation, checked on screen AND in `stockRuleProblem`. "Other" that
+  says delivered/sold/gone/already is refused with the reason: a unit that went out
+  is still ours, and picking it is what marks it sold. A reason saved before the
+  list existed stands (`savedReason`), so old invoices stay editable.
+  `fromInvoice` now reopens an off-stock line AS one — it used to come back as an
+  empty stock search the editor refused to save.
+- **"Not on the tracker? Book it in"** on an invoice line →
+  `POST /api/admin/invoices/book-in` → `bookInForInvoice`. Model AND serial are
+  required. **Refused, with no override, whenever `heldUnitsLike` finds the serial
+  anywhere on the tracker, the model on any unsold non-salvage row, or either at
+  RS Ops not yet on the tracker** — those come back to pick instead (an RS Ops one
+  is brought across with `acceptRsOpsUnits` and picked under RS Ops' SKU). The
+  owner's rule: the team must not add to the tracker at random, and somebody at
+  the invoice form is not looking at the machine. A genuinely new unit goes on as
+  `BI-…`, **NEEDS INVOICE**, no cost, no retail — off the website, and on Stock
+  gaps' no-invoice list every day until its purchase invoice explains it.
+- **The vendor drop-off form runs the same check** (in `/api/admin/intake`, before
+  `addConsignmentUnit`). Model number now required. A matching serial is refused
+  outright; a matching model stops and lists what we hold, and going ahead needs
+  the serial plus a ticked "a vendor left another one", which is written into the
+  row's Notes with who said so and which SKUs they were shown. The override exists
+  here and not on the invoice because here somebody IS looking at the appliance.
+- **Stock gaps suggests units for a line with no model number** (`loose: true`):
+  brand + appliance type (+ size) through the same search, only when the line
+  names both a brand and a type. Labelled on screen as the right KIND of unit, not
+  a match — which one went out is the serial's call.
+- **The book-in asks WHERE IT CAME FROM, and that is not cosmetic.** A vendor
+  **drop-off** (today that is Abi) is booked as `VD-…` with the vendor on the row,
+  `CONSIGNMENT` in the Invoice cell and a `consignment_units` record — stock we
+  hold and do not own, with the money owed the day it sells. Miss that and the
+  sale credits Inventory for a unit nobody paid for and the vendor is owed
+  nothing on paper (see the consignment section). Anything else is `BI-…` /
+  NEEDS INVOICE. Sales may book in a drop-off themselves (owner, 2026-09-22);
+  the purchase-invoice path tells them to check with the warehouse first.
+- **Stock by vendor** — `lib/stock-vendors.js`, the **By vendor** tab on
+  `/admin/warehouse`, `GET /api/admin/warehouse?view=vendors`. Read from the
+  TRACKER, not `products`: the units a vendor rings up about are the ones that
+  are not listed — untested, in cleaning, waiting for a part. `groupRows` is pure
+  and exported so it can be tested without a tracker; vendor names are folded
+  case- and punctuation-insensitively (`Abi` and `abi ` are one vendor) and the
+  first spelling seen is the one shown. **Cost is stripped server-side**
+  (`withoutCost`) for a non-admin, same rule as the invoice form's cost box.
+- **Still open:** quote → invoice conversion (`convertQuoteToInvoice`) does not run
+  `stockRuleProblem`, and the quote builder only offers units live on the website,
+  so a quote can still carry typed appliance lines onto an invoice.
+
 ## Vendor drop-offs — stock the sales floor lists itself (added 2026-09-10)
 Some vendors just leave appliances with us. **No invoice, a cost agreed out loud,
 and we pay them once the unit sells.** They arrive KNOWN WORKING, which is the

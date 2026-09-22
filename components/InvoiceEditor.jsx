@@ -5,6 +5,7 @@ import TaxMode, { previewTotals, modeOf, NO_TAX } from './TaxMode';
 import { toInclusiveLines } from '../lib/tax';
 import { isCreditLine } from '../lib/invoice-lines';
 import LeadSource, { whatsWrongWithLead } from './LeadSource';
+import { searchStockUnits } from '../lib/stock-match';
 
 // Edit an invoice: the customer's details, the line items (add, remove, reprice,
 // change warranty, add a service or a unit from stock), HST, memo and issue date.
@@ -70,8 +71,8 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [] })
   // pre-ticked — while money is still owed.
   const [resend, setResend] = useState(!settled);
 
-  const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = q.trim().length >= 2 ? inventory.filter((u) => tokens.every((t) => u.search.includes(t))).slice(0, 8) : [];
+  // The shared stock search — stove finds ranges, 24\" is a size (lib/stock-match.js).
+  const matches = searchStockUnits(inventory, q).units;
   function pickInventory(u) {
     setItems((xs) => [...xs, { description: u.description, amount: String(u.price), sku: u.id, kind: 'unit', warrantyMonths: 12 }]);
     setQ('');

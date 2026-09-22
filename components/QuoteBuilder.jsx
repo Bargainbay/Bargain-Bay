@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import LeadSource, { whatsWrongWithLead } from './LeadSource';
+import { searchStockUnits } from '../lib/stock-match';
 
 const blankItem = () => ({ description: '', retail: '', amount: '', sku: '' });
 const fmt = (n) => '$' + (Number(n) || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -42,10 +43,8 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
   // searchable text, so "kitchenaid dishwasher" matches even though brand and
   // type sit far apart in the string. (A plain substring match needs the whole
   // phrase contiguous and silently finds nothing.)
-  const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = q.trim().length >= 2
-    ? inventory.filter((u) => tokens.every((t) => u.search.includes(t))).slice(0, 8)
-    : [];
+  // The shared stock search — stove finds ranges, 24\" is a size (lib/stock-match.js).
+  const matches = searchStockUnits(inventory, q).units;
 
   const custQuery = (email || name).trim().toLowerCase();
   const custMatches = custOpen && custQuery.length >= 2

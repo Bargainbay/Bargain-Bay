@@ -4,6 +4,7 @@ import { loadGoogleMaps, placesReady, mapsKey } from '../lib/maps';
 import InvoiceLines, { blankItem, toPayload, stockLineProblem } from './InvoiceLines';
 import TaxMode, { previewTotals } from './TaxMode';
 import LeadSource, { whatsWrongWithLead } from './LeadSource';
+import { searchStockUnits } from '../lib/stock-match';
 
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 // Business days run on Toronto time (same as the dashboard's buckets).
@@ -72,10 +73,8 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
   // Every query word must appear somewhere in the unit's text, so multi-word
   // searches like "kitchenaid dishwasher" match (brand and type sit far apart
   // in the string; a plain substring match needs the whole phrase contiguous).
-  const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = q.trim().length >= 2
-    ? inventory.filter((u) => tokens.every((t) => u.search.includes(t))).slice(0, 8)
-    : [];
+  // The shared stock search — stove finds ranges, 24\" is a size (lib/stock-match.js).
+  const matches = searchStockUnits(inventory, q).units;
 
   const custQuery = (email || name).trim().toLowerCase();
   const custMatches = custOpen && custQuery.length >= 2
