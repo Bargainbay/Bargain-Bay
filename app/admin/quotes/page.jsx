@@ -6,6 +6,7 @@ import { listQuotes, getQuoteForBuilder } from '../../../lib/quotes';
 import { listLeadSenders } from '../../../lib/invoices';
 import { contactsForAutofill } from '../../../lib/customers';
 import { getAll } from '../../../lib/inventory';
+import { stockForInvoicing } from '../../../lib/stock-reconcile';
 import AdminNav from '../../../components/AdminNav';
 import QuoteBuilder from '../../../components/QuoteBuilder';
 import QuoteActions from '../../../components/QuoteActions';
@@ -50,15 +51,18 @@ export default async function QuotesPage({ searchParams }) {
     try { initial = await getQuoteForBuilder(sParams.from); } catch { initial = null; }
   }
 
+  // Everything on the tracker that isn't sold — the same list the invoice form
+  // offers. It used to be live website stock only, so a unit still in cleaning
+  // or repair could not be picked and got typed instead, and a typed quote line
+  // becomes a typed invoice line at conversion.
   let inventory = [];
   try {
-    inventory = (await getAll()).map((u) => ({
-      id: u.id,
-      description: `${u.title || `${u.make} ${u.model}`} (${u.id})`,
-      price: Number(u.price) || 0,
-      retail: Number(u.compareAt) || 0,
-      search: `${u.make || ''} ${u.model || ''} ${u.title || ''} ${u.category || ''} ${u.id || ''}`.toLowerCase()
-    }));
+    const catalog = await getAll().catch(() => []);
+    // Retail (the "was" price a bundle discount is shown against) only exists
+    // for a unit the website knows; a unit still in cleaning simply has none.
+    const retailOf = new Map(catalog.map((u) => [String(u.id).toUpperCase(), Number(u.compareAt) || 0]));
+    inventory = (await stockForInvoicing({ catalog }))
+      .map((u) => ({ ...u, retail: retailOf.get(String(u.id).toUpperCase()) || 0 }));
   } catch { inventory = []; }
 
   return (
