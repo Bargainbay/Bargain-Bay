@@ -39,6 +39,8 @@ export default function TeamAssistant({ placement = 'staff' }) {
   const [error, setError] = useState('');
   const [speak, setSpeak] = useState(true);
   const [talkMode, setTalkMode] = useState(false);
+  // Drivers only: whether it jokes about with them between stops.
+  const [banter, setBanter] = useState(null);
 
   const recRef = useRef(null);
   const streamRef = useRef(null);
@@ -68,6 +70,7 @@ export default function TeamAssistant({ placement = 'staff' }) {
         setThreadId(d.threadId);
         setMessages(d.messages || []);
         setPending(d.pending || []);
+        if ((d.teams || []).includes('driver')) setBanter(!!d.banter);
       })
       .catch(() => {});
   }, []);
@@ -264,6 +267,13 @@ export default function TeamAssistant({ placement = 'staff' }) {
 
   const answer = (yes) => { unlockAudio(); send({ typed: yes ? 'Yes, go ahead.' : 'No, cancel that.' }); };
 
+  const flipBanter = (on) => {
+    setBanter(on);
+    fetch('/api/assistant', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ banter: on })
+    }).catch(() => setBanter(!on));
+  };
+
   const newChat = () => {
     safe(() => window.localStorage.removeItem(THREAD_KEY));
     setThreadId(null);
@@ -332,18 +342,27 @@ export default function TeamAssistant({ placement = 'staff' }) {
             {!voice && <button type="submit" className="btn" disabled={state === 'thinking'}>Send</button>}
           </form>
 
-          {voice && (
+          {(voice || banter !== null) && (
             <div className="asst-opts">
-              <label>
-                <input type="checkbox" checked={talkMode} onChange={toggleTalk} /> Conversation (keeps listening)
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={speak}
-                  onChange={(e) => { setSpeak(e.target.checked); safe(() => window.localStorage.setItem(SPEAK_KEY, e.target.checked ? '1' : '0')); }}
-                /> Read replies aloud
-              </label>
+              {voice && (
+                <label>
+                  <input type="checkbox" checked={talkMode} onChange={toggleTalk} /> Conversation (keeps listening)
+                </label>
+              )}
+              {banter !== null && (
+                <label title="Off means it answers and nothing else.">
+                  <input type="checkbox" checked={banter} onChange={(e) => flipBanter(e.target.checked)} /> Keep me company
+                </label>
+              )}
+              {voice && (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={speak}
+                    onChange={(e) => { setSpeak(e.target.checked); safe(() => window.localStorage.setItem(SPEAK_KEY, e.target.checked ? '1' : '0')); }}
+                  /> Read replies aloud
+                </label>
+              )}
             </div>
           )}
         </section>
