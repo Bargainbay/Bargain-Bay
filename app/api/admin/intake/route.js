@@ -18,6 +18,9 @@ import {
   markIntakeTested, rejectIntake, intakeLiveStatus
 } from '../../../../lib/intake';
 import { addUnitPhotos, MAX_PHOTOS } from '../../../../lib/unit-photos';
+import { heldUnitsLike } from '../../../../lib/stock-reconcile';
+import { normModel } from '../../../../lib/stock-match';
+import { torontoDate } from '../../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -51,13 +54,50 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Unknown intake mode.' }, { status: 400 });
     }
     const f = (k) => String(form.get(k) || '').trim();
+
+    // Do we already have this machine? A vendor drop-off is a unit nobody bought,
+    // so nothing else in the building knows about it — and on 2026-09-19 a
+    // Hisense RQ22A4CSD went in this way while S-ORD115612 had already put three
+    // on the tracker. A matching SERIAL is refused outright (it is the same
+    // machine). A matching MODEL stops and shows what we hold; going ahead needs
+    // the serial and an explicit "this is a different machine", and the row
+    // records who said so and which units it was told about.
+    if (normModel(f('model')).length < 5) {
+      return NextResponse.json({ error: 'Enter the model number off the unit’s sticker — it is how we check we don’t already have it.' }, { status: 400 });
+    }
+    let held;
+    try { held = await heldUnitsLike({ model: f('model'), serial: f('serial') }); }
+    catch (e) { return NextResponse.json({ error: e?.message || 'Could not check the tracker.' }, { status: 500 }); }
+    if (held.sameSerial.length) {
+      const u = held.sameSerial[0];
+      return NextResponse.json({
+        duplicate: true, canOverride: false, sameSerial: held.sameSerial, sameModel: [], rsops: [],
+        error: `Serial ${f('serial')} is already on the tracker as ${u.sku} (${u.status}). This machine is already booked in — nothing was added.`
+      }, { status: 409 });
+    }
+    const already = [...held.sameModel, ...held.rsops.map(({ _unit, ...r }) => r)];
+    let notes = '';
+    if (already.length) {
+      if (f('confirmDifferent') !== '1') {
+        return NextResponse.json({
+          duplicate: true, canOverride: true, sameSerial: [], sameModel: held.sameModel,
+          rsops: held.rsops.map(({ _unit, ...r }) => r),
+          error: `We already have ${already.length} ${f('model')} — check the serial against these before adding another.`
+        }, { status: 409 });
+      }
+      if (normModel(f('serial')).length < 4) {
+        return NextResponse.json({ error: 'Enter the serial off the sticker — it is what shows this is a different machine from the ones we already have.' }, { status: 400 });
+      }
+      notes = `Vendor drop-off booked in by ${s.name || s.email} on ${torontoDate(new Date())} although we already held ${already.length} of this model (${already.map((u) => u.sku).slice(0, 8).join(', ')}) — confirmed a different machine, serial ${f('serial')}.`;
+    }
+
     let sku;
     let booked = true; // did the consignment liability get recorded?
     try {
       const r = await addConsignmentUnit({
         make: f('make'), model: f('model'), category: f('category'), condition: f('condition'),
         retail: f('retail'), cost: f('cost'), vendor: f('vendor'), serial: f('serial'),
-        description: f('description'), note: f('note'),
+        description: f('description'), note: f('note'), notes,
         createdBy: s.email || null
       });
       sku = r.sku;

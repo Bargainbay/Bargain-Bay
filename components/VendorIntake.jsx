@@ -35,7 +35,14 @@ export default function VendorIntake() {
   // null = not asked yet / no model typed. Drives the no-stock-photo warning.
   const [stockPhoto, setStockPhoto] = useState(null);
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  // What the server said we already hold of this model (or serial). Cleared the
+  // moment the model or serial changes — it was an answer about THAT one.
+  const [dup, setDup] = useState(null);
+  const [different, setDifferent] = useState(false);
+  const set = (k) => (e) => {
+    if (k === 'model' || k === 'serial') { setDup(null); setDifferent(false); }
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+  };
   const inp = { padding: '7px 9px', borderRadius: 8, border: '1px solid var(--line)', fontSize: 13.5 };
 
   // Has this model got a stock photo? Asked as the rep types, debounced, because
@@ -83,7 +90,8 @@ export default function VendorIntake() {
 
   async function add() {
     setErr('');
-    if (!form.make.trim() && !form.model.trim()) { setErr('Enter at least a make or model.'); return; }
+    if (!form.model.trim()) { setErr('Enter the model number off the sticker — it is how we check we don’t already have it.'); return; }
+    if (different && !form.serial.trim()) { setErr('Enter the serial — it is what shows this is a different machine.'); return; }
     if (!form.condition) { setErr('Pick a condition — the tracker works the sale price out from it, and without one the unit will never reach the site.'); return; }
     if (!(Number(form.retail) > 0)) { setErr('Enter the retail price — the sale price is a percentage of it.'); return; }
     setBusy(true);
@@ -91,10 +99,13 @@ export default function VendorIntake() {
       const fd = new FormData();
       fd.set('mode', 'consignment');
       for (const [k, v] of Object.entries(form)) fd.set(k, v);
+      if (dup?.canOverride && different) fd.set('confirmDifferent', '1');
       photos.forEach((p, i) => fd.append('photos', p.blob, `photo-${i + 1}.jpg`));
       const res = await fetch('/api/admin/intake', { method: 'POST', body: fd });
       const d = await res.json();
+      if (res.status === 409 && d.duplicate) { setDup(d); setDifferent(false); setErr(d.error); return; }
       if (!res.ok) throw new Error(d.error || 'Could not add that unit.');
+      setDup(null); setDifferent(false);
       const title = [form.make, form.model].filter(Boolean).join(' ') || form.category;
       setAdded((a) => [{
         sku: d.sku, title, photos: d.photosSaved || 0,
@@ -186,10 +197,41 @@ export default function VendorIntake() {
         <input type="number" min="0" step="0.01" placeholder="Cost $" value={form.cost} onChange={set('cost')}
           style={{ ...inp, width: 92 }} title="What we've agreed to pay the vendor when it sells." />
         <input placeholder="Vendor" value={form.vendor} onChange={set('vendor')} style={{ ...inp, width: 130 }} />
-        <input placeholder="Serial (optional)" value={form.serial} onChange={set('serial')} style={{ ...inp, width: 150 }} />
+        <input placeholder="Serial" value={form.serial} onChange={set('serial')} style={{ ...inp, width: 150 }} />
         <input placeholder="Note for the tracker (optional)" value={form.note} onChange={set('note')} style={{ ...inp, width: 220 }}
           title="Goes in the Invoice column beside CONSIGNMENT — e.g. the terms, or who dropped it off." />
       </div>
+
+      {dup && (
+        <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--warn, #e0a800)', background: 'var(--warn-bg, #fff8e6)' }}>
+          <b>{dup.canOverride ? `We already have this model:` : 'This machine is already booked in:'}</b>
+          <ul style={{ margin: '6px 0', paddingLeft: 18, fontSize: 13 }}>
+            {[...(dup.sameSerial || []), ...(dup.sameModel || []), ...(dup.rsops || [])].map((u) => (
+              <li key={u.sku}>
+                <a href={`/w/u/${encodeURIComponent(u.sku)}`} style={{ fontFamily: 'monospace' }}>{u.sku}</a>
+                {' '}· {[u.make, u.model].filter(Boolean).join(' ')} · {u.status || 'at RS Ops'}
+                {u.serial ? <> · serial <b>{u.serial}</b></> : ' · no serial recorded'}
+                {u.lot ? <> · lot {u.lot}</> : null}
+                {u.onInvoice ? ' · on an invoice' : ''}
+              </li>
+            ))}
+          </ul>
+          {dup.canOverride ? (
+            <>
+              <div className="hint" style={{ margin: '0 0 6px' }}>
+                If the machine in front of you is one of these, <b>don&apos;t add it</b> — it&apos;s already on the tracker and the site.
+                Only add it if a vendor really left another one.
+              </div>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13.5 }}>
+                <input type="checkbox" checked={different} onChange={(e) => setDifferent(e.target.checked)} />
+                A vendor left another one — this is a different machine (serial required, and noted on the tracker)
+              </label>
+            </>
+          ) : (
+            <div className="hint" style={{ margin: 0 }}>Nothing was added. If the serial was mistyped, correct it and try again.</div>
+          )}
+        </div>
+      )}
 
       {stockPhoto === false && (
         <div className="hint" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)' }}>

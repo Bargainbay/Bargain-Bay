@@ -139,7 +139,12 @@ export default function InventoryGaps() {
       </td>
       <td style={{ verticalAlign: 'top', textAlign: 'right' }}>{money(s.amount)}</td>
       <td style={{ fontSize: 13 }}>
-        {s.candidates.length === 0 && <span className="hint" style={{ margin: 0 }}>No unsold unit of this model on the tracker.</span>}
+        {s.candidates.length === 0 && <span className="hint" style={{ margin: 0 }}>{s.models?.length ? 'No unsold unit of this model on the tracker.' : 'No model number on the line, and nothing on the tracker matches its brand and type.'}</span>}
+        {s.loose && (
+          <div className="hint" style={{ margin: '0 0 4px', color: 'var(--warn-ink, #8a5300)' }}>
+            The line names no model, so these are units of the same brand, type and size — not a match. Check the serial on the customer&apos;s paperwork or delivery photos before linking.
+          </div>
+        )}
         {s.candidates.length > 0 && quantityHint(s.description) && (
           <div className="hint" style={{ margin: '0 0 4px' }}>The line says “{quantityHint(s.description)}” — tick every {s.linkedSku ? 'other ' : ''}unit it sold.</div>
         )}
@@ -158,6 +163,7 @@ export default function InventoryGaps() {
                 title={`${c.model}${c.serial ? ` · serial ${c.serial}` : ''} · ${c.status || 'no status'} · received ${c.dateReceived || '—'}`}>
                 <span style={{ fontFamily: 'monospace' }}>{on ? '☑' : '☐'} {c.sku}</span>
                 <span style={{ display: 'block', color: on ? 'inherit' : 'var(--muted)', fontSize: 11.5 }}>{c.model} · {c.status || 'no status'}{c.waitingForInvoice ? ' · no invoice yet' : ''}</span>
+                {s.loose && c.description && <span style={{ display: 'block', color: on ? 'inherit' : 'var(--muted)', fontSize: 11.5, maxWidth: 260 }}>{c.description}</span>}
               </button>
             );
           })}
