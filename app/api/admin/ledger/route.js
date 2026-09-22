@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin, canKeepBooks } from '../../../../lib/auth';
 import { setOpeningBalances, journal, trialBalance, getOpeningBalances } from '../../../../lib/ledger';
 import { setPurchaseInvoicePaid, unpaidPurchaseInvoices } from '../../../../lib/finance';
-import { markConsignmentPaid, consignmentOwed } from '../../../../lib/consignment';
+import { markConsignmentPaid, consignmentOwed, removeConsignmentUnit } from '../../../../lib/consignment';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,6 +30,16 @@ export async function POST(req) {
     if (b.action === 'pay_consignment') {
       await markConsignmentPaid(b.sku, { paidOn: b.paidOn, amount: b.amount });
       return NextResponse.json({ ok: true, owed: await consignmentOwed() });
+    }
+    // It was never consigned: booked in as a vendor drop-off when it was our own
+    // stock all along (VD-MU7671R18FL, 2026-09-22 — an RQ22A4CSD from
+    // S-ORD115612 that we had already paid SecondShop for). The liability never
+    // existed, so the row goes rather than being settled: marking it paid would
+    // put money in the ledger that never left the bank. Refused once it HAS been
+    // settled — that is a real payment and a different conversation.
+    if (b.action === 'not_consigned') {
+      const gone = await removeConsignmentUnit(b.sku);
+      return NextResponse.json({ ok: true, removed: gone, owed: await consignmentOwed() });
     }
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (e) {

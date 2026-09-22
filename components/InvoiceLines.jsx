@@ -22,13 +22,17 @@ const PLACEHOLDER = {
 function searchStock(stock, q, exclude) {
   return searchStockUnits(stock, q, { exclude, limit: 8 });
 }
-export default function InvoiceLines({ items, setItems, showCost = false, services = [], stock = [] }) {
+export default function InvoiceLines({ items, setItems, showCost = false, services = [], stock = [], taxInclusive = false }) {
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const patchItem = (i, patch) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, ...patch } : it)));
   // A unit already on another line can't be picked twice.
   const onLines = new Set(items.map((it) => it.sku).filter(Boolean));
+  // minPrice rides along with the unit: consigned stock (a vendor's drop-off)
+  // may not be sold under cost + 20%, and the rep has to see the line before
+  // they quote a number, not after the save is refused.
   const pick = (i, u) => patchItem(i, {
     sku: u.id, description: u.description, q: '', offStock: false, offStockReason: null,
+    minPrice: u.minPrice || 0, consignedTo: u.consignedTo || null,
     // Keep a price the rep already typed; otherwise take the list price when there is one.
     amount: String(items[i]?.amount || '') || (u.price > 0 ? String(u.price) : '')
   });
@@ -95,6 +99,18 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
           <button type="button" className="btn inv-del" onClick={() => removeRow(i)} aria-label="Remove line">×</button>
         </div>
 
+        {isUnitLine(it.kind) && it.sku && it.minPrice > 0 && (() => {
+          // The typed figure is tax-in when the invoice is; the floor is pre-tax.
+          const exTax = taxInclusive ? (Number(it.amount) || 0) / 1.13 : (Number(it.amount) || 0);
+          const under = Number(it.amount) > 0 && exTax + 0.005 < it.minPrice;
+          return (
+            <div className="hint" style={{ margin: '-4px 0 8px', color: under ? 'var(--danger, #b00)' : undefined, fontWeight: under ? 600 : undefined }}>
+              {it.consignedTo ? `${it.consignedTo}'s ` : 'A vendor\u2019s '}drop-off stock — at least
+              {' '}${it.minPrice.toFixed(2)} before tax{taxInclusive ? ` (${(it.minPrice * 1.13).toFixed(2)} tax-in)` : ''}
+              {under ? ' — this line is under it and the invoice will be refused.' : '.'}
+            </div>
+          );
+        })()}
         {isUnitLine(it.kind) && it.sku && (
           <div className="hint" style={{ margin: '-4px 0 8px' }}>
             From stock: <b style={{ fontFamily: 'monospace' }}>{it.sku}</b>

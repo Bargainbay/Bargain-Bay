@@ -36,6 +36,9 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  // A refused below-floor sale, and the admin's deliberate go-ahead for it.
+  const [belowFloor, setBelowFloor] = useState(false);
+  const [belowFloorOk, setBelowFloorOk] = useState(false);
   const [done, setDone] = useState(null);
   const acDone = useRef(false);
   const hasMaps = !!mapsKey();
@@ -157,12 +160,19 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
       const res = await fetch('/api/admin/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, items: toPayload(items), addHst, taxInclusive: taxMode === 'inclusive',
+        body: JSON.stringify({ name, email, items: toPayload(items), addHst, taxInclusive: taxMode === 'inclusive', belowFloorOk: belowFloorOk,
           daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate,
           leadSource, leadBy })
       });
       const d = await res.json();
-      if (!res.ok) { setErr(d.error || 'Could not create the invoice.'); return; }
+      if (!res.ok) {
+        setErr(d.error || 'Could not create the invoice.');
+        // Only an admin is offered the override, and only for the save that was
+        // just refused — it is a decision on this sale, never a setting.
+        setBelowFloor(!!d.belowFloor && !hideCost);
+        return;
+      }
+      setBelowFloor(false);
       setDone(d.invoice);
       setName(''); setEmail(''); setItems([blankItem()]); setMemo(''); setInvoiceDate(todayToronto());
       setDeliveryMethod('pickup'); setAddress(''); setCity(''); setPostal(''); setPhone('');
@@ -247,7 +257,8 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
         </div>
       )}
 
-      <InvoiceLines items={items} setItems={setItems} services={SERVICES} showCost={!hideCost} stock={inventory} />
+      <InvoiceLines items={items} setItems={setItems} services={SERVICES} showCost={!hideCost} stock={inventory}
+        taxInclusive={taxMode === 'inclusive'} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
         <TaxMode mode={taxMode} onChange={changeTaxMode} />
@@ -301,6 +312,16 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
           click Create saw the page not move and reported that invoicing was
           dead. The error has to appear where the eyes already are. */}
       {err && <div className="error-box" style={{ marginTop: 12 }}>{err}</div>}
+      {belowFloor && (
+        <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 8, fontSize: 13.5 }}>
+          <input type="checkbox" checked={belowFloorOk} onChange={(e) => setBelowFloorOk(e.target.checked)} />
+          <span>
+            Sell it under the floor anyway. <span className="hint" style={{ margin: 0 }}>
+              We still owe the vendor their cost in full, so the shortfall comes out of our own money. Admin only, and only this sale.
+            </span>
+          </span>
+        </label>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
         <div style={{ fontSize: 14, color: 'var(--muted)' }}>

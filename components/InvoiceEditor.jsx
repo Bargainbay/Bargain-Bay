@@ -15,7 +15,7 @@ import { searchStockUnits } from '../lib/stock-match';
 const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 const fmtMoney = (n) => '$' + (Number(n) || 0).toFixed(2);
 
-export default function InvoiceEditor({ invoice, inventory = [], senders = [] }) {
+export default function InvoiceEditor({ invoice, inventory = [], senders = [], admin = false }) {
   const status = invoice.status || 'open';
   const settled = status === 'paid';
   const paidSoFar = Number(invoice.amountPaid) || 0;
@@ -66,6 +66,8 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [] })
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [belowFloor, setBelowFloor] = useState(false);
+  const [belowFloorOk, setBelowFloorOk] = useState(false);
   const [done, setDone] = useState('');
   // The invoice email is a payment request, so it's only offered — and only
   // pre-ticked — while money is still owed.
@@ -119,7 +121,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [] })
       const res = await fetch('/api/admin/invoices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', items: toPayload(items), addHst,
+        body: JSON.stringify({ invoiceId: invoice.id, action: 'edit', belowFloorOk, items: toPayload(items), addHst,
           taxInclusive: taxMode === 'inclusive', memo,
           resend: resend && !settled,
           name, email, phone, deliveryMethod, address, city, postal,
@@ -129,7 +131,8 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [] })
           invoiceDate: invoiceDate !== (invoice.invoiceDate || '') ? invoiceDate : '' })
       });
       const d = await res.json();
-      if (!res.ok) { setErr(d.error || 'Could not save.'); return; }
+      if (!res.ok) { setErr(d.error || 'Could not save.'); setBelowFloor(!!d.belowFloor && admin); return; }
+      setBelowFloor(false);
       if (d.emailError) {
         // Saved, but the email didn't go out — stay on the page so it's seen.
         setErr(`Saved, but the email failed: ${d.emailError} Use “Resend email” on the invoice list to retry.`);
@@ -213,7 +216,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [] })
         </div>
       )}
 
-      <InvoiceLines items={items} setItems={setItems} services={SERVICES} stock={inventory} />
+      <InvoiceLines items={items} setItems={setItems} services={SERVICES} stock={inventory} taxInclusive={taxMode === 'inclusive'} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
         <TaxMode mode={taxMode} onChange={changeTaxMode} />
@@ -278,6 +281,12 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [] })
         </div>
         {/* With the button, not at the top of the page — see InvoiceForm. */}
         {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
+        {belowFloor && (
+          <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 8, fontSize: 13.5 }}>
+            <input type="checkbox" checked={belowFloorOk} onChange={(e) => setBelowFloorOk(e.target.checked)} />
+            <span>Sell it under the floor anyway. <span className="hint" style={{ margin: 0 }}>We still owe the vendor their cost in full. Admin only, and only this save.</span></span>
+          </label>
+        )}
       </div>
     </div>
   );

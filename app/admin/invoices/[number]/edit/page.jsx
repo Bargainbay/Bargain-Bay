@@ -91,7 +91,7 @@ export default async function EditInvoicePage({ params }) {
         )}
       </p>
       <div className="panel">
-        <InvoiceEditor invoice={editorInvoice} inventory={inventory} senders={senders} />
+        <InvoiceEditor admin={isAdmin(session)} invoice={editorInvoice} inventory={inventory} senders={senders} />
       </div>
     </div>
   );
