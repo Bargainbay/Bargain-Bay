@@ -5,10 +5,19 @@
 import { NextResponse } from 'next/server';
 import { getSession, isStaff } from '../../../../../lib/auth';
 import { bookInForInvoice } from '../../../../../lib/stock-reconcile';
+import { knownVendors } from '../../../../../lib/stock-vendors';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60; // a tracker read, an RS Ops call and an append
+
+// Vendor names already on the tracker, so one vendor doesn't become three
+// spellings of itself in the Vendor column.
+export async function GET() {
+  const s = await getSession();
+  if (!s || !isStaff(s)) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  return NextResponse.json({ vendors: await knownVendors().catch(() => []) });
+}
 
 export async function POST(req) {
   const s = await getSession();
@@ -18,7 +27,9 @@ export async function POST(req) {
     const r = await bookInForInvoice({
       make: b.make, model: b.model, category: b.category, serial: b.serial,
       description: b.description, rsopsSku: b.rsopsSku ? String(b.rsopsSku) : null,
-      by: s.name || s.email
+      source: b.source === 'consignment' ? 'consignment' : 'invoice',
+      vendor: b.vendor, cost: b.cost,
+      by: s.name || s.email, byEmail: s.email || null
     });
     // A duplicate is an answer, not a failure: 409 with the units to pick.
     return NextResponse.json(r, { status: r.ok ? 200 : 409 });

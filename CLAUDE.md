@@ -544,6 +544,22 @@ when S-ORD115612 had already put three there.
   brand + appliance type (+ size) through the same search, only when the line
   names both a brand and a type. Labelled on screen as the right KIND of unit, not
   a match — which one went out is the serial's call.
+- **The book-in asks WHERE IT CAME FROM, and that is not cosmetic.** A vendor
+  **drop-off** (today that is Abi) is booked as `VD-…` with the vendor on the row,
+  `CONSIGNMENT` in the Invoice cell and a `consignment_units` record — stock we
+  hold and do not own, with the money owed the day it sells. Miss that and the
+  sale credits Inventory for a unit nobody paid for and the vendor is owed
+  nothing on paper (see the consignment section). Anything else is `BI-…` /
+  NEEDS INVOICE. Sales may book in a drop-off themselves (owner, 2026-09-22);
+  the purchase-invoice path tells them to check with the warehouse first.
+- **Stock by vendor** — `lib/stock-vendors.js`, the **By vendor** tab on
+  `/admin/warehouse`, `GET /api/admin/warehouse?view=vendors`. Read from the
+  TRACKER, not `products`: the units a vendor rings up about are the ones that
+  are not listed — untested, in cleaning, waiting for a part. `groupRows` is pure
+  and exported so it can be tested without a tracker; vendor names are folded
+  case- and punctuation-insensitively (`Abi` and `abi ` are one vendor) and the
+  first spelling seen is the one shown. **Cost is stripped server-side**
+  (`withoutCost`) for a non-admin, same rule as the invoice form's cost box.
 - **Still open:** quote → invoice conversion (`convertQuoteToInvoice`) does not run
   `stockRuleProblem`, and the quote builder only offers units live on the website,
   so a quote can still carry typed appliance lines onto an invoice.

@@ -221,11 +221,23 @@ function OffStockReason({ line, onChange, onBack }) {
 // back here to pick instead. Model and serial are required because they are the
 // two things that tell us whether we already have it.
 function BookIn({ line, onCancel, onPicked }) {
-  const [f, setF] = useState({ make: '', model: '', category: 'Refrigerator', serial: '', description: '' });
+  const [f, setF] = useState({ make: '', model: '', category: 'Refrigerator', serial: '', description: '', source: 'consignment', vendor: '', cost: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [found, setFound] = useState(null); // { sameSerial, sameModel, rsops }
+  const [vendors, setVendors] = useState([]);
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
+
+  // Vendor names already on the tracker — picking one keeps a vendor from
+  // becoming three spellings of itself.
+  useEffect(() => {
+    let live = true;
+    fetch('/api/admin/invoices/book-in')
+      .then((r) => r.json())
+      .then((d) => { if (live) setVendors(d.vendors || []); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
 
   async function send(extra = {}) {
     setBusy(true); setErr('');
@@ -237,6 +249,9 @@ function BookIn({ line, onCancel, onPicked }) {
       const d = await res.json().catch(() => ({}));
       if (d.duplicate) { setFound(d); setErr(d.error); return; }
       if (!res.ok || !d.ok) { setErr(d.error || 'Could not book it in.'); return; }
+      // The appliance is on the tracker either way; a failed consignment record
+      // is the BOOKS not knowing we owe for it, and only a person can fix that.
+      if (d.booked === false) window.alert('Booked in — but the consignment record failed, so the books don\u2019t know we owe this vendor. Tell the owner.');
       onPicked({ id: d.sku, description: d.description, price: 0 });
     } catch { setErr('Could not reach the server.'); }
     finally { setBusy(false); }
@@ -250,6 +265,35 @@ function BookIn({ line, onCancel, onPicked }) {
       <div className="hint" style={{ margin: '0 0 8px' }}>
         Read the model and serial off the sticker. We check both against the tracker and RS Ops first — if we already have it, you&apos;ll be shown it to pick instead.
       </div>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 8, fontSize: 13.5 }}>
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input type="radio" name={`src-${line.q || 'x'}`} checked={f.source === 'consignment'}
+            onChange={() => setF((x) => ({ ...x, source: 'consignment' }))} />
+          A vendor dropped it off
+        </label>
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <input type="radio" name={`src-${line.q || 'x'}`} checked={f.source === 'invoice'}
+            onChange={() => setF((x) => ({ ...x, source: 'invoice' }))} />
+          It came on a purchase invoice
+        </label>
+      </div>
+      {f.source === 'consignment' ? (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+          <input style={{ flex: '1 1 160px' }} list="bookin-vendors" value={f.vendor} onChange={set('vendor')}
+            placeholder="Which vendor dropped it off?" />
+          <datalist id="bookin-vendors">{vendors.map((v) => <option key={v} value={v} />)}</datalist>
+          <input style={{ flex: '0 1 140px' }} type="number" min="0" step="0.01" value={f.cost} onChange={set('cost')}
+            placeholder="Agreed cost (optional)" title="What we pay the vendor when it sells" />
+          <span className="hint" style={{ margin: 0, flexBasis: '100%' }}>
+            Booked as stock we hold but don&apos;t own — the vendor is owed the day it sells.
+          </span>
+        </div>
+      ) : (
+        <div className="hint" style={{ margin: '0 0 8px' }}>
+          Check with the warehouse first — most &ldquo;missing&rdquo; units are on the floor waiting to be booked in.
+          It goes on the tracker with no cost and stays on Stock gaps until the purchase invoice is uploaded.
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <input style={{ flex: '1 1 110px' }} value={f.make} onChange={set('make')} placeholder="Make" />
         <input style={{ flex: '1 1 140px' }} value={f.model} onChange={set('model')} placeholder="Model #" autoCapitalize="characters" spellCheck={false} />

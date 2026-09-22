@@ -18,6 +18,7 @@ const TABS = [
   { key: 'find', label: 'Find a unit' },
   { key: 'spots', label: 'Spots' },
   { key: 'unplaced', label: 'Not placed yet' },
+  { key: 'vendors', label: 'By vendor' },
   { key: 'labels', label: 'Labels' }
 ];
 
@@ -218,6 +219,7 @@ export default function Warehouse({ admin = false, initialUnit = '', initialSpot
           onOpenUnit={openUnit} onChanged={loadSpots} />
       )}
       {tab === 'unplaced' && <UnplacedTab onOpenUnit={openUnit} />}
+      {tab === 'vendors' && <VendorsTab admin={admin} onOpenUnit={openUnit} />}
       {tab === 'labels' && <LabelsTab />}
     </div>
     </AreasContext.Provider>
@@ -756,6 +758,115 @@ function AddSpot({ onAdded }) {
 }
 
 // ── Not placed yet ──────────────────────────────────────────────────────────
+// Stock grouped by who it came from (lib/stock-vendors.js). Read from the
+// TRACKER, not the website, because the units a vendor asks about are usually
+// the ones that aren't listed yet — untested, in cleaning, waiting for a part.
+// Cost is admin-only and is stripped on the server; `admin` here only decides
+// whether to draw the column.
+const BUCKETS = [
+  ['live', 'On sale'],
+  ['working', 'Cleaning / QA'],
+  ['unpriced', 'No price yet'],
+  ['notReady', 'Untested / repair'],
+  ['salvage', 'Salvage']
+];
+const cash = (n) => `$${(Number(n) || 0).toLocaleString('en-CA', { maximumFractionDigits: 0 })}`;
+
+function VendorsTab({ admin, onOpenUnit }) {
+  const [d, setD] = useState(null);
+  const [err, setErr] = useState('');
+  const [open, setOpen] = useState('');
+
+  useEffect(() => {
+    let current = true;
+    (async () => {
+      try { const r = await get({ view: 'vendors' }); if (current) { setD(r); setErr(''); } }
+      catch (e) { if (current) setErr(e.message); }
+    })();
+    return () => { current = false; };
+  }, []);
+
+  if (err) return <div className="error-box">{err}</div>;
+  if (!d) return <p className="hint">Reading the tracker…</p>;
+  if (!d.vendors.length) return <p className="hint">No stock on the tracker.</p>;
+
+  const v = d.vendors.find((x) => x.key === open);
+  return (
+    <div>
+      <p className="hint" style={{ marginTop: 0 }}>
+        Everything on the tracker that isn&apos;t sold, by who it came from — {d.totals.onHand} units from {d.totals.vendors} vendors
+        {d.totals.consigned > 0 && <>, {d.totals.consigned} of them dropped off (we pay when they sell)</>}.
+        Tap a vendor for the units.
+      </p>
+      <div className="table-wrap">
+        <table className="admin">
+          <thead>
+            <tr>
+              <th>Vendor</th><th style={{ textAlign: 'right' }}>On hand</th>
+              {BUCKETS.map(([k, label]) => <th key={k} style={{ textAlign: 'right' }}>{label}</th>)}
+              <th style={{ textAlign: 'right' }}>Retail</th>
+              {admin && <th style={{ textAlign: 'right' }}>Cost</th>}
+              <th style={{ textAlign: 'right' }}>Sold</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.vendors.map((row) => (
+              <tr key={row.key} style={{ cursor: 'pointer', background: row.key === open ? 'var(--line-soft, #f4f4f4)' : undefined }}
+                onClick={() => setOpen(row.key === open ? '' : row.key)}>
+                <td>
+                  <b>{row.name}</b>
+                  {row.consigned > 0 && <span className="pill" style={{ marginLeft: 6 }}>{row.consigned} dropped off</span>}
+                </td>
+                <td style={{ textAlign: 'right' }}>{row.onHand}</td>
+                {BUCKETS.map(([k]) => <td key={k} style={{ textAlign: 'right', color: row.counts[k] ? 'inherit' : 'var(--muted)' }}>{row.counts[k] || '—'}</td>)}
+                <td style={{ textAlign: 'right' }}>{cash(row.retail)}</td>
+                {admin && <td style={{ textAlign: 'right' }}>{cash(row.cost)}{row.costMissing > 0 && <span className="hint" style={{ display: 'block', margin: 0 }}>{row.costMissing} with no cost</span>}</td>}
+                <td style={{ textAlign: 'right', color: 'var(--muted)' }}>{row.sold || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {v && (
+        <div className="panel" style={{ marginTop: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+            <h2 style={{ margin: 0 }}>{v.name} — {v.onHand} unit{v.onHand === 1 ? '' : 's'} here</h2>
+            <button type="button" className="btn" onClick={() => setOpen('')}>Close</button>
+          </div>
+          {v.oldest && <p className="hint" style={{ marginTop: 4 }}>Oldest arrived {v.oldest}.</p>}
+          <div className="table-wrap">
+            <table className="admin">
+              <thead>
+                <tr><th>Unit</th><th>Status</th><th>Spot</th><th>Received</th>
+                  <th style={{ textAlign: 'right' }}>Retail</th>{admin && <th style={{ textAlign: 'right' }}>Cost</th>}</tr>
+              </thead>
+              <tbody>
+                {v.units.map((u) => (
+                  <tr key={u.sku}>
+                    <td>
+                      <button type="button" className="linkish" style={{ background: 'none', border: 0, padding: 0, color: 'var(--link, #0a58ca)', cursor: 'pointer', fontFamily: 'monospace' }}
+                        onClick={() => onOpenUnit(u.sku)}>{u.sku}</button>
+                      <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>
+                        {[u.make, u.model].filter(Boolean).join(' ')}{u.consigned ? ' · dropped off' : ''}
+                      </span>
+                    </td>
+                    <td>{u.status}</td>
+                    <td>{u.location || <span className="hint" style={{ margin: 0 }}>not placed</span>}</td>
+                    <td>{u.dateReceived || '—'}</td>
+                    <td style={{ textAlign: 'right' }}>{u.retail ? cash(u.retail) : '—'}</td>
+                    {admin && <td style={{ textAlign: 'right' }}>{u.cost ? cash(u.cost) : '—'}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function UnplacedTab({ onOpenUnit }) {
   const [d, setD] = useState(null);
   const [err, setErr] = useState('');
