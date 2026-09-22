@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { isCreditLine, isUnitLine, INTAKE_CATEGORIES } from '../lib/constants';
 import { searchStockUnits, OFF_STOCK_REASONS, OFF_STOCK_OTHER } from '../lib/stock-match';
 import { blankItem, serviceItem, creditItem, subtotalOf, goodsOf, toPayload, fromInvoice, stockLineProblem } from '../lib/invoice-lines';
