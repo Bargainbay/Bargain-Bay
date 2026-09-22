@@ -29,7 +29,16 @@ export async function POST(req) {
         return NextResponse.json({ error: 'That code is wrong or has expired. Send a new one.' }, { status: 400 });
       }
       const jwt = await createSessionToken(user, { days: DRIVER_SESSION_DAYS });
-      const res = NextResponse.json({ ok: true });
+      // The native app has no cookie jar we can rely on, so it asks for the
+      // token itself and sends it back as `Authorization: Bearer`. Same signed
+      // token, same expiry, same token_version revocation — signing out on the
+      // web still signs the app out. Only ever returned when the caller asks
+      // (`client: 'app'`), so the browser flow is byte-identical to before.
+      const res = NextResponse.json(
+        body.client === 'app'
+          ? { ok: true, token: jwt, name: user.name || null, days: DRIVER_SESSION_DAYS }
+          : { ok: true }
+      );
       res.cookies.set(SESSION_COOKIE, jwt, sessionCookieOptions({ days: DRIVER_SESSION_DAYS }));
       touchDriverSeen(user.id).catch(() => {});
       return res;
