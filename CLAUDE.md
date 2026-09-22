@@ -608,6 +608,43 @@ cannot drift.
   this vendor has to be able to see off the tracker that the money is owed
   **on sale**, not already paid. The books know it too — see below.
 
+### Nothing a vendor dropped off is sold thin (added 2026-09-22)
+**The owner's rule: a consigned unit goes out at no less than cost + 20%**, and
+below that an invoice is REFUSED (an admin can override, per save). Consignment
+stock is ours to sell and somebody else's to be paid for, so a thin sale isn't a
+thin margin — it is our own money covering the vendor's cost.
+
+- **THE TWO SIDES ARE QUOTED DIFFERENTLY AND THAT IS THE TRAP.** Abi's costs are
+  **tax-included and carry no HST invoice we can claim** (owner, 2026-09-22), so
+  $1,600 is $1,600 out of the bank. Our prices are **pre-tax** — the HST on top is
+  collected for the CRA, not earned. So the floor compares our PRE-TAX price with
+  his FULL cost. Comparing a tax-in selling price against it flatters every line
+  by 13%, which on his LF25S6206S ($1,258.80 listed, $1,250 cost) is the
+  difference between "thin" and "a loss".
+- `CONSIGNMENT_MIN_MARGIN_PCT` / `consignmentFloor(cost)` in `lib/constants.js` —
+  one definition, `Math.ceil` because a floor that rounds down is not a floor.
+  A cost of 0 floors nothing.
+- **Four places enforce it**, because each is a different way to sell a unit:
+  `decorate()` in `lib/pricing.js` clamps the storefront price UP to the floor
+  (and the member price with it, which is capped by the public price anyway);
+  `/api/admin/clearance` refuses a markdown under it; `/api/admin/invoices` POST
+  and edit refuse a line under it (`consignmentFloorProblem`), checked on the
+  PRE-TAX lines `priceInvoice` is about to store, so a tax-inclusive invoice is
+  compared like for like; and `stockForInvoicing` carries `minPrice` so the rep
+  sees the line before quoting. **The floor is the one cost-derived figure a
+  sales screen is shown** — it is a price, not a cost, and blocking somebody
+  without telling them the number is not a workable rule.
+- **Every check degrades OPEN**: an unreadable `consignment_units` table means
+  "nothing is consigned". Losing a real sale to a failed lookup is worse than a
+  thin one.
+- The **By vendor** tab counts units the TRACKER prices under the floor — the
+  storefront won't sell them that low, but the row is where it gets fixed
+  (Retail, or the Condition that multiplies it).
+- `removeConsignmentUnit` + **"Not consigned"** on the ledger's owed panel: a
+  unit booked in as a drop-off that was ours all along. The row is DELETED, not
+  settled — marking it paid would record money leaving the bank that never did.
+  A unit already settled is refused.
+
 ### Stock we hold but do not own
 `lib/consignment.js`, table `consignment_units`, ledger account **2150 "Owed to
 consignment vendors"**, and an *Owed to consignment vendors* panel on

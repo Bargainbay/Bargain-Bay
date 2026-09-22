@@ -15,6 +15,7 @@ export default function ConsignmentOwed({ initial = [], canEdit = true }) {
   const [rows, setRows] = useState(initial);
   const [edit, setEdit] = useState({}); // sku -> { date, amount }
   const [busy, setBusy] = useState('');
+  const [armed, setArmed] = useState('');
   const [err, setErr] = useState('');
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
 
@@ -31,6 +32,20 @@ export default function ConsignmentOwed({ initial = [], canEdit = true }) {
       setRows(d.owed);
       router.refresh();
     } catch (e2) { setErr(e2.message); } finally { setBusy(''); }
+  }
+
+  async function notConsigned(r) {
+    setBusy(`x:${r.sku}`); setErr('');
+    try {
+      const res = await fetch('/api/admin/ledger', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'not_consigned', sku: r.sku })
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'That failed.');
+      setRows(d.owed);
+      router.refresh();
+    } catch (e2) { setErr(e2.message); } finally { setBusy(''); setArmed(''); }
   }
 
   if (!rows.length) {
@@ -76,6 +91,15 @@ export default function ConsignmentOwed({ initial = [], canEdit = true }) {
                       style={{ width: 88, fontSize: 12.5 }} title="Leave blank to pay the agreed cost." />{' '}
                     <button className="dash-filter" disabled={!!busy} onClick={() => pay(r)}>
                       {busy === r.sku ? '…' : 'Mark paid'}
+                    </button>{' '}
+                    {/* A unit booked in as a drop-off that was actually ours: the
+                        debt never existed, so it is removed rather than paid —
+                        marking it paid would record money leaving the bank that
+                        never did. Two taps, because it deletes a record. */}
+                    <button className="dash-filter" disabled={!!busy}
+                      title="This unit was ours all along — it was booked in as a drop-off by mistake"
+                      onClick={() => (armed === r.sku ? notConsigned(r) : setArmed(r.sku))}>
+                      {busy === `x:${r.sku}` ? '…' : armed === r.sku ? 'Remove it?' : 'Not consigned'}
                     </button>
                   </td>
                 )}

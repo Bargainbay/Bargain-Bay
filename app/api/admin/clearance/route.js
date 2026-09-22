@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { listClearanceAdmin, searchCatalog, upsertClearance, removeClearance } from '../../../../lib/clearance';
+import { consignmentFloors } from '../../../../lib/consignment';
+import { money } from '../../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +35,16 @@ export async function POST(req) {
   const price = Number(body.price);
   if (!sku) return NextResponse.json({ error: 'sku required' }, { status: 400 });
   if (!Number.isFinite(price) || price <= 0) return NextResponse.json({ error: 'valid price required' }, { status: 400 });
+  // Consigned stock can't be marked down under cost + 20%: a below-cost
+  // clearance is a decision the owner is entitled to make about OUR stock, and
+  // the money in a vendor's unit is the vendor's.
+  const floors = await consignmentFloors([sku]).catch(() => new Map());
+  const f = floors.get(sku);
+  if (f && f.floor > 0 && price + 0.005 < f.floor) {
+    return NextResponse.json({
+      error: `${sku} is ${f.vendor ? `${f.vendor}'s` : 'a vendor\u2019s'} drop-off stock — we owe ${money(f.cost)} for it when it sells, so it can't be cleared under ${money(f.floor)}.`
+    }, { status: 400 });
+  }
   try {
     const r = await upsertClearance({ sku, price, warrantyMonths: body.warrantyMonths, note: body.note, active: body.active });
     if (r && r.found === false) return NextResponse.json({ error: `No product with SKU ${sku}.` }, { status: 404 });

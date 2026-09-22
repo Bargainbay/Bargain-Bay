@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
 import { stockRuleProblem } from '../../../../lib/stock-reconcile';
-import { createAndSendInvoice, listInvoices, listInvoiceAuthors, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, refundInvoiceAmount, deleteInvoice,
+import { createAndSendInvoice, priceInvoice, listInvoices, listInvoiceAuthors, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, refundInvoiceAmount, deleteInvoice,
          updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, voidInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 import { confirmDoorCollection, rejectDoorCollection } from '../../../../lib/door-money';
+import { consignmentFloorProblem } from '../../../../lib/consignment';
+
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,6 +18,20 @@ async function admin() {
 
 // Selling surfaces (create/send/edit/mark-paid/void/refund invoices + quotes)
 // are open to sales associates as well as admins.
+// The floor is a rule about PRE-TAX money, and the figures arriving from a
+// tax-inclusive invoice are not pre-tax yet — so convert them exactly the way
+// the invoice itself will be stored (normalizeLines), rather than dividing by
+// 1.13 here and drifting from it.
+async function consignmentFloorCheck(items, { addHst, taxInclusive }) {
+  try {
+    const { lineItems } = priceInvoice(items, { addHst, taxInclusive: !!taxInclusive && !!addHst });
+    return await consignmentFloorProblem(lineItems);
+  } catch (e) {
+    console.error('consignment floor check failed', e?.message || e);
+    return ''; // degrade open: losing a sale to a failed check is the worse outcome
+  }
+}
+
 async function staff() {
   const s = await getSession();
   return !!(s && isStaff(s));
@@ -87,6 +103,16 @@ export async function POST(req) {
   // must keep working. Anything they type still surfaces on Stock gaps.
   const stockWrong = await stockRuleProblem(items).catch(() => null);
   if (stockWrong) return NextResponse.json({ error: stockWrong }, { status: 400 });
+
+  // Nothing a vendor dropped off goes out under cost + 20% (the owner's rule,
+  // 2026-09-22). Checked on the PRE-TAX lines, so a tax-inclusive invoice is
+  // compared like for like against a tax-in cost we pay in full. An ADMIN can
+  // override — a deal is sometimes worth doing — and the override is deliberate
+  // and per-save, never a setting.
+  const floorWrong = await consignmentFloorCheck(items, { addHst, taxInclusive });
+  if (floorWrong && !(body.belowFloorOk && isAdmin(await getSession()))) {
+    return NextResponse.json({ error: floorWrong, belowFloor: true }, { status: 400 });
+  }
 
   // Stamp the invoice with whoever is signed in. Taken from the session, never
   // from the request body — otherwise one rep could raise an invoice in another's
@@ -171,6 +197,10 @@ export async function PATCH(req) {
         ).catch(() => ({ rows: [] }));
         const stockWrong = await stockRuleProblem(body.items, { previous }).catch(() => null);
         if (stockWrong) return NextResponse.json({ error: stockWrong }, { status: 400 });
+        const floorWrong = await consignmentFloorCheck(body.items, { addHst: !!body.addHst, taxInclusive: !!body.taxInclusive });
+        if (floorWrong && !(body.belowFloorOk && isAdmin(await getSession()))) {
+          return NextResponse.json({ error: floorWrong, belowFloor: true }, { status: 400 });
+        }
       }
       const updated = await updateInvoice(invoiceId, {
         items: Array.isArray(body.items) ? body.items : [],
