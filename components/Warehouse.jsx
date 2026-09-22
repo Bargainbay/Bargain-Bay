@@ -797,6 +797,11 @@ function VendorsTab({ admin, onOpenUnit }) {
         Everything on the tracker that isn&apos;t sold, by who it came from — {d.totals.onHand} units from {d.totals.vendors} vendors
         {d.totals.consigned > 0 && <>, {d.totals.consigned} of them dropped off (we pay when they sell)</>}.
         Tap a vendor for the units.
+        {d.totals.belowFloor > 0 && (
+          <b style={{ display: 'block', color: 'var(--danger, #b00)', marginTop: 4 }}>
+            {d.totals.belowFloor} dropped-off unit{d.totals.belowFloor === 1 ? ' is' : 's are'} priced under cost + 20% on the tracker — fix the Retail or Condition on those rows.
+          </b>
+        )}
       </p>
       <div className="table-wrap">
         <table className="admin">
@@ -816,6 +821,7 @@ function VendorsTab({ admin, onOpenUnit }) {
                 <td>
                   <b>{row.name}</b>
                   {row.consigned > 0 && <span className="pill" style={{ marginLeft: 6 }}>{row.consigned} dropped off</span>}
+                  {row.belowFloor > 0 && <span className="pill" style={{ marginLeft: 6, background: 'var(--danger, #b00)', color: '#fff' }}>{row.belowFloor} under the floor</span>}
                 </td>
                 <td style={{ textAlign: 'right' }}>{row.onHand}</td>
                 {BUCKETS.map(([k]) => <td key={k} style={{ textAlign: 'right', color: row.counts[k] ? 'inherit' : 'var(--muted)' }}>{row.counts[k] || '—'}</td>)}
@@ -854,7 +860,10 @@ function VendorsTab({ admin, onOpenUnit }) {
                     <td>{u.status}</td>
                     <td>{u.location || <span className="hint" style={{ margin: 0 }}>not placed</span>}</td>
                     <td>{u.dateReceived || '—'}</td>
-                    <td style={{ textAlign: 'right' }}>{u.retail ? cash(u.retail) : '—'}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {u.retail ? cash(u.retail) : '—'}
+                      {u.belowFloor && <span style={{ display: 'block', fontSize: 11.5, color: 'var(--danger, #b00)' }}>sells at {cash(u.price)} · floor {cash(u.floor)}</span>}
+                    </td>
                     {admin && <td style={{ textAlign: 'right' }}>{u.cost ? cash(u.cost) : '—'}</td>}
                   </tr>
                 ))}

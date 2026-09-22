@@ -33,7 +33,16 @@ export default function QuoteActions({ quoteId, status, invoiceUrl, number }) {
     return <a href={invoiceUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>Invoiced ↗</a>;
   }
   if (msg) {
-    return <a href={msg.invoiceUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--ok)' }}>✓ {msg.invoiceNumber} ↗</a>;
+    return (
+      <span>
+        <a href={msg.invoiceUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline', color: 'var(--ok)' }}>✓ {msg.invoiceNumber} ↗</a>
+        {msg.untied > 0 && (
+          <span style={{ display: 'block', fontSize: 12, color: 'var(--warn-ink, #8a5300)' }}>
+            {msg.untied} line{msg.untied === 1 ? '' : 's'} with no stock unit — <a href="/admin/inventory-gaps" style={{ textDecoration: 'underline' }}>tie them on Stock gaps</a>
+          </span>
+        )}
+      </span>
+    );
   }
   if (!['open', 'accepted', 'expired'].includes(status)) return <span style={{ color: 'var(--muted)' }}>—</span>;
 
