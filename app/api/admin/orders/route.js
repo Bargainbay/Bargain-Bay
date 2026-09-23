@@ -1,11 +1,48 @@
 import { NextResponse } from 'next/server';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
-import { ORDER_STATUSES, updateOrderStatus } from '../../../../lib/orders';
+import { ORDER_STATUSES, updateOrderStatus, countOrders } from '../../../../lib/orders';
+import { loadOrders } from '../../../../lib/order-board';
 import { markUnitsSold } from '../../../../lib/catalog-sync';
 import { sendOrderStatusEmail } from '../../../../lib/email';
 
 export const dynamic = 'force-dynamic';
+
+// Later pages of the board, and the date-filtered window.
+//
+// The board's first paint is server-rendered; this is what "Load 200 more" and
+// the From/To filter call. Same gate as the PATCH below (staff — the people who
+// take the orders are the people who work them), and the same loader the page
+// itself uses, so a row fetched here carries the items, POD photos and warehouse
+// locations exactly as a row from the first paint does.
+export async function GET(req) {
+  const session = await getSession();
+  if (!session || !isStaff(session)) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  }
+  if (!hasDb()) return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+
+  const sp = req.nextUrl.searchParams;
+  // Every one of these is clamped/validated in lib/orders.js (limit capped, a
+  // date that isn't YYYY-MM-DD is ignored), so a hand-typed query string can
+  // neither pull the whole table nor reach the SQL.
+  const opts = {
+    limit: sp.get('limit'),
+    offset: sp.get('offset'),
+    from: sp.get('from'),
+    to: sp.get('to')
+  };
+
+  try {
+    const { orders, degraded } = await loadOrders(opts);
+    let total = null;
+    try { total = await countOrders(opts); } catch (e) { console.error('order count failed', e.message); }
+    return NextResponse.json({ orders, total, degraded });
+  } catch (e) {
+    console.error('admin orders load failed', e);
+    return NextResponse.json({ error: 'Could not load orders' }, { status: 500 });
+  }
+}
 
 // Staff, not admin. An order's own lifecycle — taking the money, saying it's
 // ready, sending it out, and cancelling the one that fell through — belongs to
