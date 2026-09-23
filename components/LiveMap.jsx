@@ -19,6 +19,11 @@ const ago = (s) => {
 };
 const REFRESH_MS = 20000;
 
+// A blunt rectangle for a truck. Drawn rather than taken from SymbolPath because
+// that set is circles and arrows, and the whole point is a silhouette that is
+// not a driver's dot.
+const VAN_PATH = 'M -9,-6 L 9,-6 L 9,6 L -9,6 Z';
+
 export default function LiveMap() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
@@ -64,35 +69,47 @@ export default function LiveMap() {
     if (!g || !map.current || !data) return;
     const bounds = new g.LatLngBounds();
     let any = false;
-    for (const d of data.drivers) {
-      if (d.lat == null || d.lng == null) continue;
+    const alive = new Set();
+    // A PHONE is a circle and a TRUCK is a rectangle, and they must not be told
+    // apart by colour alone: the two say different things (where the person is,
+    // where the van is) and they legitimately disagree the moment a driver walks
+    // a fridge up a driveway. Two dots the same shape at two ends of a street is
+    // a map nobody can read.
+    const plot = (key, subject, shape) => {
+      if (subject.lat == null || subject.lng == null) return;
       any = true;
-      const at = { lat: d.lat, lng: d.lng };
+      alive.add(key);
+      const at = { lat: subject.lat, lng: subject.lng };
       bounds.extend(at);
-      let m = markers.current.get(d.id);
+      let m = markers.current.get(key);
       if (!m) {
         m = new g.Marker({ map: map.current });
-        markers.current.set(d.id, m);
+        markers.current.set(key, m);
       }
       m.setPosition(at);
-      m.setTitle(`${d.name} — ${ago(d.ageSeconds)}`);
+      m.setTitle(`${subject.name} — ${ago(subject.ageSeconds)}`);
       // Fresh reads as solid; stale reads as an outline. Same shape, so the map
       // never has to be squinted at to tell which is which.
       m.setIcon({
-        path: g.SymbolPath.CIRCLE,
-        scale: d.fresh ? 9 : 7,
-        fillColor: d.fresh ? '#0E223B' : '#ffffff',
+        path: shape === 'van' ? VAN_PATH : g.SymbolPath.CIRCLE,
+        scale: shape === 'van' ? 1 : (subject.fresh ? 9 : 7),
+        fillColor: subject.fresh ? (shape === 'van' ? '#1d6b3f' : '#0E223B') : '#ffffff',
         fillOpacity: 1,
-        strokeColor: d.fresh ? '#ffffff' : '#9a9a9a',
-        strokeWeight: d.fresh ? 3 : 2
+        strokeColor: subject.fresh ? '#ffffff' : '#9a9a9a',
+        strokeWeight: subject.fresh ? 3 : 2
       });
-      m.setLabel(d.fresh
-        ? { text: d.name.slice(0, 1).toUpperCase(), color: '#fff', fontSize: '11px', fontWeight: '700' }
+      m.setLabel(subject.fresh
+        ? { text: subject.name.slice(0, 1).toUpperCase(), color: '#fff', fontSize: '11px', fontWeight: '700' }
         : null);
-    }
-    // Drivers who have never reported keep no marker.
-    for (const [id, m] of markers.current) {
-      if (!data.drivers.some((d) => d.id === id && d.lat != null)) { m.setMap(null); markers.current.delete(id); }
+    };
+
+    for (const d of data.drivers) plot(`d${d.id}`, d, 'phone');
+    for (const v of (data.vehicles || [])) plot(`v${v.id}`, v, 'van');
+
+    // Anything that has never reported keeps no marker. Keys are namespaced, or
+    // driver 3 and van 3 would share one and flicker between two positions.
+    for (const [key, m] of markers.current) {
+      if (!alive.has(key)) { m.setMap(null); markers.current.delete(key); }
     }
     if (any && !map.current.__framed) { map.current.fitBounds(bounds, 60); map.current.__framed = true; }
   }, [data]);
@@ -105,7 +122,10 @@ export default function LiveMap() {
   }, [focus]);
 
   const drivers = data?.drivers || [];
+  const vans = data?.vehicles || [];
   const live = drivers.filter((d) => d.fresh).length;
+  const vansLive = vans.filter((v) => v.fresh).length;
+  const tracker = data?.tracker || null;
 
   return (
     <div>
@@ -118,8 +138,62 @@ export default function LiveMap() {
 
       {err && <div className="error-box">{err}</div>}
 
+      {/* A tracker that has stopped being read looks exactly like a van that has
+          been parked since Friday, which is the whole reason this line exists —
+          the same silence CDA's watcher sat in for months. */}
+      {tracker?.lastFail && tracker.tracked > 0 && (
+        <div className="error-box">
+          <b>The van tracker is not being read.</b> {tracker.lastFail.reason}{' '}
+          Positions below are the last that reached us — the van may well have moved since.
+        </div>
+      )}
+
       <div className="live-wrap">
         <div className="live-list">
+          {/* The vans come FIRST because they are the reliable half: a tracker
+              reports whether or not anybody's phone is awake, so on most
+              afternoons this is the only list that answers "where is the truck".
+              Kept as its own list rather than merged into the drivers — see
+              vehiclePositions() for why the two are never folded together. */}
+          {vans.length > 0 && (
+            <>
+              <p className="hint" style={{ marginTop: 0 }}>
+                <b>Vans</b> · {vansLive} of {vans.length} reporting now
+              </p>
+              {vans.map((v) => (
+                <button key={`v${v.id}`} type="button"
+                  className={'live-row is-van' + (v.fresh ? ' is-live' : '') + (v.lat == null ? ' is-none' : '')}
+                  disabled={v.lat == null}
+                  onClick={() => setFocus({ lat: v.lat, lng: v.lng })}>
+                  <span className="live-dot" aria-hidden="true" />
+                  <span className="live-who">
+                    <b>{v.name}</b>{v.plate ? ` · ${v.plate}` : ''}
+                    <span className="live-when">
+                      {v.lat == null ? 'never reported' : ago(v.ageSeconds)}
+                      {v.fresh && v.speed != null && v.speed > 3 && ` · ${Math.round(v.speed)} km/h`}
+                      {/* A flat tracker is the quietest way this stops working. */}
+                      {v.battery != null && v.battery <= 20 && ` · battery ${v.battery}%`}
+                    </span>
+                    {/* Who has it, off the open shift — this ATTRIBUTES the van,
+                        it does not claim the person is standing next to it. */}
+                    {v.crew && <span className="live-job">{v.crew} on shift in it</span>}
+                  </span>
+                  {v.lat != null && (
+                    <a className="live-open" onClick={(e) => e.stopPropagation()}
+                      href={`https://www.google.com/maps?q=${v.lat},${v.lng}`}
+                      target="_blank" rel="noopener noreferrer">open ↗</a>
+                  )}
+                </button>
+              ))}
+              <p className="hint">
+                <b>A van reports on its own</b>, app or no app — roughly every few minutes while it is
+                moving, and it sleeps when parked, so a stationary truck goes quiet rather than
+                disappearing. Anything older than {data?.vanFreshMinutes || 15} minutes is shown as a last
+                known position.
+              </p>
+              <p className="hint" style={{ marginTop: 16 }}><b>Drivers&apos; phones</b></p>
+            </>
+          )}
           <p className="hint" style={{ marginTop: 0 }}>
             {live} of {drivers.length} reporting now · refreshes every {REFRESH_MS / 1000}s
           </p>

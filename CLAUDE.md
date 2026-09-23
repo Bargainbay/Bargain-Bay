@@ -2627,6 +2627,85 @@ the screen, and that notice is load-bearing.
   position in Google Maps — the list is what answers "where is Ruban", the map
   only makes it quicker.
 
+## A tracker in the van (added 2026-09-23)
+The other half of the section above, and the half that actually works while the
+van is moving. `lib/paj-gps.js` (the vendor client, no app imports),
+`lib/tracker-watch.js` (poll, backfill, alarm), `driver_pings.vehicle_id`,
+`vehicles.tracker_device_id`, `/api/cron/tracker`, and a **Vans** list at the top
+of the Live tab. Paired under People & access → the van's **tracker** button.
+
+- **We poll THEIR cloud; the device cannot be pointed at us.** A Salind 20 is
+  sealed, carries its own SIM and is locked to PAJ's FINDER portal — its manual
+  documents no SMS server command, so the usual trick of aiming a tracker at a
+  TCP listener of our own is not available. Don't go looking for it again.
+  `PAJ_EMAIL` + `PAJ_PASSWORD`; unset, the whole feature is simply off and
+  nobody is emailed about it.
+- **A truck is NOT a driver.** `driver_pings.user_id` is nullable now and a
+  `vehicle_id` sits beside it, with a CHECK that a ping belongs to one or the
+  other. The shortcut was a `users` row called "Box truck"; it would also have
+  put a phantom person in the roster, the Pay tab, both board columns,
+  `mergeDrivers` and `crewLost`'s missing-name banner — the same family as the
+  re-added driver and the second `vehicles` row.
+- **The two lists are never merged.** A phone says where the PERSON is, a
+  tracker says where the TRUCK is, and they disagree the moment a driver walks a
+  fridge up a driveway. Both are correct; folding one into the other overwrites a
+  real fix with a different real fix and leaves nobody able to tell which. The
+  van row names who is on shift in it (read live off the open `driver_shifts`,
+  `driving = true` only — a passenger is not responsible for a van), which
+  ATTRIBUTES the truck without claiming the person is standing next to it. On the
+  map a phone is a circle and a van is a rectangle: never colour alone.
+- **`VAN_FRESH_MINUTES` is 15 where a phone's is 5**, and that is the same
+  standard, not a weaker one. A phone samples every 45s while the app is open, so
+  five minutes of silence means something; a tracker reports every few minutes by
+  design and sleeps when parked, so five minutes would grey out a device that is
+  working perfectly and teach the office to ignore the colour.
+- **Two jobs, deliberately different.** `pollTrackers` is the DOT — last known
+  position, run from the Live tab's own fetch so the dispatcher looking at the
+  board is what pays for the call, throttled to once every 45s off a `settings`
+  row (not memory: instances don't share one). `backfillTrackers` is the TRAIL —
+  its own `vercel.json` entry every 20 minutes, asking `date_range` for
+  everything since our newest ping, so the hours nobody had the board open are
+  filled in properly rather than sampled into gaps. It is a separate cron entry
+  on purpose; each scheduled invocation gets its own time budget.
+- **The dedupe index is what makes both cheap.** `UNIQUE (vehicle_id, at) WHERE
+  vehicle_id IS NOT NULL` plus `ON CONFLICT … DO NOTHING`, so re-polling the same
+  fix and re-reading an overlapping window are free — which is why there is no
+  cursor anywhere to get out of step. Duplicate instants WITHIN one batch are
+  settled in JS first; the index cannot arbitrate those. Phone rows keep
+  `vehicle_id` NULL and NULLs never collide, so nothing about that path changed.
+- **Silence is the failure, and it is the one being defended against.** A van
+  parked since Friday and a tracker that died in March look identical on a map —
+  the exact shape of the CDA watcher reading nothing for months. So every give-up
+  path mails the dispatch desk (throttled on the MESSAGE, 12h) and the Live tab
+  banners it. **Check the env vars before debugging the code.**
+- **A point that cannot be attributed is DROPPED**, never handed to the only van
+  we happen to track: a dot on the wrong truck is worse than no dot, because
+  somebody routes off it.
+- **`upsertVehicle` writes `tracker_device_id` only when it is PASSED.** The fuel
+  editor, the day-rate box and the retire button all post a partial van; writing
+  the column unconditionally would mean retiring a van for the winter quietly
+  unpairs its tracker. Same rule as `updateJob`.
+- **LANDMINE — `Number(null)` is 0, and so is `Number('')`.** The shared `num()`
+  in `lib/driver-location.js` used a bare `isFinite` test, so a ping carrying no
+  position at all passed the lat/lng guard as **0,0** — a real coordinate in the
+  Gulf of Guinea, drawn on the board as a fix rather than dropped as the absence
+  it is. Found by testing the tracker path; it was latent on the phone path too.
+  Empty is not zero.
+- **Not built, on purpose:** no odometer (the Salind 20 is battery + magnet with
+  no vehicle connection, so `driver_shifts.start_km/end_km` stays typed by hand —
+  and distance is NOT derived from a trail that has sleep gaps in it, for the
+  same reason `mileageReport` only reports L/100km when both halves are real); no
+  geofence or tow alerts (they exist in PAJ's own portal and duplicating them is
+  a second thing to keep in step); and nothing is billed off tracker data —
+  `dispatch-money.js` still costs a stop from `time_in`/`time_out`.
+- **Tell the crew the truck is tracked.** Unlike the phone, this reports at
+  night and at weekends. The pairing screen says so; the driver app's existing
+  "the office can see you while the app is open" chip does not cover it.
+- Unverified until a real device is on the account, and both are marked in
+  `lib/paj-gps.js`: whether `speed` arrives in km/h, and which key carries the
+  device id. Field names are read through a candidate list and anything
+  unreadable drops its row rather than being guessed at.
+
 ## Two businesses, one codebase — BRANDS
 Bargain Bay is the consumer storefront. **RS Solutions is the delivery/service
 company** whose clients are other businesses (Transource et al). A client must

@@ -1498,6 +1498,13 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
   border: 2px solid var(--muted); background: transparent;
 }
 .live-row.is-live .live-dot { background: var(--charcoal); border-color: var(--charcoal); }
+/* A van is a SQUARE, on the list and on the map alike. A phone says where the
+   person is and a tracker says where the truck is; those disagree the moment a
+   driver walks a fridge up a driveway, and telling them apart by colour alone is
+   how somebody reads the wrong one. */
+.live-row.is-van .live-dot { border-radius: 2px; }
+.live-row.is-van.is-live { border-color: #1d6b3f; }
+.live-row.is-van.is-live .live-dot { background: #1d6b3f; border-color: #1d6b3f; }
 .live-who { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .live-when { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .live-job { font-size: 12px; color: var(--ink); }
