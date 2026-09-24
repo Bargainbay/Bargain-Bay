@@ -39,7 +39,7 @@ export default async function OrdersPage() {
     );
   }
 
-  const { orders, total, pageSize, drivers, reps, degraded } = await orderBoard();
+  const { orders, total, byStatus, pageSize, drivers, reps, degraded } = await orderBoard();
 
   return (
     <div>
@@ -49,7 +49,7 @@ export default async function OrdersPage() {
           Could not read all of it — if a feature was just deployed, run the schema migration from Operations.
         </div>
       )}
-      <AdminOrders initialOrders={orders} total={total} pageSize={pageSize} drivers={drivers} reps={reps} />
+      <AdminOrders initialOrders={orders} total={total} byStatus={byStatus} pageSize={pageSize} drivers={drivers} reps={reps} />
     </div>
   );
 }

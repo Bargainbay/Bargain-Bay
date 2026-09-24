@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
-import { ORDER_STATUSES, updateOrderStatus, countOrders } from '../../../../lib/orders';
+import { ORDER_STATUSES, updateOrderStatus, orderCounts } from '../../../../lib/orders';
 import { loadOrders } from '../../../../lib/order-board';
 import { markUnitsSold } from '../../../../lib/catalog-sync';
 import { sendOrderStatusEmail } from '../../../../lib/email';
@@ -36,8 +36,10 @@ export async function GET(req) {
   try {
     const { orders, degraded } = await loadOrders(opts);
     let total = null;
-    try { total = await countOrders(opts); } catch (e) { console.error('order count failed', e.message); }
-    return NextResponse.json({ orders, total, degraded });
+    let byStatus = null;
+    try { ({ total, byStatus } = await orderCounts(opts)); }
+    catch (e) { console.error('order counts failed', e.message); }
+    return NextResponse.json({ orders, total, byStatus, degraded });
   } catch (e) {
     console.error('admin orders load failed', e);
     return NextResponse.json({ error: 'Could not load orders' }, { status: 500 });

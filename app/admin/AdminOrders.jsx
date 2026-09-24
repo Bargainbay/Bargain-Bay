@@ -4,6 +4,12 @@ import { money, STATUS_LABELS } from '../../lib/constants';
 
 const STATUSES = ['pending_payment', 'confirmed', 'ready', 'out_for_delivery', 'delivered', 'cancelled'];
 
+// The order the header's count chips read in: the lifecycle, then the two ways a
+// sale comes back off the books. Separate from STATUSES above, which is what an
+// admin may SET on a row — 'refunded' is deliberately absent there (a refund has
+// to go through refundOrder so the units relist) and must still be COUNTED here.
+const STATUS_ORDER = ['pending_payment', 'confirmed', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'refunded'];
+
 // Format a stored pickup slot ("YYYY-MM-DDTHH:MM", store-local) for display.
 function fmtPickup(value) {
   if (!value) return '';
@@ -15,13 +21,17 @@ function fmtPickup(value) {
   return `${wd} · ${h12}:${String(mm).padStart(2, '0')} ${hh < 12 ? 'AM' : 'PM'}`;
 }
 
-export default function AdminOrders({ initialOrders, total: initialTotal = null, pageSize = 200, drivers = [], reps = [] }) {
+export default function AdminOrders({ initialOrders, total: initialTotal = null, byStatus: initialByStatus = null, pageSize = 200, drivers = [], reps = [] }) {
   const [orders, setOrders] = useState(initialOrders);
   // The REAL number of orders in the window being looked at, which is not the
   // same thing as how many are on screen. The heading used to print
   // orders.length, so once the shop passed the 200-row cap it read "Orders (200)"
   // forever and the orders falling off the bottom were invisible.
   const [total, setTotal] = useState(initialTotal == null ? initialOrders.length : initialTotal);
+  // What state those orders are in. The bare total counts cancelled orders,
+  // refunded ones and checkouts nobody paid for, so on its own it reads as a
+  // sales figure and isn't one — these chips are what stop it being misread.
+  const [byStatus, setByStatus] = useState(initialByStatus || {});
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   // The window the rows on screen actually came from — NOT the boxes, which the
@@ -46,7 +56,19 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Update failed'); return; }
-      setOrders((os) => os.map((o) => (o.id === id ? { ...o, status } : o)));
+      setOrders((os) => {
+        // Move the header's chips with the row, or marking an order cancelled
+        // leaves the breakdown above it claiming otherwise until a reload.
+        const was = os.find((o) => o.id === id)?.status;
+        if (was && was !== status) {
+          setByStatus((b) => ({
+            ...b,
+            [was]: Math.max((b[was] || 0) - 1, 0),
+            [status]: (b[status] || 0) + 1
+          }));
+        }
+        return os.map((o) => (o.id === id ? { ...o, status } : o));
+      });
     } catch {
       setError('Network error');
     } finally {
@@ -109,6 +131,7 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
         return [...os, ...data.orders.filter((o) => !seen.has(o.id))];
       });
       if (data.total != null) setTotal(data.total);
+      if (data.byStatus) setByStatus(data.byStatus);
       setWindow({ from: f || '', to: t || '' });
     } catch {
       setError('Network error');
@@ -122,6 +145,24 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
   return (
     <div>
       <h1 style={{ color: 'var(--charcoal)' }}>Orders ({total})</h1>
+      {Object.keys(byStatus).length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+          {/* Fixed order, and only the states that actually occur — a row of
+              zeroes is noise. An unrecognised status still shows rather than
+              being dropped, or the chips would stop adding up to the total. */}
+          {STATUS_ORDER.filter((st) => byStatus[st] > 0).map((st) => (
+            <span key={st} className={`status-chip status-${st}`} style={{ fontSize: 12 }}>
+              {byStatus[st]} {STATUS_LABELS[st] || st}
+            </span>
+          ))}
+          {Object.keys(byStatus).filter((st) => !STATUS_ORDER.includes(st) && byStatus[st] > 0).map((st) => (
+            <span key={st} className="pill" style={{ fontSize: 12 }}>{byStatus[st]} {st}</span>
+          ))}
+          <span className="hint" style={{ fontSize: 11.5 }} title="Cancelled, refunded and unpaid orders are counted in the total above. What counts as revenue is a narrower question — the Sales dashboard answers it.">
+            all {total} order records, not {total} sales — revenue is on the dashboard
+          </span>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
         <label style={{ fontSize: 12, color: 'var(--muted)' }}>
           From<br />
