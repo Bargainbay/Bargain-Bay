@@ -2717,6 +2717,17 @@ of the Live tab. Paired under People & access → the van's **tracker** button.
 - **No rate limit is documented anywhere in the spec** (nor any subscription or
   registration requirement). That is an absence of a statement, not a promise —
   the 45s poll throttle and the 20-minute backfill stand on their own merits.
+- **What PAJ support actually confirmed** (ticket 76880153, 2026-09-24), because
+  it is worth not asking twice: *"you must first register your device in the
+  Finder Portal in order to use the API interface"* — i.e. the prerequisite is
+  the ordinary activation and subscription every tracker needs anyway, and the
+  API sits ALONGSIDE the portal rather than replacing it. They named **no API
+  tier, no separate agreement and no extra fee**, and declined to answer on rate
+  limits or field units, pointing at the documentation instead. So "is the API
+  included in the plan" has no written yes — only the absence of any stated
+  gate. Don't re-open the question by email; the cheapest way to settle it is
+  one device on the basic plan, which is why nothing here breaks if the answer
+  turns out to be no (unset credentials = the feature is simply off).
 
 ## Two businesses, one codebase — BRANDS
 Bargain Bay is the consumer storefront. **RS Solutions is the delivery/service
