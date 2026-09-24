@@ -6,13 +6,13 @@ import { toInclusiveLines } from '../lib/tax';
 import { isCreditLine } from '../lib/invoice-lines';
 import LeadSource, { whatsWrongWithLead } from './LeadSource';
 import { searchStockUnits } from '../lib/stock-match';
+import { INVOICE_SERVICES } from '../lib/constants';
 
 // Edit an invoice: the customer's details, the line items (add, remove, reprice,
 // change warranty, add a service or a unit from stock), HST, memo and issue date.
 // Works on a settled invoice too — correcting a three-month-old sale adjusts that
 // sale in the month it happened, rather than booking anything new today.
 // Saves via PATCH action 'edit'.
-const SERVICES = ['Installation', 'Delivery', 'Door Removal'];
 const fmtMoney = (n) => '$' + (Number(n) || 0).toFixed(2);
 
 export default function InvoiceEditor({ invoice, inventory = [], senders = [], admin = false }) {
@@ -216,7 +216,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [], a
         </div>
       )}
 
-      <InvoiceLines items={items} setItems={setItems} services={SERVICES} stock={inventory} taxInclusive={taxMode === 'inclusive'} />
+      <InvoiceLines items={items} setItems={setItems} services={INVOICE_SERVICES} stock={inventory} taxInclusive={taxMode === 'inclusive'} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
         <TaxMode mode={taxMode} onChange={changeTaxMode} />

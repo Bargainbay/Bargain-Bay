@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { isCreditLine, isUnitLine, INTAKE_CATEGORIES } from '../lib/constants';
+import { isCreditLine, isUnitLine, isHaulAwayLine, INTAKE_CATEGORIES } from '../lib/constants';
 import { searchStockUnits, OFF_STOCK_REASONS, OFF_STOCK_OTHER } from '../lib/stock-match';
 import { blankItem, serviceItem, creditItem, subtotalOf, goodsOf, toPayload, fromInvoice, stockLineProblem } from '../lib/invoice-lines';
 
@@ -54,6 +54,7 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
     goods > 0 ? (Math.round(goods * pct) / 100).toFixed(2) : ''));
 
   const hasTradeIn = items.some((it) => it.kind === 'trade_in');
+  const hasHaulAway = items.some((it) => isHaulAwayLine(it.kind, it.description));
 
   return (
     <>
@@ -167,6 +168,14 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
         <div className="hint" style={{ margin: '2px 0 8px' }}>
           The delivery team is told to bring the trade-in unit back to the warehouse — it shows on the
           dispatch board, the run sheet and the driver&apos;s stop, and the driver has to confirm it&apos;s on the van.
+        </div>
+      )}
+
+      {hasHaulAway && (
+        <div className="hint" style={{ margin: '2px 0 8px' }}>
+          The stop is tagged <b>Haul away</b> when it reaches the dispatch board, so the crew leaves room on
+          the truck for their old unit. This charges it on the sale — if the customer is instead paying the
+          driver on the day, set the cash to collect on the job rather than adding it here.
         </div>
       )}
 
