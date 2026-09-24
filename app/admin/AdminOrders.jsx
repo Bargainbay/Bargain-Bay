@@ -15,8 +15,20 @@ function fmtPickup(value) {
   return `${wd} · ${h12}:${String(mm).padStart(2, '0')} ${hh < 12 ? 'AM' : 'PM'}`;
 }
 
-export default function AdminOrders({ initialOrders, drivers = [], reps = [] }) {
+export default function AdminOrders({ initialOrders, total: initialTotal = null, pageSize = 200, drivers = [], reps = [] }) {
   const [orders, setOrders] = useState(initialOrders);
+  // The REAL number of orders in the window being looked at, which is not the
+  // same thing as how many are on screen. The heading used to print
+  // orders.length, so once the shop passed the 200-row cap it read "Orders (200)"
+  // forever and the orders falling off the bottom were invisible.
+  const [total, setTotal] = useState(initialTotal == null ? initialOrders.length : initialTotal);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  // The window the rows on screen actually came from — NOT the boxes, which the
+  // user may have typed in and not applied yet. Load more has to page through
+  // the same window that produced the rows above it.
+  const [window_, setWindow] = useState({ from: '', to: '' });
+  const [loading, setLoading] = useState('');
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState('');
   // Per-order "don't email the customer on this status change" — for quiet
@@ -77,9 +89,64 @@ export default function AdminOrders({ initialOrders, drivers = [], reps = [] }) 
     }
   }
 
+  // One trip to /api/admin/orders. `append` is what separates "load 200 more"
+  // (keep what's on screen) from applying a filter (replace it).
+  async function fetchPage({ from: f, to: t, offset, append }) {
+    setLoading(append ? 'more' : 'filter'); setError('');
+    try {
+      const qs = new URLSearchParams({ limit: String(pageSize), offset: String(offset) });
+      if (f) qs.set('from', f);
+      if (t) qs.set('to', t);
+      const res = await fetch(`/api/admin/orders?${qs}`);
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Could not load orders'); return; }
+      setOrders((os) => {
+        if (!append) return data.orders;
+        // Dedupe on id: an order placed between the first page and this one
+        // shifts the offset, and a row arriving twice is a duplicate React key
+        // and a status button that updates only one of the two copies.
+        const seen = new Set(os.map((o) => o.id));
+        return [...os, ...data.orders.filter((o) => !seen.has(o.id))];
+      });
+      if (data.total != null) setTotal(data.total);
+      setWindow({ from: f || '', to: t || '' });
+    } catch {
+      setError('Network error');
+    } finally {
+      setLoading('');
+    }
+  }
+
+  const filtered = Boolean(window_.from || window_.to);
+
   return (
     <div>
-      <h1 style={{ color: 'var(--charcoal)' }}>Orders ({orders.length})</h1>
+      <h1 style={{ color: 'var(--charcoal)' }}>Orders ({total})</h1>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
+        <label style={{ fontSize: 12, color: 'var(--muted)' }}>
+          From<br />
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: 'auto', padding: '4px 7px', fontSize: 13 }} />
+        </label>
+        <label style={{ fontSize: 12, color: 'var(--muted)' }}>
+          To<br />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ width: 'auto', padding: '4px 7px', fontSize: 13 }} />
+        </label>
+        <button className="btn" style={{ padding: '5px 11px', fontSize: 12.5 }} disabled={Boolean(loading)}
+          onClick={() => fetchPage({ from, to, offset: 0, append: false })}>
+          {loading === 'filter' ? 'Loading…' : 'Apply'}
+        </button>
+        {(filtered || from || to) && (
+          <button className="btn" style={{ padding: '5px 11px', fontSize: 12.5 }} disabled={Boolean(loading)}
+            onClick={() => { setFrom(''); setTo(''); fetchPage({ from: '', to: '', offset: 0, append: false }); }}>
+            Clear
+          </button>
+        )}
+        <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
+          {orders.length < total
+            ? <>Showing the <b>{orders.length}</b> most recent of <b>{total}</b>{filtered ? ' in this range' : ''} — older ones are below the cut.</>
+            : <>Showing all <b>{total}</b>{filtered ? ' in this range' : ''}.</>}
+        </span>
+      </div>
       <p className="hint" style={{ marginBottom: 14 }}>
         Card payments are paused — orders come in <b>Confirmed · Pending payment</b> (paid by e-transfer; pickup orders
         can also pay in person). When the money lands, click <b>Mark paid</b> — the customer gets a payment-received
@@ -260,6 +327,18 @@ export default function AdminOrders({ initialOrders, drivers = [], reps = [] }) 
           </tbody>
         </table>
       </div>
+      {orders.length < total && (
+        <div style={{ marginTop: 12, textAlign: 'center' }}>
+          <button className="btn" disabled={Boolean(loading)}
+            onClick={() => fetchPage({ from: window_.from, to: window_.to, offset: orders.length, append: true })}>
+            {loading === 'more' ? 'Loading…' : `Load ${Math.min(pageSize, total - orders.length)} more`}
+          </button>
+          <div className="hint" style={{ marginTop: 6 }}>
+            {orders.length} of {total} loaded. For an order from months back, the date range above gets there in one hop —
+            or search its <b>BB-</b> number, which reads the order directly and is never capped.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
