@@ -52,7 +52,7 @@ export default async function OperationsPage() {
   let needsMigration = false;
   // Orders, drivers, reps and the proof-of-delivery photos, exactly as the
   // Orders tab loads them — one loader, so the two boards can't drift apart.
-  const { orders, total, pageSize, drivers, reps, degraded } = await orderBoard();
+  const { orders, total, byStatus, pageSize, drivers, reps, degraded } = await orderBoard();
   if (degraded) needsMigration = true;
   try {
     const { rows } = await query(
@@ -105,7 +105,7 @@ export default async function OperationsPage() {
           opens as ten bars is the point. */}
       <OpsFoldBar />
       <OpsSection id="orders" title="Orders" count={orders.length}>
-        <AdminOrders initialOrders={orders} total={total} pageSize={pageSize} drivers={drivers} reps={reps} />
+        <AdminOrders initialOrders={orders} total={total} byStatus={byStatus} pageSize={pageSize} drivers={drivers} reps={reps} />
       </OpsSection>
 
       <OpsSection id="intake-queue" title="Items waiting to be added" count={pendingIntake.length}>
