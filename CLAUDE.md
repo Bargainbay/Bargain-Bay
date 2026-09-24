@@ -2701,10 +2701,22 @@ of the Live tab. Paired under People & access → the van's **tracker** button.
 - **Tell the crew the truck is tracked.** Unlike the phone, this reports at
   night and at weekends. The pairing screen says so; the driver app's existing
   "the office can see you while the app is open" chip does not cover it.
-- Unverified until a real device is on the account, and both are marked in
-  `lib/paj-gps.js`: whether `speed` arrives in km/h, and which key carries the
-  device id. Field names are read through a candidate list and anything
-  unreadable drops its row rather than being guessed at.
+- **The request shapes come from PAJ's own OpenAPI document**, served as JSON at
+  `https://connect.paj-gps.de/docs` (the Swagger page at `/api/documentation` is
+  just a viewer over it) — fetch that, don't reason from the rendered page.
+  Settled there, after a first cut got two of them wrong from a second-hand
+  summary: **`date_range` is a GET with QUERY parameters**, not a POST with a
+  body; **login takes JSON**, not form-encoding; `deviceIDs` is an array of
+  INTEGER; a row is `{ id, lat, lng, direction, dateunix, battery, speed,
+  iddevice, accuracy, … }` wrapped in `{ success: [...] }`. **`iddevice` is the
+  device — `id` is the POINT's own id** and reading it as one would attribute
+  every fix to a van that doesn't exist. **Speed is km/h**: the spec puts no unit
+  on the field but documents the device's speed alarm as "threshold in km/h".
+  Field names are still read through a candidate list, because a spec is a
+  document and not the server.
+- **No rate limit is documented anywhere in the spec** (nor any subscription or
+  registration requirement). That is an absence of a statement, not a promise —
+  the 45s poll throttle and the 20-minute backfill stand on their own merits.
 
 ## Two businesses, one codebase — BRANDS
 Bargain Bay is the consumer storefront. **RS Solutions is the delivery/service
