@@ -35,6 +35,9 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   // re-adding is not the way out: a second `vehicles` row orphans the odometer
   // history and every fill already logged against the first one.
   const [editVan, setEditVan] = useState(null);   // { id, fuelPaidBy, carrierName, dayRate }
+  // Its own editor rather than another box in the one above, because the two are
+  // different decisions: who settles the fuel is money, and this is a device id.
+  const [editTracker, setEditTracker] = useState(null); // { id, trackerDeviceId }
   const [vanRate, setVanRate] = useState('');
   // A LIST, not one address. There are two yards — Milner Ave in Scarborough
   // and Squires Beach Rd in Pickering — and a run ends at whichever one the van
@@ -268,6 +271,32 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         ? `${v.name}: fuel is on ${editVan.carrierName || 'the carrier'} — fills logged against it stay out of the Profit tab's cost from now on.`
         : `${v.name}: we pay the fuel — the driver gets e-transferred for fills.`);
       setEditVan(null);
+      await loadVans();
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(''); }
+  }
+
+  // Pair a van with the tracker bolted to it. Sends ONLY the tracker alongside
+  // the van's identity — upsertVehicle writes that column only when it is
+  // passed, so this cannot disturb the fuel setting or the day rate, and the
+  // fuel editor above cannot unpair the tracker.
+  async function saveVanTracker(v) {
+    setBusy(`van${v.id}`); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'vehicle', id: v.id, name: v.name, plate: v.plate, active: v.active,
+          fuelPaidBy: v.fuelPaidBy, carrierName: v.carrierName, dayRate: v.dayRate,
+          trackerDeviceId: editTracker.trackerDeviceId
+        })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not save the tracker.'); return; }
+      setOk(d.vehicle?.trackerDeviceId
+        ? `${v.name} is paired with tracker ${d.vehicle.trackerDeviceId} — it will appear on the Live tab once it reports.`
+        : `${v.name} is no longer paired with a tracker.`);
+      setEditTracker(null);
       await loadVans();
     } catch { setErr('Network error — nothing was saved.'); }
     finally { setBusy(''); }
@@ -621,6 +650,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                     ? ` · fuel billed by ${v.carrierName || 'the carrier'}`
                     : ' · we pay the fuel'}
                   {v.dayRate ? ` · $${v.dayRate.toFixed(2)}/day` : ' · no day rate'}
+                  {v.trackerDeviceId ? ` · tracker ${v.trackerDeviceId}` : ''}
                 </span>
                 {!v.active && <span className="hint" style={{ margin: 0 }}> · retired</span>}
                 <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
@@ -630,7 +660,31 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                   fuel &amp; day rate
                 </button>
                 <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
+                  onClick={() => setEditTracker(editTracker?.id === v.id ? null
+                    : { id: v.id, trackerDeviceId: v.trackerDeviceId || '' })}>
+                  {v.trackerDeviceId ? 'tracker' : 'add tracker'}
+                </button>
+                <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
                   onClick={() => toggleVan(v)}>{v.active ? 'retire' : 'bring back'}</button>
+                {editTracker?.id === v.id && (
+                  <div className="disp-setup-form" style={{ marginTop: 8 }}>
+                    <input value={editTracker.trackerDeviceId} style={{ width: 220 }}
+                      placeholder="PAJ device id, e.g. 1234567"
+                      onChange={(e) => setEditTracker({ ...editTracker, trackerDeviceId: e.target.value })} />
+                    <button type="button" className="btn accent" disabled={busy === `van${v.id}`}
+                      onClick={() => saveVanTracker(v)}>
+                      {busy === `van${v.id}` ? 'Saving…' : 'Save'}
+                    </button>
+                    <button type="button" className="btn" onClick={() => setEditTracker(null)}>Cancel</button>
+                    <p className="hint" style={{ flexBasis: '100%', margin: 0 }}>
+                      The device&apos;s id in the FINDER portal — open the tracker there and it is on its
+                      details. A paired van reports its own position on the <b>Live</b> tab whether or not
+                      anybody&apos;s phone is awake, which is the half a driver&apos;s app can never do.
+                      Clear the box to unpair. <b>Tell the crew the truck is tracked</b>: unlike the phone,
+                      this one reports at night and at weekends too.
+                    </p>
+                  </div>
+                )}
                 {editVan?.id === v.id && (
                   <div className="disp-setup-form" style={{ marginTop: 8 }}>
                     <select value={editVan.fuelPaidBy} style={{ minWidth: 260 }}

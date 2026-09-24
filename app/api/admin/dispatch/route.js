@@ -12,7 +12,8 @@ import {
 } from '../../../../lib/dispatch-money';
 import {
   shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate, setShiftTimes, createShift, mergeShifts } from '../../../../lib/shifts';
-import { livePositions, driverTrail } from '../../../../lib/driver-location';
+import { livePositions, driverTrail, vehicleTrail } from '../../../../lib/driver-location';
+import { pollTrackers, trackerStatus } from '../../../../lib/tracker-watch';
 import { sendSms, smsConfigured } from '../../../../lib/sms';
 import { SITE_URL } from '../../../../lib/site';
 import { hasDb } from '../../../../lib/db';
@@ -185,10 +186,21 @@ export async function GET(req) {
     // Where the vans are. Staff, not admin: this is the dispatcher's job, and
     // it is the same information they already get by ringing the driver.
     if (sp.get('view') === 'live') {
-      return NextResponse.json(await livePositions());
+      // The dispatcher looking at the board is what pays for the API call. The
+      // poll is throttled to once every 45s inside pollTrackers, so LiveMap's
+      // 20-second refresh cannot run up PAJ's bill, and nothing is asked at all
+      // while nobody has this tab open — the cron owns the trail for that.
+      // Best-effort on purpose: a tracker we cannot reach must not take the
+      // board's own positions down with it, and trackerStatus says so on screen.
+      await pollTrackers().catch(() => {});
+      const [live, tracker] = await Promise.all([livePositions(), trackerStatus().catch(() => null)]);
+      return NextResponse.json({ ...live, tracker });
     }
     if (sp.get('view') === 'trail') {
       return NextResponse.json({ trail: await driverTrail(sp.get('driverId'), { date: sp.get('date') }) });
+    }
+    if (sp.get('view') === 'van_trail') {
+      return NextResponse.json({ trail: await vehicleTrail(sp.get('vehicleId'), { date: sp.get('date') }) });
     }
     if (sp.get('view') === 'drivers') {
       return NextResponse.json({ drivers: await listDriversForOffice() });
