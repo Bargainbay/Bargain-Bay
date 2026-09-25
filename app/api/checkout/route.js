@@ -15,6 +15,7 @@ import { readAttribution, ensureAttributionColumns } from '../../../lib/attribut
 import { createAndSendInvoice } from '../../../lib/invoices';
 import { validateCoupon, redeemCouponWithClient, releaseCouponForOrder, ensureCouponSchema } from '../../../lib/coupons';
 import { upsertCustomer } from '../../../lib/customers';
+import { grantConsent } from '../../../lib/consent';
 import {
   clientIp, userAgent, honeypotTripped, isDisposableEmail, isBlocked,
   checkOrderRate, unpaidUnitsHeld, ensureAbuseSchema, MAX_UNPAID_UNITS
@@ -263,6 +264,19 @@ export async function POST(req) {
   // the CRM must never block a sale.
   upsertCustomer({ email, name, phone, address, city, postal, userId })
     .catch((e) => console.error('customer upsert failed', e.message));
+
+  // Express consent, if they ticked the box. Best-effort and AFTER the order is
+  // safely created — same rule as the CRM write above: a consent record must
+  // never cost us a sale. Note that buying at all gives us implied consent for
+  // 24 months under CASL's existing-business-relationship rule (see
+  // lib/consent), so an untouched box is not the same as being unreachable —
+  // it just isn't an express yes, and it is not recorded as one.
+  if (body.marketingOptIn === true) {
+    grantConsent({
+      channel: 'email', email, source: 'checkout', ip,
+      evidence: String(body.marketingOptInText || '').slice(0, 500) || 'Ticked the marketing box at checkout'
+    }).catch((e) => console.error('consent record failed', e.message));
+  }
 
   // Give the web sale an INV- number and a row in the invoice ledger, so every
   // sale carries the same paperwork whether it came from the storefront or from

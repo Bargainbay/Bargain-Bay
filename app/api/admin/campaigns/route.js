@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { emailConfigured } from '../../../../lib/email';
 import { smsConfigured } from '../../../../lib/sms';
-import { audience, audienceCounts, sendEmailCampaign, sendSmsCampaign } from '../../../../lib/campaigns';
+import { audience, audienceCounts, consentCounts, sendEmailCampaign, sendSmsCampaign } from '../../../../lib/campaigns';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -17,10 +17,20 @@ const SEGMENTS = ['all', 'buyers', 'members'];
 // Live audience counts + channel config for the composer.
 export async function GET(req) {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
-  const seg = new URL(req.url).searchParams.get('segment');
+  const sp = new URL(req.url).searchParams;
+  const seg = sp.get('segment');
   const segment = SEGMENTS.includes(seg) ? seg : 'buyers';
+  const channel = sp.get('channel') === 'sms' ? 'sms' : 'email';
   const counts = await audienceCounts(segment);
-  return NextResponse.json({ segment, counts, emailConfigured: emailConfigured(), smsConfigured: smsConfigured() });
+  // How many of that segment we may LAWFULLY message, and why the rest we may
+  // not. The composer shows this before the message is written: "412 customers"
+  // and "412 people you can email" are different numbers, and finding that out
+  // after pressing send is how the wrong thing gets sent.
+  const consent = await consentCounts(segment, channel).catch(() => null);
+  return NextResponse.json({
+    segment, channel, counts, consent,
+    emailConfigured: emailConfigured(), smsConfigured: smsConfigured()
+  });
 }
 
 export async function POST(req) {
@@ -43,10 +53,10 @@ export async function POST(req) {
   if (testTo) {
     if (channel === 'email') {
       if (!validEmail(testTo)) return NextResponse.json({ error: 'Enter a valid test email.' }, { status: 400 });
-      const result = await sendEmailCampaign({ recipients: [{ name: '', email: normalizeEmail(testTo) }], subject, message });
+      const result = await sendEmailCampaign({ recipients: [{ name: '', email: normalizeEmail(testTo) }], subject, message, test: true });
       return NextResponse.json({ ok: true, test: true, result });
     }
-    const result = await sendSmsCampaign({ recipients: [{ name: '', phone: testTo }], message });
+    const result = await sendSmsCampaign({ recipients: [{ name: '', phone: testTo }], message, test: true });
     return NextResponse.json({ ok: true, test: true, result });
   }
 

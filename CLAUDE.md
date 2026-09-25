@@ -3006,6 +3006,78 @@ actions, confirmed", and a **native app with a wake word** as the hands-free doo
   last 24 turns sent back; a thread idle 4h starts fresh). Rate limit counts rows
   in Postgres, not memory.
 
+## Marketing consent — CASL (added 2026-09-24)
+`lib/consent.js`, table `consent_events`, `/unsubscribe`, `/api/sms/inbound`.
+
+The campaign email said to reply "UNSUBSCRIBE" and the SMS said "Reply STOP".
+**Neither was connected to anything** — no suppression list, no consent record,
+nothing reading inbound replies — and the privacy policy promised an unsubscribe
+LINK the emails did not contain. Somebody who opted out stayed on the list, and
+if anyone had asked why we emailed them there was no answer to give.
+
+- **THIS DOES NOT TOUCH TRANSACTIONAL MAIL AND MUST NOT.** An order
+  confirmation, an invoice, a delivery update, a password reset, a driver's
+  sign-in code — none are commercial electronic messages and none need consent.
+  Only `sendEmailCampaign` / `sendSmsCampaign` filter through the gate. Wiring
+  this into `sendEmail` globally would stop order confirmations, which is a far
+  worse outcome than the problem it solves.
+- **Express consent is an EVENT; implied consent is a FACT about a
+  relationship.** So `consent_events` holds only what a person did — said yes,
+  or opted out — and implied consent is DERIVED at read time from orders and
+  quotes. Storing it would be a second copy of what those tables already say,
+  and the two would drift. Same rule as the journal, a part's stock and a unit's
+  location.
+- **The windows are statutory, not preferences.** 24 months from a purchase, 6
+  from a quote request (`IMPLIED_PURCHASE_MONTHS` / `IMPLIED_INQUIRY_MONTHS`),
+  and there is a test pinning both so changing one has to be a decision.
+- **SMS marketing needs an express yes.** A purchase implies consent to be
+  emailed; we do not stretch that to texts, which are more intrusive and which
+  this business has never told anyone it would send.
+- **Withdrawal wins and does not expire.** Specifically: a later purchase does
+  NOT re-imply consent for somebody who opted out. Under the relationship rule
+  it arguably could, and it would be indefensible to the person who pressed
+  unsubscribe and then bought a fridge anyway.
+- **`filterAudience` FAILS CLOSED** — the only gate in this codebase that does.
+  Everything else degrades open because losing a real sale beats admitting a
+  junk one; here the cost of wrongly sending is a statutory penalty and somebody
+  who already asked us to stop, and the cost of wrongly not sending is one
+  campaign going tomorrow instead. **If the consent table can't be read, nothing
+  is sent**, and the composer says so.
+- **The evidence is the WORDING THEY WERE SHOWN.** `consent_events.evidence`
+  stores the actual sentence from `components/MarketingOptIn.jsx`, because what
+  matters is not that a box was ticked but what it said. The box is **never
+  pre-ticked** — a pre-ticked box is the specific thing the legislation was
+  written about, and a record made from one looks like proof while being worth
+  less than nothing.
+- **GET SHOWS, POST ACTS** on `/unsubscribe`. Mail scanners and link-preview
+  crawlers fetch every URL in a message — this repo has already had a one-time
+  link burned exactly that way (the driver sign-in link). The emailed link lands
+  on a page with one button.
+- The unsubscribe token is an HMAC via `lib/links.js`, derived not stored, so it
+  is valid forever with no table and no migration — which satisfies CASL's
+  60-day minimum for free. It is also what stops anybody unsubscribing somebody
+  else by editing the query string.
+- **`List-Unsubscribe` + `List-Unsubscribe-Post`** (RFC 2369 / RFC 8058) are on
+  every campaign email, which is what renders the native Unsubscribe button in
+  Gmail and Outlook — by a distance the most-used opt-out there is, and the one
+  that stops people reaching for the spam button instead, which is what actually
+  damages the sending domain. `sendEmail` gained an optional `headers` param for
+  it; transactional mail passes nothing and must keep passing nothing.
+- **Twilio already blocks STOP at its end** on its own numbers. What it cannot
+  do is put the opt-out in OUR records — without which we have no proof, the
+  person still counts as a recipient in every campaign, and a number blocked at
+  Twilio silently fails every send forever with nobody looking. Point the
+  number's "A MESSAGE COMES IN" webhook at `/api/sms/inbound`.
+- **The composer shows the real number before the message is written.** "412
+  customers" and "412 people you may email" are different, and finding that out
+  after pressing send is how the wrong thing gets sent.
+- **NOT DONE YET:** `audience()` still reads `users`, so campaigns reach only
+  people who made an ACCOUNT — every guest buyer and phone customer that
+  `backfillCustomers` assembles is still invisible to marketing. That is Phase
+  2.7 and it is a bigger change than this one. There is also no admin screen for
+  the consent history (`consentHistory()` exists and nothing renders it), and no
+  bounce/complaint handling.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.

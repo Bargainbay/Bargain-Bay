@@ -4,6 +4,7 @@ import { getCart, removeFromCart, clearCart, onCartChange } from '../../lib/cart
 import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS, CARD_PAYMENTS_ENABLED, ETRANSFER_EMAIL } from '../../lib/constants';
 import { loadGoogleMaps, placesReady, mapsKey } from '../../lib/maps';
 import HoneypotField from '../../components/HoneypotField';
+import MarketingOptIn, { CONSENT_TEXT } from '../../components/MarketingOptIn';
 
 export default function CheckoutClient({ catalog, session, prefill }) {
   const [skus, setSkus] = useState(null);
@@ -17,7 +18,8 @@ export default function CheckoutClient({ catalog, session, prefill }) {
     password: '',
     // Honeypot — stays '' for every real customer and rides along in the POST
     // body via the {...form} spread in submit().
-    website: ''
+    website: '',
+    marketingOptIn: false
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -113,7 +115,13 @@ export default function CheckoutClient({ catalog, session, prefill }) {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skus, ...form, couponCode: applied ? applied.code : '' })
+        body: JSON.stringify({
+          skus, ...form,
+          couponCode: applied ? applied.code : '',
+          // The sentence they were actually shown travels with the tick. That
+          // wording is what makes the consent record proof of anything.
+          marketingOptInText: form.marketingOptIn ? CONSENT_TEXT : ''
+        })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -164,6 +172,11 @@ export default function CheckoutClient({ catalog, session, prefill }) {
                 <input id="co-email" type="email" required autoComplete="email" value={form.email} onChange={set('email')} disabled={!!session} />
                 {session && <div className="hint">Logged in as {session.email}</div>}
               </div>
+              <MarketingOptIn
+                id="co-marketing"
+                checked={form.marketingOptIn}
+                onChange={(v) => setForm((f) => ({ ...f, marketingOptIn: v }))}
+              />
               {!session && (
                 <div className="field" style={{ background: '#f4f7fc', borderRadius: 10, padding: '12px 14px' }}>
                   <label htmlFor="co-pass">Create an account to track your order <span style={{ fontWeight: 400, color: 'var(--muted)' }}>(optional)</span></label>

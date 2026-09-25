@@ -1027,3 +1027,26 @@ CREATE INDEX IF NOT EXISTS idx_quotes_email_lower   ON quotes   (lower(email));
 -- Revenue queries filter on status and date together on every dashboard,
 -- report and KPI in the app.
 CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders (status, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Marketing consent (CASL). APPEND-ONLY: "when did they opt out, and what had
+-- they been told when they opted in" is the whole question this answers, and an
+-- UPDATE destroys it.
+--
+-- It holds only what a PERSON DID — said yes, or opted out. Implied consent
+-- (bought in the last 24 months, asked for a quote in the last 6) is DERIVED at
+-- read time from orders and quotes rather than stored, because storing it would
+-- be a second copy of what those tables already say and the two would drift.
+-- See lib/consent.js.
+CREATE TABLE IF NOT EXISTS consent_events (
+  id       serial PRIMARY KEY,
+  identity text NOT NULL,                 -- lowercased email, or E.164 phone
+  channel  text NOT NULL,                 -- 'email' | 'sms'
+  event    text NOT NULL,                 -- 'granted' | 'withdrawn'
+  source   text,                          -- signup | checkout | unsubscribe_link | sms_stop | admin | ...
+  evidence text,                          -- THE WORDING THEY WERE SHOWN. This is the proof.
+  ip       text,
+  actor    text,                          -- who recorded it, when a person did
+  at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_consent_identity ON consent_events (identity, channel, at DESC);
