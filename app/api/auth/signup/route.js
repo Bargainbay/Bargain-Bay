@@ -6,6 +6,7 @@ import {
 } from '../../../../lib/auth';
 import { notifyOwner, esc } from '../../../../lib/email';
 import { upsertCustomer } from '../../../../lib/customers';
+import { grantConsent } from '../../../../lib/consent';
 import {
   clientIp, honeypotTripped, isDisposableEmail, isBlocked,
   checkSignupRate, ensureAbuseSchema
@@ -68,6 +69,16 @@ export async function POST(req) {
     await query('UPDATE orders SET user_id = $1 WHERE user_id IS NULL AND email = $2', [user.id, email]).catch(() => {});
     // Fold into the client database (links the record to this new account).
     upsertCustomer({ email, name, phone, userId: user.id }).catch(() => {});
+
+    // Express consent, with the exact wording they were shown as the evidence.
+    // Only when they actually ticked it: an untouched box is not a yes, and
+    // recording one would be worse than recording nothing.
+    if (body.marketingOptIn === true) {
+      grantConsent({
+        channel: 'email', email, source: 'signup', ip,
+        evidence: String(body.marketingOptInText || '').slice(0, 500) || 'Ticked the marketing box at signup'
+      }).catch((e) => console.error('consent record failed', e.message));
+    }
 
     // Notify the owner (fire-and-forget; never blocks signup).
     notifyOwner(

@@ -1,17 +1,21 @@
 # Bargain Bay — e-commerce storefront
 
 Production storefront for RS Solutions' liquidation appliance business
-(Hamilton, ON). Next.js 14 App Router, plain JavaScript, Postgres, Stripe
-Checkout, with the master inventory tracker (Google Sheet) as the
-source of truth for the catalogue.
+(Pickering, ON — warehouse and pickup at 1135 Squires Beach Rd). Next.js 16 App
+Router, plain JavaScript, Postgres, Stripe Checkout, with the master inventory
+tracker (Google Sheet) as the source of truth for the catalogue.
+
+This repo is much more than the storefront: it also carries the CRM, the books
+and general ledger, and the RS Solutions dispatch/logistics portal. See
+`CLAUDE.md` for the full map.
 
 ## How the pieces fit
 
 ```
 Master tracker (Google Sheet / xlsx)
-        │  scripts/sync-sheet.mjs (cron) — or regenerate from the master xlsx
+        │  /api/admin/sync-inventory (the Sync button, and the nightly cron)
         ▼
-data/catalog.json  (139 one-of-a-kind units)
+Postgres `products`  (one row per one-of-a-kind unit)
         │
         ▼
 Next.js storefront ── customer checks out ──► order + 30-min SKU reservation (Postgres)
@@ -75,7 +79,7 @@ See `.env.example` for the full annotated list:
 2. Add a Postgres database (Vercel Postgres / Neon integration) — copy its
    connection string into `POSTGRES_URL`, then run the schema bootstrap above.
 3. Set `AUTH_SECRET` (random 32+ bytes), `ADMIN_EMAILS`, and
-   `SITE_URL=https://bargainbay.org`.
+   `SITE_URL=https://bargainbay.ca`.
 4. Deploy. The site is fully launchable at this point in
    **pay-on-pickup/delivery mode** (orders are confirmed instantly, you collect
    payment in person).
@@ -85,13 +89,13 @@ See `.env.example` for the full annotated list:
    checkouts are also cleaned opportunistically on every new checkout, so the
    cron is belt-and-suspenders. Set `CRON_SECRET` to lock the endpoint down.
 
-### Pointing bargainbay.org at Vercel
+### Pointing bargainbay.ca at Vercel
 
-1. In Vercel → Project → Settings → Domains, add `bargainbay.org` (and
-   `www.bargainbay.org`).
+1. In Vercel → Project → Settings → Domains, add `bargainbay.ca` (and
+   `www.bargainbay.ca`).
 2. At the registrar, set the apex `A` record to `76.76.21.21` and the `www`
    `CNAME` to `cname.vercel-dns.com` (Vercel shows the exact values).
-3. Wait for DNS + automatic TLS, then set `SITE_URL=https://bargainbay.org`
+3. Wait for DNS + automatic TLS, then set `SITE_URL=https://bargainbay.ca`
    and redeploy so Stripe success/cancel redirect URLs use the real domain.
 
 ### Turning on Stripe payments

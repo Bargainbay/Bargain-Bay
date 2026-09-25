@@ -14,26 +14,41 @@ One consequence worth knowing before you touch the tracker: the master tracker h
   the kind of stale fact that costs a session: a plan limit is the first thing
   anybody blames when a cron looks like it is not firing, and on Pro it is
   never the answer).
-- **Stack:** Next.js 14 (App Router), **plain JavaScript/JSX** (no TypeScript), React 18, Postgres (`pg`), Clover Hosted Checkout, `bcryptjs` + `jose` auth, `googleapis` for sheet sync.
+- **Stack:** Next.js 16 (App Router), **plain JavaScript/JSX** (no TypeScript), React 19, Postgres (`pg`), **Stripe Checkout** (`lib/stripe.js`; card payments currently OFF — see LANDMINE 8), `bcryptjs` + `jose` auth, `googleapis` for sheet sync.
 
 ## Source of truth & the catalog pipeline
 The **master inventory tracker (Google Sheet / `RS Solutions Master Inventory Tracker.xlsx`)** is the source of truth for inventory. It is NOT in this repo. Flow:
 
 ```
 Master tracker sheet
-  → scripts/sync-sheet.mjs (npm run sync, Vercel cron)   [or regenerate from the xlsx]
-  → data/catalog.json  { generatedAt, units: [...] }       (one entry per available unit)
+  → /api/admin/sync-inventory  (the Sync button, and the sync-inventory cron)
+  → Postgres `products`                                   (one row per unit)
   → Next.js storefront
-  → checkout → 30-min SKU reservation (Postgres) → Clover Hosted Checkout → webhook → mark sold + writeSold() back to the sheet
+  → checkout → 30-min SKU reservation (Postgres) → Stripe Checkout → webhook → mark sold + writeSold() back to the sheet
 ```
 
-A unit object: `{ id (SKU), make, model, category, title, condition, price, compareAt (retail) }`. **Sold/reserved units are filtered out at request time from Postgres**, so `data/catalog.json` can lag without overselling.
+A unit object: `{ id (SKU), make, model, category, title, condition, price, compareAt (retail) }`. **Sold/reserved units are filtered out at request time from Postgres.**
+
+**`data/catalog.json` IS DECOMMISSIONED AND MUST STAY EMPTY.** It was an offline
+snapshot `lib/inventory.js` fell back to when the products read failed. It went
+months stale, and twice a transient database blip had Sarah report that old list
+to a customer as current fact — so #124 emptied it. The file being empty is the
+safety property: `fileUnits` is then `[]` and the fallback degrades to "no stock
+right now" rather than to June's stock. `npm run sync` now refuses to write it
+without `--force`, and the nightly GitHub Action that regenerated it has been
+deleted (it had never once succeeded in three months — and success would have
+committed the regression to `main` and auto-deployed it).
+
+One consequence that is NOT yet decided: `app/api/chat/route.js` builds its
+catalogue context from the same file, so the public chat agent currently has no
+catalogue in its prompt. Left as-is deliberately — wiring it to the live
+products table is a behaviour change, not a docs fix.
 
 ## Key files
 - `lib/pricing.js` — **authoritative price resolver**. Layers: catalog price → clearance markdown → member tier. Used by every storefront page AND `app/api/checkout`. Never trust client price; always resolve here.
 - `lib/clearance.js` — clearance layer on a Postgres `clearance` table (sku, price, warranty_months, note, active). Degrades to "no clearance" with no DB.
 - `lib/members.js` + `data/member-prices.json` — wholesale/member pricing (see rules below).
-- `lib/inventory.js` — `getAll()`, `getById()`, `getAvailable()` (DB-aware), reads `data/catalog.json`.
+- `lib/inventory.js` — `getAll()`, `getById()`, `getAvailable()`. Reads Postgres `products`; the `data/catalog.json` fallback is deliberately empty (above).
 - `lib/images.js` — `imageFor(unit)`, `hasRealImage(unit)`. Manufacturer photos (AJ Madison CDN) keyed by model via `data/images.json`; falls back to branded per-category placeholder SVG in `public/stock/`. `hasRealImage` is false for placeholders.
 
 ### The product page is a gallery (added 2026-09-11)
@@ -128,7 +143,7 @@ case folding. Three things follow, all learned filling the gap on 2026-09-10:
   Midea entries added on 2026-09-10 carry it. Fine on a New-in-Box unit, worth a
   thought on a used one, where our own warranty is one year.
 - `lib/reservations.js` — race-safe 30-min SKU holds in Postgres. `unavailableSkus()`, `isUnavailable()`.
-- `lib/clover.js` — Clover Hosted Checkout. `lib/sheets.js` — read + writeSold via Google service account.
+- `lib/stripe.js` — Stripe Checkout (+ `app/api/stripe-webhook`). `lib/sheets.js` — read + writeSold via Google service account.
 - `lib/auth.js` — bcryptjs + jose JWT cookie `bb_session`. `lib/db.js` — lazy `pg` pool (build never needs `POSTGRES_URL`).
 - `lib/constants.js` — HST 13%, $79 delivery, COLLECTIONS, condition labels, `money()`, `pctOff()`. `lib/specs.js` — `seoDescription()`, spec rows. `lib/site.js` — `SITE_URL`.
 - `app/` — `page.jsx` (home), `shop/`, `product/[id]/`, `cart/`, `checkout/`, `clearance/`, `order/[orderNumber]/` (status timeline), `track/`, `account/ login/ signup/`, `admin/` (ADMIN_EMAILS-gated order board + reservations + `/api/admin/migrate`), `policies/`, `contact/`, `api/*`.
@@ -2990,6 +3005,78 @@ actions, confirmed", and a **native app with a wake word** as the hands-free doo
 - Conversations live in `assistant_threads` / `assistant_messages` (text only,
   last 24 turns sent back; a thread idle 4h starts fresh). Rate limit counts rows
   in Postgres, not memory.
+
+## Marketing consent — CASL (added 2026-09-24)
+`lib/consent.js`, table `consent_events`, `/unsubscribe`, `/api/sms/inbound`.
+
+The campaign email said to reply "UNSUBSCRIBE" and the SMS said "Reply STOP".
+**Neither was connected to anything** — no suppression list, no consent record,
+nothing reading inbound replies — and the privacy policy promised an unsubscribe
+LINK the emails did not contain. Somebody who opted out stayed on the list, and
+if anyone had asked why we emailed them there was no answer to give.
+
+- **THIS DOES NOT TOUCH TRANSACTIONAL MAIL AND MUST NOT.** An order
+  confirmation, an invoice, a delivery update, a password reset, a driver's
+  sign-in code — none are commercial electronic messages and none need consent.
+  Only `sendEmailCampaign` / `sendSmsCampaign` filter through the gate. Wiring
+  this into `sendEmail` globally would stop order confirmations, which is a far
+  worse outcome than the problem it solves.
+- **Express consent is an EVENT; implied consent is a FACT about a
+  relationship.** So `consent_events` holds only what a person did — said yes,
+  or opted out — and implied consent is DERIVED at read time from orders and
+  quotes. Storing it would be a second copy of what those tables already say,
+  and the two would drift. Same rule as the journal, a part's stock and a unit's
+  location.
+- **The windows are statutory, not preferences.** 24 months from a purchase, 6
+  from a quote request (`IMPLIED_PURCHASE_MONTHS` / `IMPLIED_INQUIRY_MONTHS`),
+  and there is a test pinning both so changing one has to be a decision.
+- **SMS marketing needs an express yes.** A purchase implies consent to be
+  emailed; we do not stretch that to texts, which are more intrusive and which
+  this business has never told anyone it would send.
+- **Withdrawal wins and does not expire.** Specifically: a later purchase does
+  NOT re-imply consent for somebody who opted out. Under the relationship rule
+  it arguably could, and it would be indefensible to the person who pressed
+  unsubscribe and then bought a fridge anyway.
+- **`filterAudience` FAILS CLOSED** — the only gate in this codebase that does.
+  Everything else degrades open because losing a real sale beats admitting a
+  junk one; here the cost of wrongly sending is a statutory penalty and somebody
+  who already asked us to stop, and the cost of wrongly not sending is one
+  campaign going tomorrow instead. **If the consent table can't be read, nothing
+  is sent**, and the composer says so.
+- **The evidence is the WORDING THEY WERE SHOWN.** `consent_events.evidence`
+  stores the actual sentence from `components/MarketingOptIn.jsx`, because what
+  matters is not that a box was ticked but what it said. The box is **never
+  pre-ticked** — a pre-ticked box is the specific thing the legislation was
+  written about, and a record made from one looks like proof while being worth
+  less than nothing.
+- **GET SHOWS, POST ACTS** on `/unsubscribe`. Mail scanners and link-preview
+  crawlers fetch every URL in a message — this repo has already had a one-time
+  link burned exactly that way (the driver sign-in link). The emailed link lands
+  on a page with one button.
+- The unsubscribe token is an HMAC via `lib/links.js`, derived not stored, so it
+  is valid forever with no table and no migration — which satisfies CASL's
+  60-day minimum for free. It is also what stops anybody unsubscribing somebody
+  else by editing the query string.
+- **`List-Unsubscribe` + `List-Unsubscribe-Post`** (RFC 2369 / RFC 8058) are on
+  every campaign email, which is what renders the native Unsubscribe button in
+  Gmail and Outlook — by a distance the most-used opt-out there is, and the one
+  that stops people reaching for the spam button instead, which is what actually
+  damages the sending domain. `sendEmail` gained an optional `headers` param for
+  it; transactional mail passes nothing and must keep passing nothing.
+- **Twilio already blocks STOP at its end** on its own numbers. What it cannot
+  do is put the opt-out in OUR records — without which we have no proof, the
+  person still counts as a recipient in every campaign, and a number blocked at
+  Twilio silently fails every send forever with nobody looking. Point the
+  number's "A MESSAGE COMES IN" webhook at `/api/sms/inbound`.
+- **The composer shows the real number before the message is written.** "412
+  customers" and "412 people you may email" are different, and finding that out
+  after pressing send is how the wrong thing gets sent.
+- **NOT DONE YET:** `audience()` still reads `users`, so campaigns reach only
+  people who made an ACCOUNT — every guest buyer and phone customer that
+  `backfillCustomers` assembles is still invisible to marketing. That is Phase
+  2.7 and it is a bigger change than this one. There is also no admin screen for
+  the consent history (`consentHistory()` exists and nothing renders it), and no
+  bounce/complaint handling.
 
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)

@@ -9,7 +9,7 @@
 # It runs on pull requests and on main, and NOT as part of the Vercel build.
 # That is deliberate: a lint failure must be able to stop a merge, and must
 # never be able to stop a deploy.
-name: Lint
+name: Lint & test
 
 on:
   pull_request:
@@ -33,9 +33,33 @@ jobs:
           node-version: "20"
       # ESLint is deliberately NOT a devDependency. Adding one means changing
       # package-lock.json too, and a lockfile out of step with package.json
-      # makes `npm ci` fail outright — which is what Vercel builds with and
-      # what sync-catalog runs nightly. eslint.config.mjs is self-contained,
+      # makes `npm ci` fail outright — which is what Vercel builds with.
+      # eslint.config.mjs is self-contained,
       # so eslint on its own is the entire toolchain and the app's own
       # dependencies never need installing to run this.
       - name: Check for undefined variables
         run: npx --yes eslint@9 .
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      # The HARNESS has no dependencies (test/_harness.mjs is fifty lines of
+      # Node), and no devDependency is added for it — that rule stands, because
+      # a lockfile out of step with package.json makes `npm ci` fail, and
+      # `npm ci` is what Vercel builds with.
+      #
+      # But the tests import the app's own modules, and lib/partial and
+      # lib/consent reach lib/db, which imports `pg`. So the app's EXISTING
+      # runtime dependencies do have to be installed. That touches nothing:
+      # `npm ci` installs exactly what the committed lockfile already says.
+      #
+      # Phase 1 replaces this with a real runner (Vitest + PGlite) so the money
+      # code can be tested against an actual Postgres.
+      - run: npm ci
+      - name: Run tests
+        run: npm test

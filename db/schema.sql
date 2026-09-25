@@ -1010,3 +1010,43 @@ CREATE INDEX IF NOT EXISTS idx_part_requests_open ON part_requests(status, creat
 -- How a salvage unit left: sold on an invoice, or stripped for parts. Without
 -- it a parted-out unit reads as a disposal nobody invoiced.
 ALTER TABLE salvage_units ADD COLUMN IF NOT EXISTS disposal text;
+
+-- ---------------------------------------------------------------------------
+-- CRM join keys. Customer identity is an email address compared case-
+-- insensitively, so every lookup is on lower(email) — a function of the column,
+-- which a plain index on the column itself cannot answer. Before these, the
+-- customer list, the customer profile, the repeat-buyer analytics and the
+-- checkout fraud check each scanned their whole table.
+--
+-- The expression has to match the queries exactly (see lib/customers.js,
+-- lib/analytics.js, lib/antifraud.js) or the planner ignores the index.
+CREATE INDEX IF NOT EXISTS idx_orders_email_lower   ON orders   (lower(email));
+CREATE INDEX IF NOT EXISTS idx_invoices_email_lower ON invoices (lower(email));
+CREATE INDEX IF NOT EXISTS idx_quotes_email_lower   ON quotes   (lower(email));
+
+-- Revenue queries filter on status and date together on every dashboard,
+-- report and KPI in the app.
+CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders (status, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Marketing consent (CASL). APPEND-ONLY: "when did they opt out, and what had
+-- they been told when they opted in" is the whole question this answers, and an
+-- UPDATE destroys it.
+--
+-- It holds only what a PERSON DID — said yes, or opted out. Implied consent
+-- (bought in the last 24 months, asked for a quote in the last 6) is DERIVED at
+-- read time from orders and quotes rather than stored, because storing it would
+-- be a second copy of what those tables already say and the two would drift.
+-- See lib/consent.js.
+CREATE TABLE IF NOT EXISTS consent_events (
+  id       serial PRIMARY KEY,
+  identity text NOT NULL,                 -- lowercased email, or E.164 phone
+  channel  text NOT NULL,                 -- 'email' | 'sms'
+  event    text NOT NULL,                 -- 'granted' | 'withdrawn'
+  source   text,                          -- signup | checkout | unsubscribe_link | sms_stop | admin | ...
+  evidence text,                          -- THE WORDING THEY WERE SHOWN. This is the proof.
+  ip       text,
+  actor    text,                          -- who recorded it, when a person did
+  at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_consent_identity ON consent_events (identity, channel, at DESC);

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "npx --yes eslint@9 .",
-    "sync": "node scripts/sync-sheet.mjs"
+    "sync": "node scripts/sync-sheet.mjs",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./test/register.mjs test/run.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.4.1",
@@ -15,12 +16,11 @@
     "googleapis": "^140.0.1",
     "jose": "^5.9.6",
     "jsqr": "1.4.0",
-    "next": "16.2.11",
+    "next": "^16.3.6",
     "pg": "^8.12.0",
     "qrcode-generator": "^1.4.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "stripe": "^22.2.1",
-    "xlsx": "^0.18.5"
+    "stripe": "^22.2.1"
   }
 }

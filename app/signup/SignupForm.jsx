@@ -1,12 +1,13 @@
 'use client';
 import { useState } from 'react';
 import HoneypotField from '../../components/HoneypotField';
+import MarketingOptIn, { CONSENT_TEXT } from '../../components/MarketingOptIn';
 import { useSearchParams } from 'next/navigation';
 
 export default function SignupForm() {
   const params = useSearchParams();
   const next = params.get('next') || '/account';
-  const [form, setForm] = useState({ email: '', name: '', phone: '', password: '', website: '' });
+  const [form, setForm] = useState({ email: '', name: '', phone: '', password: '', website: '', marketingOptIn: false });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -19,7 +20,7 @@ export default function SignupForm() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, marketingOptInText: form.marketingOptIn ? CONSENT_TEXT : '' })
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Signup failed.'); return; }
@@ -56,7 +57,11 @@ export default function SignupForm() {
             <input id="password" type="password" required minLength={8} autoComplete="new-password" value={form.password} onChange={set('password')} />
             <div className="hint">At least 8 characters.</div>
           </div>
-          <button className="btn primary block" disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
+          <MarketingOptIn
+            checked={form.marketingOptIn}
+            onChange={(v) => setForm((f) => ({ ...f, marketingOptIn: v }))}
+          />
+          <button className="btn primary block" style={{ marginTop: 14 }} disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
         </form>
         <p className="hint" style={{ marginTop: 14 }}>
           Already have an account? <a href={`/login?next=${encodeURIComponent(next)}`} style={{ fontWeight: 700, color: 'var(--charcoal)' }}>Login</a>.

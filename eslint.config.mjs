@@ -97,7 +97,18 @@ const placeholders = {
 export default [
   {
     // .next is generated, data/ is JSON the tracker writes, node_modules is not ours.
-    ignores: ['.next/**', 'out/**', 'node_modules/**', 'data/**', 'coverage/**']
+    //
+    // The `**/` prefixes matter. A bare `.next/**` anchors at the repo root, so
+    // a build output nested anywhere else — a git worktree under .claude/, a
+    // `.vercel/output` from the CLI — was linted as source and buried the real
+    // findings under a hundred `'trustedTypes' is not defined` from minified
+    // chunks. CI never saw it (fresh checkout, none of those directories exist)
+    // and every local run did, which is the wrong way round: the person who can
+    // act on a finding is the one whose output is noise.
+    ignores: [
+      '**/.next/**', '**/out/**', '**/node_modules/**', '**/coverage/**',
+      '.vercel/**', '.claude/**', 'data/**'
+    ]
   },
   {
     // .jsx is listed explicitly: flat config only walks a directory for the

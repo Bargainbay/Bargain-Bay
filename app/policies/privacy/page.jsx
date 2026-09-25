@@ -43,10 +43,26 @@ export default function PrivacyPage() {
         properly without them.
       </p>
 
-      <h2>Email marketing</h2>
+      <h2>Marketing email and texts</h2>
       <p>
-        If you opt in, we may email you about new lots and deals. You can unsubscribe at any time using the link
-        in any email.
+        We send marketing messages only where Canada&apos;s Anti-Spam Legislation (CASL) allows it: you ticked the
+        box asking for them, or you bought from us in the last 24 months, or you asked us for a quote in the
+        last 6 months. Marketing texts are sent only if you expressly asked for them.
+      </p>
+      <p>
+        <b>Every marketing email carries an unsubscribe link</b>, and it keeps working indefinitely. You can also
+        use the Unsubscribe button your email provider shows next to our name. For texts, reply <b>STOP</b>.
+        Opting out is recorded immediately and is permanent — buying from us again afterwards does not put you
+        back on the list.
+      </p>
+      <p>
+        Opting out of marketing does not stop messages about an order you have placed — confirmations, invoices
+        and delivery updates. Those are not marketing and we cannot switch them off while an order is live.
+      </p>
+      <p>
+        We keep a record of when you opted in or out, and of the wording you were shown at the time, because
+        CASL requires us to be able to show why we contacted you. You can ask us what that record says at
+        {' '}<a href="mailto:sales@bargainbay.ca">sales@bargainbay.ca</a>.
       </p>
 
       <h2>Data retention &amp; security</h2>
