@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { emailConfigured } from '../../../../lib/email';
-import { smsConfigured } from '../../../../lib/sms';
+import { smsConfigured, smsMarketingConfigured } from '../../../../lib/sms';
 import { audience, audienceCounts, consentCounts, sendEmailCampaign, sendSmsCampaign } from '../../../../lib/campaigns';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +29,10 @@ export async function GET(req) {
   const consent = await consentCounts(segment, channel).catch(() => null);
   return NextResponse.json({
     segment, channel, counts, consent,
-    emailConfigured: emailConfigured(), smsConfigured: smsConfigured()
+    emailConfigured: emailConfigured(), smsConfigured: smsConfigured(),
+    // False means marketing would go out on the OPERATIONS number — the one
+    // drivers get their sign-in codes on. Not fatal, but the composer says so.
+    smsMarketingConfigured: smsMarketingConfigured()
   });
 }
 

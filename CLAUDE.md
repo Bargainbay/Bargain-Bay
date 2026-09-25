@@ -3078,6 +3078,50 @@ if anyone had asked why we emailed them there was no answer to give.
   the consent history (`consentHistory()` exists and nothing renders it), and no
   bounce/complaint handling.
 
+### Marketing texts go out on their OWN number (added 2026-09-24)
+`TWILIO_FROM` is the **operations** number — driver sign-in codes, sign-in
+links, shift nudges, the outbound import-review call.
+`TWILIO_MARKETING_FROM` carries Bargain Bay adverts and nothing else.
+
+**They must be different numbers, and the reason is Twilio, not tidiness:
+STOP blocks a NUMBER PAIR at carrier level, not a kind of message.** Once
+somebody texts STOP to one of our numbers, every later send from that number to
+them fails with error 21610 — and from the app's side it just fails.
+
+The concrete failure on one shared number: `audience('all')` is
+`SELECT ... FROM users` with **no filter**, and a driver is a `users` row with a
+real mobile on it — so a marketing blast texted every driver. A driver who then
+texts STOP (a liquidation-appliance advert is not why they gave us their number)
+can no longer receive a sign-in code, their screen still says one was sent, and
+the first anybody hears is a driver at a van at 7am.
+
+- **The consent gate already stops the future case** — drivers are added by
+  `addDriverByPhone`, never tick a box, so `filterAudience` excludes them.
+  This fixes the other half: even if something did sweep them in, the advert
+  is on a number whose loss costs them nothing.
+- **`sendSms`'s `from` defaults to OPERATIONS.** A caller that says nothing can
+  never put an advert on the sign-in number; marketing passes `marketingFrom()`
+  explicitly. There is a test pinning exactly this.
+- **Unset is safe but NOT silent.** `marketingFrom()` falls back to
+  `TWILIO_FROM` so campaigns keep working before the second number is bought,
+  and the composer says on screen that it did. A hard refusal would break
+  marketing on deploy; a silent fallback would quietly restore the bug.
+  `smsMarketingConfigured()` also rejects the two vars being the *same* number,
+  which is the obvious way to think you have separated them without having.
+- **21610 is named, not swallowed.** `sendSms` returns `optedOut`, and the two
+  places it matters act on it: a campaign records the opt-out in
+  `consent_events` (so it is never retried, and the fact leaves Twilio's console
+  where nobody looks), and the driver sign-in path **emails the office** — that
+  person is locked out and cannot be told why, because the sign-in reply must
+  stay identical for an unknown number.
+- **BOTH numbers point their "A MESSAGE COMES IN" webhook at
+  `/api/sms/inbound`.** It records which one was texted; a STOP on the
+  operations number is reported to Sentry as a lockout, not filed as an
+  ordinary opt-out.
+- Phase 4.2's customer delivery SMS lands on the same trap — opting out of
+  adverts must not carrier-block "your driver is 20 minutes away". Send those
+  from `TWILIO_FROM`.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
