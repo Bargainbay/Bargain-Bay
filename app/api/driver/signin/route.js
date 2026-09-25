@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { hasDb } from '../../../../lib/db';
 import { startDriverCode, verifyDriverCode, touchDriverSeen, driverSmsNumber } from '../../../../lib/drivers';
 import { sendSms } from '../../../../lib/sms';
+import { captureMessage } from '../../../../lib/observe';
+import { notifyOwner, esc } from '../../../../lib/email';
 import {
   createSessionToken, sessionCookieOptions, SESSION_COOKIE, DRIVER_SESSION_DAYS
 } from '../../../../lib/auth';
@@ -46,10 +48,36 @@ export async function POST(req) {
 
     const r = await startDriverCode(phone);
     if (r.sent) {
-      await sendSms({
-        to: driverSmsNumber(r.driver.phone || phone),
+      const to = driverSmsNumber(r.driver.phone || phone);
+      const sms = await sendSms({
+        to,
         body: `${r.code} is your RS Solutions sign-in code. It lasts ${r.minutes} minutes.`
-      }).catch(() => {});
+      }).catch(() => null);
+
+      // A DRIVER WHO CANNOT RECEIVE A CODE IS LOCKED OUT AND DOES NOT KNOW WHY.
+      // Twilio blocks a number pair at carrier level once somebody texts STOP to
+      // it — historically possible here because marketing and operations shared
+      // one number — and from the app's side the send simply fails. The driver
+      // sees "we've texted you a code", nothing arrives, and the first anyone
+      // hears is a driver at a van at 7am. The reply to them is deliberately
+      // unchanged (it must not reveal whether a number is one of ours), so the
+      // office is told instead.
+      if (sms && sms.optedOut) {
+        await captureMessage('Driver sign-in code blocked — recipient has opted out of this Twilio number', {
+          tags: { where: 'driver-signin' },
+          extra: { to, driverId: r.driver.id || null },
+          fingerprint: `driver-signin-optout:${to}`
+        }).catch(() => {});
+        notifyOwner(
+          'A driver cannot receive their sign-in code',
+          `<p>Twilio refused the sign-in code for <b>${esc(to)}</b> because that number has
+             texted STOP to it at some point (error 21610).</p>
+           <p><b>That driver is locked out of the app</b> and has no way to tell why — their
+             screen says the code was sent.</p>
+           <p>Fix: Twilio Console &rarr; Messaging &rarr; Opt-out management, remove that number
+             from the opt-out list for the operations number. Then ask them to try again.</p>`
+        ).catch(() => {});
+      }
     }
     // Always the same answer — see above.
     return NextResponse.json({ ok: true, sent: true });

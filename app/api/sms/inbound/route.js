@@ -17,7 +17,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { withdrawConsent, grantConsent, normPhone } from '../../../../lib/consent';
-import { captureError } from '../../../../lib/observe';
+import { captureError, captureMessage } from '../../../../lib/observe';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -74,12 +74,36 @@ export async function POST(req) {
   const body = String(params.Body || '').trim();
   if (!from) return twiml('');
 
+  // WHICH of our numbers they texted, because the two mean different things.
+  // A STOP to the marketing number costs somebody adverts. A STOP to the
+  // OPERATIONS number is a driver carrier-blocking the number their sign-in
+  // code arrives on, and they will not find out until they cannot sign in.
+  // Both numbers should point their "A MESSAGE COMES IN" webhook here.
+  const to = normPhone(params.To);
+  const opsNumber = normPhone(process.env.TWILIO_FROM);
+  const mktNumber = normPhone(process.env.TWILIO_MARKETING_FROM);
+  const which = to && opsNumber && to === opsNumber ? 'operations'
+    : to && mktNumber && to === mktNumber ? 'marketing'
+      : 'unknown';
+
   try {
     if (STOP_WORDS.test(body)) {
       await withdrawConsent({
         channel: 'sms', phone: from, source: 'sms_stop',
-        evidence: `Texted: ${body.slice(0, 200)}`
+        evidence: `Texted "${body.slice(0, 120)}" to the ${which} number${to ? ` (${to})` : ''}`
       });
+
+      // Twilio has now blocked this pair at carrier level. On the operations
+      // number that is somebody who can no longer receive a driver sign-in
+      // code, a shift nudge or (once it ships) a delivery notification — none
+      // of which they meant to switch off, and none of which will fail loudly.
+      if (which === 'operations') {
+        await captureMessage('STOP received on the OPERATIONS number — that person can no longer be texted a sign-in code', {
+          tags: { where: 'sms-inbound' },
+          extra: { from, to },
+          fingerprint: `sms-stop-ops:${from}`
+        }).catch(() => {});
+      }
       // Twilio sends its own confirmation for the keywords it intercepts;
       // replying again would double-text somebody who just asked us to stop.
       return twiml('');

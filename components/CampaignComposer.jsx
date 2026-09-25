@@ -15,6 +15,7 @@ export default function CampaignComposer({ emailConfigured, smsConfigured }) {
   const [testTo, setTestTo] = useState('');
   const [counts, setCounts] = useState(null);
   const [consent, setConsent] = useState(null);
+  const [mktNumber, setMktNumber] = useState(true);
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
   const [result, setResult] = useState(null);
@@ -24,7 +25,7 @@ export default function CampaignComposer({ emailConfigured, smsConfigured }) {
     setConsent(null);
     fetch(`/api/admin/campaigns?segment=${segment}&channel=${channel}`)
       .then((r) => r.json())
-      .then((d) => { if (live) { setCounts(d.counts); setConsent(d.consent || null); } })
+      .then((d) => { if (live) { setCounts(d.counts); setConsent(d.consent || null); setMktNumber(d.smsMarketingConfigured !== false); } })
       .catch(() => {});
     return () => { live = false; };
   }, [segment, channel]);
@@ -121,6 +122,19 @@ export default function CampaignComposer({ emailConfigured, smsConfigured }) {
       {/* This used to be advice. It is now a description of what the send
           actually does — the filter is in lib/consent and this is only
           reporting it, so the number on the button is the number that goes. */}
+      {channel === 'sms' && !mktNumber && (
+        <div className="notice-box" style={{ fontSize: 13, borderColor: '#c98a00' }}>
+          <b>This will send from the operations number.</b> That is the same number
+          drivers receive their sign-in codes on. Twilio blocks a number pair at
+          carrier level when somebody texts STOP, so anyone who opts out of this
+          advert can no longer be texted anything else from it.
+          <div style={{ marginTop: 6 }}>
+            Buy a second Twilio number and set <code>TWILIO_MARKETING_FROM</code> in
+            Vercel. Marketing moves to it on the next deploy; nothing else changes.
+          </div>
+        </div>
+      )}
+
       {consent && consent.failed && (
         <div className="error-box" style={{ fontSize: 13 }}>
           <b>The consent list could not be read.</b> Nothing can be sent until it can —
@@ -155,6 +169,17 @@ export default function CampaignComposer({ emailConfigured, smsConfigured }) {
           {result.blocked && (result.blocked.withdrawn > 0 || result.blocked.noConsent > 0) && (
             <div style={{ marginTop: 4, fontSize: 12.5 }}>
               Held back: {result.blocked.withdrawn} opted out, {result.blocked.noConsent} with no consent on record.
+            </div>
+          )}
+          {result.optedOut > 0 && (
+            <div style={{ marginTop: 4, fontSize: 12.5 }}>
+              {result.optedOut} were refused by Twilio as already opted out — they have been
+              added to the suppression list, so they will not be attempted again.
+            </div>
+          )}
+          {result.usedOpsNumber && (
+            <div style={{ marginTop: 4, fontSize: 12.5, color: '#c98a00' }}>
+              Sent from the operations number — see the warning above.
             </div>
           )}
           {result.consentError && <div style={{ marginTop: 4, color: '#b3261e' }}>{result.consentError}</div>}
