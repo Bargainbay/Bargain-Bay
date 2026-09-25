@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, canKeepBooks } from '../../../../lib/auth';
 import { setOpeningBalances, journal, trialBalance, getOpeningBalances } from '../../../../lib/ledger';
+import { reader, partialWarning } from '../../../../lib/partial';
 import { setPurchaseInvoicePaid, unpaidPurchaseInvoices } from '../../../../lib/finance';
 import { markConsignmentPaid, consignmentOwed, removeConsignmentUnit } from '../../../../lib/consignment';
 
@@ -57,12 +58,24 @@ export async function GET(req) {
   const to = new URL(req.url).searchParams.get('to')
     || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
 
-  const entries = await journal(opening.asOf, to);
+  // One reader for the export, so an unreadable section shows up IN THE FILE.
+  // This is the CSV an accountant actually works from; a section silently
+  // missing from it is the worst version of the bug lib/partial describes.
+  const read = reader('ledger-csv');
+  const entries = await journal(opening.asOf, to, read);
   const cell = (v) => {
     const str = v === null || v === undefined ? '' : String(v);
     return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
   };
-  const rows = [['Date', 'Account', 'Account name', 'Memo', 'Reference', 'Debit', 'Credit']];
+  const rows = [];
+  // Row 1, before the headers, where Excel opens. A warning three hundred rows
+  // down is a warning nobody reads.
+  const warning = partialWarning(read.problems);
+  if (warning) {
+    rows.push([`*** INCOMPLETE — DO NOT FILE FROM THIS FILE. ${warning.text} ***`]);
+    rows.push([]);
+  }
+  rows.push(['Date', 'Account', 'Account name', 'Memo', 'Reference', 'Debit', 'Credit']);
   const { ACCOUNTS } = await import('../../../../lib/ledger');
   for (const e of entries) {
     for (const l of e.lines) {
@@ -72,11 +85,15 @@ export async function GET(req) {
   }
   const tb = await trialBalance(to);
   rows.push([], ['', '', '', 'TOTALS', '', tb.debits.toFixed(2), tb.credits.toFixed(2)]);
+  // The totals above balance whether or not a section was dropped — every entry
+  // is a balanced pair, so losing a query loses both halves. Say so, rather
+  // than letting "it balances" be read as "it is right".
+  if (warning) rows.push([], [`*** ${warning.text} ***`]);
 
   return new Response(rows.map((r) => r.map(cell).join(',')).join('\n'), {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="bargain-bay-general-ledger-${opening.asOf}-to-${to}.csv"`
+      'Content-Disposition': `attachment; filename="bargain-bay-general-ledger-${opening.asOf}-to-${to}${warning ? '-INCOMPLETE' : ''}.csv"`
     }
   });
 }

@@ -3,6 +3,8 @@ import { getSession, isAdmin, canKeepBooks } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { money, BUSINESS_NAME, BUSINESS_LEGAL, HST_NUMBER } from '../../../../lib/constants';
 import { booksSummary, BOOK_PERIODS } from '../../../../lib/books';
+import { partialWarning } from '../../../../lib/partial';
+import IncompleteBanner from '../../../../components/IncompleteBanner';
 import { listAccountants } from '../../../../lib/accountants';
 import AdminNav from '../../../../components/AdminNav';
 import AccountantAccess from '../../../../components/AccountantAccess';
@@ -35,6 +37,8 @@ export default async function BooksPage({ searchParams }) {
   return (
     <div>
       <AdminNav active="operations" booksOnly={!admin} />
+
+      <IncompleteBanner warning={partialWarning(b.problems)} />
 
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', margin: '4px 0 12px' }}>
         <div>
@@ -79,12 +83,21 @@ export default async function BooksPage({ searchParams }) {
               {Object.entries(b.sections).map(([key, s]) => (
                 <tr key={key}>
                   <td>{s.label}</td>
-                  <td style={{ textAlign: 'right' }}>{s.count}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{money(s.total)}</td>
+                  {/* A section that FAILED and a section that is genuinely
+                      empty both came back as 0 rows and £0.00, and the row
+                      then said "nothing to export" — which is the lie this is
+                      for. A quiet month and a broken query now read
+                      differently. */}
+                  <td style={{ textAlign: 'right' }}>{s.failed ? '—' : s.count}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                    {s.failed ? '—' : money(s.total)}
+                  </td>
                   <td style={{ textAlign: 'right' }}>
-                    {s.count > 0
-                      ? <a className="btn" style={{ fontSize: 12.5 }} href={`/api/admin/books?section=${key}&period=${period}`}>Download CSV</a>
-                      : <span className="hint" style={{ fontSize: 11.5 }}>nothing to export</span>}
+                    {s.failed
+                      ? <span style={{ fontSize: 11.5, color: '#b3261e', fontWeight: 600 }}>could not be read</span>
+                      : s.count > 0
+                        ? <a className="btn" style={{ fontSize: 12.5 }} href={`/api/admin/books?section=${key}&period=${period}`}>Download CSV</a>
+                        : <span className="hint" style={{ fontSize: 11.5 }}>nothing to export</span>}
                   </td>
                 </tr>
               ))}

@@ -3,10 +3,12 @@ import { getSession, isAdmin, canKeepBooks } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { money, BUSINESS_NAME, BUSINESS_LEGAL, HST_NUMBER } from '../../../../lib/constants';
 import { balanceSheet, getOpeningBalances, ACCOUNTS } from '../../../../lib/ledger';
+import { partialWarning } from '../../../../lib/partial';
 import { inventoryAtCost, unpaidPurchaseInvoices } from '../../../../lib/finance';
 import { consignmentOwed } from '../../../../lib/consignment';
 import AdminNav from '../../../../components/AdminNav';
 import PrintButton from '../../../../components/PrintButton';
+import IncompleteBanner from '../../../../components/IncompleteBanner';
 import OpeningBalances from '../../../../components/OpeningBalances';
 import PayablesList from '../../../../components/PayablesList';
 import ConsignmentOwed from '../../../../components/ConsignmentOwed';
@@ -48,9 +50,14 @@ export default async function LedgerPage() {
   const consOwed = await consignmentOwed().catch(() => []);
   const owingTotal = owing.reduce((a, r) => a + r.total, 0);
 
+  // balanceSheet spreads trialBalance, which carries the reader's problems.
+  const warning = partialWarning(bs?.problems);
+
   return (
     <div>
       <div className="no-print"><AdminNav active="books" booksOnly={!admin} /></div>
+
+      <IncompleteBanner warning={warning} />
 
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', margin: '4px 0 12px' }}>
         <div>

@@ -36,24 +36,10 @@ export async function onRequestError(error, request, context) {
 }
 
 export async function register() {
-  // Edge has no `process`; only the Node runtime gets the process-level nets.
+  // Edge has no `process`. The import is DYNAMIC as well as guarded: a static
+  // one puts lib/observe-node in the Edge compilation graph, where Turbopack
+  // sees `process.on` and warns on every build regardless of the check.
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
-
-  // A rejected promise nobody awaited is the shape most of this codebase's
-  // background work takes — a best-effort email, a photo upload, a tracker
-  // poll. `onRequestError` never sees those: they are not attached to a
-  // request, and Node's default is to print a warning and move on.
-  process.on('unhandledRejection', (reason) => {
-    captureError(reason instanceof Error ? reason : new Error(String(reason)), {
-      tags: { where: 'unhandledRejection' }
-    }).catch(() => {});
-  });
-
-  process.on('uncaughtException', (err) => {
-    // Report and RE-THROW by doing nothing else: this handler deliberately does
-    // not swallow. A process that keeps running after an uncaught exception is
-    // a process in an unknown state, and Next/Node will tear it down. The
-    // report is fire-and-forget because there may be no tick left to await in.
-    captureError(err, { tags: { where: 'uncaughtException' }, level: 'fatal' }).catch(() => {});
-  });
+  const { installProcessHandlers } = await import('./lib/observe-node');
+  installProcessHandlers();
 }
