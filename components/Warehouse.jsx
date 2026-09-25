@@ -267,6 +267,14 @@ function ScanTab({ visible, spots, counting, onCountClosed, onOpenUnit, onOpenSp
     if (!p) return;
     const { counting: cnt, codes: known } = live.current;
     let { kind, value } = p;
+    // A parts label off the same roll. This screen moves UNITS, and a part moves
+    // in quantities it has no box for — so it says what it read and sends them to
+    // the right screen, rather than failing as an unknown SKU, which is what a
+    // bin label scanned at a rack used to look like.
+    if (kind === 'part') {
+      note('warn', `That's a parts label (#${value}), not a unit — parts are moved on the Parts screen.`);
+      return;
+    }
     if (kind === 'text') {
       const c = normCode(value);
       if (known.has(c)) { kind = 'location'; value = c; } else kind = 'unit';

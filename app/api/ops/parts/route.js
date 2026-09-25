@@ -15,7 +15,7 @@
 import { NextResponse } from 'next/server';
 import { hasDb } from '../../../../lib/db';
 import { listAreas, listLocations } from '../../../../lib/locations';
-import { bookInPart, getPart, receiveParts, searchParts, usePart } from '../../../../lib/parts';
+import { bookInPart, describeParts, getPart, receiveParts, searchParts, usePart } from '../../../../lib/parts';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -53,6 +53,12 @@ export async function GET(req) {
   const sp = new URL(req.url).searchParams;
   try {
     if (sp.get('id')) return NextResponse.json({ part: floorPart(await getPart(Number(sp.get('id')))) });
+    // Several parts at once, for RS Ops' label sheet. One call, not one per
+    // sticker: a roll is printed a shelf at a time.
+    if (sp.get('ids')) {
+      const ids = sp.get('ids').split(/[\s,]+/).map(Number).filter((n) => Number.isFinite(n) && n > 0).slice(0, 300);
+      return NextResponse.json({ parts: (await describeParts(ids)).map(floorPart) });
+    }
     if (sp.get('spots')) {
       const [spots, areas] = await Promise.all([spotList(), listAreas()]);
       return NextResponse.json({ spots, areas });

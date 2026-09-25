@@ -41,6 +41,11 @@ const ago = (iso) => {
 };
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const partTitle = (p) => [p.partNumber, p.name].filter(Boolean).join(' · ');
+// The label sheet lives on the warehouse side because that is where the QR
+// encoder, the print CSS and the roll sizes already are — a second copy of that
+// page is a second set of sticker shapes to keep in step.
+const labelsHref = (ids) =>
+  `/admin/warehouse/labels?${new URLSearchParams({ type: 'parts', ids: ids.join(',') })}`;
 
 const CSS = `
   .pt h1 { font-size: 22px; margin: 4px 0 2px; color: var(--charcoal); }
@@ -59,10 +64,13 @@ const CSS = `
   .pt-in { font-size: 16px; padding: 9px 11px; }
 `;
 
-export default function Parts({ admin = false }) {
+export default function Parts({ admin = false, initialPart = null }) {
   const [tab, setTab] = useState('shelf');
   const [overview, setOverview] = useState(null);
-  const [openPart, setOpenPart] = useState(null);
+  // A parts label scanned with a phone camera lands here with ?part= on it (see
+  // lib/location-codes.js). Initial state only: closing the card must not have
+  // the URL spring it open again.
+  const [openPart, setOpenPart] = useState(initialPart || null);
   const [err, setErr] = useState('');
 
   const loadOverview = useCallback(async () => {
@@ -158,6 +166,15 @@ function Shelf({ onOpen }) {
         placeholder="Part number, name, brand, or a model it fits" aria-label="Find a part" />
       {err && <div className="error-box">{err}</div>}
       {parts && !parts.length && <p className="hint">Nothing matches. Book it in under <b>Book parts in</b> if it is new to us.</p>}
+      {/* Labelling a shelf is done a shelf at a time, not a part at a time —
+          search "igniter", print the lot, walk over with the roll. */}
+      {parts?.length > 0 && (
+        <p style={{ margin: '0 0 10px' }}>
+          <a className="btn" href={labelsHref(parts.map((p) => p.id))} target="_blank" rel="noreferrer">
+            Print {plural(parts.length, 'label')}
+          </a>
+        </p>
+      )}
       <PartList parts={parts} onOpen={onOpen} />
     </div>
   );
@@ -202,7 +219,10 @@ function PartCard({ id, admin, onClose, onChanged }) {
             {part.fits?.length ? ` · fits ${part.fits.join(', ')}` : ''}
           </div>
         </div>
-        <button type="button" className="btn" onClick={onClose}>Close</button>
+        <div className="pt-row">
+          <a className="btn" href={labelsHref([part.id])} target="_blank" rel="noreferrer">Print label</a>
+          <button type="button" className="btn" onClick={onClose}>Close</button>
+        </div>
       </div>
       {err && <div className="error-box">{err}</div>}
       {msg && <div className="notice-box">{msg}</div>}
