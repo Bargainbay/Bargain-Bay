@@ -192,7 +192,9 @@ case folding. Three things follow, all learned filling the gap on 2026-09-10:
 See `.env.example` for the full annotated list. The site builds and browses with none of them set.
 - `POSTGRES_URL` — accounts/orders/reservations/admin (Neon).
 - `AUTH_SECRET` — login sessions. `ADMIN_EMAILS` — admin gate (comma-separated; admin user id=1 is service@rssolutions.ca).
-- `SALES_EMAILS` — **sales-associate gate** (comma-separated). Sales get the Sales dashboard, Quotes, Invoices (full invoice control: create/send/edit/mark-paid/void/refund), **Orders** and **Dispatch** — the surfaces you need to sell a thing and then get it to the customer. Cost-derived figures are hidden from them: the Profit KPI, the Profit column in sales-by-category, and the per-line cost input on the invoice form. Helpers live in `lib/auth.js`: `isAdmin` / `isSales` / `isStaff` (admin implies sales). Nav is filtered via `<AdminNav salesOnly>` and `<DashboardShell salesOnly>`.
+- `SALES_EMAILS` — **sales-associate gate** (comma-separated). Since 2026-09-25
+  this is the FLOOR, not the whole list: roles can also be granted in
+  `staff_access` from /admin/operations without a redeploy (see below). Sales get the Sales dashboard, Quotes, Invoices (full invoice control: create/send/edit/mark-paid/void/refund), **Orders** and **Dispatch** — the surfaces you need to sell a thing and then get it to the customer. Cost-derived figures are hidden from them: the Profit KPI, the Profit column in sales-by-category, and the per-line cost input on the invoice form. Helpers live in `lib/auth.js`: `isAdmin` / `isSales` / `isStaff` (admin implies sales). Nav is filtered via `<AdminNav salesOnly>` and `<DashboardShell salesOnly>`.
 
   **Gate rule (rewritten 2026-09-08, by the owner). The line is NOT "money vs
   not" — sales handle money all day. It is THE CUSTOMER'S SALE versus THE
@@ -3254,6 +3256,48 @@ performs a real dump and restore against a real Postgres (PGlite):
   nothing is worse than no backup.
 - `backups/` is gitignored — a dump holds every customer's name, address, phone
   and order history.
+
+## Staff roles live in the database now (added 2026-09-25)
+`lib/staff.js`, table `staff_access` (migration 0002), **Staff access** on
+`/admin/operations`, `/api/admin/staff` (admin only).
+
+Hiring or firing a rep used to mean editing `SALES_EMAILS` in Vercel and
+redeploying. CLAUDE.md already made the argument for why that is wrong — it is
+the reasoning behind `accountant_access` and `dispatch_access`, *"a hire starts
+on a Monday and might be gone by Friday, and revoking has to be two clicks, not
+a redeploy"* — and never applied it back to the two roles that matter most.
+
+- **`ADMIN_EMAILS` / `SALES_EMAILS` REMAIN, and are checked FIRST.** They are
+  read synchronously from the environment, cannot be broken by a database
+  problem, and are what guarantees the owner can get in — including to fix the
+  grants table. `staff_access` is a SECOND way in, never the only way in. The
+  admin screen deliberately cannot edit them.
+- **`isAdmin` / `isSales` STAYED SYNCHRONOUS, and that is the whole design.**
+  `isAdmin` has 101 call sites and `isStaff` 28. An unawaited `isAdmin()`
+  returns a **Promise, which is truthy** — so one missed `await` among 129 would
+  be a silent authorisation bypass that reads like working code, in plain
+  JavaScript with a linter that only checks `no-undef`. There is a test that
+  asserts these return a boolean.
+- **So the grants are read from a 30-second module cache** (`STAFF_TTL_MS`).
+  The cost is precision on revocation: immediate on the instance that performed
+  it, within the TTL everywhere else — serverless gives each instance its own
+  memory, the same caveat `lib/antifraud` documents for rate limits. Thirty
+  seconds of residual access is not the threat this fixes; somebody who left in
+  March still having admin in June is.
+- **A failed load does NOT clear the cache.** A blip must not sign everybody
+  out. A sustained outage lets it go stale and table-granted access eventually
+  stops, which is the right way round — and the environment lists keep working
+  throughout.
+- The cache is warmed in `instrumentation.js`'s `register()`, so a cold instance
+  does not refuse a table-granted user on their first request.
+- **Revoking keeps the row** (`revoked_at` / `revoked_by`), same as the other
+  two access tables. "Who had admin, between which dates, and who let them in"
+  is what gets asked afterwards. The unique index is therefore PARTIAL
+  (`WHERE revoked_at IS NULL`) or re-granting somebody would collide with their
+  own history.
+- **You cannot revoke your own admin** unless `ADMIN_EMAILS` would still let you
+  in. Otherwise the last admin can lock the business out of its own admin
+  screens and the only way back is a redeploy.
 
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)

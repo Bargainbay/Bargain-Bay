@@ -11,6 +11,7 @@ import OpsSection from '../../../components/OpsSection';
 import OpsFoldBar from '../../../components/OpsFoldBar';
 import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
+import StaffAccess from '../../../components/StaffAccess';
 import AdminClearance from '../AdminClearance';
 import AdminMembers from '../AdminMembers';
 import AdminReconcile from '../AdminReconcile';
@@ -145,8 +146,14 @@ export default async function OperationsPage() {
         <AdminClearance initialItems={clearance} />
       </OpsSection>
 
-      <OpsSection id="tools" title="Reservations & tools" count={reservations.length}>
+      <OpsSection id="tools" title="Reservations &amp; tools" count={reservations.length}>
         <AdminTools initialReservations={reservations} />
+      </OpsSection>
+
+      {/* Beside the other tools rather than on a screen of its own — same
+          one-page reasoning as dispatch's People & access tab. */}
+      <OpsSection id="access" title="Staff access">
+        <StaffAccess />
       </OpsSection>
     </div>
   );

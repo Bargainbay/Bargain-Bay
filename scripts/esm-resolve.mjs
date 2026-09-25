@@ -12,7 +12,16 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+// Modules the test runner substitutes. ONLY active when BB_TEST_STUBS is set,
+// which `npm test` does and `npm run migrate` does not — a resolver used by a
+// production script must not quietly swap a real module for a fake one.
+const TEST_STUBS = { 'next/headers': '../test/stubs/next-headers.mjs' };
+
 export async function resolve(specifier, context, next) {
+  if (process.env.BB_TEST_STUBS === '1' && TEST_STUBS[specifier]) {
+    return next(new URL(TEST_STUBS[specifier], import.meta.url).href, context);
+  }
+
   // `import x from './db'` -> './db.js'
   if (specifier.startsWith('.') && !/\.[a-z]+$/i.test(specifier)) {
     for (const ext of ['.js', '.jsx', '.mjs', '/index.js']) {
