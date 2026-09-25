@@ -1,5 +1,6 @@
 import './globals.css';
 import SiteChrome from '../components/SiteChrome';
+import EnvBanner from '../components/EnvBanner';
 import MetaPixel from '../components/MetaPixel';
 import AttributionTracker from '../components/AttributionTracker';
 import { SALES_EMAIL, PICKUP_ADDRESS } from '../lib/constants';
@@ -70,6 +71,7 @@ export default function RootLayout({ children }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLd(storeSchema) }}
         />
+        <EnvBanner />
         <SiteChrome>{children}</SiteChrome>
       </body>
     </html>

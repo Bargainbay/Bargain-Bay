@@ -18,7 +18,13 @@ function twilioEnv() {
   process.env.TWILIO_ACCOUNT_SID = 'ACtest';
   process.env.TWILIO_AUTH_TOKEN = 'token';
   process.env.TWILIO_FROM = OPS;
+  // These tests are about WHICH NUMBER a message goes out from, so they need
+  // the production path. Outside production lib/environment refuses the send
+  // entirely (see test/environment) — correctly, which is why these had to be
+  // told. Restored by clearEnv below.
+  process.env.VERCEL_ENV = 'production';
 }
+const clearEnv = () => { delete process.env.VERCEL_ENV; };
 const clearMkt = () => { delete process.env.TWILIO_MARKETING_FROM; };
 
 test('with no marketing number, marketingFrom falls back to operations', () => {
@@ -82,7 +88,7 @@ test('an omitted `from` defaults to OPERATIONS, never to marketing', async () =>
   try {
     await sendSms({ to: '+15551234567', body: 'your code is 123456' });
     equal(sent[0].From, OPS, 'a caller that says nothing gets the operations number');
-  } finally { await close(); clearMkt(); }
+  } finally { await close(); clearMkt(); clearEnv(); }
 });
 
 test('an explicit `from` is honoured', async () => {
@@ -91,7 +97,7 @@ test('an explicit `from` is honoured', async () => {
   try {
     await sendSms({ to: '+15551234567', body: 'deals!', from: marketingFrom() });
     equal(sent[0].From, MKT, 'marketing goes out on the marketing number');
-  } finally { await close(); clearMkt(); }
+  } finally { await close(); clearMkt(); clearEnv(); }
 });
 
 test('Twilio 21610 is surfaced as optedOut, not as a generic failure', async () => {
@@ -107,7 +113,7 @@ test('Twilio 21610 is surfaced as optedOut, not as a generic failure', async () 
     equal(r.optedOut, true, 'and specifically an opt-out');
   } finally {
     reply = { status: 201, body: { sid: 'SM1' } };
-    await close();
+    await close(); clearEnv();
   }
 });
 
@@ -121,7 +127,7 @@ test('an ordinary failure is NOT reported as an opt-out', async () => {
     assert(!r.optedOut, 'a bad number is not somebody opting out');
   } finally {
     reply = { status: 201, body: { sid: 'SM1' } };
-    await close();
+    await close(); clearEnv();
   }
 });
 

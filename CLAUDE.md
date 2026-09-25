@@ -3149,6 +3149,42 @@ the first anybody hears is a driver at a van at 7am.
   adverts must not carrier-block "your driver is 20 minutes away". Send those
   from `TWILIO_FROM`.
 
+## Staging, and what a non-production deploy may touch (added 2026-09-25)
+`lib/environment.js` + `docs/STAGING.md`. **Production is unaffected — every
+guard is a no-op when `VERCEL_ENV` is `production`, and a test says so.**
+
+Nothing used to distinguish the two. Point a second deployment at the existing
+environment variables — which is exactly what a staging environment IS — and it
+would email real customers about orders they did not place, text real drivers
+sign-in codes at whatever hour the cron ran, and **write "Sold" into the master
+tracker**, which is the source of truth for the whole business and is not in
+this repo.
+
+- **Email and SMS are REDIRECTED** outside production (`STAGING_EMAIL_TO`,
+  `STAGING_SMS_TO`), with the real recipient in the subject/body, because you
+  still want to see that they work. **Unset means nothing is sent** — it fails
+  closed, since falling through to the real recipient is the bug being fixed.
+- **The tracker is REFUSED, never redirected.** There is no safe second
+  spreadsheet. The block is in `sheetsClient()`, the one boundary every write
+  passes through — gating the callers was tried first and does not work:
+  `writebackEnabled()` guards the SOLD path and intake's `appendTrackerUnits`
+  (vendor drop-offs, purchase-invoice manifests) never consulted it.
+- **Outbound calls are REFUSED.** A phone rings a person.
+- **`VERCEL_ENV`, never `NODE_ENV`.** NODE_ENV is `production` for ANY
+  `next build`, preview included, so it cannot answer this and never could. With
+  neither set it is `development` and outbound is off; outside Vercel,
+  `NODE_ENV=production` counts as production so a self-hosted deploy works.
+- `ALLOW_REAL_OUTBOUND=yes-i-mean-it` is the escape hatch, spelled exactly —
+  `true` and `1` deliberately do not work — and it logs every time.
+- Every non-production page carries a purple banner, so nobody reads a dashboard
+  off staging and quotes the number in a meeting.
+- **BLOCKER: every PR currently reports `Vercel — Canceled by Ignored Build
+  Step`,** so no preview is built at all. Until Settings → Git → Ignored Build
+  Step is changed there is no staging environment whatever the env vars say.
+- Still NOT safe on a preview: Stripe (give it a test key or leave the key
+  unset), Vercel Blob (shared store unless Preview gets its own token), and
+  QuickBooks/Plaid (leave their tokens unset).
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
