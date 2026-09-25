@@ -2972,6 +2972,38 @@ screens need the labels and must not pull `./db` into the browser, same split as
   taking a part against the unit on its bench, parting out a salvage unit from
   RS Ops, and the parts website.
 
+### The parts label (added 2026-09-25)
+A third scan payload — `<bargainbay>/w/p/<part id>` — beside the unit sticker and
+the spot sign. `PART_PATH` / `partScanUrl` / `normPartId` in `lib/location-codes.js`,
+`app/w/p/[id]` redirecting onto `/admin/parts?part=`, `type=parts&ids=` on
+`/admin/warehouse/labels`, and RS Ops' own `/labels/parts` off `/api/ops/parts?ids=`.
+Printed from BOTH parts screens: the office's `/admin/parts` and RS Ops' Parts tab,
+because the floor is where a part is booked in and the office is where it is priced.
+
+- **It carries the part's ID, not its part number.** A part number is allowed to
+  be blank, to be spelled two ways, or to be corrected next week; `parts.id` is
+  the row. It also keeps the payload SHORT — 29 QR modules against a SKU URL's
+  ~33 — which is what makes 1 x 1 in genuinely readable for a part where it is
+  marginal for a unit.
+- **The part number is sized to FIT on one line** (`partNumSize`), not dropped
+  through the SKU stickers' three fixed steps. Those were tuned on SKUs —
+  `SS-117082` is nine characters — and part numbers are longer: `W10295370A`
+  wrapped to `W10295370` / `A` at 11.5pt, and that is read out over the phone and
+  typed into a supplier's site as two part numbers. Keep RS Ops' copy in step.
+- **On-hand and the spot are deliberately NOT on it.** Both change the moment
+  somebody takes one, and a printed count is a wrong count by the afternoon —
+  the part's card answers both, live. Cost never goes on a label at all.
+- **One label per KIND of part**: it goes on the bin, not on every piece. Both
+  screens say so, and both offer "print the lot" off a search — a shelf is
+  labelled a shelf at a time, not a part at a time.
+- **The warehouse scan screen REFUSES a parts label**, by name (`kind: 'part'`).
+  That screen moves units, and a part moves in quantities it has no box for; a
+  bin label scanned at a rack used to fail as an unknown SKU.
+- Like the unit sticker, it lands on an admin-only page. The floor works in RS
+  Ops and `/admin/parts` says so when it turns somebody away — do not invent a
+  second payload scheme for them: **a label already stuck on a bin cannot be
+  edited**, which is what `test/scan-labels.test.mjs` pins.
+
 ## RS Manager — the crew's AI assistant (added 2026-09-17)
 `lib/assistant/` → `POST/GET /api/assistant` (signed-in drivers + staff, cookie
 OR `Authorization: Bearer <session token>` for the native app) and

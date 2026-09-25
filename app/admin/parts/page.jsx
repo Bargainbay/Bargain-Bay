@@ -11,7 +11,8 @@ export const metadata = { title: 'Parts — Bargain Bay' };
 // and the history. ADMIN only (owner, 2026-09-16). The floor finds, books in and
 // takes parts in RS Ops, which reads and writes the same records through
 // /api/ops/parts — two floor screens for one shelf is how they drift.
-export default async function PartsPage() {
+export default async function PartsPage({ searchParams }) {
+  const sp = await searchParams;
   const session = await getSession();
   if (!session) redirect('/login?next=/admin/parts');
   if (!isAdmin(session)) {
@@ -26,7 +27,7 @@ export default async function PartsPage() {
     <div>
       <AdminNav active="parts" />
       {hasDb()
-        ? <Parts admin />
+        ? <Parts admin initialPart={Number(sp?.part) > 0 ? Number(sp.part) : null} />
         : <div className="panel">Database not configured — set <code>POSTGRES_URL</code>.</div>}
     </div>
   );
