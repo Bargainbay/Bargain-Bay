@@ -1116,7 +1116,12 @@ sheet, GL detail as CSV.
   figure to a real balance, and the gap IS the measure of what the records are
   missing (unrecorded cash, credit purchases, owner draws). The page says this.
   When Plaid is live, wire the real balance in and make the comparison automatic.
-- `SALE` now exists in four files. Still deliberate, still: change one, change all.
+- `SALE` exists in FOUR files in its accrual form (`lib/analytics.js`, `lib/pnl.js`,
+  `lib/books.js`, `lib/ledger.js`) and as a plain status list in four more
+  (`campaigns`, `customers`, `payroll`, `finance-report`). Still deliberate,
+  still: change one, change all — and `test/sale-predicate.test.mjs` now reads
+  them out of the source and fails if any copy drifts, so the rule is enforced
+  rather than merely written down.
 
 ## CDA's live workbook (added 2026-09-11)
 
@@ -1281,9 +1286,10 @@ downloadable, plus the P&L built from them. `lib/books.js`.
   says so in as many words. Do NOT add a "balance sheet" that derives assets from
   inventory + AR and quietly omits equity — it would balance to nothing real and
   somebody would file it.
-- `SALE` is now copied in three places (`lib/analytics.js`, `lib/pnl.js`,
-  `lib/books.js`). Deliberate — each surface would be worse if it silently
-  disagreed — but change one, change all three.
+- `SALE` is copied in FOUR places in this form (`lib/analytics.js`, `lib/pnl.js`,
+  `lib/books.js`, `lib/ledger.js` — the ledger one was never listed here).
+  Deliberate — each surface would be worse if it silently disagreed — but change
+  one, change all four. `test/sale-predicate.test.mjs` enforces it.
 
 ## Expense sorting, the ledger floor, and the P&L (added 2026-08-27)
 
