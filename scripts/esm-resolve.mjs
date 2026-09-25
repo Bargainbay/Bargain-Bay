@@ -1,11 +1,11 @@
-// Let plain Node import the app's modules.
+// Let plain Node import the app's modules — used by `npm test` and `npm run migrate`.
 //
 // Every internal import in this codebase is extensionless — `from './db'`,
 // `from '../lib/observe'` — which is what Next's bundler resolves and what
 // plain Node ESM does not. The options were to put `.js` on several hundred
-// import statements across the app, or to teach the test runner the same
+// import statements across the app, or to teach plain Node the same
 // resolution the bundler already does. This is the second one: the app is not
-// reshaped to suit its tests.
+// reshaped to suit the tools that read it.
 //
 // It only ever adds an extension to a RELATIVE specifier that has none, and
 // only when that file actually exists, so it cannot mask a genuine typo.

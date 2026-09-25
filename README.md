@@ -49,12 +49,38 @@ to light up accounts, orders, reservations, and admin.
 Create a Postgres database (Neon free tier works great), then either:
 
 ```bash
-psql "$POSTGRES_URL" -f db/schema.sql
+POSTGRES_URL=... npm run migrate
 ```
 
-…or skip psql entirely: deploy, sign up with an `ADMIN_EMAILS` account, open
-`/admin`, and click **Run schema migration** (it executes `db/schema.sql` via
-`/api/admin/migrate`). Safe to re-run — everything is `IF NOT EXISTS`.
+…or skip the terminal entirely: deploy, sign up with an `ADMIN_EMAILS` account,
+open `/admin`, and click **Run schema migration** (`/api/admin/migrate`). Both
+run the same code, so they cannot disagree about what has been applied.
+
+### Schema changes
+
+Migrations live in `db/migrations/`, numbered, applied in filename order, each
+in its own transaction, and recorded in `schema_migrations`.
+
+```bash
+npm run migrate -- --status   # what is applied, what is pending
+npm run migrate -- --dry      # what WOULD run
+npm run migrate               # apply it
+```
+
+To add one, write `db/migrations/0002_what_it_does.sql`. Do not edit a migration
+that has been applied — the runner checksums them and refuses, because the file
+is then no longer a description of the database. Write a new one.
+
+A migration that cannot run inside a transaction (`CREATE INDEX CONCURRENTLY`,
+which does not block writes on a live table) says so on its first line:
+
+```sql
+-- migrate:no-transaction
+```
+
+Note that `db/migrations/0001_baseline.sql` does **not** describe the whole
+database: 27 `ensureXSchema()` functions in `lib/` still create tables at
+runtime. Folding those in is the next step.
 
 ## Environment variables
 
@@ -154,7 +180,7 @@ app/
   api/auth/*               signup / login / logout / me
   api/admin/orders         PATCH order status
   api/admin/reservations   DELETE = release a hold
-  api/admin/migrate        run db/schema.sql (idempotent)
+  api/admin/migrate        apply outstanding migrations (recorded, transactional)
   api/cron/expire-reservations  cleanup (also runs opportunistically on checkout)
 lib/
   db.js                    lazy pg pool (build never needs POSTGRES_URL)
@@ -162,7 +188,7 @@ lib/
   reservations.js          race-safe 30-min SKU holds (Postgres)
   inventory.js  images.js  catalog + image resolution
   stripe.js  sheets.js     Stripe Checkout + master-sheet sync
-db/schema.sql              users / orders / order_items / reservations
+db/migrations/             numbered schema migrations (0001 is the baseline)
 vercel.json                daily cron for reservation cleanup
 ```
 

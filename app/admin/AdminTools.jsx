@@ -247,8 +247,10 @@ export default function AdminTools({ initialReservations }) {
           {migrating ? 'Running…' : 'Run schema migration'}
         </button>
         <span style={{ fontSize: 13.5, color: 'var(--muted)' }}>
-          Applies <code>db/schema.sql</code> (idempotent — safe to re-run). Run once after creating the database
-          and after any deploy that changes the schema.
+          Applies any outstanding migrations from <code>db/migrations/</code>, each in its own
+          transaction, and records them. One already applied is skipped, not re-run — so this
+          is safe to press when you are not sure whether you pressed it. Run it after any
+          deploy that changes the schema.
         </span>
         {migrateMsg && <span style={{ fontSize: 13.5, fontWeight: 600 }}>{migrateMsg}</span>}
       </div>

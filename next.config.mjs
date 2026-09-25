@@ -13,11 +13,15 @@ const nextConfig = {
       { protocol: 'https', hostname: 'rs-ops.vercel.app', pathname: '/api/storefront/photo/**' }
     ]
   },
-  // /api/admin/migrate reads db/schema.sql at runtime — make sure the file
-  // ships with the serverless function on Vercel. (Stable top-level option
-  // since Next 15; was experimental.* on Next 14.)
+  // /api/admin/migrate reads db/migrations/*.sql at runtime — make sure they
+  // ship with the serverless function on Vercel. (Stable top-level option since
+  // Next 15; was experimental.* on Next 14.)
+  //
+  // The glob matters: this used to name db/schema.sql exactly, so a migrations
+  // DIRECTORY would have deployed empty and the button would have reported
+  // "no migrations found" on production while working perfectly in dev.
   outputFileTracingIncludes: {
-    '/api/admin/migrate': ['./db/schema.sql']
+    '/api/admin/migrate': ['./db/migrations/**/*.sql']
   }
 };
 export default nextConfig;
