@@ -37,11 +37,15 @@ function tmpMigrations(files) {
 
 suite('lib/migrate — the real baseline');
 
-test('the baseline applies cleanly and builds the whole schema', async () => {
+test('every migration on disk applies cleanly and builds the whole schema', async () => {
   const client = await fresh();
   const res = await migrate({ client });
-  assert(res.ok, `baseline failed: ${res.error}`);
-  equal(res.applied.map((a) => a.id), ['0001_baseline'], 'applied exactly the baseline');
+  assert(res.ok, `migrations failed: ${res.error}`);
+  // Compared against what is ON DISK rather than a hardcoded list, so adding a
+  // migration does not break this test — which is what the first version did.
+  equal(res.applied.map((a) => a.id), listMigrations().map((m) => m.id),
+    'applied exactly the migrations in db/migrations');
+  assert(res.applied.some((a) => a.id === '0001_baseline'), 'including the baseline');
 
   const { rows } = await client.query(
     "SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema='public'"
@@ -57,17 +61,18 @@ test('running it twice applies nothing the second time', async () => {
   const again = await migrate({ client });
   assert(again.ok);
   equal(again.applied, [], 'nothing re-applied');
-  equal(again.skipped, ['0001_baseline'], 'recorded as already applied');
+  equal(again.skipped, listMigrations().map((m) => m.id), 'all recorded as already applied');
 });
 
 test('the ledger records what ran, and when', async () => {
   const client = await fresh();
   await migrate({ client });
-  const { rows } = await client.query('SELECT id, checksum, ms FROM schema_migrations');
-  equal(rows.length, 1);
-  equal(rows[0].id, '0001_baseline');
-  assert(rows[0].checksum && rows[0].checksum.length === 16, 'checksum recorded');
-  assert(rows[0].ms >= 0, 'duration recorded');
+  const { rows } = await client.query('SELECT id, checksum, ms FROM schema_migrations ORDER BY id');
+  equal(rows.map((r) => r.id), listMigrations().map((m) => m.id), 'one ledger row per migration');
+  for (const r of rows) {
+    assert(r.checksum && r.checksum.length === 16, `${r.id}: checksum recorded`);
+    assert(r.ms >= 0, `${r.id}: duration recorded`);
+  }
 });
 
 suite('lib/migrate — ordering, failure and history');
