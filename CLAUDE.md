@@ -3185,6 +3185,44 @@ this repo.
   unset), Vercel Blob (shared store unless Preview gets its own token), and
   QuickBooks/Plaid (leave their tokens unset).
 
+## Backups — and the two stores nothing backs up (added 2026-09-25)
+`lib/backup.js`, `npm run backup`, `docs/BACKUP.md`.
+
+**The business's state is in THREE stores and only one of them is backed up.**
+
+- **Postgres** — Neon point-in-time restore (primary), plus `npm run backup` for
+  anything older than Neon's retention or in case the account itself is lost.
+- **The master tracker** — a Google Sheet, the source of truth for inventory,
+  not in this repo, covered by nothing but Google's version history.
+- **Vercel Blob** — proof-of-delivery SIGNATURES, delivery photos, unit photos,
+  driver fuel receipts. **Nothing backs it up and there is no point-in-time
+  restore.** Postgres holds only the PATHS, so restoring the database alone
+  gives rows pointing at pictures that are gone — including the signed PODs that
+  are the evidence in a damage claim.
+
+Rules for the Postgres path, each with a test in `test/backup.test.mjs` that
+performs a real dump and restore against a real Postgres (PGlite):
+
+- **A restore does NOT build the schema.** Run the migrations first. A restore
+  that built it could rebuild it WRONG — from whatever the dump happened to
+  capture rather than from the migrations, which are the definition. It refuses
+  and says so.
+- **`schema_migrations` is excluded from a dump.** It describes the TARGET's
+  schema history, not the source's data. Including it collided on a duplicate
+  key, which is how this was found.
+- **Sequences are moved past the restored ids.** Without it the first new order
+  after a restore dies on a duplicate key — a failure that looks like corruption
+  and is merely a counter.
+- **`--truncate` is off by default**, so restoring into a populated database
+  COLLIDES rather than silently interleaving two datasets. That is the safe
+  outcome and is pinned.
+- **numeric comes back as a STRING** and must go back as one. Parsing money into
+  a Number is how $1,061.95 becomes $1,061.9499.
+- An empty backup **exits non-zero**. A backup that reports success and holds
+  nothing is worse than no backup.
+- `backups/` is gitignored — a dump holds every customer's name, address, phone
+  and order history.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
