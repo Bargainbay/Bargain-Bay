@@ -225,7 +225,28 @@ See `.env.example` for the full annotated list. The site builds and browses with
 - `RESEND_API_KEY`, `IMAGES_BASE_URL`, `CRON_SECRET` — email, remote photos, cron protection.
 
 ## Deploy workflow
-Push to `main` → Vercel auto-builds and promotes to Production (bargainbay.ca). DB bootstrap: deploy, sign in with an `ADMIN_EMAILS` account, open `/admin`, click **Run schema migration** (`/api/admin/migrate`, runs `db/schema.sql`, idempotent).
+Push to `main` → Vercel auto-builds and promotes to Production (bargainbay.ca). DB bootstrap: deploy, sign in with an `ADMIN_EMAILS` account, open `/admin`, click **Run schema migration** (`/api/admin/migrate`).
+
+**Schema changes go in `db/migrations/`** (added 2026-09-25), numbered, applied
+in filename order, each in its own transaction, recorded in `schema_migrations`.
+`npm run migrate`, `-- --status`, `-- --dry`. The button and the CLI run the same
+code so they cannot disagree.
+
+- **An applied migration is history.** The runner checksums them and REFUSES to
+  continue if one changes — the file would no longer describe the database, and
+  every later reading of it would be wrong. Write a new one.
+- **A failure rolls back and stops the run.** Postgres has transactional DDL,
+  which is the whole reason this beats re-running one big idempotent blob.
+  Later migrations do not run: they may assume the failed one did.
+- `-- migrate:no-transaction` on the first line for `CREATE INDEX CONCURRENTLY`.
+- **`0001_baseline.sql` is NOT the whole database.** It is the old
+  `db/schema.sql` moved verbatim, and 27 `ensureXSchema()` functions in `lib/`
+  still create tables at runtime, plus at least one CHECK constraint
+  (`jobs_type_check`) that exists in production and in no file here. Folding
+  those in is the next step and wants a staging database in front of it.
+- **`next.config.mjs` must keep tracing `./db/migrations/**/*.sql`.** It named
+  `db/schema.sql` exactly; a directory would have deployed EMPTY and the button
+  would report "no migrations found" on production while working in dev.
 
 ## Invoicing, orders & what counts as revenue (changed 2026-08-22)
 An invoice raises its **fulfilment order immediately**, not when it's paid — see
