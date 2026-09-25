@@ -47,14 +47,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      # No `npm ci`. The harness in test/_harness.mjs has no dependencies, on
-      # purpose and for the same reason eslint has none here: a devDependency
-      # means a package-lock.json change, and a lockfile out of step with
-      # package.json makes `npm ci` fail outright — which is what Vercel builds
-      # with. A test must never be able to break a deploy.
+          cache: npm
+      # The HARNESS has no dependencies (test/_harness.mjs is fifty lines of
+      # Node), and no devDependency is added for it — that rule stands, because
+      # a lockfile out of step with package.json makes `npm ci` fail, and
+      # `npm ci` is what Vercel builds with.
+      #
+      # But the tests import the app's own modules, and lib/partial and
+      # lib/consent reach lib/db, which imports `pg`. So the app's EXISTING
+      # runtime dependencies do have to be installed. That touches nothing:
+      # `npm ci` installs exactly what the committed lockfile already says.
       #
       # Phase 1 replaces this with a real runner (Vitest + PGlite) so the money
-      # code can be tested against an actual Postgres. At that point this job
-      # grows an install step and these two lines go away.
+      # code can be tested against an actual Postgres.
+      - run: npm ci
       - name: Run tests
         run: npm test
