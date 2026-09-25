@@ -3337,6 +3337,48 @@ been passing `email: email || null` and silently creating no customer at all.
   Making orders email-optional is a much larger blast radius — checkout,
   invoices, order emails, analytics, the fraud checks — and is its own job.
 
+### Merging two records that are one person (added 2026-09-25)
+`mergeCustomers` / `customerAliases` / `duplicateCandidates`, table
+`customer_aliases` (migration 0004), **Possible duplicates** on
+`/admin/customers`.
+
+**NOTHING MOVES, because nothing points at a customer.** A driver's work is
+linked by a real foreign key (`jobs.driver_id`), so `mergeDrivers` is a handful
+of UPDATEs. There is no `customer_id` anywhere — orders, invoices and quotes are
+matched by EMAIL ADDRESS. So the survivor ABSORBS the other record's identities
+and every lookup sees through them. Same shape as `client_aliases`, which
+dispatch already uses to learn that "CDA" is Canadian Discount Appliances.
+
+- **`upsertCustomer` consults the aliases**, or the next order from the absorbed
+  address recreates the duplicate — the merge would last exactly until the
+  customer next bought something.
+- **THE ORDER OF THE MERGE IS LOAD-BEARING**, and getting it wrong is a
+  unique-constraint violation rather than a silent mess (which is the good kind
+  of wrong). Move the other record's own aliases FIRST — `customer_aliases` is
+  `ON DELETE CASCADE`, so deleting first takes a previous merge's trail with it.
+  Then DELETE, because `email` is uniquely indexed and giving the survivor an
+  address the other record still holds violates it. Then fill blanks. Then
+  record what was absorbed.
+- **The two kinds of identity need aliases under DIFFERENT conditions.** An
+  email the survivor now owns is findable by the ordinary email lookup and needs
+  none. A phone is only an identity for a record with NO email (2.1's rule), so
+  on a survivor that HAS an email the absorbed number is findable ONLY as an
+  alias — skipping it there loses the number the merge was often performed
+  because of.
+- **The survivor's own values always win**; the other record only fills blanks.
+  `created_at` takes the EARLIER of the two, so merging never makes a
+  long-standing customer look new. Notes are joined rather than dropped.
+- **The row is deleted, not marked.** Nothing references a customer, and a
+  `merged_into` column would have to be filtered by every query forever. The
+  alias rows are the trail, carrying who did it and which record it came from.
+- **`duplicateCandidates` PROPOSES, never merges.** A household shares a phone
+  and two people share a name; a merge cannot be undone. A name under four
+  characters is not treated as evidence.
+- **`ORDER_MATCH` and the profile's own `BY()` must BOTH know about aliases.**
+  They are two copies of the same question, and when only one learned about
+  merging, a merged customer's rollup and their order list disagreed — which is
+  the exact bug `ORDER_MATCH` was extracted to prevent. Caught by a test.
+
 ### Testing anything that touches the database
 `test/db.mjs` + `__useTestDatabase` in `lib/db.js`. PGlite is Postgres compiled
 to WebAssembly, so the modules under test are the REAL ones running their real

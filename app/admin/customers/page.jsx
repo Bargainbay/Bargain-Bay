@@ -8,6 +8,7 @@ import { ratingStats } from '../../../lib/ratings';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
 import CustomerSearch from '../../../components/CustomerSearch';
+import DuplicateCustomers from '../../../components/DuplicateCustomers';
 import { Kpi, Donut, HBars } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
@@ -134,6 +135,20 @@ export default async function CustomersDashboardPage({ searchParams }) {
         </table></div>
         <p className="hint" style={{ marginTop: 8 }}>Approve / reject members under <a href="/admin/operations" style={{ textDecoration: 'underline' }}>Operations</a>.</p>
       </div>
+
+      {/* Above the list, because a duplicate is worth resolving before somebody
+          reads one half of a customer's history and thinks it is all of it. */}
+      <details className="panel" style={{ marginTop: 18 }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 700, color: 'var(--charcoal)' }}>
+          Possible duplicates
+        </summary>
+        <p className="hint" style={{ marginTop: 8 }}>
+          Records sharing a phone number or a name. Two people genuinely can — a household
+          shares a landline — so nothing is merged automatically. Merging moves the other
+          record&apos;s orders, invoices and quotes onto the one you keep, and cannot be undone.
+        </p>
+        <DuplicateCustomers />
+      </details>
 
       <div className="panel" style={{ marginTop: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>

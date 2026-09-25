@@ -2,7 +2,10 @@
 // contact details / notes, POST {action:'rebuild'} = re-sweep all history.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { listCustomers, updateCustomerDetails, backfillCustomers } from '../../../../lib/customers';
+import {
+  listCustomers, updateCustomerDetails, backfillCustomers,
+  mergeCustomers, duplicateCandidates
+} from '../../../../lib/customers';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -15,8 +18,15 @@ async function gate() {
 export async function GET(req) {
   const denied = await gate();
   if (denied) return denied;
-  const q = new URL(req.url).searchParams.get('q') || '';
+  const sp = new URL(req.url).searchParams;
+  const q = sp.get('q') || '';
   try {
+    // Records that LOOK like the same person. Proposed, never merged — a
+    // household shares a phone, two people share a name, and a merge cannot be
+    // undone: the other record is deleted and its identities move.
+    if (sp.get('duplicates')) {
+      return NextResponse.json({ duplicates: await duplicateCandidates({}) });
+    }
     return NextResponse.json({ customers: await listCustomers({ q }) });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not load customers.' }, { status: 500 });
@@ -42,6 +52,19 @@ export async function POST(req) {
   if (denied) return denied;
   let body;
   try { body = await req.json(); } catch { body = {}; }
+  if (body.action === 'merge') {
+    const session = await getSession();
+    try {
+      // keep / drop are explicit rather than inferred from which is "better".
+      // Which record survives decides which email a customer keeps hearing
+      // from, and that is a judgement, not an ordering.
+      return NextResponse.json(
+        await mergeCustomers(body.keep, body.drop, { by: session?.email || null })
+      );
+    } catch (e) {
+      return NextResponse.json({ error: e?.message || 'Merge failed.' }, { status: 400 });
+    }
+  }
   if (body.action !== 'rebuild') return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
   try {
     return NextResponse.json(await backfillCustomers());
