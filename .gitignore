@@ -9,3 +9,6 @@ data/reservations.json
 
 # Claude Code local state and agent worktrees
 .claude
+
+# Local database backups — never commit one.
+backups/
