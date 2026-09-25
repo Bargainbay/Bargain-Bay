@@ -898,9 +898,34 @@ movement.** `invoice_items.kind` and `order_items.kind` both hold:
 | kind | sign | moves stock | on the van |
 |---|---|---|---|
 | `unit` | + | yes | delivered |
-| `service` | + | no | — |
+| `service` | + | no | — (a haul-away is the exception — see below) |
 | `discount` | − | no | — |
 | `trade_in` | − | no | **collected** |
+
+### A haul-away is a SERVICE, not a trade-in (added 2026-09-24)
+Asked for by sales. `INVOICE_SERVICES` (lib/constants.js) is the one-tap service
+list on **both** invoice screens — it was a copy-pasted array in `InvoiceForm`
+and `InvoiceEditor`, which is how those two drifted before `InvoiceLines` was
+pulled out of them, and a service on one and not the other means a rep can add it
+when raising the sale and not when correcting it.
+
+- **The difference from a trade-in is which way the money goes.** A haul-away is
+  a positive service line — the customer PAYS us to take their old machine and
+  dispose of it. A trade-in is a credit against the sale. Both put something on
+  the van going back, and that is the part that has to reach dispatch.
+- **`jobFromOrder` tags the job `haul_away`** (the tag already existed in
+  `JOB_SERVICES` and already renders on the board card, the run sheet and the
+  driver's stop), plus a `HAUL-AWAY PAID FOR:` note, exactly as the trade-in does.
+  Without it the pull produced an untagged stop and the crew found out at the
+  door, with no room left on the truck.
+- **Recognised by its TEXT** (`isHaulAwayLine`), because there is no line kind
+  for it and there should not be: a kind is what decides SKUs, warranties, cost
+  and stock movement, and a haul-away behaves like every other service on all
+  four. The match covers what the rep typed as well as the preset.
+- **Not to be confused with `jobs.collect_cash`** — that is a haul-away the
+  customer pays the DRIVER for at the door, which no invoice knows about. An
+  invoice line is money billed on the sale. The line editor says so, because
+  charging both is charging twice.
 
 - **Sign is enforced, never trusted.** A credit is TYPED as a plain positive
   number ("take fifty off") and STORED negative, so a subtotal is always just
