@@ -14,26 +14,41 @@ One consequence worth knowing before you touch the tracker: the master tracker h
   the kind of stale fact that costs a session: a plan limit is the first thing
   anybody blames when a cron looks like it is not firing, and on Pro it is
   never the answer).
-- **Stack:** Next.js 14 (App Router), **plain JavaScript/JSX** (no TypeScript), React 18, Postgres (`pg`), Clover Hosted Checkout, `bcryptjs` + `jose` auth, `googleapis` for sheet sync.
+- **Stack:** Next.js 16 (App Router), **plain JavaScript/JSX** (no TypeScript), React 19, Postgres (`pg`), **Stripe Checkout** (`lib/stripe.js`; card payments currently OFF — see LANDMINE 8), `bcryptjs` + `jose` auth, `googleapis` for sheet sync.
 
 ## Source of truth & the catalog pipeline
 The **master inventory tracker (Google Sheet / `RS Solutions Master Inventory Tracker.xlsx`)** is the source of truth for inventory. It is NOT in this repo. Flow:
 
 ```
 Master tracker sheet
-  → scripts/sync-sheet.mjs (npm run sync, Vercel cron)   [or regenerate from the xlsx]
-  → data/catalog.json  { generatedAt, units: [...] }       (one entry per available unit)
+  → /api/admin/sync-inventory  (the Sync button, and the sync-inventory cron)
+  → Postgres `products`                                   (one row per unit)
   → Next.js storefront
-  → checkout → 30-min SKU reservation (Postgres) → Clover Hosted Checkout → webhook → mark sold + writeSold() back to the sheet
+  → checkout → 30-min SKU reservation (Postgres) → Stripe Checkout → webhook → mark sold + writeSold() back to the sheet
 ```
 
-A unit object: `{ id (SKU), make, model, category, title, condition, price, compareAt (retail) }`. **Sold/reserved units are filtered out at request time from Postgres**, so `data/catalog.json` can lag without overselling.
+A unit object: `{ id (SKU), make, model, category, title, condition, price, compareAt (retail) }`. **Sold/reserved units are filtered out at request time from Postgres.**
+
+**`data/catalog.json` IS DECOMMISSIONED AND MUST STAY EMPTY.** It was an offline
+snapshot `lib/inventory.js` fell back to when the products read failed. It went
+months stale, and twice a transient database blip had Sarah report that old list
+to a customer as current fact — so #124 emptied it. The file being empty is the
+safety property: `fileUnits` is then `[]` and the fallback degrades to "no stock
+right now" rather than to June's stock. `npm run sync` now refuses to write it
+without `--force`, and the nightly GitHub Action that regenerated it has been
+deleted (it had never once succeeded in three months — and success would have
+committed the regression to `main` and auto-deployed it).
+
+One consequence that is NOT yet decided: `app/api/chat/route.js` builds its
+catalogue context from the same file, so the public chat agent currently has no
+catalogue in its prompt. Left as-is deliberately — wiring it to the live
+products table is a behaviour change, not a docs fix.
 
 ## Key files
 - `lib/pricing.js` — **authoritative price resolver**. Layers: catalog price → clearance markdown → member tier. Used by every storefront page AND `app/api/checkout`. Never trust client price; always resolve here.
 - `lib/clearance.js` — clearance layer on a Postgres `clearance` table (sku, price, warranty_months, note, active). Degrades to "no clearance" with no DB.
 - `lib/members.js` + `data/member-prices.json` — wholesale/member pricing (see rules below).
-- `lib/inventory.js` — `getAll()`, `getById()`, `getAvailable()` (DB-aware), reads `data/catalog.json`.
+- `lib/inventory.js` — `getAll()`, `getById()`, `getAvailable()`. Reads Postgres `products`; the `data/catalog.json` fallback is deliberately empty (above).
 - `lib/images.js` — `imageFor(unit)`, `hasRealImage(unit)`. Manufacturer photos (AJ Madison CDN) keyed by model via `data/images.json`; falls back to branded per-category placeholder SVG in `public/stock/`. `hasRealImage` is false for placeholders.
 
 ### The product page is a gallery (added 2026-09-11)
@@ -128,7 +143,7 @@ case folding. Three things follow, all learned filling the gap on 2026-09-10:
   Midea entries added on 2026-09-10 carry it. Fine on a New-in-Box unit, worth a
   thought on a used one, where our own warranty is one year.
 - `lib/reservations.js` — race-safe 30-min SKU holds in Postgres. `unavailableSkus()`, `isUnavailable()`.
-- `lib/clover.js` — Clover Hosted Checkout. `lib/sheets.js` — read + writeSold via Google service account.
+- `lib/stripe.js` — Stripe Checkout (+ `app/api/stripe-webhook`). `lib/sheets.js` — read + writeSold via Google service account.
 - `lib/auth.js` — bcryptjs + jose JWT cookie `bb_session`. `lib/db.js` — lazy `pg` pool (build never needs `POSTGRES_URL`).
 - `lib/constants.js` — HST 13%, $79 delivery, COLLECTIONS, condition labels, `money()`, `pctOff()`. `lib/specs.js` — `seoDescription()`, spec rows. `lib/site.js` — `SITE_URL`.
 - `app/` — `page.jsx` (home), `shop/`, `product/[id]/`, `cart/`, `checkout/`, `clearance/`, `order/[orderNumber]/` (status timeline), `track/`, `account/ login/ signup/`, `admin/` (ADMIN_EMAILS-gated order board + reservations + `/api/admin/migrate`), `policies/`, `contact/`, `api/*`.

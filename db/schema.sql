@@ -1010,3 +1010,20 @@ CREATE INDEX IF NOT EXISTS idx_part_requests_open ON part_requests(status, creat
 -- How a salvage unit left: sold on an invoice, or stripped for parts. Without
 -- it a parted-out unit reads as a disposal nobody invoiced.
 ALTER TABLE salvage_units ADD COLUMN IF NOT EXISTS disposal text;
+
+-- ---------------------------------------------------------------------------
+-- CRM join keys. Customer identity is an email address compared case-
+-- insensitively, so every lookup is on lower(email) — a function of the column,
+-- which a plain index on the column itself cannot answer. Before these, the
+-- customer list, the customer profile, the repeat-buyer analytics and the
+-- checkout fraud check each scanned their whole table.
+--
+-- The expression has to match the queries exactly (see lib/customers.js,
+-- lib/analytics.js, lib/antifraud.js) or the planner ignores the index.
+CREATE INDEX IF NOT EXISTS idx_orders_email_lower   ON orders   (lower(email));
+CREATE INDEX IF NOT EXISTS idx_invoices_email_lower ON invoices (lower(email));
+CREATE INDEX IF NOT EXISTS idx_quotes_email_lower   ON quotes   (lower(email));
+
+-- Revenue queries filter on status and date together on every dashboard,
+-- report and KPI in the app.
+CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders (status, created_at DESC);
