@@ -145,7 +145,7 @@ case folding. Three things follow, all learned filling the gap on 2026-09-10:
 - `lib/reservations.js` — race-safe 30-min SKU holds in Postgres. `unavailableSkus()`, `isUnavailable()`.
 - `lib/stripe.js` — Stripe Checkout (+ `app/api/stripe-webhook`). `lib/sheets.js` — read + writeSold via Google service account.
 - `lib/auth.js` — bcryptjs + jose JWT cookie `bb_session`. `lib/db.js` — lazy `pg` pool (build never needs `POSTGRES_URL`).
-- `lib/constants.js` — HST 13%, $79 delivery, COLLECTIONS, condition labels, `money()`, `pctOff()`. `lib/specs.js` — `seoDescription()`, spec rows. `lib/site.js` — `SITE_URL`.
+- `lib/constants.js` — `phoneKey`, `torontoToday`, HST 13%, $79 delivery, COLLECTIONS, condition labels, `money()`, `pctOff()`. `lib/specs.js` — `seoDescription()`, spec rows. `lib/site.js` — `SITE_URL`.
 - `app/` — `page.jsx` (home), `shop/`, `product/[id]/`, `cart/`, `checkout/`, `clearance/`, `order/[orderNumber]/` (status timeline), `track/`, `account/ login/ signup/`, `admin/` (ADMIN_EMAILS-gated order board + reservations + `/api/admin/migrate`), `policies/`, `contact/`, `api/*`.
 
 ## Meta / Facebook ads integration (added 2026-06-16)
@@ -3336,6 +3336,51 @@ been passing `email: email || null` and silently creating no customer at all.
   address the counter took, and the customer is matched to it on the PHONE.
   Making orders email-optional is a much larger blast radius — checkout,
   invoices, order emails, analytics, the fraud checks — and is its own job.
+
+### What was said, and what happens next (added 2026-09-25)
+`lib/crm.js`, tables `customer_activity` / `customer_tasks` (migration 0005),
+`components/CustomerCrm.jsx` on a customer's page, `components/MyDay.jsx` on the
+sales dashboard, `/api/admin/crm` (STAFF — this is the customer's sale, not the
+business's books).
+
+The CRM was a read-only history. It could say what somebody had bought and
+nothing about the conversation, and **there was no way at all to write down
+"call them Thursday"** — the single thing a salesperson needs a CRM for.
+`customers.notes` remains for standing facts ("narrow staircase, side door");
+it is one blob with no author and no date, so the second person to edit it
+silently overwrites the first. Anything that HAPPENED goes in the timeline.
+
+- **The activity log is APPEND-ONLY.** A log that can be edited is a log nobody
+  can rely on when the question is what was actually promised. A correction is a
+  new entry.
+- **`at` is when it HAPPENED, not when it was typed.** A call logged the next
+  morning still happened yesterday.
+- **Who logged it is stamped from the SESSION, never the request body** —
+  otherwise one rep could log a call in another's name. Same rule as
+  `invoices.created_by`, and the name is snapshotted for the same reason.
+- **`due_on` is a DATE.** Nobody says "call them at 14:32"; they say Thursday.
+  A time would be precision this never has and would make "due today" depend on
+  the hour.
+- **MY DAY IS THREE BUCKETS, NEVER ONE LIST**: overdue, today, and nobody's.
+  Lumped together the count means nothing — a run of overdue follow-ups reads
+  the same as a quiet Tuesday. **Next week is deliberately absent**; a CRM that
+  shows it beside today's work is a CRM people stop reading.
+- **An UNOWNED follow-up is shown to everybody.** It is the one most likely to
+  be forgotten, and a list scoped strictly to `me` would never show it to
+  anyone at all. Unassigned is a real choice on the form, not a missing field.
+- **Completing one writes a line on the timeline** — "we said we would ring them
+  and we did" is exactly what it should show, and the one place a system-written
+  entry beats a typed one. An `outcome` matters: a follow-up dropped on purpose
+  and one that was forgotten look identical without it.
+- **LANDMINE — bucket dates in SQL, not in JS.** The driver returns a `date`
+  column as a Date object, and `String(thatDate)` is "Mon Sep 22 2026 …", not an
+  ISO date. Slicing ten characters off it and comparing put every OVERDUE
+  follow-up in the "today" bucket, silently, which defeats the only reason the
+  buckets exist. Caught by a test.
+- **LANDMINE — `mergeCustomers` must move both tables BEFORE the delete.** Both
+  are `ON DELETE CASCADE`, so merging destroyed every note anybody had written
+  and every follow-up still owed — and reported success. Same ordering trap as
+  the aliases, one table further along.
 
 ### Merging two records that are one person (added 2026-09-25)
 `mergeCustomers` / `customerAliases` / `duplicateCandidates`, table

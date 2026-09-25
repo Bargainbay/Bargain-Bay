@@ -6,6 +6,7 @@ import { getCustomerProfile } from '../../../../lib/customers';
 import { linkToken } from '../../../../lib/links';
 import DashboardShell from '../../../../components/DashboardShell';
 import CustomerEditor from '../../../../components/CustomerEditor';
+import CustomerCrm from '../../../../components/CustomerCrm';
 import { Kpi } from '../../../../components/charts';
 
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,11 @@ export default async function CustomerProfilePage({ params }) {
         <Kpi label="Avg order" value={c.orders ? money(avgOrder) : '—'} sub="per sale" />
         <Kpi label="Customer since" value={fmtDate(c.createdAt)} sub={c.business || (c.hasAccount ? 'has an account' : 'guest / invoiced')} />
       </div>
+
+      {/* Above the history, because somebody opening this page is usually about
+          to ring them, and what happens next is the thing they most need to
+          write down afterwards. */}
+      <CustomerCrm customerId={c.id} />
 
       <div className="dash-2col">
         <div className="panel">
