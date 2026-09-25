@@ -3299,6 +3299,53 @@ a redeploy"* — and never applied it back to the two roles that matter most.
   in. Otherwise the last admin can lock the business out of its own admin
   screens and the only way back is a redeploy.
 
+## A customer can be somebody with a phone and no email (added 2026-09-25)
+`lib/customers.js`, migration `0003_customer_identity`.
+
+`customers.email` was `text UNIQUE NOT NULL`, so `upsertCustomer` returned NULL
+and did nothing for anybody without one. **That excluded walk-ins and phone
+orders — the two lead sources the business most wants to measure — from the very
+table the lead-source report exists to explain.** Sarah's own voice tool has
+been passing `email: email || null` and silently creating no customer at all.
+
+- **Identity is the email when there is one, and the phone only when there is
+  not.** Both are partial unique indexes, not column constraints.
+- **The phone is deliberately NOT an identity for a record that already has an
+  email.** Two family members share a landline; merging them would be worse than
+  the duplicate `mergeCustomers` exists to clean up. A hard unique constraint on
+  phone would refuse the second of them outright, and losing a real customer is
+  worse than holding a duplicate.
+- **THE UPGRADE is the case the design turns on.** Somebody booked in at the
+  counter with a number, who later buys online and gives an email, becomes the
+  SAME customer: `upsertCustomer` fills the email into the phone-only row rather
+  than creating a second one.
+- **A row identified by neither is refused** (`customers_identifiable`, NOT VALID
+  so it does not have to validate history). A name on its own is not a record
+  anybody could find again.
+- **`phone_key` is the E.164 form; `phone` keeps whatever they actually gave
+  us**, because that is what a person reads back to them.
+- **`phoneKey` in `lib/constants.js` is now the ONE phone normaliser.** There
+  were already three — `lib/consent`'s `normPhone`, `lib/drivers`' `e164`,
+  `lib/sarah-threads`' `normalizePhone` — each slightly different, and a fourth
+  was about to be written. Two spellings of one number is how a suppression list
+  gets holes and how a customer becomes two customers. consent re-exports it.
+- **`ORDER_MATCH` is defined once** and used by both the list and the profile,
+  or a customer's spend disagrees with their own order history.
+- **STILL EMAIL-ONLY: `orders`, `invoices` and `quotes`.** This change made
+  CUSTOMERS email-optional, not orders. So a walk-in's order carries whatever
+  address the counter took, and the customer is matched to it on the PHONE.
+  Making orders email-optional is a much larger blast radius — checkout,
+  invoices, order emails, analytics, the fraud checks — and is its own job.
+
+### Testing anything that touches the database
+`test/db.mjs` + `__useTestDatabase` in `lib/db.js`. PGlite is Postgres compiled
+to WebAssembly, so the modules under test are the REAL ones running their real
+SQL; only the connection underneath is swapped. `__useTestDatabase` is never
+called in production, is not reachable from any route, and is named so nobody
+mistakes it for configuration. The alternative was threading an optional
+`client` through every function in every module, which is a large change to
+production code made entirely for its tests.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
