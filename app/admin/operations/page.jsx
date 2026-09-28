@@ -13,6 +13,7 @@ import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
 import StaffAccess from '../../../components/StaffAccess';
 import PurchaseOrders from '../../../components/PurchaseOrders';
+import Suppliers from '../../../components/Suppliers';
 import AdminClearance from '../AdminClearance';
 import AdminMembers from '../AdminMembers';
 import AdminReconcile from '../AdminReconcile';
@@ -126,6 +127,13 @@ export default async function OperationsPage() {
           question this screen could not answer at all. */}
       <OpsSection id="on-order" title="On order">
         <PurchaseOrders />
+      </OpsSection>
+
+      {/* Straight after the orders, because it answers the other half of the
+          same question: the order says what is coming, this says who it is
+          coming from, what we owe them and when it falls due. */}
+      <OpsSection id="suppliers" title="Suppliers">
+        <Suppliers />
       </OpsSection>
 
       <OpsSection id="intake" title="Inventory intake">

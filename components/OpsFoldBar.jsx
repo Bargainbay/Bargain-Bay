@@ -6,9 +6,12 @@
 // of it should not be "scroll back up to the header you came from". Broadcasts
 // to every OpsSection and writes each one's stored preference so the choice
 // survives a reload like any other.
+// Every section on the page. A section missing from this list is simply not
+// reached by Open all / Close all, silently — 'on-order' was left out when it
+// was added, which is the failure mode to watch for when adding one.
 const IDS = [
-  'orders', 'intake-queue', 'purchase-intake', 'intake', 'reconcile',
-  'salvage', 'drivers', 'members', 'clearance', 'tools'
+  'orders', 'intake-queue', 'purchase-intake', 'on-order', 'suppliers',
+  'intake', 'reconcile', 'salvage', 'drivers', 'members', 'clearance', 'tools'
 ];
 
 export default function OpsFoldBar() {
