@@ -125,16 +125,15 @@ test('a partial update never blanks the other fields', async () => {
 
 suite('reorder — what is already on its way');
 test('a part on an open purchase order moves OFF the buy list, not out of sight', async () => {
-  const { done, client } = await fresh();
+  const { done } = await fresh();
   try {
     const id = await stocked('Control board', 1);
     await setReorderPoint(id, { point: 3 });
     equal((await reorderReport()).counts.toBuy, 1);
 
-    const po = await createPurchaseOrder({
-      vendor: 'PartsCo', lines: [{ description: 'Control board', qty: 5 }]
-    });
-    await client.query(`UPDATE purchase_order_lines SET part_id = $1 WHERE po_id = $2`, [id, po.id]);
+    // The order names the PART, which is what closes this loop — and is the
+    // path the screen actually takes.
+    await createPurchaseOrder({ vendor: 'PartsCo', lines: [{ partId: id, qty: 5 }] });
 
     const r = await reorderReport();
     equal(r.counts.toBuy, 0, 'nothing to do — it is ordered');
@@ -151,8 +150,7 @@ test('a CANCELLED order is not on its way', async () => {
   try {
     const id = await stocked('Capacitor', 0);
     await setReorderPoint(id, { point: 2 });
-    const po = await createPurchaseOrder({ vendor: 'PartsCo', lines: [{ description: 'Capacitor', qty: 4 }] });
-    await client.query(`UPDATE purchase_order_lines SET part_id = $1 WHERE po_id = $2`, [id, po.id]);
+    const po = await createPurchaseOrder({ vendor: 'PartsCo', lines: [{ partId: id, qty: 4 }] });
     await client.query(`UPDATE purchase_orders SET cancelled_at = now() WHERE id = $1`, [po.id]);
 
     const r = await reorderReport();
@@ -166,10 +164,8 @@ test('only the part of an order still OWED counts', async () => {
   try {
     const id = await stocked('Valve', 0);
     await setReorderPoint(id, { point: 5 });
-    const po = await createPurchaseOrder({ vendor: 'PartsCo', lines: [{ description: 'Valve', qty: 6 }] });
-    await client.query(
-      `UPDATE purchase_order_lines SET part_id = $1, qty_received = 6 WHERE po_id = $2`, [id, po.id]
-    );
+    const po = await createPurchaseOrder({ vendor: 'PartsCo', lines: [{ partId: id, qty: 6 }] });
+    await client.query(`UPDATE purchase_order_lines SET qty_received = 6 WHERE po_id = $1`, [po.id]);
     const r = await reorderReport();
     equal(find([...r.below, ...r.onOrder], 'Valve').onOrder, 0, 'fully received owes nothing');
   } finally { done(); }

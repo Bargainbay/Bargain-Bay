@@ -33,7 +33,12 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     { key: 'coupons', label: 'Coupons', href: '/admin/coupons' },
     { key: 'payroll', label: 'Payroll', href: '/admin/payroll' },
     { key: 'dispatch', label: 'Dispatch', href: '/admin/dispatch', sales: true },
-    { key: 'books', label: 'The books', href: '/admin/reports/books' },
+    // ONE tab over every report. The P&L, the general ledger and the financial
+    // dashboard were in the accountant's nav below and in nobody else's, so the
+    // owner could open the reports describing his own business only by typing
+    // the URL. A hub rather than four more tabs: this nav is already long, and
+    // a report is something you go looking for rather than work in all day.
+    { key: 'reports', label: 'Reports', href: '/admin/reports' },
     { key: 'operations', label: 'Operations', href: '/admin/operations' }
   ];
   // An accountant gets the books and nothing else — no operations, no dispatch,

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import PurchaseOrderForm from './PurchaseOrderForm';
 
 // What we have ordered, and what is late.
 //
@@ -164,6 +165,7 @@ export default function PurchaseOrders() {
   const [openId, setOpenId] = useState(null);
   const [po, setPo] = useState(null);
   const [msg, setMsg] = useState('');
+  const [raising, setRaising] = useState(false);
 
   const load = () => fetch('/api/admin/purchase-orders?view=summary')
     .then((r) => r.json()).then(setS).catch(() => setS(null));
@@ -177,11 +179,31 @@ export default function PurchaseOrders() {
 
   return (
     <div className="panel" style={{ marginTop: 18 }}>
-      <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>On order</h2>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>On order</h2>
+        {/* This button did not exist, and neither did anything else that called
+            createPurchaseOrder — so this panel rendered empty forever and
+            receiving had nothing to receive against. */}
+        <button className="btn primary" style={{ marginLeft: 'auto', fontSize: 13 }}
+                onClick={() => setRaising((v) => !v)}>
+          {raising ? 'Close' : '+ Raise a purchase order'}
+        </button>
+      </div>
 
       {msg && <div className="notice-box">{msg}</div>}
 
-      {!s.orders && <p className="hint" style={{ margin: 0 }}>Nothing on order.</p>}
+      {raising && (
+        <PurchaseOrderForm
+          onCancel={() => setRaising(false)}
+          onCreated={() => { setRaising(false); setMsg('Purchase order raised.'); load(); }} />
+      )}
+
+      {!s.orders && !raising && (
+        <p className="hint" style={{ margin: 0 }}>
+          Nothing on order. Raise one and the appliances exist in the system from the moment they
+          are ordered — so they can be chased, and they arrive priced.
+        </p>
+      )}
 
       {s.orders > 0 && (
         <>
@@ -208,6 +230,16 @@ export default function PurchaseOrders() {
                             onClick={() => setOpenId(openId === p.id ? null : p.id)}>
                       {openId === p.id ? 'Close' : 'Receive'}
                     </button>
+                    <button className="btn" style={{ fontSize: 12.5, marginLeft: 6 }}
+                            title="It is not coming. Cancelling leaves anything already received alone."
+                            onClick={async () => {
+                              if (!window.confirm(`Cancel the ${p.vendor} order? Anything already received stays booked in.`)) return;
+                              await fetch('/api/admin/purchase-orders', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'cancel', id: p.id })
+                              });
+                              setMsg('Order cancelled.'); setOpenId(null); load();
+                            }}>Cancel</button>
                   </td>
                 </tr>
               ))}

@@ -1626,3 +1626,17 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
   .asst-panel { right: 8px; left: 8px; width: auto; max-width: none; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
 }
 @media print { .asst { display: none !important; } }
+
+/* The reports hub (/admin/reports). A card per report, saying what question it
+   answers — reports were built and unreachable before this existed. */
+.report-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.report-grid > * { min-width: 0; }
+.report-card {
+  display: flex; flex-direction: column; gap: 3px; padding: 13px 15px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+  text-decoration: none; color: inherit; transition: border-color .12s, transform .12s;
+}
+.report-card:hover { border-color: var(--charcoal); transform: translateY(-1px); }
+.report-card b { font-size: 14.5px; color: var(--charcoal); }
+.report-asks { font-size: 13px; color: var(--ink, inherit); }
+.report-note { font-size: 12.2px; color: var(--muted); line-height: 1.45; }
