@@ -3006,6 +3006,76 @@ because the floor is where a part is booked in and the office is where it is pri
   second payload scheme for them: **a label already stuck on a bin cannot be
   edited**, which is what `test/scan-labels.test.mjs` pins.
 
+### When to buy more of one (added 2026-09-28)
+`lib/reorder.js`, `parts.reorder_point` / `reorder_qty` / `preferred_supplier_id`
+and `purchase_order_lines.part_id` (migration 0010), the **To reorder** tab on
+`/admin/parts`, `GET/POST /api/admin/parts` action `reorder`. ADMIN, like
+everything else cost-adjacent on that screen — a level decides what gets bought
+and names the supplier.
+
+The shelf could always say it was empty. Nothing said it was ABOUT to be, so the
+first anybody knew was a tech on a doorstep with a machine open and no igniter —
+and the part then arrives in three days instead of having been there all along.
+
+- **IT COMPARES WHAT IS AVAILABLE, NOT WHAT IS ON THE SHELF.** A part held by an
+  open `part_requests` row is spoken for. Counting it as stock means the last
+  igniter, already promised to a tech, reads as one in hand and **the reorder
+  never fires** — which is exactly the case this feature exists for.
+  `available = on_hand − held` is the number `describeParts` already shows, and
+  the table prints "3 on the shelf, 1 promised" so the difference is never a
+  silent one.
+- **AT the level counts as below it.** The level is what you want LEFT when the
+  order lands, not the point at which you are out.
+- **NULL is not zero, and a part with no level is UNWATCHED.** It can never reach
+  the buy list however empty the shelf gets, and it is counted and listed rather
+  than hidden — on the day this shipped that is every part there is. Zero would
+  say every part is fine; one would say every part is urgent. Same rule as
+  `suppliers.terms_days` and `expenses.tax`. **A level of 0 is nonetheless a real
+  setting** ("buy when it runs out"), which is why clearing one has to write NULL
+  rather than 0.
+- **Already on order comes OFF the buy list and into its own group.** A list that
+  keeps shouting about something ordered last week is a list people stop reading;
+  a part that silently vanished would be worse, because "did somebody order it"
+  is the first question asked about a part that is out. This is what
+  `purchase_order_lines.part_id` is for — additive, so every existing line stays
+  an appliance line. Only the quantity still OWED counts, and a cancelled order
+  counts for nothing.
+- **Usage is measured from TAKES, and `adjust` is not a take.** A correction to a
+  miscount is not demand; counting it would order more of something nobody used.
+  `harvest` is stock arriving, not leaving.
+- **A part nobody has ever used has NO rate and NO days of cover — null, never
+  zero and never Infinity.** "We take two a week" and "we have never taken one"
+  are different facts, and only the second means the level is untested.
+- **A SUGGESTED level needs BOTH halves measured**: a rate off real takes and a
+  lead time off real deliveries (`supplierLeadTimes` — ordered date to FIRST
+  receipt, per supplier, from their own purchase orders). With either missing it
+  says which one rather than printing a number. Same rule as `mileageReport`'s
+  L/100km: a figure built on one real half looks authoritative and is invented,
+  and somebody would set a shelf level from it.
+- **Nothing orders anything.** It proposes; a person raises the purchase order.
+- **With no quantity stated it refills to TWICE the level**, because refilling to
+  the level puts the part straight back on this list the same afternoon.
+
+**Migration 0010 carries `parts`, `part_moves` and `part_requests` VERBATIM**
+before altering them — the same 0008 trap, since all three are created by
+`ensurePartSchema()` at runtime and by no migration, so the ALTERs would have
+had nothing to alter on a database built from migrations alone. Three more of
+the 27 runtime-DDL tables are now covered. It is IF NOT EXISTS and a no-op
+against the live database.
+
+**Not built:** reorder points on APPLIANCES (`products` is rewritten wholesale by
+every sync, so a level would have to live in its own table, and one-of-a-kind
+stock does not reorder anyway), anything that emails a supplier, and raising the
+purchase order from this screen — see the gap below.
+
+**LANDMINE — A PURCHASE ORDER STILL CANNOT BE RAISED FROM ANY SCREEN.**
+`createPurchaseOrder` and `cancelPurchaseOrder` exist in `lib/purchase-orders.js`
+and `/api/admin/purchase-orders` accepts both, and **nothing in `components/`
+calls either**. So "On order" renders empty on a live site, receiving has nothing
+to receive against, three-way matching has no orders to match, and this reorder
+list has no way to close its own loop. Until a create form exists the whole
+purchase-order feature is reachable only by POSTing JSON by hand.
+
 ## RS Manager — the crew's AI assistant (added 2026-09-17)
 `lib/assistant/` → `POST/GET /api/assistant` (signed-in drivers + staff, cookie
 OR `Authorization: Bearer <session token>` for the native app) and

@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import Reorder from './Reorder';
 import { money } from '../lib/constants';
 import { PART_CONDITIONS } from '../lib/parts-labels';
 
@@ -14,6 +15,7 @@ const TABS = [
   { key: 'shelf', label: 'Find a part' },
   { key: 'partout', label: 'Part out a unit' },
   { key: 'requests', label: 'Requests' },
+  { key: 'reorder', label: 'To reorder' },
   { key: 'receive', label: 'Book parts in' }
 ];
 
@@ -110,6 +112,7 @@ export default function Parts({ admin = false, initialPart = null }) {
       {tab === 'shelf' && <Shelf onOpen={setOpenPart} />}
       {tab === 'partout' && <PartOut admin={admin} salvage={overview?.salvage || []} onChanged={loadOverview} onOpen={setOpenPart} />}
       {tab === 'requests' && <Requests admin={admin} onChanged={loadOverview} onOpen={setOpenPart} />}
+      {tab === 'reorder' && <Reorder onOpen={setOpenPart} />}
       {tab === 'receive' && <Receive admin={admin} onChanged={loadOverview} onOpen={setOpenPart} />}
     </div>
   );
