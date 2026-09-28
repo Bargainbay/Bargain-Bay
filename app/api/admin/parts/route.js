@@ -5,6 +5,7 @@
 // Ops through /api/ops/parts. The cost stripping below is kept so that widening
 // this gate again can never quietly start sending cost to a non-admin.
 import { NextResponse } from 'next/server';
+import { explainDbError } from '../../../../lib/migrate';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import {
@@ -24,6 +25,9 @@ const who = (s) => ({ by: s.email || null, byName: s.name || s.email || null });
 
 function fail(e) {
   if (e?.code) console.error('parts route failed', e);
+  // A missing table is a migration nobody has run, not a server fault — say so
+  // rather than reporting a Postgres internal to whoever is standing there.
+  if (e?.code === '42P01') return NextResponse.json({ error: explainDbError(e) }, { status: 400 });
   return NextResponse.json({ error: e?.code ? 'Something went wrong saving that.' : (e?.message || 'Something went wrong.') },
     { status: e?.code ? 500 : 400 });
 }

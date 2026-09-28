@@ -5,6 +5,7 @@
 // spots is the one admin action: it changes the map everybody else scans against.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff } from '../../../../lib/auth';
+import { setTrackerRetail } from '../../../../lib/sheets';
 import { hasDb } from '../../../../lib/db';
 import {
   listLocations, locationContents, unitWhere, findUnits, unplacedUnits,
@@ -80,6 +81,14 @@ export async function POST(req) {
         return NextResponse.json({ ok: true, ...(await moveUnits({ skus, code: null, note: body.note, via: 'out', ...who(s) })) });
       case 'count':
         return NextResponse.json({ ok: true, ...(await countSpot({ code: body.code, skus, ...who(s) })) });
+      // Clearing the consignment floor. ADMIN, because the floor is derived
+      // from what we agreed to pay the vendor, and the whole point of the
+      // number is a cost comparison. Retail only — see setTrackerRetail: the
+      // Condition is RS Ops's grade, and re-grading a machine so its price
+      // clears a floor is falsifying the grade to fix the arithmetic.
+      case 'set_retail':
+        if (!isAdmin(s)) return denied();
+        return NextResponse.json({ ok: true, ...(await setTrackerRetail(body.sku, body.retail)) });
       case 'add_area':
         if (!isAdmin(s)) return denied();
         return NextResponse.json({ ok: true, ...(await addArea({ label: body.label, by: s.email || null })) });

@@ -250,6 +250,29 @@ code so they cannot disagree.
   `db/schema.sql` exactly; a directory would have deployed EMPTY and the button
   would report "no migrations found" on production while working in dev.
 
+### A deploy is not a migration (added 2026-09-28)
+`explainDbError` in `lib/migrate.js`, used by the suppliers, parts and
+purchase-order routes.
+
+The supplier panel was opened on production the day its PR merged and the Add
+form answered **`relation "suppliers" does not exist`** in a red box. The code
+was correct and deployed; migration 0009 had simply not been run, and nothing
+anywhere said that running it is a **button somebody has to press after a
+deploy**.
+
+- Postgres raises **42P01** for a missing table and the driver's message is the
+  raw SQL one, so any feature whose migration is outstanding reports a database
+  internal to whoever is standing in front of it. `explainDbError` names the
+  table, names the button, and says a deploy ships the migration rather than
+  applying it.
+- **The answer is NOT to migrate automatically on boot.** A migration that runs
+  itself on every cold start is a migration nobody chose to run, against a
+  production database, possibly mid-request — the runner's whole design (a
+  checksum, an advisory lock, one transaction each, a refusal on drift) assumes a
+  person decided. Say which button to press instead.
+- Every other error passes through untouched: a validation message is already
+  the right thing to show.
+
 ## Invoicing, orders & what counts as revenue (changed 2026-08-22)
 An invoice raises its **fulfilment order immediately**, not when it's paid — see
 `createAndSendInvoice` in `lib/invoices.js`.
@@ -590,8 +613,10 @@ when S-ORD115612 had already put three there.
   nothing on paper (see the consignment section). Anything else is `BI-…` /
   NEEDS INVOICE. Sales may book in a drop-off themselves (owner, 2026-09-22);
   the purchase-invoice path tells them to check with the warehouse first.
-- **Stock by vendor** — `lib/stock-vendors.js`, the **By vendor** tab on
-  `/admin/warehouse`, `GET /api/admin/warehouse?view=vendors`. Read from the
+- **Stock by vendor** — `lib/stock-vendors.js`, the **Their stock** tab on
+  `/admin/suppliers` (it was the *By vendor* tab on `/admin/warehouse` until
+  2026-09-28 — see "One page for who we buy from"),
+  `GET /api/admin/warehouse?view=vendors`. Read from the
   TRACKER, not `products`: the units a vendor rings up about are the ones that
   are not listed — untested, in cleaning, waiting for a part. `groupRows` is pure
   and exported so it can be tested without a tracker; vendor names are folded
@@ -3802,6 +3827,59 @@ and the buckets are `over30 / overdue / week / later / unknown`.
 **Not built yet:** a supplier's own price list, minimum order quantities, and
 anything that emails them. The performance figure counts orders, not lines — a
 supplier who is reliably late on one SKU reads as on time.
+
+## One page for who we buy from (added 2026-09-28)
+`/admin/suppliers` (**STAFF**), `components/SupplierHub.jsx` over
+`SupplierStock` / `Suppliers` / `SupplierSpend`.
+
+It used to be **two pages that did not know about each other**: a *By vendor*
+tab on `/admin/warehouse` reading the TRACKER (whose stock is standing here),
+and a *Suppliers* fold on `/admin/operations` reading the DATABASE (terms,
+contact, what we owe). Nothing linked them and neither said the other existed.
+**The split was an accident of where the data came from, not of what anybody was
+trying to find out** — which is the general failure to watch for: two data
+sources is not two subjects.
+
+- **Four tabs, ordered by how often the question is asked**, not by how the data
+  is stored: *Their stock* first, because a vendor rings up about their stock far
+  more often than anybody opens a payables report.
+- **STAFF, not admin.** A rep answering the phone to a vendor is doing a selling
+  job — that is exactly why *By vendor* lived on the staff-level warehouse page.
+  What a rep does NOT get is anything derived from cost: the **What we spend**
+  and **What we owe** tabs are admin, and unit cost is stripped SERVER-side by
+  `withoutCost` as it always was. A hidden tab is not a permission.
+- `Suppliers` takes a `show` prop (`file` / `owed` / `all`) so the two halves can
+  sit on different tabs **out of one component** — rendering a second copy is how
+  the aging and the contact book would come to disagree about a supplier.
+- `/admin/warehouse` lost its *By vendor* tab and `/admin/operations` keeps a
+  **pointer, not a second copy**. `/admin/reports/suppliers` (which existed for
+  less than a day) is a redirect.
+
+### Clearing the consignment floor — RETAIL, never the grade
+`minRetail` in `lib/stock-vendors.js`, `setTrackerRetail` in `lib/sheets.js`,
+`set_retail` on `/api/admin/warehouse` (ADMIN — the floor is a cost comparison).
+
+The By vendor tab could say *"5 dropped-off units are priced under cost + 20%"*
+and the only thing it could then tell you was to go and open the spreadsheet.
+**A warning with no way to act on it is a dead end wearing a red badge**, and it
+is worth checking for that shape anywhere a count is shown in red.
+
+- **RETAIL is the lever, and Condition deliberately is not.** The tracker prices
+  a unit as Retail × Condition%, so either number would clear the floor — but
+  **Condition belongs to RS Ops**, which is the only thing that ever tests or
+  grades a machine. Re-grading an appliance so its price clears a floor is
+  falsifying the grade to fix the arithmetic, and the grade is what the customer
+  is being told about the machine.
+- **The row states the figure to type.** `minRetail = ceil(floor × retail ÷ price)`
+  — the condition multiplier read back off the ROW (`price ÷ retail`) rather than
+  looked up in the Settings tab, because those tiers have been renamed before and
+  a row carrying a retired label is exactly the row that ends up mispriced.
+  `Math.ceil`, because a retail that rounds down does not clear a floor.
+- **An ungraded unit gets no suggestion** (null, not a guess). With no Suggested
+  Price there is no multiplier to work back from, and inventing a retail would be
+  a number somebody types into the source of truth for the whole business.
+- Saving **re-reads the tracker**, because Suggested Price is a formula: what the
+  floor check sees only changes once the sheet has recalculated.
 
 ## Every report has to be REACHABLE (added 2026-09-28)
 `lib/reports.js` + `/admin/reports`, the **Reports** tab in `AdminNav`.

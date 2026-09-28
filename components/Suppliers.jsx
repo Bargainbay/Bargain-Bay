@@ -203,7 +203,11 @@ function TermsCell({ s, onSaved }) {
   );
 }
 
-export default function Suppliers() {
+// `show` picks which half of this panel renders, because the supplier page
+// splits them across two tabs: 'owed' is the payables aging, 'file' is the
+// contact book plus the names nobody has identified. Omitted renders both, which
+// is how it is used anywhere it stands alone.
+export default function Suppliers({ show = 'all' }) {
   const [list, setList] = useState(null);
   const [perf, setPerf] = useState([]);
 
@@ -222,11 +226,12 @@ export default function Suppliers() {
 
   return (
     <div className="panel" style={{ marginTop: 18 }}>
-      <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Suppliers</h2>
+      {show === 'all' && <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Suppliers</h2>}
 
-      <Aging />
-      <Unknown suppliers={list} onChange={load} />
+      {show !== 'file' && <Aging />}
+      {show !== 'owed' && <Unknown suppliers={list} onChange={load} />}
 
+      {show === 'owed' ? null : <>
       <h3 style={{ fontSize: 13.5, margin: '16px 0 4px' }}>On file ({list.length})</h3>
       {!list.length && (
         <p className="hint" style={{ margin: 0 }}>
@@ -268,6 +273,7 @@ export default function Suppliers() {
       )}
 
       <AddSupplier onAdded={load} />
+      </>}
     </div>
   );
 }
