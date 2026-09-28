@@ -67,6 +67,98 @@ function Receive({ po, onDone }) {
   );
 }
 
+// Money the books do not know about, in both directions.
+function Gaps() {
+  const [g, setG] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => fetch('/api/admin/purchase-orders?view=gaps').then((r) => r.json()).then(setG).catch(() => {});
+  useEffect(() => { load(); }, []);
+  if (!g || (!g.unbilled?.length && !g.unmatched?.length)) return null;
+
+  async function link(invoiceId, poId) {
+    setBusy(true);
+    try {
+      await fetch('/api/admin/purchase-orders', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'link', invoiceId, poId })
+      });
+      await load();
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      {g.unbilled?.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 13.5, margin: '0 0 4px', color: '#b3261e' }}>
+            Arrived, nobody billed us ({g.unbilled.length} · {money(g.unbilledValue)})
+          </h3>
+          <p className="hint" style={{ margin: '0 0 8px', fontSize: 12.5 }}>
+            Their cost is not in the books and no HST has been reclaimed on them. Chase the supplier
+            for an invoice, or upload it if it is sitting in the inbox.
+          </p>
+          <div className="table-wrap"><table className="admin">
+            <thead><tr><th>Supplier</th><th>Order</th><th style={{ textAlign: 'right' }}>Units in</th><th style={{ textAlign: 'right' }}>Cost</th></tr></thead>
+            <tbody>
+              {g.unbilled.map((r) => (
+                <tr key={r.id}><td>{r.vendor}</td><td>{r.order_number || '—'}</td>
+                  <td style={{ textAlign: 'right' }}>{r.received}</td>
+                  <td style={{ textAlign: 'right' }}>{money(r.value)}</td></tr>
+              ))}
+            </tbody>
+          </table></div>
+        </>
+      )}
+
+      {g.unmatched?.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 13.5, margin: '14px 0 4px' }}>
+            Invoices with no order ({g.unmatched.length} · {money(g.unmatchedValue)})
+          </h3>
+          <p className="hint" style={{ margin: '0 0 8px', fontSize: 12.5 }}>
+            Either somebody bought outside the process, or an order was never raised. Link one to its
+            order and the three-way check starts working for it.
+          </p>
+          <div className="table-wrap"><table className="admin">
+            <thead><tr><th>Supplier</th><th>Invoice</th><th style={{ textAlign: 'right' }}>Units</th><th style={{ textAlign: 'right' }}>Subtotal</th><th /></tr></thead>
+            <tbody>
+              {g.unmatched.map((r) => <UnmatchedRow key={r.id} inv={r} onLink={link} busy={busy} />)}
+            </tbody>
+          </table></div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function UnmatchedRow({ inv, onLink, busy }) {
+  const [opts, setOpts] = useState(null);
+  return (
+    <tr>
+      <td>{inv.vendor || '—'}</td>
+      <td>{inv.invoice_number || <span className="hint">no number</span>}</td>
+      <td style={{ textAlign: 'right' }}>{inv.units}</td>
+      <td style={{ textAlign: 'right' }}>{money(inv.subtotal)}</td>
+      <td style={{ textAlign: 'right' }}>
+        {!opts && (
+          <button className="btn" style={{ fontSize: 12 }} disabled={busy}
+                  onClick={() => fetch(`/api/admin/purchase-orders?suggest=${inv.id}`)
+                    .then((r) => r.json()).then((d) => setOpts(d.orders || []))}>
+            Find its order
+          </button>
+        )}
+        {opts && !opts.length && <span className="hint" style={{ fontSize: 12 }}>no open order for this supplier</span>}
+        {opts?.map((o) => (
+          <button key={o.id} className="btn" style={{ fontSize: 12, marginLeft: 6 }} disabled={busy}
+                  onClick={() => onLink(inv.id, o.id)}>
+            {o.order_number || `#${o.id}`}{o.exact ? ' ✓' : ''}
+          </button>
+        ))}
+      </td>
+    </tr>
+  );
+}
+
 export default function PurchaseOrders() {
   const [s, setS] = useState(null);
   const [openId, setOpenId] = useState(null);
@@ -123,6 +215,8 @@ export default function PurchaseOrders() {
           </table></div>
         </>
       )}
+
+      <Gaps />
 
       {po && (
         <div className="panel" style={{ marginTop: 12 }}>

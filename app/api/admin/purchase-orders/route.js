@@ -8,7 +8,8 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import {
   createPurchaseOrder, getPurchaseOrder, receivePurchaseOrder,
-  cancelPurchaseOrder, listPurchaseOrders, outstandingSummary
+  cancelPurchaseOrder, listPurchaseOrders, outstandingSummary,
+  matchPurchaseOrder, linkInvoiceToPurchaseOrder, suggestPurchaseOrderForInvoice, matchingGaps
 } from '../../../../lib/purchase-orders';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,9 @@ export async function GET(req) {
     return po ? NextResponse.json({ po }) : NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
   if (sp.get('view') === 'summary') return NextResponse.json(await outstandingSummary());
+  if (sp.get('view') === 'gaps') return NextResponse.json(await matchingGaps({}));
+  if (sp.get('match')) return NextResponse.json({ match: await matchPurchaseOrder(sp.get('match')) });
+  if (sp.get('suggest')) return NextResponse.json({ orders: await suggestPurchaseOrderForInvoice(sp.get('suggest')) });
   return NextResponse.json({ orders: await listPurchaseOrders({ status: sp.get('status') || 'outstanding' }) });
 }
 
@@ -46,6 +50,13 @@ export async function POST(req) {
         // either "it is booked in" or "nothing happened".
         return NextResponse.json(
           await receivePurchaseOrder(body.id, body.lines, { by: session.email, note: body.note })
+        );
+      case 'link':
+        // Explicit. Nothing links automatically — matching on a number that
+        // "looks like" the order's is exactly how the S-ORD115612 /
+        // PS-INV116968 tangle happened.
+        return NextResponse.json(
+          await linkInvoiceToPurchaseOrder(body.invoiceId, body.poId ?? null, { by: session.email })
         );
       case 'cancel':
         return NextResponse.json(await cancelPurchaseOrder(body.id, { by: session.email }));

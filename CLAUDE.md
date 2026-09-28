@@ -3561,10 +3561,46 @@ exist to paper over an ordering record that did not exist.
   decision somebody made.
 - **LATE only applies to something still owed.** A fully received order whose
   date has passed is not late; it arrived.
-- **Not built yet:** three-way matching against `purchase_invoices` (the
-  invoice still records only a header — there is no line-item table), and
-  nothing yet retires a NEEDS INVOICE row when a PO receipt would have covered
-  it.
+### Three-way matching (added 2026-09-28)
+`matchPurchaseOrder` / `linkInvoiceToPurchaseOrder` /
+`suggestPurchaseOrderForInvoice` / `matchingGaps`, migration 0008.
+
+**HEADER LEVEL, and that is a real limitation stated rather than hidden.**
+`purchase_invoices` records a vendor, a number, a date, a subtotal, a tax
+figure, a total and a UNIT COUNT — there is no line-item table, because intake
+parses the PDF's lines straight into tracker units and keeps only the header for
+the HST credit. So this compares totals and counts, not line against line: it
+cannot tell you that one fridge on a six-line invoice was priced wrong.
+
+What it does catch, all of it money:
+- **stock arrived that nobody billed us for** — its cost is not in the books and
+  no input tax credit has been claimed on it;
+- an invoice belonging to no order at all (bought outside the process, or an
+  order was never raised);
+- units invoiced ≠ units received;
+- money invoiced ≠ what we agreed to pay.
+
+- **The SUBTOTAL is compared, never the total.** We agreed a price for the
+  goods; the tax on top is reclaimed, not spent. Comparing totals would flag
+  every invoice in the country as 13% over.
+- **Billed for MORE than arrived is high severity; fewer is low.** Being billed
+  for stock that never came costs us money; being billed for less usually means
+  an invoice is still on its way.
+- **NOTHING LINKS AUTOMATICALLY.** It suggests — exact order number first,
+  within the same supplier — and a person confirms. Matching on a number that
+  "looks like" the order's is exactly how the S-ORD115612 / PS-INV116968 tangle
+  happened. A link is reversible.
+- **Still not built:** line-level matching (needs a `purchase_invoice_lines`
+  table and a change to intake), and nothing yet retires a NEEDS INVOICE row
+  when a PO receipt would have covered it.
+
+**LANDMINE — `purchase_invoices` is created by `ensureFinanceSchema()` at
+runtime and by no migration**, so migration 0008's `ALTER TABLE` had nothing to
+alter on a database built from migrations alone. That is the 27-runtime-DDL
+problem finally biting something. 0008 therefore carries a verbatim
+`CREATE TABLE IF NOT EXISTS` copy first — a no-op against the live database. Any
+migration that touches a table not in `db/migrations/` needs the same treatment
+until those 27 are folded in.
 
 **LANDMINE, and I walked into it twice in one week: never compare dates in JS
 on this boundary.** The driver returns a `date` column as a Date object and
