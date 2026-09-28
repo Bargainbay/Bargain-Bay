@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import {
-  listCustomers, updateCustomerDetails, backfillCustomers,
+  listCustomers, countCustomers, updateCustomerDetails, backfillCustomers,
   mergeCustomers, duplicateCandidates
 } from '../../../../lib/customers';
 
@@ -27,7 +27,13 @@ export async function GET(req) {
     if (sp.get('duplicates')) {
       return NextResponse.json({ duplicates: await duplicateCandidates({}) });
     }
-    return NextResponse.json({ customers: await listCustomers({ q }) });
+    const limit = Number(sp.get('limit')) || 100;
+    const offset = Number(sp.get('offset')) || 0;
+    const [customers, total] = await Promise.all([
+      listCustomers({ q, limit, offset }),
+      countCustomers({ q })
+    ]);
+    return NextResponse.json({ customers, total, limit, offset });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not load customers.' }, { status: 500 });
   }

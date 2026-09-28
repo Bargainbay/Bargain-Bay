@@ -3421,6 +3421,57 @@ silently overwrites the first. Anything that HAPPENED goes in the timeline.
   and every follow-up still owed — and reported success. Same ordering trap as
   the aliases, one table further along.
 
+### Marketing reads the CUSTOMER database now (added 2026-09-28)
+`marketingAudience` in `lib/customers.js`; `lib/campaigns.js` calls it.
+
+`audience()` read `users`, so it could only reach people who had created an
+ACCOUNT. **Every guest checkout, invoiced client, phone lead and walk-in was
+invisible to marketing** — while `backfillCustomers` was busy assembling exactly
+those people into a table nothing marketed to. The CRM and the mailing list were
+two different databases that did not speak.
+
+- **It lives in `lib/customers` because `ORDER_MATCH` does.** "Has this person
+  bought from us" has to be the same question the customer list and the profile
+  ask, or a segment disagrees with the rollup on the screen beside it.
+- **DRIVER ACCOUNTS ARE EXCLUDED.** `backfillCustomers` sweeps all of `users`,
+  so the synthetic `driver-<digits>@drivers.bargainbay.ca` accounts are in the
+  customer table. The consent gate already stops them being texted — they never
+  tick a box — but they would inflate every audience count, and a count somebody
+  trusts is worse than one they cannot get.
+- A phone-only customer is reachable by text, their orders matched on the number
+  exactly as the customer list matches them.
+
+### The customer list is paged (added 2026-09-28)
+`listCustomers({ q, limit, offset })` + `countCustomers`. It capped at 500 with
+no offset, so customer 501 was unreachable from the screen — which on a growing
+list is the same as not having them.
+
+- **`ORDER BY … , c.id DESC` — the `id` is load-bearing.** OFFSET paging needs a
+  TOTAL ordering, and every customer who has bought nothing ties on both spend
+  and created_at. Without the tiebreaker Postgres may return ties in any order,
+  so one person appears on two pages while another is never shown. Caught by a
+  test; nobody would have noticed until a customer was reported twice.
+- **One search predicate** (`CUSTOMER_SEARCH`), shared by the list and the
+  count, or a page shows rows the count says are not there.
+- **A phone number is matched on its DIGITS as well as literally**, because a
+  number has as many spellings as people who type it: "488-8549" has to find a
+  customer stored as "4374888549". Guarded at four digits — below that, strip
+  the punctuation and "1" matches every number containing a 1.
+
+### LANDMINE — ON CONFLICT against a PARTIAL unique index (2026-09-28)
+2.1 made `customers.email` nullable and replaced the column's UNIQUE constraint
+with a **partial** unique index (`WHERE email IS NOT NULL`). A conflict target
+has to match that index's own predicate, so the backfill's bare
+`ON CONFLICT (email)` stopped resolving: *"there is no unique or exclusion
+constraint matching the ON CONFLICT specification"*.
+
+`backfillCustomers` wraps each sweep in a catch-and-log, so **it failed silently
+on every nightly run** between shipping 2.1 and finding it. The live path
+(`upsertCustomer` on every checkout, invoice and quote) was unaffected, so the
+damage was limited to historical convergence — but nothing said so. Every one of
+those statements now reads `ON CONFLICT (email) WHERE email IS NOT NULL`, and a
+test asserts the sweep actually returns rows.
+
 ### Merging two records that are one person (added 2026-09-25)
 `mergeCustomers` / `customerAliases` / `duplicateCandidates`, table
 `customer_aliases` (migration 0004), **Possible duplicates** on
