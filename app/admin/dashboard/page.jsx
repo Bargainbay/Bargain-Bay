@@ -7,6 +7,7 @@ import { getSetting } from '../../../lib/settings';
 import { listReps } from '../../../lib/reps';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
+import MyDay from '../../../components/MyDay';
 import GoalEditor from '../../../components/GoalEditor';
 import RepsEditor from '../../../components/RepsEditor';
 import TaxOwed from '../../../components/TaxOwed';
@@ -78,6 +79,10 @@ export default async function SalesDashboardPage({ searchParams }) {
         <h1 style={{ margin: 0 }}>Sales performance</h1>
         <span className="hint" style={{ margin: 0 }}>Showing <strong>{periodLabel(period)}</strong>{vs ? ` — compared${vs}` : ''}</span>
       </div>
+
+      {/* Before the numbers. A dashboard tells you how the month went; this is
+          the only thing on the page that is owed to somebody TODAY. */}
+      <MyDay />
 
       <DashboardFilters periods={DASH_PERIODS} active={period} />
 
