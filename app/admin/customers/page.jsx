@@ -3,7 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { customersDashboard, DASH_PERIODS } from '../../../lib/analytics';
-import { listCustomers } from '../../../lib/customers';
+import { listCustomers, countCustomers } from '../../../lib/customers';
 import { ratingStats } from '../../../lib/ratings';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
@@ -28,8 +28,11 @@ export default async function CustomersDashboardPage({ searchParams }) {
 
   const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
   const q = String(sParams?.q || '').slice(0, 100);
+  const PER_PAGE = 100;
+  const page = Math.max(1, Number(sParams?.page) || 1);
   let d = null, customers = [], csat = null, error = '';
-  try { [d, customers, csat] = await Promise.all([customersDashboard(period), listCustomers({ q }), ratingStats()]); }
+  let total = 0;
+  try { [d, customers, csat, total] = await Promise.all([customersDashboard(period), listCustomers({ q, limit: PER_PAGE, offset: (page - 1) * PER_PAGE }), ratingStats(), countCustomers({ q })]); }
   catch (e) { console.error('customers load failed', e.message); error = 'Could not load customer data.'; }
   if (error || !d) return (<DashboardShell active="customers"><div className="error-box">{error || 'No data.'}</div></DashboardShell>);
 
@@ -83,7 +86,27 @@ export default async function CustomersDashboardPage({ searchParams }) {
                 <tr key={g.city}><td>{g.city}</td><td style={{ textAlign: 'right' }}>{g.orders}</td><td style={{ textAlign: 'right', fontWeight: 700 }}>{money(g.revenue)}</td></tr>
               ))}
             </tbody>
-          </table></div>
+        </table></div>
+
+        {/* Customer 501 used to be simply unreachable from this screen, which on
+            a growing list is the same as not having them. */}
+        {total > PER_PAGE && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+            {page > 1 && (
+              <a className="btn" href={`/admin/customers?${new URLSearchParams({ ...(q ? { q } : {}), page: String(page - 1) })}`}>
+                ← Previous
+              </a>
+            )}
+            <span className="hint">
+              {((page - 1) * PER_PAGE) + 1}–{Math.min(page * PER_PAGE, total)} of {total.toLocaleString('en-CA')}
+            </span>
+            {page * PER_PAGE < total && (
+              <a className="btn" href={`/admin/customers?${new URLSearchParams({ ...(q ? { q } : {}), page: String(page + 1) })}`}>
+                Next →
+              </a>
+            )}
+          </div>
+        )}
         </div>
         <div className="panel">
           <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Satisfaction (CSAT)</h2>
@@ -152,7 +175,11 @@ export default async function CustomersDashboardPage({ searchParams }) {
 
       <div className="panel" style={{ marginTop: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
-          <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Client database ({customers.length}{q ? ` matching “${q}”` : ''})</h2>
+          {/* "500 customers" and "the first 100 of 2,300" are different things
+              to be told, which is why the total is counted separately. */}
+          <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>
+            Client database ({total.toLocaleString('en-CA')}{q ? ` matching “${q}”` : ''})
+          </h2>
           <CustomerSearch initial={q} />
         </div>
         <p className="hint" style={{ marginTop: 0 }}>
