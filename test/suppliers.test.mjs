@@ -8,7 +8,8 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import {
   createSupplier, updateSupplier, resolveSupplier, addSupplierAlias,
-  unknownVendorNames, supplierPerformance, payablesAging, listSuppliers, relinkAll
+  unknownVendorNames, supplierPerformance, payablesAging, listSuppliers, relinkAll,
+  supplierSpend
 } from '../lib/suppliers.js';
 import { createPurchaseOrder, getPurchaseOrder, receivePurchaseOrder } from '../lib/purchase-orders.js';
 import { supplierKey, torontoToday } from '../lib/constants.js';
@@ -269,5 +270,121 @@ test('terms can be set later, and cleared', async () => {
     await updateSupplier(s.id, { termsDays: null });
     [row] = await listSuppliers();
     equal(row.terms_days, null, 'and they can be cleared deliberately');
+  } finally { done(); }
+});
+
+
+suite('suppliers — what we have SPENT, period by period');
+
+// Spend is taxed separately from what we agreed to pay, so this helper takes
+// both halves rather than the shorthand above.
+const billed = (c, { vendor, number, subtotal, tax = 0, date, supplierId = null }) =>
+  c.query(
+    `INSERT INTO purchase_invoices (vendor, invoice_number, invoice_date, subtotal, tax, total, units, supplier_id)
+     VALUES ($1,$2,$3,$4,$5,$6,1,$7)`,
+    [vendor, number, date, subtotal, tax, Number(subtotal) + Number(tax), supplierId]
+  );
+// The first of the month, `n` months back — where date_trunc('month') lands.
+const monthsAgo = (n) => {
+  const d = new Date();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() - n);
+  return d.toISOString().slice(0, 10);
+};
+
+test('THE SUBTOTAL IS SPEND — the HST on top is reclaimed, not spent', async () => {
+  const { client, done } = await fresh();
+  try {
+    const s = await createSupplier({ name: 'SecondShop' });
+    await billed(client, { vendor: 'SecondShop', number: 'A1', subtotal: 1000, tax: 130, date: monthsAgo(0), supplierId: s.id });
+    const r = await supplierSpend({ groupBy: 'month', periods: 3 });
+    equal(r.total, 1000, 'not 1130 — including the tax overstates every supplier by 13%');
+    equal(r.suppliers[0].supplier, 'SecondShop');
+  } finally { done(); }
+});
+
+test('one row per supplier per period, and the months line up', async () => {
+  const { client, done } = await fresh();
+  try {
+    const a = await createSupplier({ name: 'SecondShop' });
+    const b = await createSupplier({ name: 'PartsCo' });
+    await billed(client, { vendor: 'SecondShop', number: 'A1', subtotal: 500, date: monthsAgo(0), supplierId: a.id });
+    await billed(client, { vendor: 'SecondShop', number: 'A2', subtotal: 300, date: monthsAgo(0), supplierId: a.id });
+    await billed(client, { vendor: 'SecondShop', number: 'A3', subtotal: 200, date: monthsAgo(1), supplierId: a.id });
+    await billed(client, { vendor: 'PartsCo',    number: 'B1', subtotal: 900, date: monthsAgo(1), supplierId: b.id });
+
+    const r = await supplierSpend({ groupBy: 'month', periods: 3 });
+    const ss = r.suppliers.find((x) => x.supplier === 'SecondShop');
+    equal(ss.total, 1000, 'two months added up');
+    equal(ss.byPeriod[monthsAgo(0)], 800, 'this month is the two invoices together');
+    equal(ss.byPeriod[monthsAgo(1)], 200);
+    equal(ss.invoices, 3);
+    // Biggest spend first: that is the supplier worth negotiating with.
+    equal(r.suppliers[0].supplier, 'SecondShop');
+    equal(r.perPeriod[monthsAgo(1)], 1100, 'both suppliers in that month');
+    equal(r.total, 1900);
+  } finally { done(); }
+});
+
+test('a QUIET month is a column of zero, not a missing column', async () => {
+  const { client, done } = await fresh();
+  try {
+    const s = await createSupplier({ name: 'SecondShop' });
+    await billed(client, { vendor: 'SecondShop', number: 'A1', subtotal: 100, date: monthsAgo(0), supplierId: s.id });
+    const r = await supplierSpend({ groupBy: 'month', periods: 4 });
+    equal(r.periods.length, 4, 'every month in the window is reported');
+    equal(r.perPeriod[monthsAgo(2)], 0, 'a month with no purchases reads as zero');
+  } finally { done(); }
+});
+
+test('AN UNIDENTIFIED VENDOR IS STILL SPEND, and the report says how much', async () => {
+  const { client, done } = await fresh();
+  try {
+    const s = await createSupplier({ name: 'SecondShop' });
+    await billed(client, { vendor: 'SecondShop', number: 'A1', subtotal: 600, date: monthsAgo(0), supplierId: s.id });
+    // Never linked to a supplier — exactly what unknownVendorNames lists.
+    await billed(client, { vendor: 'Some Guy', number: 'C1', subtotal: 400, date: monthsAgo(0) });
+
+    const r = await supplierSpend({ groupBy: 'month', periods: 2 });
+    equal(r.total, 1000, 'dropping the unlinked rows would understate the total');
+    equal(r.unidentified, 400, 'and it says what the unknown-names list is costing');
+    const row = r.suppliers.find((x) => x.supplier === 'Some Guy');
+    assert(row, 'grouped under the name as typed');
+    equal(row.unidentified, true);
+  } finally { done(); }
+});
+
+test('the window is honoured — older invoices are out of it', async () => {
+  const { client, done } = await fresh();
+  try {
+    const s = await createSupplier({ name: 'SecondShop' });
+    await billed(client, { vendor: 'SecondShop', number: 'OLD', subtotal: 5000, date: monthsAgo(11), supplierId: s.id });
+    await billed(client, { vendor: 'SecondShop', number: 'NEW', subtotal: 100, date: monthsAgo(0), supplierId: s.id });
+    equal((await supplierSpend({ groupBy: 'month', periods: 3 })).total, 100, 'three months back only');
+    equal((await supplierSpend({ groupBy: 'month', periods: 12 })).total, 5100, 'twelve reaches it');
+  } finally { done(); }
+});
+
+test('weeks group as weeks', async () => {
+  const { client, done } = await fresh();
+  try {
+    const s = await createSupplier({ name: 'SecondShop' });
+    await billed(client, { vendor: 'SecondShop', number: 'A1', subtotal: 100, date: day(-1), supplierId: s.id });
+    await billed(client, { vendor: 'SecondShop', number: 'A2', subtotal: 250, date: day(-20), supplierId: s.id });
+    const r = await supplierSpend({ groupBy: 'week', periods: 6 });
+    equal(r.unit, 'week');
+    equal(r.total, 350);
+    const ss = r.suppliers[0];
+    equal(Object.keys(ss.byPeriod).length, 2, 'three weeks apart is two buckets');
+  } finally { done(); }
+});
+
+test('nothing bought at all is zeroes, not a crash', async () => {
+  const { done } = await fresh();
+  try {
+    const r = await supplierSpend({});
+    equal(r.total, 0);
+    equal(r.suppliers.length, 0);
+    equal(r.unidentified, 0);
   } finally { done(); }
 });

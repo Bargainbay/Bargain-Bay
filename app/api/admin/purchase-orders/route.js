@@ -11,6 +11,8 @@ import {
   cancelPurchaseOrder, listPurchaseOrders, outstandingSummary,
   matchPurchaseOrder, linkInvoiceToPurchaseOrder, suggestPurchaseOrderForInvoice, matchingGaps
 } from '../../../../lib/purchase-orders';
+import { listSuppliers } from '../../../../lib/suppliers';
+import { reorderReport } from '../../../../lib/reorder';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -27,6 +29,23 @@ export async function GET(req) {
   if (id) {
     const po = await getPurchaseOrder(id);
     return po ? NextResponse.json({ po }) : NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+  // Everything the raise-an-order form needs, in one call: who we buy from, and
+  // the parts that are short. A part is offered here because a purchase order
+  // line can now name one, which is what lets the reorder list know something
+  // is already on its way.
+  if (sp.get('view') === 'setup') {
+    const [suppliers, reorder] = await Promise.all([
+      listSuppliers({}),
+      reorderReport({}).catch(() => ({ below: [] }))
+    ]);
+    return NextResponse.json({
+      suppliers,
+      parts: (reorder.below || []).map((p) => ({
+        id: p.id, name: p.name, partNumber: p.partNumber,
+        supplier: p.supplier, suggestQty: p.orderQty
+      }))
+    });
   }
   if (sp.get('view') === 'summary') return NextResponse.json(await outstandingSummary());
   if (sp.get('view') === 'gaps') return NextResponse.json(await matchingGaps({}));

@@ -12,6 +12,8 @@ import {
   partOutState, harvestPart, removeHarvested, finishPartOut,
   requestPart, listRequests, decideRequest, pickRequest, cancelRequest, priceParts
 } from '../../../../lib/parts';
+import { reorderReport, setReorderPoint } from '../../../../lib/reorder';
+import { listSuppliers } from '../../../../lib/suppliers';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -53,6 +55,13 @@ export async function GET(req) {
         return NextResponse.json(await partOutState(sp.get('sku') || ''));
       case 'requests':
         return NextResponse.json({ requests: await listRequests({ status: sp.get('status') || 'open' }) });
+      case 'reorder':
+        // The suppliers come with it so the screen can offer "who we buy this
+        // from" without a second round trip — it is one short list.
+        return NextResponse.json({
+          ...(await reorderReport({ windowDays: sp.get('days') })),
+          suppliers: await listSuppliers({})
+        });
       default: {
         const overview = await partsOverview();
         return NextResponse.json(admin ? overview : { ...overview, valueAtCost: undefined });
@@ -100,6 +109,11 @@ export async function POST(req) {
         return NextResponse.json({ ok: true, ...(await decideRequest({ id: body.id, approve: !!body.approve, ...who(s) })) });
       case 'pick':
         return NextResponse.json({ ok: true, ...(await pickRequest({ id: body.id, location: body.location, ...who(s) })) });
+      case 'reorder':
+        // Admin, like every other cost-adjacent thing on this screen: a reorder
+        // point decides what gets BOUGHT, and it names the supplier.
+        if (!admin) return denied();
+        return NextResponse.json({ ok: true, ...(await setReorderPoint(body.partId, body)) });
       case 'cancel_request':
         return NextResponse.json({ ok: true, ...(await cancelRequest({ id: body.id, by: s.email || null })) });
       default:

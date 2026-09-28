@@ -3006,6 +3006,73 @@ because the floor is where a part is booked in and the office is where it is pri
   second payload scheme for them: **a label already stuck on a bin cannot be
   edited**, which is what `test/scan-labels.test.mjs` pins.
 
+### When to buy more of one (added 2026-09-28)
+`lib/reorder.js`, `parts.reorder_point` / `reorder_qty` / `preferred_supplier_id`
+and `purchase_order_lines.part_id` (migration 0010), the **To reorder** tab on
+`/admin/parts`, `GET/POST /api/admin/parts` action `reorder`. ADMIN, like
+everything else cost-adjacent on that screen — a level decides what gets bought
+and names the supplier.
+
+The shelf could always say it was empty. Nothing said it was ABOUT to be, so the
+first anybody knew was a tech on a doorstep with a machine open and no igniter —
+and the part then arrives in three days instead of having been there all along.
+
+- **IT COMPARES WHAT IS AVAILABLE, NOT WHAT IS ON THE SHELF.** A part held by an
+  open `part_requests` row is spoken for. Counting it as stock means the last
+  igniter, already promised to a tech, reads as one in hand and **the reorder
+  never fires** — which is exactly the case this feature exists for.
+  `available = on_hand − held` is the number `describeParts` already shows, and
+  the table prints "3 on the shelf, 1 promised" so the difference is never a
+  silent one.
+- **AT the level counts as below it.** The level is what you want LEFT when the
+  order lands, not the point at which you are out.
+- **NULL is not zero, and a part with no level is UNWATCHED.** It can never reach
+  the buy list however empty the shelf gets, and it is counted and listed rather
+  than hidden — on the day this shipped that is every part there is. Zero would
+  say every part is fine; one would say every part is urgent. Same rule as
+  `suppliers.terms_days` and `expenses.tax`. **A level of 0 is nonetheless a real
+  setting** ("buy when it runs out"), which is why clearing one has to write NULL
+  rather than 0.
+- **Already on order comes OFF the buy list and into its own group.** A list that
+  keeps shouting about something ordered last week is a list people stop reading;
+  a part that silently vanished would be worse, because "did somebody order it"
+  is the first question asked about a part that is out. This is what
+  `purchase_order_lines.part_id` is for — additive, so every existing line stays
+  an appliance line. Only the quantity still OWED counts, and a cancelled order
+  counts for nothing.
+- **Usage is measured from TAKES, and `adjust` is not a take.** A correction to a
+  miscount is not demand; counting it would order more of something nobody used.
+  `harvest` is stock arriving, not leaving.
+- **A part nobody has ever used has NO rate and NO days of cover — null, never
+  zero and never Infinity.** "We take two a week" and "we have never taken one"
+  are different facts, and only the second means the level is untested.
+- **A SUGGESTED level needs BOTH halves measured**: a rate off real takes and a
+  lead time off real deliveries (`supplierLeadTimes` — ordered date to FIRST
+  receipt, per supplier, from their own purchase orders). With either missing it
+  says which one rather than printing a number. Same rule as `mileageReport`'s
+  L/100km: a figure built on one real half looks authoritative and is invented,
+  and somebody would set a shelf level from it.
+- **Nothing orders anything.** It proposes; a person raises the purchase order.
+- **With no quantity stated it refills to TWICE the level**, because refilling to
+  the level puts the part straight back on this list the same afternoon.
+
+**Migration 0010 carries `parts`, `part_moves` and `part_requests` VERBATIM**
+before altering them — the same 0008 trap, since all three are created by
+`ensurePartSchema()` at runtime and by no migration, so the ALTERs would have
+had nothing to alter on a database built from migrations alone. Three more of
+the 27 runtime-DDL tables are now covered. It is IF NOT EXISTS and a no-op
+against the live database.
+
+**Not built:** reorder points on APPLIANCES (`products` is rewritten wholesale by
+every sync, so a level would have to live in its own table, and one-of-a-kind
+stock does not reorder anyway), anything that emails a supplier, and raising the
+purchase order from this screen — see the gap below.
+
+**Raising the order** is on the On order panel — see "Raising one" above. Until
+2026-09-28 it did not exist anywhere, which meant this list could not close its
+own loop; a part below its level is now one of the lines that form offers, with
+the quantity already worked out.
+
 ## RS Manager — the crew's AI assistant (added 2026-09-17)
 `lib/assistant/` → `POST/GET /api/assistant` (signed-in drivers + staff, cookie
 OR `Authorization: Bearer <session token>` for the native app) and
@@ -3561,6 +3628,36 @@ exist to paper over an ordering record that did not exist.
   decision somebody made.
 - **LATE only applies to something still owed.** A fully received order whose
   date has passed is not late; it arrived.
+### Raising one (added 2026-09-28)
+`components/PurchaseOrderForm.jsx`, the **+ Raise a purchase order** button on
+the On order panel, `GET /api/admin/purchase-orders?view=setup`.
+
+**Until this shipped a purchase order could not be raised from any screen.**
+`createPurchaseOrder` and `cancelPurchaseOrder` had been here since the ordering
+feature went in, `/api/admin/purchase-orders` accepted both, and **nothing in
+`components/` called either** — so On order rendered empty on the live site,
+receiving had nothing to receive against, three-way matching had no orders to
+match, and the whole feature was reachable only by posting JSON by hand. The
+lesson is worth more than the fix: **a library function and an API case are not
+a feature.** Check something on the screen calls them.
+
+- **A known supplier is PICKED (a datalist), a new name is TYPED, and both
+  work.** Picking one attaches the order to the supplier master, so it inherits
+  their terms and counts towards their on-time record. A name that matches
+  nothing still raises the order and turns up under "names nobody has
+  identified" — refusing would mean a delivery could not be recorded because
+  somebody new had not been added yet, which is how people go back to paper.
+- **A line may name a PART instead of an appliance** (`part_id`, migration
+  0010). `createPurchaseOrder` treats a line as usable if it carries a make, a
+  model, a description **or** a part id — testing only the appliance fields
+  silently dropped every line the reorder list raises. The parts offered are the
+  ones currently below their level, with the quantity already worked out.
+- **Cancel is on the row**, behind a confirm that says what it does: anything
+  already received stays booked in. `cancelPurchaseOrder` had the same problem
+  as create — callable, and called by nothing.
+- Raising an order moves no stock and the form says so. The appliances reach the
+  tracker, priced from the order, when they are **received**.
+
 ### Three-way matching (added 2026-09-28)
 `matchPurchaseOrder` / `linkInvoiceToPurchaseOrder` /
 `suggestPurchaseOrderForInvoice` / `matchingGaps`, migration 0008.
@@ -3649,6 +3746,39 @@ could say what was owed and never when.
   private `keyOf`, and folding case and punctuation the same way in both places
   is the only reason the By-vendor tab and this agree about who a vendor is.
 
+### What we spend with them (added 2026-09-28)
+`supplierSpend` in `lib/suppliers.js`, `components/SupplierSpend.jsx`,
+`/admin/reports/suppliers` (ADMIN), `GET /api/admin/suppliers?view=spend`.
+
+"What did we spend with SecondShop in August against September" **had no answer
+on any screen.** Nothing anywhere grouped `purchase_invoices` by period —
+`date_trunc` appears in analytics, pnl, books, payroll and dispatch-money and in
+none of the purchasing code — so the only supplier figure in the building was
+one twelve-month ordered total, which is what we agreed to buy rather than what
+we were charged.
+
+- **It reads INVOICES, not orders.** An order is an intention; an invoice is the
+  money. An order that was never filled is not spend.
+- **The SUBTOTAL, never the total.** The HST on top is reclaimed as an input tax
+  credit rather than spent — the same rule the three-way match and the P&L
+  follow. Including it overstates every supplier by 13%.
+- **Dated to the INVOICE date**, so a correction lands in the month of the
+  purchase and not the month somebody typed it in.
+- **A VENDOR NOBODY HAS IDENTIFIED IS STILL SPEND.** Rows with no `supplier_id`
+  are grouped under the name as typed and flagged, never dropped — otherwise the
+  report quietly understates the total by however much of the unknown-names list
+  is outstanding, and the total is the one number nobody can check. The panel
+  says what that unidentified share is worth, which is what makes answering the
+  list feel worth doing.
+- **A quiet month is a column of zero, not a missing column** — same rule as the
+  HST panel's quarters. Periods come from the calendar AND from the rows, because
+  a week boundary computed in JS and one computed by `date_trunc` can disagree,
+  and money landing in a column the report did not draw would vanish from the
+  table while staying in the total.
+
+The page carries the same `Suppliers` component Operations does — one component,
+so the two can never disagree — with this report above it.
+
 ### Terms, and why blank is not zero
 `payablesAging` computes the due date **in SQL** from `suppliers.terms_days`,
 and the buckets are `over30 / overdue / week / later / unknown`.
@@ -3672,6 +3802,45 @@ and the buckets are `over30 / overdue / week / later / unknown`.
 **Not built yet:** a supplier's own price list, minimum order quantities, and
 anything that emails them. The performance figure counts orders, not lines — a
 supplier who is reliably late on one SKU reads as on time.
+
+## Every report has to be REACHABLE (added 2026-09-28)
+`lib/reports.js` + `/admin/reports`, the **Reports** tab in `AdminNav`.
+
+The owner's rule, in his words: *"Any ERP reporting we have needs to be within
+dashboards, or be accessible with the click of a few buttons. I don't want to
+have to enter a URL each time. Nor would any client we onboard."*
+
+Two things were wrong, and both were invisible because the code was all present
+and correct:
+
+- **`/admin/reports/pnl`, `/admin/reports/ledger` and `/admin/financial` were in
+  the ACCOUNTANT's nav and in nobody else's.** `AdminNav`'s `booksOnly` branch
+  listed them; the owner's `all` array did not. So the person whose business
+  they describe could only open the P&L by typing the URL.
+- **Four fully-built dashboards were flagged `built: false`** in
+  `lib/dashboards.js` and rendered greyed out with a **SOON** tag.
+  `/admin/fulfilment`, `/admin/customers`, `/admin/financial` and
+  `/admin/marketing` each have a real page calling a real function in
+  `lib/analytics.js` — `fulfilmentDashboard`, `customersDashboard`,
+  `financialDashboard`, `marketingDashboard`, all complete. The link worked; the
+  tag told everybody not to bother clicking it. The flag is kept for the next
+  dashboard, but **a page that renders real data must never carry it.**
+
+**A HUB, not more tabs.** `AdminNav` was already sixteen items and four more
+would make it unreadable, which is its own way of hiding something. A report is
+something you go LOOKING for rather than work in all day, so one tab leads to a
+page of cards: one click to the hub, one to the report.
+
+- **Each card says WHAT QUESTION IT ANSWERS**, not what the report is called.
+  "Profit & loss" is a name; "did we make money this period, and where did it
+  go?" is why somebody clicks. This matters most for the client demo — a person
+  who has never seen the system should be able to find the answer without being
+  taught the vocabulary.
+- `/admin/reports` used to be a **redirect** to the dashboard, left behind when
+  the Reports tab was folded into it. It is a real page again.
+- **`lib/reports.js` is the list, and a new report belongs in it.** A report
+  added to a route and not to that file is reachable only by URL, which is the
+  exact failure this section exists to stop.
 
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
