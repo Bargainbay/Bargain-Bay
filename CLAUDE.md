@@ -3609,6 +3609,70 @@ characters off it and comparing silently answers false for everything. It put
 every overdue CRM follow-up in the "today" bucket on 2026-09-25 and made every
 late purchase order read as on-time three days later. **Compare in SQL.**
 
+## Who we buy from — the supplier master (added 2026-09-28)
+`lib/suppliers.js`, tables `suppliers` / `supplier_aliases` (migration 0009),
+**Suppliers** on `/admin/operations`, `/api/admin/suppliers` (ADMIN — every
+figure here is cost- or payables-derived).
+
+A supplier was a **string typed by hand** on every path that touches one. So
+"SecondShop", "Second Shop" and "secondshop " were three suppliers on a report
+and one company in the driveway, and there was nowhere at all to record their
+terms, who to ring, or whether they turn up when they said they would. The
+consequence that costs money: **with no terms there is no due date, so there was
+no such thing as an overdue supplier invoice** — the payables side of the ledger
+could say what was owed and never when.
+
+- **THE NAME STILL GOVERNS.** `supplier_id` is additive on `purchase_orders` and
+  `purchase_invoices`, and the vendor NAME is still written down beside it. The
+  master tracker is the source of truth for stock, is not in this repo, and its
+  Vendor column cannot carry a foreign key. Same shape as customers, where the
+  email string is still on the order.
+- **A name NEVER creates a supplier**, exactly like `client-match` and for the
+  same reason: a list full of typos is a list nobody can raise a purchase order
+  from. `resolveSupplier` returns null, `linkByVendorName` leaves `supplier_id`
+  null, and the name turns up on **`unknownVendorNames`** — the working list,
+  where each row is one of two answers (a new supplier, or another name for one
+  we have).
+- **Answering fixes the HISTORY too.** Creating a supplier or recording an alias
+  runs `relinkAll` in the same request, so the orders and invoices already
+  filed under that spelling come with it. A supplier added today is no use if
+  four years of their paperwork stays unattached, and nobody would think to
+  press a second button for it.
+- **`createSupplier` RETURNS an existing supplier rather than erroring.** The
+  caller is usually a PO form, and refusing sends somebody off to work out which
+  of two near-identical names is the real one. `created: false` says which
+  happened.
+- **An alias is globally unique** (`supplier_aliases.alias_key`), and claiming
+  one that belongs to another supplier is refused by name. Two suppliers
+  answering to one spelling is worse than an unanswered row.
+- `supplierKey` is in `lib/constants.js` — it was `lib/stock-vendors.js`'s
+  private `keyOf`, and folding case and punctuation the same way in both places
+  is the only reason the By-vendor tab and this agree about who a vendor is.
+
+### Terms, and why blank is not zero
+`payablesAging` computes the due date **in SQL** from `suppliers.terms_days`,
+and the buckets are `over30 / overdue / week / later / unknown`.
+
+- **NULL TERMS ARE REPORTED AS UNKNOWN, never assumed to be due on receipt.**
+  Assuming zero would show every unpaid invoice from a supplier nobody has set
+  terms for as overdue, which is the fastest way to make an aging report
+  ignored. The screen carries the unknown bucket with its own total and says in
+  as many words that these are *not* overdue.
+- **The buckets measure days past DUE, not days since the invoice.** An invoice
+  raised 45 days ago on 30-day terms is fifteen days past due — `overdue`, not
+  `over30`. That is an easy thing to misread and it is what the test fixture
+  got wrong first; the test data now spells out the resulting position per row.
+- Everything on the list is an unpaid purchase invoice (`paid_at IS NULL`), so
+  marking one paid on the ledger takes it off with no second step.
+- **`onTimePct` is `null`, not 0, when there is nothing to measure.** On-time is
+  counted only over orders carrying BOTH an expected date and a receipt; a
+  supplier whose orders have no dates on them has no record, and a percentage
+  computed from nothing looks like a fact. The screen prints "no dated orders".
+
+**Not built yet:** a supplier's own price list, minimum order quantities, and
+anything that emails them. The performance figure counts orders, not lines — a
+supplier who is reliably late on one SKU reads as on time.
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
