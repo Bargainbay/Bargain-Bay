@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import {
   createSupplier, updateSupplier, addSupplierAlias, listSuppliers,
-  supplierPerformance, payablesAging, unknownVendorNames, relinkAll
+  supplierPerformance, payablesAging, unknownVendorNames, relinkAll, supplierSpend
 } from '../../../../lib/suppliers';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +30,10 @@ export async function GET(req) {
       return NextResponse.json(await payablesAging());
     case 'performance':
       return NextResponse.json({ suppliers: await supplierPerformance({ days: sp.get('days') }) });
+    case 'spend':
+      return NextResponse.json(await supplierSpend({
+        groupBy: sp.get('groupBy') || 'month', periods: sp.get('periods')
+      }));
     case 'unknown':
       return NextResponse.json({ names: await unknownVendorNames({}) });
     default:
