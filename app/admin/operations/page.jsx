@@ -12,6 +12,7 @@ import OpsFoldBar from '../../../components/OpsFoldBar';
 import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
 import StaffAccess from '../../../components/StaffAccess';
+import PurchaseOrders from '../../../components/PurchaseOrders';
 import AdminClearance from '../AdminClearance';
 import AdminMembers from '../AdminMembers';
 import AdminReconcile from '../AdminReconcile';
@@ -120,6 +121,13 @@ export default async function OperationsPage() {
       {/* Both halves of intake, so the owner's fold still holds everything.
           The vendor drop-off form is also its own staff tab at /admin/intake —
           one component, so the two can't drift. */}
+      {/* Before intake, because an order is what intake is receiving AGAINST —
+          and because "what have we ordered that has not arrived" is the
+          question this screen could not answer at all. */}
+      <OpsSection id="on-order" title="On order">
+        <PurchaseOrders />
+      </OpsSection>
+
       <OpsSection id="intake" title="Inventory intake">
         <VendorIntake />
         <AdminIntake />
