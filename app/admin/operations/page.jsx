@@ -13,7 +13,6 @@ import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
 import StaffAccess from '../../../components/StaffAccess';
 import PurchaseOrders from '../../../components/PurchaseOrders';
-import Suppliers from '../../../components/Suppliers';
 import AdminClearance from '../AdminClearance';
 import AdminMembers from '../AdminMembers';
 import AdminReconcile from '../AdminReconcile';
@@ -129,11 +128,16 @@ export default async function OperationsPage() {
         <PurchaseOrders />
       </OpsSection>
 
-      {/* Straight after the orders, because it answers the other half of the
-          same question: the order says what is coming, this says who it is
-          coming from, what we owe them and when it falls due. */}
+      {/* Suppliers has its own page now (/admin/suppliers). It used to be this
+          fold AND a "By vendor" tab on the warehouse page — two pages for one
+          subject, neither aware of the other. This stays as a pointer rather
+          than a second copy: rendering the panel in both places is how they
+          would drift, and the page has tabs this fold cannot hold. */}
       <OpsSection id="suppliers" title="Suppliers">
-        <Suppliers />
+        <p className="hint" style={{ margin: 0 }}>
+          Suppliers moved to <a href="/admin/suppliers"><b>its own page</b></a> — their stock, who to
+          ring, their terms, what we owe them and what we have spent, all in one place.
+        </p>
       </OpsSection>
 
       <OpsSection id="intake" title="Inventory intake">

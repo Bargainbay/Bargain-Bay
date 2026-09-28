@@ -5,6 +5,7 @@
 // CLAUDE.md draws everywhere else — the customer's sale is staff, the
 // business's books are the owner's.
 import { NextResponse } from 'next/server';
+import { explainDbError } from '../../../../lib/migrate';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import {
   createSupplier, updateSupplier, addSupplierAlias, listSuppliers,
@@ -76,6 +77,6 @@ export async function POST(req) {
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
     }
   } catch (e) {
-    return NextResponse.json({ error: e?.message || 'That did not work.' }, { status: 400 });
+    return NextResponse.json({ error: explainDbError(e) }, { status: 400 });
   }
 }
