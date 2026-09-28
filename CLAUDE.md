@@ -3523,6 +3523,56 @@ mistakes it for configuration. The alternative was threading an optional
 `client` through every function in every module, which is a large change to
 production code made entirely for its tests.
 
+## Purchase orders — what we ORDERED (added 2026-09-28)
+`lib/purchase-orders.js`, tables `purchase_orders` / `purchase_order_lines` /
+`purchase_order_receipts` (migration 0007), **On order** on
+`/admin/operations`, `/api/admin/purchase-orders` (ADMIN — a PO carries cost).
+
+Stock used to enter the system only when a supplier INVOICE was uploaded. There
+was no record of what had been ordered, from whom, at what price, or when it was
+due — so **nothing could be chased, nothing was ever late, and three-way
+matching was impossible.**
+
+That gap is what produced the 2026-09-17 mess: 64 of the 114 appliances RS Ops
+held were not on the tracker, because nobody had uploaded the invoices that would
+have put them there; they sold anyway on typed lines, so nothing marked them
+sold. The NEEDS INVOICE rows, the fill requests and the Stock gaps screen all
+exist to paper over an ordering record that did not exist.
+
+**An appliance now exists in the system from the moment it is ORDERED.**
+
+- **A received unit arrives WITH A COST**, taken from the PO line, so it is not
+  a NEEDS INVOICE row waiting on an admin to approve a fill request. That is the
+  whole gain over the old flow.
+- **The supplier's own order number names the tracker lot**, so when their
+  invoice turns up later it lands on the lot that is already there rather than
+  opening a second one. Same rule as `lotForInvoice` — the owner does not want a
+  lot renamed.
+- **THE TRACKER APPEND HAPPENS INSIDE THE TRANSACTION.** A refused write (a
+  duplicate SKU, a staging deployment, missing credentials) leaves NO receipt
+  behind. The reverse order would record a receipt for stock that is not on the
+  tracker — the exact invisibility this feature exists to end.
+- **Receipts are cumulative and OVER-RECEIPT IS ALLOWED**, and visible. A
+  supplier sends what they have and the rest follows; refusing an over-ship
+  would leave an appliance that is physically here unbooked, which is the
+  original sin.
+- **Status is DERIVED from the lines**, never stored — same rule as a part's
+  on-hand and a unit's location. `cancelled` is the exception, because that IS a
+  decision somebody made.
+- **LATE only applies to something still owed.** A fully received order whose
+  date has passed is not late; it arrived.
+- **Not built yet:** three-way matching against `purchase_invoices` (the
+  invoice still records only a header — there is no line-item table), and
+  nothing yet retires a NEEDS INVOICE row when a PO receipt would have covered
+  it.
+
+**LANDMINE, and I walked into it twice in one week: never compare dates in JS
+on this boundary.** The driver returns a `date` column as a Date object and
+`String(thatDate)` is `"Mon Sep 23 2026 …"`, not an ISO date — so slicing ten
+characters off it and comparing silently answers false for everything. It put
+every overdue CRM follow-up in the "today" bucket on 2026-09-25 and made every
+late purchase order read as on-time three days later. **Compare in SQL.**
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.
