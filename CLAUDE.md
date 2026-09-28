@@ -3337,6 +3337,45 @@ been passing `email: email || null` and silently creating no customer at all.
   Making orders email-optional is a much larger blast radius — checkout,
   invoices, order emails, analytics, the fraud checks — and is its own job.
 
+### Quotes expire, and say why they were lost (added 2026-09-28)
+`expireStaleQuotes` / `setQuoteLostReason` / `quoteOutcomes` in `lib/quotes.js`,
+`QUOTE_LOST_REASONS` in `lib/constants.js`, migration 0006, the **Won & lost**
+panel on `/admin/quotes`.
+
+**`expired` had been in the status CHECK and in the conversion logic since
+quotes were built, and NOTHING HAD EVER SET IT.** Quotes sat `open` forever;
+expiry was enforced only at the moment a customer tried to accept one — by which
+point they have been told a price that is no longer offered. Any figure for
+"open quote value" counted every quote ever written, and the list grew
+monotonically.
+
+- **The sweep runs in `runNightlyOps`**, not as its own `vercel.json` entry.
+  It is cheap housekeeping, and CLAUDE.md's rule about separate scheduling is
+  about the three jobs that each need their own time budget.
+- **A quote due TODAY is still live.** Expiring on the day would take a price
+  off the table while the customer is still looking at the email offering it.
+- **A quote with NO expiry date is LEFT ALONE.** Somebody wrote it deliberately
+  without one; guessing a date would close deals that are still live.
+- **Expiring raises an UNASSIGNED follow-up** (2.4). A quote going stale is
+  exactly the moment to ring somebody, and unowned means it shows on everyone's
+  day rather than nobody's — the rep who wrote it may be off. A quote for
+  somebody not on file still expires: the follow-up is a nicety, expiring the
+  quote is the job.
+- **The reason is recorded SEPARATELY from closing the quote**, because the
+  answer arrives later than the decision — the sweep cannot ask anybody
+  anything. `voidQuote` can carry one inline when a person is there.
+- **A fixed list** (`QUOTE_LOST_REASONS`), same reasoning as `LEAD_SOURCES` and
+  `jobs.services`: one reason spelled four ways is four buckets. `no_answer` is
+  deliberately separate from `changed_mind` — a customer who went quiet and one
+  who said no are different failures, and only the first is something the shop
+  can act on.
+- **UNRECORDED IS A ROW, NOT A GAP**, exactly as the lead-source panel does it.
+  On the day this shipped every lost quote is unrecorded, and a report showing
+  only the answered ones would read as a complete picture of the year from its
+  first hour. Every reason is listed even at zero for the same reason.
+- `winRate` is **null** rather than 0 when nothing has closed: no closed quotes
+  is not a 0% win rate.
+
 ### What was said, and what happens next (added 2026-09-25)
 `lib/crm.js`, tables `customer_activity` / `customer_tasks` (migration 0005),
 `components/CustomerCrm.jsx` on a customer's page, `components/MyDay.jsx` on the

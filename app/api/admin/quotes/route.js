@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { createAndSendQuote, updateQuote, listQuotes, convertQuoteToInvoice, voidQuote } from '../../../../lib/quotes';
+import {
+  createAndSendQuote, updateQuote, listQuotes, convertQuoteToInvoice, voidQuote,
+  setQuoteLostReason, quoteOutcomes
+} from '../../../../lib/quotes';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -21,10 +24,13 @@ function noDb() {
   return NextResponse.json({ error: 'Database not configured (set POSTGRES_URL).' }, { status: 503 });
 }
 
-export async function GET() {
+export async function GET(req) {
   if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return NextResponse.json({ quotes: [] });
   try {
+    if (new URL(req.url).searchParams.get('view') === 'outcomes') {
+      return NextResponse.json({ outcomes: await quoteOutcomes({}) });
+    }
     return NextResponse.json({ quotes: await listQuotes(25) });
   } catch (e) {
     return NextResponse.json({ quotes: [], error: e?.message || 'Could not load quotes.' }, { status: 200 });
@@ -79,8 +85,20 @@ export async function PATCH(req) {
   if (!quoteId) return NextResponse.json({ error: 'quoteId is required.' }, { status: 400 });
 
   try {
+    if (body.action === 'lost') {
+      // Recorded separately from closing the quote, because the answer usually
+      // arrives later than the decision — the nightly sweep expires a quote and
+      // cannot ask anybody anything.
+      const s2 = await getSession();
+      return NextResponse.json(await setQuoteLostReason(quoteId, {
+        reason: body.reason || null, note: body.note || null, by: s2?.email || null
+      }));
+    }
     if (body.action === 'void') {
-      const voided = await voidQuote(quoteId);
+      const s2 = await getSession();
+      const voided = await voidQuote(quoteId, {
+        reason: body.reason || null, note: body.note || null, by: s2?.email || null
+      });
       if (!voided) return NextResponse.json({ error: 'Only an open quote can be voided.' }, { status: 409 });
       return NextResponse.json({ ok: true, quote: { id: voided.id, number: voided.number, status: 'void' } });
     }

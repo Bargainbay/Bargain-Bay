@@ -3,6 +3,7 @@ import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { money } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
 import { listQuotes, getQuoteForBuilder } from '../../../lib/quotes';
+import QuoteOutcomes from '../../../components/QuoteOutcomes';
 import { listLeadSenders } from '../../../lib/invoices';
 import { contactsForAutofill } from '../../../lib/customers';
 import { getAll } from '../../../lib/inventory';
@@ -69,6 +70,9 @@ export default async function QuotesPage({ searchParams }) {
     <div>
       <AdminNav active="quotes" salesOnly={!isAdmin(session)} />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Quotes</h1>
+
+      {/* Why deals are lost, which this list could never answer before. */}
+      <QuoteOutcomes />
 
       {!hasDb() && (
         <div className="error-box">Database isn&apos;t configured (set <code>POSTGRES_URL</code>). Quotes need it.</div>
