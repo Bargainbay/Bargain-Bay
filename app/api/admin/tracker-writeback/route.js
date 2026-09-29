@@ -5,7 +5,7 @@
 // building block for the nightly Sold catch-up sweep.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { writeSoldRows, writeUnsoldRows, setTrackerCost, sheetsConfigured } from '../../../../lib/sheets';
+import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, sheetsConfigured } from '../../../../lib/sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -21,6 +21,12 @@ export async function POST(req) {
   // and Date Sold cleared. Accepts ['SKU', ...] or [{ sku }, ...].
   const unsold = (Array.isArray(b.unsold) ? b.unsold : []).map((u) => (typeof u === 'string' ? u : u?.sku));
   const costs = Array.isArray(b.costs) ? b.costs : [];
+  // Which purchase invoice a unit came in on: [{ sku, invoice, lot?, vendor? }].
+  // For a lot RS Ops booked in by hand whose paperwork turned up later — nothing
+  // else can write that cell, and until it is written the invoice's own cost
+  // check has no units to check. `force` allows overwriting a cell that already
+  // names a different invoice; without it, those rows are refused and named.
+  const invoices = Array.isArray(b.invoices) ? b.invoices : [];
   try {
     const soldRes = sold.length ? await writeSoldRows(sold) : { written: 0 };
     const unsoldRes = unsold.length ? await writeUnsoldRows(unsold) : { written: 0, missing: [] };
@@ -29,7 +35,11 @@ export async function POST(req) {
       if (!c || !c.sku || c.amount == null) continue;
       costRes.push(await setTrackerCost(String(c.sku), Number(c.amount)));
     }
-    return NextResponse.json({ ok: true, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written, unsoldMissing: unsoldRes.missing, costsUpdated: costRes });
+    const invoiceRes = invoices.length ? await setTrackerInvoice(invoices, { force: !!b.force }) : null;
+    return NextResponse.json({
+      ok: true, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
+      unsoldMissing: unsoldRes.missing, costsUpdated: costRes, invoices: invoiceRes
+    });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Write-back failed.' }, { status: 500 });
   }

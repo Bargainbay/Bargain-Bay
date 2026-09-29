@@ -502,6 +502,34 @@ still in cleaning or repair — most of them — could only be typed.
   - `recordPurchaseInvoice` is an upsert on vendor + invoice number, so
     recording twice CORRECTS rather than claiming the credit twice. The screen
     says when it corrected an existing record.
+- **THE INVOICE CELL IS CORRECTABLE** (added 2026-09-29). `setTrackerInvoice`
+  (lib/sheets.js) + `invoices: [{ sku, invoice, lot?, vendor? }]` on
+  `POST /api/admin/tracker-writeback`.
+
+  Nothing could write that cell. `fillWaitingRows` only ever touches a row that
+  still says NEEDS INVOICE — the row nobody has told anything. A lot RS Ops
+  books in by hand carries whatever the floor typed in the Invoice column, so
+  when the paperwork arrives days later there was no way to record it, and
+  **until that cell names the invoice the invoice's own cost check has nothing
+  to check**: `unitsOnInvoice` counted ZERO units against the $15,000
+  Bertazzoni/Fulgor invoice (PS-INV117078, 21 rows booked as `SS-12345678`), so
+  `invoiceCostProblem` stayed silent on a lot whose costs do not add up.
+  - **It moves no money.** Cost, retail, condition and status are not writable
+    here, and a field left out is left ALONE, never blanked — so a mistaken call
+    can never empty the row it was pointed at.
+  - **A row already naming a DIFFERENT invoice is REFUSED and named**
+    (`invoiceCellBlocked`, in `lib/stock-match.js` with the other pure
+    predicates). Overwriting it moves one delivery's stock onto another's
+    paperwork silently, which is precisely how the S-ORD115612 / PS-INV116968
+    tangle happened. A note, a filename, `CONSIGNMENT` or a NEEDS INVOICE
+    placeholder is not a claim on the row and is replaceable. `force: true`
+    overrides, per call.
+  - Writing the same number twice is free, for the same reason recording an
+    invoice twice corrects rather than double-claiming.
+  - **It does NOT rename the SKU.** The lot cell and the Item ID are different
+    things: RS Ops' photo blobs are named after the SKU (418 files on that one
+    lot), so re-keying orphans every photograph. Renaming a LOT is a cell;
+    renaming a SKU is a migration.
 - **Model matching tolerates exactly three things** (`modelsMatch`): case and
   punctuation, O/0 and I/1, and a revision suffix of ≤3 characters on a model of
   ≥7. GRFS2853AF ≠ GRFN2853AF and MLTW ≠ MLTE on purpose.
