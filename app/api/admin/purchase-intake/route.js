@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { extractPurchaseInvoice } from '../../../../lib/purchase-intake';
 import { addIntakeLines, lotForInvoice } from '../../../../lib/intake';
-import { matchInvoiceLines, requestFills } from '../../../../lib/stock-reconcile';
+import { matchInvoiceLines, requestFills, unitsOnInvoice } from '../../../../lib/stock-reconcile';
+import { invoiceCostProblem } from '../../../../lib/stock-match';
 import { recordPurchaseInvoice } from '../../../../lib/finance';
 import { pushManifestToRsOps } from '../../../../lib/rsops-push';
 
@@ -45,6 +46,54 @@ export async function POST(req) {
     } catch (e) {
       // A failed lookup must not stop an invoice going in; the screen just shows no matches.
       return NextResponse.json({ ok: true, matches: [], error: e?.message || 'Could not check for units already booked in.' });
+    }
+  }
+
+  // The stock this invoice bought is already on the tracker — what did it cost?
+  // Read-only: the screen asks as the invoice number is typed, so the owner sees
+  // what they are about to record the tax against.
+  if (body.action === 'invoice_units') {
+    try {
+      const found = await unitsOnInvoice(body.invoice);
+      return NextResponse.json({
+        ok: true, ...found,
+        problem: invoiceCostProblem(found.costTotal, body.subtotal, { count: found.count })
+      });
+    } catch (e) {
+      return NextResponse.json({ error: e?.message || 'Could not read the tracker.' }, { status: 502 });
+    }
+  }
+
+  // Record ONLY the invoice's own figures — no units, no tracker write.
+  //
+  // For an invoice whose appliances RS Ops already booked in by hand. By the time
+  // the paperwork arrives those rows no longer say NEEDS INVOICE, so the upload
+  // path cannot match them and committing would add every appliance twice. That
+  // left the tax uncapturable, and an unclaimed input tax credit is money.
+  //
+  // `units` is COUNTED from the tracker rather than taken from the caller: it is
+  // a fact about what is here, and the point of this path is that nobody is
+  // typing the units in.
+  if (body.action === 'record_header') {
+    const tax = Number(body.tax);
+    if (!Number.isFinite(tax) || tax < 0) {
+      return NextResponse.json({ error: 'Enter the tax from the invoice, or 0 if it charged none.' }, { status: 400 });
+    }
+    try {
+      const found = await unitsOnInvoice(body.invoice).catch(() => ({ count: 0, costTotal: 0, units: [] }));
+      const session = await getSession();
+      const saved = await recordPurchaseInvoice({
+        vendor: body.vendor, invoiceNumber: body.invoice, invoiceDate: body.date,
+        subtotal: body.subtotal, tax, total: body.total,
+        units: found.count, note: body.note, createdBy: session?.email
+      });
+      return NextResponse.json({
+        ok: true, tax: Math.round(tax * 100) / 100, taxUpdated: saved.updated,
+        units: found.count, costTotal: found.costTotal, skus: found.units.map((u) => u.sku),
+        problem: invoiceCostProblem(found.costTotal, body.subtotal, { count: found.count })
+      });
+    } catch (e) {
+      return NextResponse.json({ error: e?.message || 'Could not record that invoice.' }, { status: 400 });
     }
   }
 
