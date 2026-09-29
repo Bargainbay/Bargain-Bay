@@ -469,6 +469,39 @@ still in cleaning or repair — most of them — could only be typed.
     says so on screen, rather than holding appliances nowhere. **A row whose lot is named after a
   DIFFERENT invoice is never offered** (`pointsElsewhere`) — RS Ops typing
   MRU217BST for MRU21C7BST put another delivery's fridge at the top of the list.
+- **An invoice whose stock is ALREADY on the tracker records its HEADER ONLY**
+  (added 2026-09-29). `unitsOnInvoice` + `POST /api/admin/purchase-intake`
+  actions `invoice_units` (read-only) and `record_header`, rendered by the
+  "Record an invoice on its own" panel under the upload.
+
+  It exists because the normal path cannot reach that invoice. RS Ops books a
+  delivery in by hand, the paperwork arrives days later, and by then those rows
+  no longer say NEEDS INVOICE — so `matchInvoiceLines` matches nothing and a
+  commit would add every appliance a SECOND time. That left the invoice's HST
+  with nowhere to go, and an unclaimed input tax credit is money. It was $902.60
+  across five invoices on 2026-09-28.
+
+  - **It writes to `purchase_invoices` and nothing else.** No units, no tracker
+    write, no manifest to RS Ops. The tracker is READ, never touched.
+  - **`units` is COUNTED from the tracker, never taken from the caller** — the
+    whole point is that nobody is typing the units in. `sameInvoiceNumber`
+    matches on case and punctuation only, and is deliberately NOT a substring
+    test: "117036" must not claim "PS-INV1170361", and an empty cell must not
+    match an empty query or every blank row joins the first invoice recorded.
+  - **A row still WAITING is excluded**, even though its cell names the invoice
+    ("NEEDS INVOICE (lot name says PS-INV117036)"). It carries no cost, so
+    counting it would drag the reconciliation under the subtotal and make a
+    correct invoice look wrong.
+  - **`invoiceCostProblem` is the check that matters**: SUM(cost of those units)
+    must equal the invoice subtotal, because every one of those costs came off
+    this invoice. It WARNS, never blocks — an invoice can legitimately cover
+    stock that is not all on the tracker. This is the check that catches a
+    wrong cost: on 2026-09-28 a parser wrote each invoice's TAX as its last
+    line's cost on five invoices and every individual figure still looked
+    plausible ($258.08 for a dishwasher). One sum found all five.
+  - `recordPurchaseInvoice` is an upsert on vendor + invoice number, so
+    recording twice CORRECTS rather than claiming the credit twice. The screen
+    says when it corrected an existing record.
 - **Model matching tolerates exactly three things** (`modelsMatch`): case and
   punctuation, O/0 and I/1, and a revision suffix of ≤3 characters on a model of
   ≥7. GRFS2853AF ≠ GRFN2853AF and MLTW ≠ MLTE on purpose.

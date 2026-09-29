@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { HST_RATE, money } from '../lib/constants';
+import { invoiceCostProblem } from '../lib/stock-match';
 
 // Upload a supplier purchase invoice (PDF/image) → AI extracts the units + costs
 // AND the invoice's own tax → review/edit → the units go to the master tracker as
@@ -253,6 +254,141 @@ export default function PurchaseIntake() {
           </div>
         </div>
       )}
+
+      {!items && <HeaderOnly />}
+    </div>
+  );
+}
+
+// ── The stock is already on the tracker ──────────────────────────────────────
+// RS Ops books a delivery in by hand and the supplier's paperwork turns up days
+// later. By then those rows no longer say NEEDS INVOICE, so the upload above
+// can't match them and committing would add every appliance a second time —
+// which left the invoice's TAX with nowhere to go. It is a recoverable credit,
+// so "nowhere to go" means money.
+//
+// This records the invoice and nothing else. It writes no units and does not
+// touch the tracker; it READS the tracker to count what this invoice already
+// bought, and to check that those units' cost adds up to the subtotal being
+// claimed against.
+function HeaderOnly() {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [done, setDone] = useState(null);
+  const [found, setFound] = useState(null);
+  const [head, setHead] = useState({ vendor: '', invoice: '', date: '', subtotal: '', tax: '', total: '' });
+
+  const set = (k, v) => { setHead((h) => ({ ...h, [k]: v })); setDone(null); };
+
+  async function look() {
+    const invoice = head.invoice.trim();
+    if (!invoice) { setFound(null); return; }
+    setBusy('look'); setErr('');
+    try {
+      const res = await fetch('/api/admin/purchase-intake', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'invoice_units', invoice, subtotal: head.subtotal })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not read the tracker.'); setFound(null); return; }
+      setFound(d);
+    } catch {
+      setErr('Network error.'); setFound(null);
+    } finally { setBusy(''); }
+  }
+
+  async function save() {
+    setBusy('save'); setErr(''); setDone(null);
+    try {
+      const res = await fetch('/api/admin/purchase-intake', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'record_header', ...head })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not record that invoice.'); return; }
+      setDone(d);
+      setHead({ vendor: '', invoice: '', date: '', subtotal: '', tax: '', total: '' });
+      setFound(null);
+    } catch {
+      setErr('Network error.');
+    } finally { setBusy(''); }
+  }
+
+  // The cost check uses whatever the lookup last returned, re-run against the
+  // subtotal as it is typed so the warning appears while the number is still in
+  // front of them rather than after saving.
+  const problem = found && found.count && head.subtotal !== ''
+    ? invoiceCostProblem(found.costTotal, head.subtotal, { count: found.count })
+    : '';
+  const ready = head.invoice.trim() && /^\d{4}-\d{2}-\d{2}$/.test(head.date) && head.tax !== '';
+
+  if (!open) {
+    return (
+      <p className="hint" style={{ marginTop: 14 }}>
+        Already put this delivery on the tracker by hand?{' '}
+        <button type="button" className="linkish" onClick={() => setOpen(true)}>
+          Record the invoice on its own
+        </button>{' '}
+        — no units added, just its HST.
+      </p>
+    );
+  }
+
+  return (
+    <div className="panel" style={{ marginTop: 14, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <b style={{ fontSize: 14, color: 'var(--charcoal)' }}>Record an invoice whose stock is already here</b>
+        <button type="button" className="linkish" onClick={() => { setOpen(false); setErr(''); setDone(null); }}>close</button>
+      </div>
+      <p className="hint" style={{ marginTop: 6 }}>
+        Adds <b>no units</b> and changes nothing on the tracker. Use it when the appliances were booked in
+        before the paperwork arrived — otherwise upload the invoice above, which adds the stock as well.
+      </p>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+        <label style={{ fontSize: 13 }}>Vendor <input value={head.vendor} onChange={(e) => set('vendor', e.target.value)} placeholder="e.g. SecondShop" /></label>
+        <label style={{ fontSize: 13 }}>Invoice #{' '}
+          <input value={head.invoice} onChange={(e) => set('invoice', e.target.value)} onBlur={look} placeholder="e.g. PS-INV117036" />
+        </label>
+        <label style={{ fontSize: 13 }}>Invoice date <input type="date" max={today()} value={head.date} onChange={(e) => set('date', e.target.value)} /></label>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 8 }}>
+        <label style={{ fontSize: 13 }}>Subtotal <input style={{ width: 110, textAlign: 'right' }} type="number" step="0.01" min="0" value={head.subtotal} onChange={(e) => set('subtotal', e.target.value)} /></label>
+        <label style={{ fontSize: 13 }}>HST / tax <input style={{ width: 110, textAlign: 'right' }} type="number" step="0.01" min="0" value={head.tax} onChange={(e) => set('tax', e.target.value)} placeholder="0.00" /></label>
+        <label style={{ fontSize: 13 }}>Invoice total <input style={{ width: 110, textAlign: 'right' }} type="number" step="0.01" min="0" value={head.total} onChange={(e) => set('total', e.target.value)} /></label>
+        <div style={{ fontSize: 12.5, color: 'var(--muted)', alignSelf: 'center' }}>{taxNote(head)}</div>
+      </div>
+
+      {busy === 'look' && <div className="hint" style={{ marginTop: 8 }}>Checking the tracker…</div>}
+      {found && !busy && (
+        <div className="hint" style={{ marginTop: 8 }}>
+          {found.count
+            ? <>On the tracker for this invoice: <b>{found.count}</b> unit{found.count === 1 ? '' : 's'}, {money(found.costTotal)} of cost.</>
+            : <>No tracker rows name this invoice yet — its HST will still be recorded, against 0 units.</>}
+        </div>
+      )}
+      {problem && <div className="notice-box" style={{ marginTop: 8 }}>⚠ {problem}</div>}
+
+      {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
+      {done && (
+        <div className="notice-box" style={{ marginTop: 10 }}>
+          ✓ {money(done.tax)} recorded as an input tax credit
+          {done.taxUpdated ? ' (this invoice was already on file — its figures were corrected)' : ''}
+          {done.units ? <> against <b>{done.units}</b> unit{done.units === 1 ? '' : 's'} already on the tracker</> : ''}.
+          {' '}It shows on the <a href="/admin/dashboard">dashboard&apos;s HST panel</a> and in the{' '}
+          <a href="/admin/reports/books">records pack</a>. No units were added.
+        </div>
+      )}
+
+      <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button className="btn accent" disabled={!!busy || !ready} onClick={save}>
+          {busy === 'save' ? 'Recording…' : 'Record this invoice'}
+        </button>
+        <button className="btn" disabled={!!busy} onClick={look} title="Re-count the units on this invoice">Re-check tracker</button>
+      </div>
+      {!ready && <div className="hint" style={{ marginTop: 6 }}>Needs an invoice number, a date, and a tax figure (0 if it charged none).</div>}
     </div>
   );
 }
