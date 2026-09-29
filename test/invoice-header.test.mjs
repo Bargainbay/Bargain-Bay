@@ -12,7 +12,7 @@
 // looked plausible — a dishwasher at $258.08 is not obviously wrong. Summing the
 // units against the subtotal catches it in one line.
 import { suite, test, assert, equal } from './_harness.mjs';
-import { sameInvoiceNumber, invoiceCostProblem, isWaitingForInvoice } from '../lib/stock-match.js';
+import { sameInvoiceNumber, invoiceCostProblem, isWaitingForInvoice, invoiceCellBlocked } from '../lib/stock-match.js';
 
 suite('purchase invoice — header-only record');
 
@@ -93,4 +93,38 @@ test('THE MESSAGE SAYS WHAT TO DO ABOUT IT', () => {
   // return, so it has to say that one of the two figures is wrong.
   const msg = invoiceCostProblem(1100.62, 1260.50, { count: 6 });
   assert(/before claiming the tax/i.test(msg), `must warn against claiming: ${msg}`);
+});
+
+suite('purchase invoice — correcting which invoice a unit came in on');
+
+test('A NOTE SOMEBODY TYPED IS NOT A CLAIM ON THE ROW', () => {
+  // The real cell on the 21 Bertazzoni/Fulgor rows, before PS-INV117078 was
+  // known. It names a spreadsheet, not an invoice, so it is replaceable.
+  const cell = 'Supplier list Bertazzoni_Fulgor_Inventory.xlsx (no invoice sent) - cost = list Sell Price';
+  equal(invoiceCellBlocked(cell, 'PS-INV117078'), '', 'a note must not block the correction');
+  equal(invoiceCellBlocked('', 'PS-INV117078'), '', 'an empty cell is writable');
+  equal(invoiceCellBlocked('CONSIGNMENT', 'PS-INV117078'), '', 'a consignment marker is not an invoice number');
+});
+
+test('A ROW NAMING ANOTHER INVOICE IS REFUSED, AND SAYS WHICH', () => {
+  // Overwriting it moves that delivery's stock onto this invoice's paperwork.
+  // This is the S-ORD115612 / PS-INV116968 tangle, and it was silent.
+  const msg = invoiceCellBlocked('PS-INV116968', 'PS-INV117078');
+  assert(msg, 'another invoice must block the write');
+  assert(msg.includes('PS-INV116968'), `it has to name what is there: ${msg}`);
+  assert(invoiceCellBlocked('S-ORD115612', 'PS-INV117078'), 'a sales-order lot counts too');
+});
+
+test('REWRITING A CELL WITH THE SAME NUMBER IS NOT A CONFLICT', () => {
+  // Re-running a correction must be free, the same way recording an invoice
+  // twice corrects rather than claiming the credit twice.
+  equal(invoiceCellBlocked('PS-INV117078', 'PS-INV117078'), '', 'identical is fine');
+  equal(invoiceCellBlocked('ps inv 117078', 'PS-INV117078'), '', 'and so is the same number spelled differently');
+});
+
+test('A ROW STILL WAITING IS WRITABLE EVEN THOUGH IT NAMES AN INVOICE', () => {
+  // "NEEDS INVOICE (lot name says PS-INV117057)" is a HINT about where the row
+  // came from, not a record of which invoice paid for it.
+  equal(invoiceCellBlocked('NEEDS INVOICE (lot name says PS-INV117057)', 'PS-INV117078'), '',
+    'a waiting row is exactly what this is for');
 });
