@@ -5,7 +5,7 @@
 // building block for the nightly Sold catch-up sweep.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, sheetsConfigured } from '../../../../lib/sheets';
+import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, sheetsConfigured } from '../../../../lib/sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -27,6 +27,9 @@ export async function POST(req) {
   // check has no units to check. `force` allows overwriting a cell that already
   // names a different invoice; without it, those rows are refused and named.
   const invoices = Array.isArray(b.invoices) ? b.invoices : [];
+  // What the appliance IS: [{ sku, model?, make?, description?, category?, serial? }].
+  // Identity only — this arm can move no money and can put nothing on sale.
+  const corrections = Array.isArray(b.corrections) ? b.corrections : [];
   try {
     const soldRes = sold.length ? await writeSoldRows(sold) : { written: 0 };
     const unsoldRes = unsold.length ? await writeUnsoldRows(unsold) : { written: 0, missing: [] };
@@ -36,9 +39,10 @@ export async function POST(req) {
       costRes.push(await setTrackerCost(String(c.sku), Number(c.amount)));
     }
     const invoiceRes = invoices.length ? await setTrackerInvoice(invoices, { force: !!b.force }) : null;
+    const correctionRes = corrections.length ? await correctTrackerUnit(corrections) : null;
     return NextResponse.json({
       ok: true, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
-      unsoldMissing: unsoldRes.missing, costsUpdated: costRes, invoices: invoiceRes
+      unsoldMissing: unsoldRes.missing, costsUpdated: costRes, invoices: invoiceRes, corrections: correctionRes
     });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Write-back failed.' }, { status: 500 });
