@@ -12,7 +12,7 @@
 // looked plausible — a dishwasher at $258.08 is not obviously wrong. Summing the
 // units against the subtotal catches it in one line.
 import { suite, test, assert, equal } from './_harness.mjs';
-import { sameInvoiceNumber, invoiceCostProblem, isWaitingForInvoice, invoiceCellBlocked } from '../lib/stock-match.js';
+import { sameInvoiceNumber, invoiceCostProblem, isWaitingForInvoice, invoiceCellBlocked, modelsMatch } from '../lib/stock-match.js';
 
 suite('purchase invoice — header-only record');
 
@@ -127,4 +127,19 @@ test('A ROW STILL WAITING IS WRITABLE EVEN THOUGH IT NAMES AN INVOICE', () => {
   // came from, not a record of which invoice paid for it.
   equal(invoiceCellBlocked('NEEDS INVOICE (lot name says PS-INV117057)', 'PS-INV117078'), '',
     'a waiting row is exactly what this is for');
+});
+
+suite('correcting what an appliance IS');
+
+test('A MODEL TYPO IS WHAT MAKES THE NEXT INVOICE ADD IT TWICE', () => {
+  // The reason a model correction needs a path at all. `modelsMatch` is what
+  // pairs a supplier's line to a row already on the tracker; two rows of the
+  // Bertazzoni lot carried models that do not exist, so nothing could match
+  // them and a later invoice would have booked the same range in again.
+  assert(!modelsMatch('F8PGR366S2', 'F6PDF366S1'), 'a wrong model matches nothing');
+  assert(!modelsMatch('F6PDF366S2', 'F6PDF366S1'), 'S1 and S2 are different ranges, not a revision suffix');
+  assert(!modelsMatch('MRU217BST', 'MRU21C7BST'), 'the PS-INV117057 typo the same way');
+  // And once corrected they pair, which is the whole point of fixing them.
+  assert(modelsMatch('F6PDF366S1', 'F6PDF366S1'), 'the corrected model matches its own invoice line');
+  assert(modelsMatch('F6PGR366S2', 'f6pgr-366 s2'), 'case and punctuation still do not matter');
 });

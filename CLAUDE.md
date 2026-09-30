@@ -526,6 +526,21 @@ still in cleaning or repair — most of them — could only be typed.
     overrides, per call.
   - Writing the same number twice is free, for the same reason recording an
     invoice twice corrects rather than double-claiming.
+- **AND SO IS WHAT THE APPLIANCE IS** — `correctTrackerUnit` +
+  `corrections: [{ sku, model?, make?, description?, category?, serial? }]` on
+  the same route. A wrong model is not cosmetic: `modelsMatch` is what pairs a
+  supplier's invoice line to a row already on the tracker, so a typo means the
+  next invoice for that appliance matches NOTHING and books it in a second time.
+  Two rows of the Bertazzoni lot were recorded as models that do not exist
+  (`F8PGR366S2`, `F6PDF366S2`) and two of PS-INV117057 as `MRU217BST` /
+  `MTE52M2BGG`; every one had to be worked around by hand first.
+  **Identity only** — cost, retail, condition, status, sold price and the
+  invoice are all unreachable from it, so correcting what a machine is can never
+  move money or put something on sale. Omitted fields are left alone.
+  **The unit's own rating-plate photo is the evidence**, not the supplier's
+  list: RS Ops photographs a model sticker at intake, and on this lot the
+  supplier's own spreadsheet was the less reliable of the two — it says in its
+  own description column that one model was "assumed".
   - **It does NOT rename the SKU.** The lot cell and the Item ID are different
     things: RS Ops' photo blobs are named after the SKU (418 files on that one
     lot), so re-keying orphans every photograph. Renaming a LOT is a cell;
