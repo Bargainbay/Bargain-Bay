@@ -84,7 +84,10 @@ const partNumSize = (text, format) => {
   return `${Math.max(4.5, Math.min(t.max, (t.in / len / 0.62) * 72)).toFixed(1)}pt`;
 };
 
+const beamSize = (code) => (code.length <= 5 ? '90pt' : code.length <= 8 ? '60pt' : code.length <= 12 ? '40pt' : '28pt');
+
 const SPOT_FORMATS = {
+  beam: { label: 'Rack beam — 3 per letter sheet', page: 'letter', margin: '0.25in' },
   '4x6': { label: '4 × 6 in label', page: '4in 6in', margin: '0' },
   letter: { label: 'Letter paper — one per page', page: 'letter', margin: '0.5in' }
 };
@@ -126,6 +129,11 @@ const CSS = `
   .lbl-spot { background: #fff; outline: 1px dashed #bbb; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
   .lbl-spot .code { font-weight: 800; line-height: 1; letter-spacing: .02em; }
   .lbl-spot .sub { font-size: 12pt; }
+  .sbeam { gap: 0; }
+  .sbeam .lbl-spot { width: 8in; height: 3.5in; padding: .2in .3in; flex-direction: row; justify-content: flex-start; gap: .3in; text-align: left; border: 1px dotted #999; }
+  .sbeam .lbl-spot .q { flex: none; width: 2.9in; height: 2.9in; order: -1; }
+  .sbeam .lbl-spot .t { min-width: 0; flex: 1; }
+  .sbeam .lbl-spot .sub { font-size: 16pt; margin-top: 8pt; }
   .s4x6 .lbl-spot { width: 4in; height: 6in; padding: .3in; }
   .s4x6 .lbl-spot .q { width: 2.7in; height: 2.7in; }
   .sletter .lbl-spot { width: 7.5in; height: 9.9in; padding: .4in; }
@@ -136,6 +144,8 @@ const CSS = `
     body, body *:has(.lbl-sheet) { margin: 0 !important; padding: 0 !important; border: 0 !important; max-width: none !important; background: #fff !important; box-shadow: none !important; }
     .lbl-sheet { gap: 0 !important; }
     .lbl-sticker, .lbl-spot { outline: none !important; }
+    .sbeam .lbl-spot { break-after: auto; page-break-after: auto; }
+    .sbeam .lbl-spot:nth-child(3n) { break-after: page; page-break-after: always; }
     .lbl-sheet:not(.f-sheet) .lbl-sticker, .lbl-spot { break-after: page; page-break-after: always; }
     .lbl-sheet:not(.f-sheet) .lbl-sticker:last-child, .lbl-spot:last-child { break-after: auto; page-break-after: auto; }
   }
@@ -268,11 +278,13 @@ export default async function LabelsPage({ searchParams }) {
     );
   }
 
-  const format = SPOT_FORMATS[sp?.format] ? sp.format : '4x6';
   const areas = list(sp?.area);
   const codes = list(sp?.codes).map(normCode);
   const spots = (await listLocations()).filter((s) => s.active
     && (codes.length ? codes.includes(s.code) : (!areas.length || areas.includes(s.area))));
+  // Racks go on cross beams ~4 in tall: three strips to a letter sheet.
+  const format = SPOT_FORMATS[sp?.format] ? sp.format
+    : spots.length && spots.every((s) => s.kind === 'rack') ? 'beam' : '4x6';
   const allAreas = await listAreas();
   const areaLabel = (k) => allAreas.find((a) => a.key === k)?.label || '';
   return (
@@ -292,14 +304,31 @@ export default async function LabelsPage({ searchParams }) {
       <div className={`lbl-sheet s${format}`}>
         {spots.map((s) => (
           <div key={s.code} className="lbl-spot">
-            <div className="code" style={{ fontSize: spotSize(s.code, format === 'letter') }}>{s.code}</div>
-            {/* eslint-disable-next-line react/no-danger */}
-            <div className="q" dangerouslySetInnerHTML={{ __html: qrSvg(spotScanUrl(SITE_URL, s.code)) }} />
-            <div className="sub">
-              {areaLabel(s.area)}
-              {s.kind === 'rack' && s.level ? ` · shelf ${s.level}` : ''}
-              {s.purpose ? <><br /><b>{s.purpose}</b></> : null}
-            </div>
+            {format === 'beam' ? (
+              <>
+                {/* eslint-disable-next-line react/no-danger */}
+                <div className="q" dangerouslySetInnerHTML={{ __html: qrSvg(spotScanUrl(SITE_URL, s.code)) }} />
+                <div className="t">
+                  <div className="code" style={{ fontSize: beamSize(s.code) }}>{s.code}</div>
+                  <div className="sub">
+                    {areaLabel(s.area)}
+                    {s.kind === 'rack' && s.level ? ` · shelf ${s.level}` : ''}
+                    {s.purpose ? <><br /><b>{s.purpose}</b></> : null}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="code" style={{ fontSize: spotSize(s.code, format === 'letter') }}>{s.code}</div>
+                {/* eslint-disable-next-line react/no-danger */}
+                <div className="q" dangerouslySetInnerHTML={{ __html: qrSvg(spotScanUrl(SITE_URL, s.code)) }} />
+                <div className="sub">
+                  {areaLabel(s.area)}
+                  {s.kind === 'rack' && s.level ? ` · shelf ${s.level}` : ''}
+                  {s.purpose ? <><br /><b>{s.purpose}</b></> : null}
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
