@@ -12,7 +12,7 @@
 // looked plausible — a dishwasher at $258.08 is not obviously wrong. Summing the
 // units against the subtotal catches it in one line.
 import { suite, test, assert, equal } from './_harness.mjs';
-import { sameInvoiceNumber, invoiceCostProblem, isWaitingForInvoice, invoiceCellBlocked, modelsMatch } from '../lib/stock-match.js';
+import { sameInvoiceNumber, invoiceCostProblem, isWaitingForInvoice, invoiceCellBlocked, modelsMatch, isHaulAway, isHaulAwayLot } from '../lib/stock-match.js';
 
 suite('purchase invoice — header-only record');
 
@@ -142,4 +142,41 @@ test('A MODEL TYPO IS WHAT MAKES THE NEXT INVOICE ADD IT TWICE', () => {
   // And once corrected they pair, which is the whole point of fixing them.
   assert(modelsMatch('F6PDF366S1', 'F6PDF366S1'), 'the corrected model matches its own invoice line');
   assert(modelsMatch('F6PGR366S2', 'f6pgr-366 s2'), 'case and punctuation still do not matter');
+});
+
+suite('a haul-away has no invoice to wait for');
+
+test('IT IS NOT WAITING, SO IT LEAVES THE STOCK GAPS LIST', () => {
+  // The whole point. 10 haul-aways booked in on 2026-09-30 landed as NEEDS
+  // INVOICE and would have sat on the daily email for ever, because the
+  // paperwork they were waiting for does not exist.
+  assert(isHaulAway('HAUL-AWAY'), 'the marker reads as a haul-away');
+  assert(!isWaitingForInvoice('HAUL-AWAY'), 'and never as a row awaiting an invoice');
+  assert(!isWaitingForInvoice('HAUL-AWAY — kerbside pickup'), 'a note after it changes nothing');
+});
+
+test('IT CAN NEVER BE CLAIMED BY SOMEBODY ELSE’S INVOICE', () => {
+  // `fillWaitingRows` only writes a row that is still waiting, and
+  // `unitsOnInvoice` only counts a row whose cell names the invoice. A
+  // haul-away must fail both, or a supplier's invoice could absorb a machine
+  // nobody bought and the reconciliation would silently pass.
+  assert(!sameInvoiceNumber('HAUL-AWAY', 'PS-INV117385'), 'it matches no invoice number');
+  assert(!sameInvoiceNumber('HAUL-AWAY', 'S-ORD115828'), 'nor a sales-order lot');
+  // And it is not waiting, so `fillWaitingRows` refuses it outright — that is
+  // the guard that actually stops an invoice absorbing it, not the name test.
+  assert(!isWaitingForInvoice('HAUL-AWAY'), 'fillWaitingRows will not touch it');
+});
+
+test('THE LOT NAME IS READ THE WAY A VENDOR NAME IS FOLDED', () => {
+  assert(isHaulAwayLot('SS-Haulaways'), 'the real lot');
+  assert(isHaulAwayLot('haul away'), 'spaced');
+  assert(isHaulAwayLot('HAUL-AWAYS'), 'hyphenated and plural');
+  assert(!isHaulAwayLot('PS-INV117385'), 'an ordinary purchase lot is not one');
+  assert(!isHaulAwayLot('SS-117082'), 'nor is a hand-booked lot');
+});
+
+test('THE MARKER IS REPLACEABLE IF A UNIT TURNS OUT TO BE BOUGHT', () => {
+  // Not an invoice-like code, so correcting it needs no `force` — same as a
+  // note or a filename.
+  equal(invoiceCellBlocked('HAUL-AWAY', 'PS-INV117385'), '', 'it can be corrected to a real invoice');
 });

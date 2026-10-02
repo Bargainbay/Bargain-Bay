@@ -448,6 +448,29 @@ still in cleaning or repair — most of them — could only be typed.
   is in its Invoice cell, the model matches, it is unsold, RS Ops doesn't already
   use that SKU, and **no invoice line or reservation points at it** (`skusInUse`
   fails CLOSED). The old SKU is written into Tested Notes.
+- **A HAUL-AWAY is marked, not left waiting** (added 2026-10-02). `HAUL_AWAY` /
+  `isHaulAway` / `isHaulAwayLot` in `lib/stock-match.js`; `acceptRsOpsUnits`
+  writes `HAUL-AWAY` in the Invoice column and a cost of **0** for any unit
+  arriving from a lot whose name folds to "haulaway".
+
+  Somebody pays US to take their old appliance away. There is no supplier, no
+  paperwork, and nothing to wait for — but every unit RS Ops sends was marked
+  NEEDS INVOICE, so 10 haul-aways booked in on 2026-09-30 joined the Stock gaps
+  list and the daily email for ever. A list that shouts about rows nobody can
+  ever action is a list people stop reading, which costs the rows that DO matter.
+  RS Ops held 31 of them, so this was going to keep happening.
+  - **Same reasoning as `CONSIGNMENT`**: an empty Invoice cell reads as a number
+    nobody has typed in yet, so the cell has to SAY what the row is.
+  - **The cost is a real ZERO, never blank.** Blank means nobody has looked it
+    up; zero means there is nothing to look up. That difference is the whole
+    point of the marker, and `lib/pricing.js` already treats a cost of 0 as a
+    real answer that floors nothing.
+  - **The LOT NAME is the signal**, because it is the only one RS Ops sends,
+    folded case- and punctuation-insensitively like `supplierKey`.
+  - It stops being waiting, so `fillWaitingRows` refuses it and a supplier's
+    invoice can never absorb a machine nobody bought. The marker is NOT
+    invoice-like, so `invoiceCellBlocked` still lets it be corrected to a real
+    invoice number if a unit turns out to have been purchased after all.
 - **The purchase invoice arriving later fills those rows — ONLY ONCE AN ADMIN
   APPROVES** (owner, 2026-09-17). Committing (upload screen or email queue) does
   not write matched rows: `requestFills` files one `stock_fill_requests` row per
