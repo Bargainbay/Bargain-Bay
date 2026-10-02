@@ -952,7 +952,7 @@ function LabelsTab() {
     fresh.forEach((k) => seen.current.add(k));
     if (fresh.length) setAreas((a) => [...a, ...fresh]);
   }, [allAreas]);
-  const [spotFormat, setSpotFormat] = useState('4x6');
+  const [spotFormat, setSpotFormat] = useState('beam');
   const [skuText, setSkuText] = useState('');
   const [unitFormat, setUnitFormat] = useState('roll');
   const skus = [...new Set(skuText.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))];
@@ -970,6 +970,7 @@ function LabelsTab() {
         ))}
         <div className="wh-row" style={{ marginTop: 10 }}>
           <select value={spotFormat} onChange={(e) => setSpotFormat(e.target.value)} style={{ width: 'auto' }}>
+            <option value="beam">Rack beam — 3 per letter sheet</option>
             <option value="4x6">4 × 6 in label</option>
             <option value="letter">Letter paper</option>
           </select>
