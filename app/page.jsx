@@ -4,6 +4,8 @@ import { getSession } from '../lib/auth';
 import { decorate } from '../lib/pricing';
 import { COLLECTIONS, collectionFilter, money } from '../lib/constants';
 import ProductCard from '../components/ProductCard';
+import { dealsSnapshot } from '../lib/deals';
+import { heroFor, dayLabel } from '../lib/deals-config';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +40,8 @@ function tileImage(slug, units) {
 export default async function Home() {
   const session = await getSession();
   const units = await decorate(await getAvailable(), session);
+  // Whatever is being promoted today. Any failure means the ordinary hero.
+  const promo = heroFor(await dealsSnapshot().catch(() => null));
   // One card per model — four of the same fridge are one listing, not four tiles.
   const newest = newestModels(units, 12);
   const clearance = units.filter((u) => u.onClearance);
@@ -48,20 +52,40 @@ export default async function Home() {
 
   return (
     <div>
-      <section className="hero">
-        <div className="hero-inner">
-          <h1>Name-brand appliances. <em>Liquidation prices.</em></h1>
-          <p>
-            Overstock, open-box, and lightly-used fridges, washers, ranges and more — every unit
-            tested, working, and backed by a one-year warranty. Pickup or delivery across Pickering,
-            Durham Region, Scarborough and the GTA.
-          </p>
-          <div className="btn-row">
-            <a href="/shop" className="btn accent">Shop all appliances</a>
-            <a href="/shop?collection=under-500" className="btn">Deals under $500</a>
+      {promo ? (
+        <section className="hero hero-promo">
+          <div className="hero-inner">
+            <span className="hero-kicker">{promo.kicker}</span>
+            <h1>{promo.headline}</h1>
+            <p>{promo.sub}</p>
+            {promo.code && (
+              <p className="hero-code">
+                Code <code>{promo.code.code}</code> · {promo.code.text}
+              </p>
+            )}
+            <div className="btn-row">
+              <a href={promo.cta.href} className="btn accent">{promo.cta.label}</a>
+              <a href={promo.secondary.href} className="btn">{promo.secondary.label}</a>
+            </div>
+            <span className="hero-ends">Ends {dayLabel(promo.ends)}</span>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="hero">
+          <div className="hero-inner">
+            <h1>Name-brand appliances. <em>Liquidation prices.</em></h1>
+            <p>
+              Overstock, open-box, and lightly-used fridges, washers, ranges and more — every unit
+              tested, working, and backed by a one-year warranty. Pickup or delivery across Pickering,
+              Durham Region, Scarborough and the GTA.
+            </p>
+            <div className="btn-row">
+              <a href="/shop" className="btn accent">Shop all appliances</a>
+              <a href="/shop?collection=under-500" className="btn">Deals under $500</a>
+            </div>
+          </div>
+        </section>
+      )}
 
       {clearance.length > 0 && (
         <a href="/clearance" className="clearance-banner" aria-label="Shop clearance">

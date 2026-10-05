@@ -6,7 +6,7 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import {
   DEALS, DROPS, GIVEAWAY, isRunning, isUpcoming, dropFor, giveawayOpen,
-  describeCoupon, bannerFor, torontoParts
+  describeCoupon, bannerFor, heroFor, torontoParts
 } from '../lib/deals-config.js';
 import { entryKey, postalPrefix } from '../lib/giveaway.js';
 
@@ -78,6 +78,23 @@ test('the banner leads with the soonest-ending deal and adds the giveaway as a s
 });
 test('no deal and no giveaway means no banner (the header falls back to its own line)', () => {
   equal(bannerFor({ active: [], giveaway: false }), null);
+});
+
+suite('lib/deals-config: the homepage hero');
+
+test('an open giveaway takes the hero over a running deal', () => {
+  const h = heroFor({ giveaway: true, active: [{ title: 'Laundry Week', hero: { headline: 'x', sub: 'y' }, to: '2026-10-19' }] });
+  equal(h.cta, { label: 'Enter now', href: '/giveaway' });
+});
+test('with no giveaway the soonest deal shows, with its live code', () => {
+  const h = heroFor({ giveaway: false, active: [{ title: 'Laundry Week', to: '2026-10-19', hero: { headline: 'Laundry Week.', sub: 's' },
+    coupon: { code: 'LAUNDRY100', kind: 'amount', value: 100, minSubtotal: 1000, endsAt: '2026-10-19' } }] });
+  equal(h.code.code, 'LAUNDRY100');
+  equal(h.ends, '2026-10-19');
+});
+test('nothing running means no promo hero, so the page shows the ordinary one', () => {
+  equal(heroFor({ giveaway: false, active: [] }), null);
+  equal(heroFor(null), null);
 });
 
 suite('lib/giveaway: one inbox, one ticket');
