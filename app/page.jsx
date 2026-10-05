@@ -53,7 +53,7 @@ export default async function Home() {
   return (
     <div>
       {promo ? (
-        <section className="hero hero-promo">
+        <section className="hero hero-promo" style={promo.bg ? { '--hero-bg': `url(${promo.bg})` } : undefined}>
           <div className="hero-inner">
             <span className="hero-kicker">{promo.kicker}</span>
             <h1>{promo.headline}</h1>
@@ -69,6 +69,14 @@ export default async function Home() {
             </div>
             <span className="hero-ends">Ends {dayLabel(promo.ends)}</span>
           </div>
+          {promo.image && (
+            <div className="hero-art">
+              <img src={promo.image} alt={promo.imageAlt} />
+              {promo.badge && (
+                <span className="hero-badge"><small>{promo.badge.top}</small><b>{promo.badge.main}</b></span>
+              )}
+            </div>
+          )}
         </section>
       ) : (
         <section className="hero">
