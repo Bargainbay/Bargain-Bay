@@ -142,6 +142,17 @@ case folding. Three things follow, all learned filling the gap on 2026-09-10:
   Midea's own asset, so there is no clean alternative for those models — the four
   Midea entries added on 2026-09-10 carry it. Fine on a New-in-Box unit, worth a
   thought on a used one, where our own warranty is one year.
+### Every listed unit needs a stock photo (added 2026-10-05)
+`data/images.json` is hand-filled and nothing forced anyone to fill it, so new
+stock simply arrived without a picture: 28 models on `/shop` showed placeholder
+art on 2026-10-05 (and `/feed` skips them, so they could not be advertised).
+`modelsWithoutStockPhoto` (lib/images.js) now runs inside
+`syncInventoryFromTracker`; the sync buttons warn with the model list
+(`report.noStockPhoto`) and the nightly pass emails `SERVICE_EMAIL` while any
+remain. **The fix is one key per model in `data/images.json`.** AJ Madison and
+its CDN bot-block scripted lookups (403 even from a browser session) — fetch
+those by hand in a normal browser, don't hammer it.
+
 - `lib/reservations.js` — race-safe 30-min SKU holds in Postgres. `unavailableSkus()`, `isUnavailable()`.
 - `lib/stripe.js` — Stripe Checkout (+ `app/api/stripe-webhook`). `lib/sheets.js` — read + writeSold via Google service account.
 - `lib/auth.js` — bcryptjs + jose JWT cookie `bb_session`. `lib/db.js` — lazy `pg` pool (build never needs `POSTGRES_URL`).
