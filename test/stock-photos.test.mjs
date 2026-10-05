@@ -40,3 +40,40 @@ test('the sync summary warns when models lack a photo, and is quiet otherwise', 
 test('every images.json entry is an https URL', () => {
   for (const [k, v] of Object.entries(images)) assert(/^https:\/\//.test(v), `${k} is not an https URL`);
 });
+
+// ---- the editable layer (model_photos) ----
+import { withTestDb } from './db.mjs';
+import { setModelPhoto, clearModelPhoto, modelPhotoRows, validPhotoUrl } from '../lib/model-photos.js';
+import { modelImage } from '../lib/images.js';
+
+suite('stock photos — managed from /admin/photos');
+
+test('only full https links are accepted', () => {
+  assert(validPhotoUrl('https://x.com/a.jpg'));
+  equal(validPhotoUrl('http://x.com/a.jpg'), null);
+  equal(validPhotoUrl('javascript:alert(1)'), null);
+  equal(validPhotoUrl('/stock/range.svg'), null);
+  equal(validPhotoUrl('https://x.com/a b.jpg'), null);
+});
+
+test('a row wins over images.json, and removing it falls back', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    await client.query(
+      `INSERT INTO products (sku, make, model, category, title, price, active) VALUES ('T-1','LG','NEWMODEL-1','Range','t',100,true),('T-2','LG',$1,'Range','t',100,true)`, [known]);
+    let rows = await modelPhotoRows();
+    equal(rows[0].model, 'NEWMODEL-1');
+    equal(rows[0].source, 'missing');
+    await setModelPhoto('NEWMODEL-1', { url: 'https://cdn.example/new.jpg' }, { createdBy: 'a@b.c' });
+    equal(modelImage('NEWMODEL-1'), 'https://cdn.example/new.jpg');
+    // overriding a model that is in the file replaces it; clearing restores it
+    await setModelPhoto(known, { url: 'https://cdn.example/over.jpg' });
+    equal(modelImage(known), 'https://cdn.example/over.jpg');
+    await clearModelPhoto(known);
+    assert(modelImage(known) && modelImage(known) !== 'https://cdn.example/over.jpg');
+    await clearModelPhoto('NEWMODEL-1');
+    equal(modelImage('NEWMODEL-1'), null);
+    rows = await modelPhotoRows();
+    equal(rows.find((r) => r.model === 'NEWMODEL-1').source, 'missing');
+  } finally { done(); }
+});
