@@ -19,16 +19,19 @@ export default function GiveawayForm() {
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(d.error || 'Could not submit your entry.'); return; }
-      setDone(d.entered ? 'in' : 'already');
+      // A new entry goes straight on to the checklist. A repeat gets no link on
+      // screen (it is emailed), so it just says so.
+      if (d.entered && d.e) { window.location.href = `/giveaway?e=${encodeURIComponent(d.e)}`; return; }
+      setDone('already');
     } catch { setErr('Network error. Please try again.'); } finally { setBusy(false); }
   }
 
   if (done) {
     return (
       <div className="panel" style={{ maxWidth: 520 }}>
-        <h2 style={{ marginTop: 0 }}>{done === 'in' ? 'You’re entered. Good luck!' : 'You’re already entered.'}</h2>
+        <h2 style={{ marginTop: 0 }}>You’re already entered.</h2>
         <p style={{ fontSize: 14.5 }}>
-          {done === 'in' ? 'We just emailed a confirmation. ' : 'There is one entry per person. '}
+          There is one entry per person. We’ve emailed you the link to your checklist, where you can earn extra entries.
           Meanwhile, see <a href="/deals" style={{ textDecoration: 'underline' }}>this week’s deals</a>.
         </p>
       </div>

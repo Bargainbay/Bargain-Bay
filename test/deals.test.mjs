@@ -6,9 +6,12 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import {
   DEALS, DROPS, GIVEAWAY, isRunning, isUpcoming, dropFor, giveawayOpen,
-  describeCoupon, bannerFor, heroFor, torontoParts
+  describeCoupon, bannerFor, heroFor, torontoParts, ticketsOf, BONUS, MAX_TICKETS
 } from '../lib/deals-config.js';
-import { entryKey, postalPrefix } from '../lib/giveaway.js';
+import {
+  entryKey, postalPrefix, normalizeInstagram, pickWeighted, entryParam, entryIdFromParam,
+  entryStatus, setInstagram, registerVideo, reviewVideo, videoPrefix
+} from '../lib/giveaway.js';
 
 const at = (iso) => new Date(iso);
 const deal = (id) => DEALS.find((d) => d.id === id);
@@ -194,5 +197,80 @@ test('only a current winner can be resolved', async () => {
     let msg = '';
     try { await resolveWinner(G, rows[0].id, 'claimed', '', 'a'); } catch (e) { msg = e.message; }
     assert(msg.includes('not a current winner'));
+  } finally { done(); }
+});
+
+suite('giveaway: bonus entries are derived, never stored');
+
+test('tickets add up from the four optional steps, and the video only counts once approved', () => {
+  equal(ticketsOf({}), 1);
+  equal(ticketsOf({ has_account: true, newsletter: true, instagram_handle: 'x' }), 4);
+  equal(ticketsOf({ video_status: 'pending' }), 1, 'a video nobody has watched is not a ticket');
+  equal(ticketsOf({ video_status: 'rejected' }), 1);
+  equal(ticketsOf({ has_account: true, newsletter: true, instagram_handle: 'x', video_status: 'approved' }), MAX_TICKETS);
+  equal(MAX_TICKETS, 1 + BONUS.account + BONUS.newsletter + BONUS.instagram + BONUS.video);
+});
+
+test('Instagram handles are cleaned up from however they were typed', () => {
+  equal(normalizeInstagram('@Bargain.Bay'), 'bargain.bay');
+  equal(normalizeInstagram('https://www.instagram.com/some_one/?hl=en'), 'some_one');
+  equal(normalizeInstagram('has space'), null);
+  equal(normalizeInstagram(''), null);
+});
+
+test('the weighted pick follows the tickets exactly', () => {
+  const items = [{ id: 'a', tickets: 1 }, { id: 'b', tickets: 3 }, { id: 'c', tickets: 2 }];
+  // rand(6) in [0,6): 0 -> a, 1..3 -> b, 4..5 -> c
+  equal([0, 1, 2, 3, 4, 5].map((r) => pickWeighted(items, () => r).id), ['a', 'b', 'b', 'b', 'c', 'c']);
+  equal(pickWeighted([], () => 0), null);
+});
+
+test('an entry link verifies, and a tampered one does not', () => {
+  process.env.AUTH_SECRET = process.env.AUTH_SECRET || 'test-secret';
+  const p = entryParam(42);
+  equal(entryIdFromParam(p), 42);
+  equal(entryIdFromParam(p.replace('42.', '43.')), null, 'the id cannot be swapped');
+  equal(entryIdFromParam('42.deadbeef'), null);
+  equal(entryIdFromParam(''), null);
+});
+
+test('account, newsletter, Instagram and video each add entries, from the real tables', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { ensureConsentSchema, grantConsent, withdrawConsent } = await import('../lib/consent.js');
+    await ensureConsentSchema();
+    const r = await enterGiveaway(G, person(1));
+    const id = r.id;
+    equal((await entryStatus(id)).tickets, 1);
+
+    // An account made LATER, with the same address (any case), is picked up.
+    await query(`INSERT INTO users (email, name, password_hash) VALUES ('P1@Example.com','P1','x')`);
+    equal((await entryStatus(id)).tickets, 2);
+
+    await grantConsent({ channel: 'email', email: 'p1@example.com', source: 'giveaway', evidence: 'ticked' });
+    equal((await entryStatus(id)).tickets, 3);
+    await withdrawConsent({ channel: 'email', email: 'p1@example.com', source: 'unsubscribe_link' });
+    equal((await entryStatus(id)).tickets, 2, 'unsubscribing takes the bonus away');
+
+    await setInstagram(id, '@p1');
+    equal((await entryStatus(id)).tickets, 3);
+
+    await registerVideo(G, id, `${videoPrefix(G, id)}abc.mp4`, true);
+    equal((await entryStatus(id)).tickets, 3, 'pending does not count');
+    await reviewVideo(G, id, 'approved', 'admin');
+    equal((await entryStatus(id)).tickets, 6);
+  } finally { done(); }
+});
+
+test('a video must carry this entry\'s prefix and the release', async () => {
+  const { done } = await withTestDb();
+  try {
+    const a = (await enterGiveaway(G, person(1))).id;
+    const b = (await enterGiveaway(G, person(2))).id;
+    let m1 = '', m2 = '';
+    try { await registerVideo(G, a, `${videoPrefix(G, b)}x.mp4`, true); } catch (e) { m1 = e.message; }
+    try { await registerVideo(G, a, `${videoPrefix(G, a)}x.mp4`, false); } catch (e) { m2 = e.message; }
+    assert(m1.includes('does not belong'), 'cannot attach somebody else\'s upload');
+    assert(m2.includes('share your video'), 'the release must be ticked');
   } finally { done(); }
 });
