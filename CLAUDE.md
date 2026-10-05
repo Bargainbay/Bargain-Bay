@@ -153,6 +153,16 @@ remain. **The fix is one key per model in `data/images.json`.** AJ Madison and
 its CDN bot-block scripted lookups (403 even from a browser session) — fetch
 those by hand in a normal browser, don't hammer it.
 
+**Managed at `/admin/photos` (Photos tab, staff; added 2026-10-05).** Stock photo per
+MODEL via `lib/model-photos.js` / table `model_photos` (migration 0011) — a row
+WINS over `data/images.json`, the file stays as the fallback so nothing was
+migrated. `imageFor` stays synchronous: overrides are loaded into an in-process
+map (`warmModelPhotos`, 30s TTL) at the top of `getAll`/`getById`/`getMany` and
+the sync. A pasted link is **previewed in the browser, never fetched
+server-side** (CDNs 403 servers). Uploads go to the private Blob store under a
+fresh key each time (`/api/photo` is cached an hour). The second tab manages
+`unit_photos` through the existing `/api/admin/unit-photos`.
+
 - `lib/reservations.js` — race-safe 30-min SKU holds in Postgres. `unavailableSkus()`, `isUnavailable()`.
 - `lib/stripe.js` — Stripe Checkout (+ `app/api/stripe-webhook`). `lib/sheets.js` — read + writeSold via Google service account.
 - `lib/auth.js` — bcryptjs + jose JWT cookie `bb_session`. `lib/db.js` — lazy `pg` pool (build never needs `POSTGRES_URL`).

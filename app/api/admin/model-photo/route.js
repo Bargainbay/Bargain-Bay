@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { modelImage } from '../../../../lib/images';
+import { warmModelPhotos } from '../../../../lib/model-photos';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,6 +23,7 @@ export async function GET(req) {
   if (!(s && isStaff(s))) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   const model = (new URL(req.url).searchParams.get('model') || '').trim();
   if (!model) return NextResponse.json({ model: '', hasStock: false, asked: false });
+  await warmModelPhotos();
   // Exact-match lookup, exactly as the storefront does it — so the answer here
   // is the answer the site will give, typo and all.
   return NextResponse.json({ model, hasStock: !!modelImage(model), asked: true });
