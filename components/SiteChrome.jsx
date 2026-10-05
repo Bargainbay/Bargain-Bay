@@ -16,7 +16,7 @@ import { DASHBOARD_ROUTES } from '../lib/dashboards';
 // role check is needed here. Not on pages that exist to be printed.
 const PAPER = /\/(print|labels|pod|packing-slip)(\/|$)/;
 
-export default function SiteChrome({ children }) {
+export default function SiteChrome({ children, promo = null }) {
   const path = usePathname() || '';
   const crew = path.startsWith('/driver') ? <TeamAssistant placement="driver" />
     : PAPER.test(path) ? null : <TeamAssistant />;
@@ -26,7 +26,7 @@ export default function SiteChrome({ children }) {
   if (isPortal) return <><main className="wrap">{children}</main>{crew}</>;
   return (
     <>
-      <Header />
+      <Header promo={promo} />
       <main className="wrap">{children}</main>
       <Footer />
       <ChatWidget />

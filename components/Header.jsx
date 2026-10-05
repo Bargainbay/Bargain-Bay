@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { getCart, onCartChange } from '../lib/cart';
 import { COLLECTIONS } from '../lib/constants';
 
-export default function Header() {
+export default function Header({ promo = null }) {
   const [count, setCount] = useState(0);
   const [user, setUser] = useState(null);
   const [open, setOpen] = useState(false);
@@ -21,7 +21,7 @@ export default function Header() {
   return (
     <header className="site-header">
       <div className="announce">
-        New lot just landed — tested &amp; working, <b>up to ~70% off retail</b>. <a href="/shop">Shop now →</a>
+        {promo || (<>New lot just landed — tested &amp; working, <b>up to ~70% off retail</b>. <a href="/shop">Shop now →</a></>)}
       </div>
       <div className="wrap">
         <div className="header-row">
@@ -31,6 +31,7 @@ export default function Header() {
           </a>
           <nav className={'main-nav' + (open ? ' open' : '')} onClick={() => setOpen(false)}>
             <a href="/shop">Shop</a>
+            <a href="/deals" className="nav-clearance">Deals</a>
             <a href="/clearance" className="nav-clearance">Clearance</a>
             <a href="/bundle">Bundle &amp; Save</a>
             <a href="/track">Track Order</a>

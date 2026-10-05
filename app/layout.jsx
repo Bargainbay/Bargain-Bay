@@ -3,6 +3,7 @@ import SiteChrome from '../components/SiteChrome';
 import EnvBanner from '../components/EnvBanner';
 import MetaPixel from '../components/MetaPixel';
 import AttributionTracker from '../components/AttributionTracker';
+import PromoBar from '../components/PromoBar';
 import { SALES_EMAIL, PICKUP_ADDRESS } from '../lib/constants';
 import { SITE_URL, jsonLd } from '../lib/site';
 
@@ -72,7 +73,7 @@ export default function RootLayout({ children }) {
           dangerouslySetInnerHTML={{ __html: jsonLd(storeSchema) }}
         />
         <EnvBanner />
-        <SiteChrome>{children}</SiteChrome>
+        <SiteChrome promo={<PromoBar />}>{children}</SiteChrome>
       </body>
     </html>
   );
