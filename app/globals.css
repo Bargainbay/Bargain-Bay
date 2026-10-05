@@ -1666,3 +1666,17 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .giveaway-rules h2 { font-size: 16px; margin: 18px 0 6px; }
 .giveaway-rules p, .giveaway-rules li { font-size: 14px; line-height: 1.55; }
 @media (max-width: 640px) { .deal-giveaway { flex-direction: column; align-items: flex-start; } }
+
+/* Homepage promo hero (added 2026-10-05). Same .hero shell as the default one. */
+.hero-promo { background: linear-gradient(115deg, #7a1226 0%, #a31b34 55%, #3a3937 130%); }
+.hero-kicker { display: inline-block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; font-family: var(--font-head); background: rgba(255,255,255,.16); padding: 5px 11px; border-radius: 999px; margin-bottom: 14px; }
+.hero-promo h1 { font-size: 40px; }
+.hero-code { font-size: 15px; margin: -12px 0 20px !important; }
+.hero-code code { font-size: 18px; font-weight: 700; letter-spacing: .06em; background: rgba(255,255,255,.18); padding: 2px 9px; border-radius: 6px; }
+.hero-ends { display: block; margin-top: 16px; font-size: 12.5px; opacity: .8; }
+@media (max-width: 600px) { .hero-promo h1 { font-size: 28px; } }
+.check-step { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line-soft); }
+.check-mark { flex: 0 0 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-weight: 700; font-size: 14px; color: #fff; }
+.check-step[data-done="1"] .check-mark { background: var(--charcoal); border-color: var(--charcoal); }
+.check-title { font-weight: 600; font-size: 15px; }
+.check-bonus { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--card); border: 1px solid var(--line-soft); border-radius: 999px; padding: 2px 9px; margin-left: 6px; white-space: nowrap; }

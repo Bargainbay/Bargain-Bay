@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { giveawayOverview, drawWinner, resolveWinner } from '../../../../lib/giveaway';
+import { giveawayOverview, drawWinner, resolveWinner, reviewVideo } from '../../../../lib/giveaway';
 import { GIVEAWAY } from '../../../../lib/deals-config';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +32,10 @@ export async function POST(req) {
     }
     if (body.action === 'resolve') {
       await resolveWinner(GIVEAWAY.id, Number(body.id), body.outcome, body.note, s.email);
+      return NextResponse.json({ ok: true });
+    }
+    if (body.action === 'review_video') {
+      await reviewVideo(GIVEAWAY.id, Number(body.id), body.outcome, s.email);
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });

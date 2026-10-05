@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation';
 export default function SignupForm() {
   const params = useSearchParams();
   const next = params.get('next') || '/account';
-  const [form, setForm] = useState({ email: '', name: '', phone: '', password: '', website: '', marketingOptIn: false });
+  const [form, setForm] = useState({ email: params.get('email') || '', name: '', phone: '', password: '', website: '', marketingOptIn: false });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 

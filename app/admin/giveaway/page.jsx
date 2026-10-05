@@ -18,7 +18,7 @@ export default async function GiveawayAdminPage() {
   if (!hasDb()) return <div><AdminNav active="giveaway" /><div className="panel">Database not configured — set POSTGRES_URL.</div></div>;
   // The table comes from migration 0012; before it has run, show the empty state
   // rather than a 500.
-  const initial = await giveawayOverview(GIVEAWAY.id).catch(() => ({ total: 0, optIns: 0, winner: null, history: [] }));
+  const initial = await giveawayOverview(GIVEAWAY.id).catch(() => ({ total: 0, tickets: 0, optIns: 0, winner: null, history: [], videos: [] }));
   return (
     <div>
       <AdminNav active="giveaway" />

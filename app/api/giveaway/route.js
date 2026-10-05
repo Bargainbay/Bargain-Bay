@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { hasDb } from '../../../lib/db';
-import { enterGiveaway } from '../../../lib/giveaway';
+import { enterGiveaway, entryParam } from '../../../lib/giveaway';
 import { GIVEAWAY, giveawayOpen, dayLabel } from '../../../lib/deals-config';
 import { grantConsent } from '../../../lib/consent';
 import { sendEmail, esc } from '../../../lib/email';
@@ -46,19 +46,28 @@ export async function POST(req) {
           evidence: String(body.marketingOptInText || '').slice(0, 500) || 'Ticked the marketing box on the giveaway entry form'
         }).catch((e) => console.error('giveaway consent record failed', e.message));
       }
-      // Confirms the address works (a winner we cannot reach is a wasted draw)
-      // and is the entrant's own copy of the rules link. Awaited: a serverless
-      // instance is frozen once the response goes out.
+    }
+    // A confirmation goes out for a repeat entry too, carrying the link back to
+    // the checklist: it is the only way back in, and sending it to the address
+    // on the entry (not to whoever typed it) leaks nothing. Awaited: a
+    // serverless instance is frozen once the response goes out.
+    if (r.id) {
+      const link = `${SITE_URL}/giveaway?e=${entryParam(r.id)}`;
       await sendEmail({
         to: r.email,
         subject: `You're entered: ${GIVEAWAY.title}`,
         html: `<p>Hi ${esc(r.name.split(' ')[0])},</p>
           <p>You're entered to win ${esc(GIVEAWAY.prize)}. We draw on ${esc(dayLabel(GIVEAWAY.drawDate))} and contact the winner by email or phone.</p>
+          <p><b>Want more chances?</b> Create an account, subscribe to our deals and flyers, follow us on Instagram, or send a short video of what you're thankful for. Each is optional and earns extra entries until ${esc(dayLabel(GIVEAWAY.to))}:</p>
+          <p><a href="${link}">${link}</a></p>
           <p>Full contest rules: <a href="${SITE_URL}/giveaway#rules">${SITE_URL}/giveaway#rules</a></p>
           <p>Good luck,<br>Bargain Bay</p>`
       }).catch((e) => console.error('giveaway confirmation failed', e.message));
     }
-    return NextResponse.json({ ok: true, entered: r.entered });
+    // The token goes to the browser that made a NEW entry. For a repeat it does
+    // not: anyone can type somebody else's address, so that link only travels by email.
+    return NextResponse.json({ ok: true, entered: r.entered, e: r.entered ? entryParam(r.id) : null });
+
   } catch (e) {
     console.error('giveaway entry failed', e);
     return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });

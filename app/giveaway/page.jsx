@@ -1,6 +1,8 @@
-import { GIVEAWAY, giveawayOpen, dayLabel, torontoParts } from '../../lib/deals-config';
-import { BUSINESS_LEGAL, BUSINESS_NAME, BUSINESS_ADDRESS, PICKUP_ADDRESS, SALES_EMAIL } from '../../lib/constants';
+import { GIVEAWAY, BONUS, MAX_TICKETS, giveawayOpen, dayLabel, torontoParts } from '../../lib/deals-config';
+import { entryIdFromParam, entryStatus } from '../../lib/giveaway';
+import { BUSINESS_LEGAL, BUSINESS_NAME, BUSINESS_ADDRESS, PICKUP_ADDRESS, SALES_EMAIL, INSTAGRAM_URL } from '../../lib/constants';
 import GiveawayForm from './GiveawayForm';
+import GiveawayChecklist from './GiveawayChecklist';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,8 +12,13 @@ export const metadata = {
   alternates: { canonical: '/giveaway' }
 };
 
-export default function GiveawayPage() {
+export default async function GiveawayPage({ searchParams }) {
+  const sp = (await searchParams) || {};
   const open = giveawayOpen();
+  // Somebody following their link back sees their checklist, not the form.
+  const eParam = typeof sp.e === 'string' ? sp.e : '';
+  const entryId = open ? entryIdFromParam(eParam) : null;
+  const entry = entryId ? await entryStatus(entryId).catch(() => null) : null;
   const { date } = torontoParts();
   const notYet = date < GIVEAWAY.from;
 
@@ -30,7 +37,10 @@ export default function GiveawayPage() {
       </section>
 
       <div style={{ marginTop: 18 }}>
-        {open ? <GiveawayForm /> : (
+        {open && entry ? (
+          <GiveawayChecklist e={eParam} initial={JSON.parse(JSON.stringify(entry))}
+            instagramUrl={INSTAGRAM_URL} closesLabel={dayLabel(GIVEAWAY.to)} />
+        ) : open ? <GiveawayForm /> : (
           <div className="panel" style={{ fontSize: 15 }}>
             {notYet
               ? `Entries open ${dayLabel(GIVEAWAY.from)}.`
@@ -57,11 +67,30 @@ export default function GiveawayPage() {
 
         <h2>3. How to enter</h2>
         <p>
-          Complete the entry form on this page. One entry per person. Entries made with more than one email
-          address by the same person, or by automated means, will be disqualified.
+          Complete the entry form on this page for one (1) entry. One person, one entry form: entries made with
+          more than one email address by the same person, or by automated means, will be disqualified.
         </p>
 
-        <h2>4. Prize</h2>
+        <h2>4. Bonus entries (optional)</h2>
+        <p>
+          After entering you may earn extra entries by doing any of the following. None is required, and not doing
+          them does not affect your base entry. Up to {MAX_TICKETS} entries per person in total.
+        </p>
+        <ul>
+          <li><b>+{BONUS.account}</b> Create a Bargain Bay account using the same email you entered with.</li>
+          <li><b>+{BONUS.newsletter}</b> Subscribe to our deals and flyers email. You may unsubscribe at any time, and your entries are kept.</li>
+          <li><b>+{BONUS.instagram}</b> Follow Bargain Bay on Instagram and give us your username. We will confirm the winner follows us before the prize is awarded.</li>
+          <li><b>+{BONUS.video}</b> Send us a video of up to 30 seconds of what you are thankful for. It counts once we have reviewed and approved it. Videos are not judged and the best video does not win: it only earns bonus entries.</li>
+        </ul>
+        <p>
+          <b>Video terms.</b> By sending a video you confirm you made it, that everyone appearing in it has agreed,
+          that it contains no copyrighted music or third-party material, and that it shows no one under 18. You give
+          {' '}{BUSINESS_LEGAL} a non-exclusive, royalty-free licence to show it on our website and social media, and in
+          our marketing, for as long as we choose to. We may decline any video that is unsuitable. Your video is kept
+          private until we choose to use it.
+        </p>
+
+        <h2>5. Prize</h2>
         <p>
           One (1) prize: {GIVEAWAY.prize}, approximate retail value ${GIVEAWAY.retailValue} CAD. The prize has no cash
           value, cannot be exchanged or transferred, and may be replaced with a unit of equal or greater value if this
@@ -70,14 +99,13 @@ export default function GiveawayPage() {
           responsible for any installation and for any taxes owing on the prize.
         </p>
 
-        <h2>5. The draw</h2>
+        <h2>6. The draw</h2>
         <p>
-          On {dayLabel(GIVEAWAY.drawDate)}, one entry will be selected at random from all eligible entries received. The
-          odds of winning depend on the number of eligible entries received. The selected entrant will be contacted by
-          email and/or phone using the details on the entry and must respond within 72 hours.
+          On {dayLabel(GIVEAWAY.drawDate)}, one entry will be selected at random from all eligible entries received,
+          counting each entry, including bonus entries, as one chance. The odds of winning depend on the number of
+          eligible entries received. The selected entrant will be contacted by email and/or phone using the details on
+          the entry and must respond within 72 hours.
         </p>
-
-        <h2>6. Skill-testing question</h2>
         <p>
           To be declared the winner, the selected entrant must first correctly answer, without assistance, a
           mathematical skill-testing question. If they cannot be reached within 72 hours, answer incorrectly, or are
@@ -87,7 +115,7 @@ export default function GiveawayPage() {
         <h2>7. Your information</h2>
         <p>
           We use the details you give only to run this contest and to contact the winner. We will send you marketing
-          email only if you tick the separate, optional box on the form, and you can unsubscribe at any time. The winner&apos;s
+          email only if you tick a separate, optional box (on the entry form or in your checklist), and you can unsubscribe at any time. The winner&apos;s
           first name and city may be announced with their consent.
         </p>
 
