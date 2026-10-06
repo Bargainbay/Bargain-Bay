@@ -9,6 +9,8 @@ import { listSalvage } from '../../../lib/salvage';
 import AdminNav from '../../../components/AdminNav';
 import OpsSection from '../../../components/OpsSection';
 import OpsFoldBar from '../../../components/OpsFoldBar';
+import MarketingPosters from '../../../components/MarketingPosters';
+import { posterCount } from '../../../lib/marketing-assets';
 import AdminOrders from '../AdminOrders';
 import AdminTools from '../AdminTools';
 import StaffAccess from '../../../components/StaffAccess';
@@ -160,6 +162,10 @@ export default async function OperationsPage() {
 
       <OpsSection id="clearance" title="Clearance" count={clearance.filter((c) => c.active).length}>
         <AdminClearance initialItems={clearance} />
+      </OpsSection>
+
+      <OpsSection id="posters" title="Marketing posters" count={posterCount()}>
+        <MarketingPosters />
       </OpsSection>
 
       <OpsSection id="tools" title="Reservations &amp; tools" count={reservations.length}>

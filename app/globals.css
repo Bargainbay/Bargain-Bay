@@ -1727,3 +1727,18 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .check-line input { width: auto !important; margin-top: 2px; flex: 0 0 auto; }
 .giveaway-ad { margin-top: 18px; }
 .giveaway-ad video { width: 100%; max-height: 70vh; border-radius: var(--radius); background: #000; display: block; }
+
+/* Marketing posters section on /admin/operations */
+.poster-h { margin: 14px 0 2px; font-size: 14px; }
+.poster-h span { font-weight: 400; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
+.poster-grid { display: grid; gap: 14px; }
+.poster-grid-feed { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.poster-grid-story { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.poster-grid-ad { grid-template-columns: minmax(300px, 640px); }
+.poster-card { margin: 0; background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 10px; }
+.poster-stills { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.poster-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 3px; }
+.poster-card img, .poster-card video { width: 100%; display: block; border-radius: 8px; background: #000; object-fit: cover; }
+.poster-card figcaption { margin-top: 8px; font-size: 13.5px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; }
+.poster-dl { display: inline-flex; gap: 12px; }
+.poster-dl a { text-decoration: underline; font-size: 13px; }
