@@ -37,8 +37,12 @@ test('the sync summary warns when models lack a photo, and is quiet otherwise', 
   equal(syncSummary({ report: { noStockPhoto: [] } }).warnings.length, 0);
 });
 
-test('every images.json entry is an https URL', () => {
-  for (const [k, v] of Object.entries(images)) assert(/^https:\/\//.test(v), `${k} is not an https URL`);
+test('every images.json entry is an https URL or a file we ship in public/model-photos', async () => {
+  const { existsSync } = await import('node:fs');
+  for (const [k, v] of Object.entries(images)) {
+    if (v.startsWith('/model-photos/')) assert(existsSync(new URL('../public' + v, import.meta.url)), `${k}: ${v} is missing from public/`);
+    else assert(/^https:\/\//.test(v), `${k} is not an https URL`);
+  }
 });
 
 // ---- the editable layer (model_photos) ----
