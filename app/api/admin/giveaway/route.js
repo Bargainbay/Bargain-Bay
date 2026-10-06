@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { giveawayOverview, drawWinner, resolveWinner, reviewVideo } from '../../../../lib/giveaway';
+import { giveawayOverview, drawWinner, resolveWinner, reviewVideo, entriesCsv } from '../../../../lib/giveaway';
 import { GIVEAWAY } from '../../../../lib/deals-config';
 
 export const dynamic = 'force-dynamic';
@@ -14,9 +14,19 @@ async function admin() {
   return s && isAdmin(s) ? s : null;
 }
 
-export async function GET() {
+export async function GET(req) {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
-  return NextResponse.json(await giveawayOverview(GIVEAWAY.id));
+  const o = await giveawayOverview(GIVEAWAY.id);
+  if (new URL(req.url).searchParams.get('format') === 'csv') {
+    return new Response(entriesCsv(o.entries), {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${GIVEAWAY.id}-entries.csv"`,
+        'Cache-Control': 'private, no-store'
+      }
+    });
+  }
+  return NextResponse.json(o);
 }
 
 export async function POST(req) {

@@ -10,7 +10,7 @@ import {
 } from '../lib/deals-config.js';
 import {
   entryKey, postalPrefix, checkEntryInput, normalizeInstagram, pickWeighted, entryParam, entryIdFromParam,
-  entryStatus, setInstagram, registerVideo, reviewVideo, videoPrefix
+  entryStatus, setInstagram, registerVideo, reviewVideo, videoPrefix, entriesCsv
 } from '../lib/giveaway.js';
 
 const at = (iso) => new Date(iso);
@@ -293,4 +293,33 @@ test('a video must carry this entry\'s prefix and the release', async () => {
     assert(m1.includes('does not belong'), 'cannot attach somebody else\'s upload');
     assert(m2.includes('share your video'), 'the release must be ticked');
   } finally { done(); }
+});
+
+suite('giveaway admin: who entered');
+
+test('the overview lists every entrant, newest first, with their details and entries', async () => {
+  const { done } = await withTestDb();
+  try {
+    const a = (await enterGiveaway(G, person(1, { name: 'Ann One', phone: '416-555-0101' }))).id;
+    const b = (await enterGiveaway(G, person(2, { name: 'Bob Two' }))).id;
+    await setInstagram(a, '@annone');
+    const o = await giveawayOverview(G);
+    equal(o.entries.map((e) => e.id), [b, a], 'newest first');
+    const ann = o.entries.find((e) => e.id === a);
+    equal([ann.name, ann.email, ann.phone, ann.postal_prefix, ann.instagram_handle, ann.tickets],
+      ['Ann One', 'p1@example.com', '416-555-0101', 'L1W', 'annone', 2]);
+    equal(o.total, 2);
+  } finally { done(); }
+});
+
+test('the CSV quotes awkward cells and cannot carry a spreadsheet formula', () => {
+  const csv = entriesCsv([{ id: 1, created_at: '2026-10-06T14:00:00Z', name: '=HYPERLINK("x")', email: 'a@b.ca',
+    phone: null, postal_prefix: 'L1W', tickets: 2, has_account: true, newsletter: false, instagram_handle: 'zed',
+    video_status: null, status: 'entered', note: 'said "hi", twice' }]);
+  const lines = csv.trim().split('\r\n');
+  equal(lines.length, 2);
+  assert(lines[0].startsWith('id,entered_at,name,email'));
+  assert(lines[1].includes(`"'=HYPERLINK(""x"")"`), 'a leading = is neutralised and quotes are doubled');
+  assert(lines[1].includes('"said ""hi"", twice"'));
+  assert(lines[1].includes(',zed,'), 'the handle is written without an @, which a spreadsheet would treat as a formula marker');
 });
