@@ -6,6 +6,7 @@ export default function GiveawayAdmin({ initial, title, drawDate }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [note, setNote] = useState('');
+  const [q, setQ] = useState('');
 
   async function call(payload) {
     setBusy(true); setErr('');
@@ -20,7 +21,7 @@ export default function GiveawayAdmin({ initial, title, drawDate }) {
 
   const w = o.winner;
   return (
-    <div className="panel" style={{ maxWidth: 720 }}>
+    <div className="panel" style={{ maxWidth: 1100 }}>
       <h2 style={{ marginTop: 0 }}>{title}</h2>
       <p style={{ fontSize: 14.5 }}>
         <b>{o.total}</b> people · <b>{o.tickets}</b> entries in the pot · <b>{o.optIns}</b> subscribed · draw planned {drawDate}
@@ -62,6 +63,40 @@ export default function GiveawayAdmin({ initial, title, drawDate }) {
           </table>
         </>
       )}
+      <h3 style={{ fontSize: 14, margin: '22px 0 6px' }}>Entrants ({o.entries.length})</h3>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '0 0 8px', flexWrap: 'wrap' }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, email, phone, Instagram" style={{ maxWidth: 320 }} />
+        <a className="btn" href="/api/admin/giveaway?format=csv">Download CSV</a>
+      </div>
+      <div className="table-wrap">
+        <table className="admin">
+          <thead>
+            <tr><th>Entered</th><th>Name</th><th>Email</th><th>Phone</th><th>Postal</th><th>Entries</th><th>Account</th><th>Email list</th><th>Instagram</th><th>Video</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {o.entries.filter((e) => {
+              const t = q.trim().toLowerCase();
+              return !t || [e.name, e.email, e.phone, e.instagram_handle].some((v) => String(v || '').toLowerCase().includes(t));
+            }).map((e) => (
+              <tr key={e.id}>
+                <td style={{ whiteSpace: 'nowrap' }}>{e.created_at ? new Date(e.created_at).toLocaleString('en-CA', { timeZone: 'America/Toronto', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''}</td>
+                <td>{e.name}</td>
+                <td>{e.email}</td>
+                <td>{e.phone || ''}</td>
+                <td>{e.postal_prefix}</td>
+                <td><b>{e.tickets}</b></td>
+                <td>{e.has_account ? 'yes' : <span title="Entered before an account was required">no</span>}</td>
+                <td>{e.newsletter ? 'yes' : <span title="Not subscribed, or unsubscribed since">no</span>}</td>
+                <td>{e.instagram_handle ? <a href={`https://instagram.com/${e.instagram_handle}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>@{e.instagram_handle}</a> : ''}</td>
+                <td>{e.video_status || ''}</td>
+                <td>{e.status}</td>
+              </tr>
+            ))}
+            {o.entries.length === 0 && <tr><td colSpan={11} className="hint">No entries yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
       <h3 style={{ fontSize: 14, margin: '22px 0 6px' }}>Thankful videos ({o.videos.length})</h3>
       {o.videos.length === 0 && <p className="hint">None yet.</p>}
       {o.videos.map((v) => (
