@@ -1708,9 +1708,18 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .check-title { font-weight: 600; font-size: 15px; }
 .check-bonus { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--card); border: 1px solid var(--line-soft); border-radius: 999px; padding: 2px 9px; margin-left: 6px; white-space: nowrap; }
 
-/* The 3D prize. Poster photo underneath, the viewer fades in over it. */
-.hero3d { position: relative; width: 250px; height: 380px; }
-.hero3d-poster { position: absolute; left: 50%; bottom: 0; height: 340px; width: auto; transform: translateX(-50%); transition: opacity .4s; }
-.hero3d-poster[data-hidden="1"] { opacity: 0; }
-.hero3d model-viewer { position: absolute; inset: 0; width: 100%; height: 100%; background: transparent; --poster-color: transparent; transition: opacity .4s; outline: none; }
-@media (max-width: 760px) { .hero3d { width: 190px; height: 250px; } .hero3d-poster { height: 190px; } }
+/* Animated hero backdrop. The still (--hero-bg) paints first; the clip fades in
+   over it. The readability scrim moves from a background layer to ::after so it
+   sits ABOVE the video instead of underneath it. */
+.hero-vid-wrap { position: absolute; inset: 0; z-index: 0; overflow: hidden; border-radius: inherit; }
+.hero-vid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 1s linear; }
+.hero-has-video { background-image: var(--hero-bg, linear-gradient(115deg, #7a1226 0%, #a31b34 55%, #3a3937 130%)); }
+.hero-has-video::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(90deg, rgba(38,8,14,.82) 0%, rgba(38,8,14,.55) 42%, rgba(38,8,14,0) 72%);
+}
+.hero-has-video > .hero-inner, .hero-has-video > .hero-art { z-index: 2; }
+@media (max-width: 760px) {
+  .hero-has-video { background-image: var(--hero-bg, linear-gradient(115deg, #7a1226 0%, #a31b34 55%, #3a3937 130%)); }
+  .hero-has-video::after { background: linear-gradient(180deg, rgba(38,8,14,.82) 0%, rgba(38,8,14,.45) 70%, rgba(38,8,14,.25) 100%); }
+}
