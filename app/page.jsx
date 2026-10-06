@@ -4,7 +4,7 @@ import { getSession } from '../lib/auth';
 import { decorate } from '../lib/pricing';
 import { COLLECTIONS, collectionFilter, money } from '../lib/constants';
 import ProductCard from '../components/ProductCard';
-import Hero3D from '../components/Hero3D';
+import HeroVideo from '../components/HeroVideo';
 import { dealsSnapshot } from '../lib/deals';
 import { heroFor, dayLabel } from '../lib/deals-config';
 
@@ -54,7 +54,8 @@ export default async function Home() {
   return (
     <div>
       {promo ? (
-        <section className="hero hero-promo" style={promo.bg ? { '--hero-bg': `url(${promo.bg})` } : undefined}>
+        <section className={'hero hero-promo' + (promo.video ? ' hero-has-video' : '')} style={promo.bg ? { '--hero-bg': `url(${promo.bg})` } : undefined}>
+          {promo.video && <HeroVideo src={promo.video} />}
           <div className="hero-inner">
             <span className="hero-kicker">{promo.kicker}</span>
             <h1>{promo.headline}</h1>
@@ -72,9 +73,7 @@ export default async function Home() {
           </div>
           {promo.image && (
             <div className="hero-art">
-              {promo.glb
-                ? <Hero3D poster={promo.image} glb={promo.glb} alt={promo.imageAlt} />
-                : <img src={promo.image} alt={promo.imageAlt} />}
+              <img src={promo.image} alt={promo.imageAlt} />
               {promo.badge && (
                 <span className="hero-badge"><small>{promo.badge.top}</small><b>{promo.badge.main}</b></span>
               )}
