@@ -1,5 +1,7 @@
 # Thanksgiving giveaway: Instagram posting guide
 
+**All the posters, still and animated, are in the app: Admin → Operations → Marketing posters.** The files live in `public/marketing/giveaway/` (`stills/` and `animated/`). The names below are the same in both folders (animated ones end in `-animated.mp4`).
+
 Giveaway link: **bargainbay.ca/giveaway** · entries close **Mon Oct 12, 11:59 pm ET** · draw **Tue Oct 13**.
 Put the link in the bio (and a **link sticker** on every story: each story image leaves a rounded space for it).
 

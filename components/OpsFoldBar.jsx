@@ -11,7 +11,7 @@
 // was added, which is the failure mode to watch for when adding one.
 const IDS = [
   'orders', 'intake-queue', 'purchase-intake', 'on-order', 'suppliers',
-  'intake', 'reconcile', 'salvage', 'drivers', 'members', 'clearance', 'tools'
+  'intake', 'reconcile', 'salvage', 'drivers', 'members', 'clearance', 'posters', 'tools'
 ];
 
 export default function OpsFoldBar() {
