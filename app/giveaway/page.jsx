@@ -37,8 +37,8 @@ export default async function GiveawayPage({ searchParams }) {
       </section>
 
       <section className="giveaway-ad" aria-label="Thanksgiving advertisement">
-        <video controls preload="none" playsInline poster="/giveaway/thanksgiving-ad-poster.jpg">
-          <source src="/giveaway/thanksgiving-ad.mp4" type="video/mp4" />
+        <video controls preload="none" playsInline poster="/giveaway/thanksgiving-ad-v2-poster.jpg">
+          <source src="/giveaway/thanksgiving-ad-v2.mp4" type="video/mp4" />
           Your browser can’t play this video.
         </video>
         <p className="hint" style={{ margin: '6px 0 0' }}>Advertisement made with AI. The freezer shown is the prize.</p>
