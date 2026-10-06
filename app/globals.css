@@ -1707,3 +1707,10 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .check-step[data-done="1"] .check-mark { background: var(--charcoal); border-color: var(--charcoal); }
 .check-title { font-weight: 600; font-size: 15px; }
 .check-bonus { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--card); border: 1px solid var(--line-soft); border-radius: 999px; padding: 2px 9px; margin-left: 6px; white-space: nowrap; }
+
+/* The 3D prize. Poster photo underneath, the viewer fades in over it. */
+.hero3d { position: relative; width: 250px; height: 380px; }
+.hero3d-poster { position: absolute; left: 50%; bottom: 0; height: 340px; width: auto; transform: translateX(-50%); transition: opacity .4s; }
+.hero3d-poster[data-hidden="1"] { opacity: 0; }
+.hero3d model-viewer { position: absolute; inset: 0; width: 100%; height: 100%; background: transparent; --poster-color: transparent; transition: opacity .4s; outline: none; }
+@media (max-width: 760px) { .hero3d { width: 190px; height: 250px; } .hero3d-poster { height: 190px; } }
