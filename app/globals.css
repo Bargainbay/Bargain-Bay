@@ -1668,7 +1668,34 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 @media (max-width: 640px) { .deal-giveaway { flex-direction: column; align-items: flex-start; } }
 
 /* Homepage promo hero (added 2026-10-05). Same .hero shell as the default one. */
-.hero-promo { background: linear-gradient(115deg, #7a1226 0%, #a31b34 55%, #3a3937 130%); }
+.hero-promo {
+  /* Left-to-right scrim keeps the text readable over the artwork; --hero-bg is the
+     generated backdrop, falling back to the brand gradient when a promo has none. */
+  background-image:
+    linear-gradient(90deg, rgba(38,8,14,.82) 0%, rgba(38,8,14,.55) 42%, rgba(38,8,14,0) 72%),
+    var(--hero-bg, linear-gradient(115deg, #7a1226 0%, #a31b34 55%, #3a3937 130%));
+  background-size: cover; background-position: center;
+  flex-direction: row; align-items: center; justify-content: space-between; gap: 24px;
+  min-height: 400px;
+}
+.hero-art { position: relative; flex: 0 0 auto; margin-right: 6%; align-self: flex-end; }
+.hero-art::after { content: ''; position: absolute; left: -12%; right: -12%; bottom: -10px; height: 26px; background: radial-gradient(ellipse at center, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 70%); z-index: 0; }
+.hero-art img { position: relative; z-index: 1; display: block; height: 340px; width: auto; filter: drop-shadow(0 22px 26px rgba(0,0,0,.5)); }
+.hero-badge {
+  position: absolute; top: 8px; right: -46px; width: 96px; height: 96px; border-radius: 50%;
+  background: #f2b84b; color: #3a1a0a; display: grid; place-content: center; text-align: center;
+  box-shadow: 0 8px 18px rgba(0,0,0,.4); transform: rotate(10deg); line-height: 1.05; z-index: 2;
+}
+.hero-badge small { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.hero-badge b { font-size: 26px; font-weight: 800; }
+@media (max-width: 760px) {
+  .hero-promo { flex-direction: column; align-items: flex-start; min-height: 0; padding-bottom: 0; }
+  .hero-promo { background-image: linear-gradient(180deg, rgba(38,8,14,.82) 0%, rgba(38,8,14,.45) 70%, rgba(38,8,14,.25) 100%), var(--hero-bg, linear-gradient(115deg, #7a1226 0%, #a31b34 55%, #3a3937 130%)); }
+  .hero-art { align-self: center; margin: 4px 0 0; }
+  .hero-art img { height: 190px; }
+  .hero-badge { right: -34px; top: 6px; width: 74px; height: 74px; }
+  .hero-badge b { font-size: 21px; }
+}
 .hero-kicker { display: inline-block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; font-family: var(--font-head); background: rgba(255,255,255,.16); padding: 5px 11px; border-radius: 999px; margin-bottom: 14px; }
 .hero-promo h1 { font-size: 40px; }
 .hero-code { font-size: 15px; margin: -12px 0 20px !important; }
