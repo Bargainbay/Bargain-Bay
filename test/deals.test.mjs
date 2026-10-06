@@ -49,8 +49,8 @@ test('there is never a gap or a double booking in the weekly drops', () => {
 });
 
 test('the giveaway window and its draw date agree', () => {
-  assert(giveawayOpen(at('2026-10-06T14:00:00Z')));
-  assert(!giveawayOpen(at('2026-10-05T14:00:00Z')));
+  assert(giveawayOpen(at('2026-10-05T14:00:00Z')), 'opened Oct 5');
+  assert(!giveawayOpen(at('2026-10-04T14:00:00Z')), 'closed the day before');
   assert(giveawayOpen(at('2026-10-13T01:00:00Z')), '9pm Oct 12 Toronto is still open');
   assert(!giveawayOpen(at('2026-10-13T05:00:00Z')));
   assert(GIVEAWAY.drawDate > GIVEAWAY.to);
