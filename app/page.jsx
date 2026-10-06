@@ -4,6 +4,7 @@ import { getSession } from '../lib/auth';
 import { decorate } from '../lib/pricing';
 import { COLLECTIONS, collectionFilter, money } from '../lib/constants';
 import ProductCard from '../components/ProductCard';
+import Hero3D from '../components/Hero3D';
 import { dealsSnapshot } from '../lib/deals';
 import { heroFor, dayLabel } from '../lib/deals-config';
 
@@ -71,7 +72,9 @@ export default async function Home() {
           </div>
           {promo.image && (
             <div className="hero-art">
-              <img src={promo.image} alt={promo.imageAlt} />
+              {promo.glb
+                ? <Hero3D poster={promo.image} glb={promo.glb} alt={promo.imageAlt} />
+                : <img src={promo.image} alt={promo.imageAlt} />}
               {promo.badge && (
                 <span className="hero-badge"><small>{promo.badge.top}</small><b>{promo.badge.main}</b></span>
               )}
