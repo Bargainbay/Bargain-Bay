@@ -36,6 +36,14 @@ export default async function GiveawayPage({ searchParams }) {
         </div>
       </section>
 
+      <section className="giveaway-ad" aria-label="Thanksgiving advertisement">
+        <video controls preload="none" playsInline poster="/giveaway/thanksgiving-ad-poster.jpg">
+          <source src="/giveaway/thanksgiving-ad.mp4" type="video/mp4" />
+          Your browser can’t play this video.
+        </video>
+        <p className="hint" style={{ margin: '6px 0 0' }}>Advertisement made with AI. The freezer shown is the prize.</p>
+      </section>
+
       <div style={{ marginTop: 18 }}>
         {open && entry ? (
           <GiveawayChecklist e={eParam} initial={JSON.parse(JSON.stringify(entry))}
@@ -66,20 +74,24 @@ export default async function GiveawayPage({ searchParams }) {
         </p>
 
         <h2>3. How to enter</h2>
+        <p>To enter you must do all three of the following. Together they earn one (1) entry:</p>
+        <ol>
+          <li>Create a free Bargain Bay account, or log in to your existing one, using the email address you enter with. No purchase is needed to create an account.</li>
+          <li>Agree to receive Bargain Bay&apos;s deals, flyers and new-arrival announcements by email (about once a week). You may unsubscribe at any time using the link in any of those emails, and your entry stays valid if you do.</li>
+          <li>Complete the entry form on this page.</li>
+        </ol>
         <p>
-          Complete the entry form on this page for one (1) entry. One person, one entry form: entries made with
-          more than one email address by the same person, or by automated means, will be disqualified.
+          One entry form per person: entries made with more than one email address by the same person, or by automated
+          means, will be disqualified.
         </p>
 
         <h2>4. Bonus entries (optional)</h2>
         <p>
-          After entering you may earn extra entries by doing any of the following. None is required, and not doing
+          After entering you may earn extra entries in either of these two ways. Neither is required, and not doing
           them does not affect your base entry. Up to {MAX_TICKETS} entries per person in total.
         </p>
         <ul>
-          <li><b>+{BONUS.account}</b> Create a Bargain Bay account using the same email you entered with.</li>
-          <li><b>+{BONUS.newsletter}</b> Subscribe to our deals and flyers email. You may unsubscribe at any time, and your entries are kept.</li>
-          <li><b>+{BONUS.instagram}</b> Follow Bargain Bay on Instagram and give us your username. We will confirm the winner follows us before the prize is awarded.</li>
+          <li><b>+{BONUS.instagram}</b> Follow Bargain Bay on Instagram (@bargainbayinc) and give us your username. We will confirm the winner follows us before the prize is awarded.</li>
           <li><b>+{BONUS.video}</b> Send us a video of up to 30 seconds of what you are thankful for. It counts once we have reviewed and approved it. Videos are not judged and the best video does not win: it only earns bonus entries.</li>
         </ul>
         <p>
@@ -114,9 +126,9 @@ export default async function GiveawayPage({ searchParams }) {
 
         <h2>7. Your information</h2>
         <p>
-          We use the details you give only to run this contest and to contact the winner. We will send you marketing
-          email only if you tick a separate, optional box (on the entry form or in your checklist), and you can unsubscribe at any time. The winner&apos;s
-          first name and city may be announced with their consent.
+          We use the details you give to run this contest, to contact the winner, to create your Bargain Bay account, and
+          to send the deals and flyers email you agree to in section 3. You can unsubscribe from that email at any time.
+          The winner&apos;s first name and city may be announced with their consent.
         </p>
 
         <h2>8. General</h2>

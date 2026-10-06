@@ -16,13 +16,15 @@ Put the link in the bio (and a **link sticker** on every story: each story image
 > Hosting season means a full fridge and a fuller freezer, so we're giving one away. 🎁
 >
 > HOW TO ENTER 👇
-> 1️⃣ Fill in the entry form (link in bio): that's your entry
-> 2️⃣ Want more chances? Create a Bargain Bay account (+1)
-> 3️⃣ Get our weekly deals and flyers (+1)
-> 4️⃣ Follow @bargainbayinc (+1)
-> 5️⃣ Send us a 30-second video: what are you thankful for? (+3)
+> 1️⃣ Create a free Bargain Bay account (required)
+> 2️⃣ Join our weekly deals and flyers email (required)
+> 3️⃣ Fill in the entry form (link in bio): that's your entry
 >
-> Up to 7 entries. Every bonus step is optional.
+> BONUS ENTRIES (optional) 🎁
+> ➕ Follow @bargainbayinc (+1)
+> ➕ Send us a 30-second video: what are you thankful for? (+3)
+>
+> Up to 5 entries.
 >
 > 🔗 bargainbay.ca/giveaway (link in bio)
 > ⏰ Entries close Mon, Oct 12 at 11:59 pm ET. Winner drawn Tue, Oct 13.
@@ -43,6 +45,9 @@ Put the link in the bio (and a **link sticker** on every story: each story image
 
 ## Video bonus: what to expect
 People upload on the website, not on Instagram. You review each video at **/admin/giveaway** and approve or reject it. No kids' faces, no one else's face without permission, no copyrighted music (the checklist says so).
+
+## The ad
+`video/thanksgiving-ad-vertical-1080p.mp4` for Reels/Stories and `video/thanksgiving-ad-wide-1080p.mp4` for Facebook/YouTube. Both are AI-generated: turn on the **AI info** label when you upload. The widescreen one also plays on bargainbay.ca/giveaway.
 
 ## Before you post
 - **Wordmark:** these were generated, and the "BARGAIN BAY" lettering is not our exact logo. For a polished brand look, drop the real logo over the top of it in Canva or your editor.

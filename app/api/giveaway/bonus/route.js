@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { hasDb } from '../../../../lib/db';
 import { GIVEAWAY, giveawayOpen } from '../../../../lib/deals-config';
 import { entryIdFromParam, entryStatus, setInstagram, registerVideo } from '../../../../lib/giveaway';
-import { grantConsent } from '../../../../lib/consent';
-import { clientIp } from '../../../../lib/antifraud';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,13 +21,6 @@ export async function POST(req) {
 
     if (body.action === 'instagram') {
       await setInstagram(id, body.handle);
-    } else if (body.action === 'newsletter') {
-      // Express consent with the wording they were shown. Only on a real tick.
-      if (body.optIn !== true) return NextResponse.json({ error: 'Tick the box to subscribe.' }, { status: 400 });
-      await grantConsent({
-        channel: 'email', email: cur.email, source: 'giveaway', ip: clientIp(req),
-        evidence: String(body.optInText || '').slice(0, 500) || 'Ticked the newsletter box on the giveaway checklist'
-      });
     } else if (body.action === 'video') {
       await registerVideo(GIVEAWAY.id, id, body.pathname, body.release === true);
     } else {

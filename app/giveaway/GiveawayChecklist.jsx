@@ -3,14 +3,9 @@ import { useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
 import { BONUS, MAX_TICKETS } from '../../lib/deals-config';
 
-// Shown to someone who already has an entry (the signed link carries which).
-// Every step is OPTIONAL and earns bonus entries; the base entry is already in.
-// Wording for the newsletter box is what we store as consent evidence, so it
-// says exactly what they will get and who it is from.
-const NEWSLETTER_TEXT =
-  'Email me Bargain Bay’s deals, flyers and new-arrival announcements (about once a week). ' +
-  'From Bargain Bay, 1135 Squires Beach Rd, Pickering ON. You can unsubscribe at any time using the link in any of those emails.';
-
+// Shown to someone who already has an entry (the signed link carries which). The
+// account and the deals-and-flyers email were REQUIRED to get here, so they are
+// not steps. What is left is optional: two ways to earn bonus entries.
 const post = (body) => fetch('/api/giveaway/bonus', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 }).then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) }));
@@ -32,7 +27,6 @@ export default function GiveawayChecklist({ e, initial, instagramUrl, closesLabe
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
   const [ig, setIg] = useState(initial.instagram_handle || '');
-  const [opt, setOpt] = useState(false);
   const [release, setRelease] = useState(false);
   const [progress, setProgress] = useState(0);
   const file = useRef(null);
@@ -73,35 +67,12 @@ export default function GiveawayChecklist({ e, initial, instagramUrl, closesLabe
       <h2 style={{ marginTop: 0 }}>You’re in, {s.name.split(' ')[0]}.</h2>
       <p style={{ fontSize: 15 }}>
         You have <b>{s.tickets} {s.tickets === 1 ? 'entry' : 'entries'}</b> (of a possible {MAX_TICKETS}).
-        Each step below is optional and earns bonus entries until {closesLabel}.
+        The two steps below are optional and earn bonus entries until {closesLabel}.
       </p>
       {err && <div className="error-box">{err}</div>}
 
       <Step done title="Entered the giveaway" bonus={1}>
-        <div className="hint">Confirmation sent to {s.email}.</div>
-      </Step>
-
-      <Step done={s.has_account} title="Create a Bargain Bay account" bonus={BONUS.account}>
-        {s.has_account
-          ? <div className="hint">Done, using {s.email}.</div>
-          : <>
-              <div className="hint">Use the same email ({s.email}) so we can match it.</div>
-              <a className="btn" style={{ marginTop: 8 }}
-                href={`/signup?email=${encodeURIComponent(s.email)}&next=${encodeURIComponent('/giveaway?e=' + e)}`}>Create account</a>
-            </>}
-      </Step>
-
-      <Step done={s.newsletter} title="Get our weekly deals and flyers" bonus={BONUS.newsletter}>
-        {s.newsletter ? <div className="hint">You’re subscribed. Unsubscribe any time from any email.</div> : (
-          <>
-            <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 13.5, lineHeight: 1.45, cursor: 'pointer', fontWeight: 400 }}>
-              <input type="checkbox" checked={opt} onChange={(ev) => setOpt(ev.target.checked)} style={{ marginTop: 2, width: 'auto' }} />
-              <span>{NEWSLETTER_TEXT}</span>
-            </label>
-            <button className="btn" style={{ marginTop: 8 }} disabled={!opt || busy === 'newsletter'}
-              onClick={() => act('newsletter', { action: 'newsletter', optIn: true, optInText: NEWSLETTER_TEXT })}>Subscribe</button>
-          </>
-        )}
+        <div className="hint">Your Bargain Bay account and our deals and flyers email are set up. Confirmation sent to {s.email}.</div>
       </Step>
 
       <Step done={!!s.instagram_handle} title="Follow us on Instagram" bonus={BONUS.instagram}>

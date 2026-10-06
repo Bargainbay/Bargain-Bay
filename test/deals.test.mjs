@@ -6,10 +6,10 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import {
   DEALS, DROPS, GIVEAWAY, isRunning, isUpcoming, dropFor, giveawayOpen,
-  describeCoupon, bannerFor, heroFor, torontoParts, ticketsOf, BONUS, MAX_TICKETS
+  describeCoupon, bannerFor, heroFor, torontoParts, ticketsOf, BONUS, MAX_TICKETS, GIVEAWAY_EMAIL_TEXT
 } from '../lib/deals-config.js';
 import {
-  entryKey, postalPrefix, normalizeInstagram, pickWeighted, entryParam, entryIdFromParam,
+  entryKey, postalPrefix, checkEntryInput, normalizeInstagram, pickWeighted, entryParam, entryIdFromParam,
   entryStatus, setInstagram, registerVideo, reviewVideo, videoPrefix
 } from '../lib/giveaway.js';
 
@@ -202,13 +202,32 @@ test('only a current winner can be resolved', async () => {
 
 suite('giveaway: bonus entries are derived, never stored');
 
-test('tickets add up from the four optional steps, and the video only counts once approved', () => {
+test('only Instagram and an approved video earn bonus entries', () => {
   equal(ticketsOf({}), 1);
-  equal(ticketsOf({ has_account: true, newsletter: true, instagram_handle: 'x' }), 4);
+  // An account and the email subscription are REQUIRED to enter, so they are not bonuses.
+  equal(ticketsOf({ has_account: true, newsletter: true }), 1);
+  equal(ticketsOf({ instagram_handle: 'x' }), 2);
   equal(ticketsOf({ video_status: 'pending' }), 1, 'a video nobody has watched is not a ticket');
   equal(ticketsOf({ video_status: 'rejected' }), 1);
-  equal(ticketsOf({ has_account: true, newsletter: true, instagram_handle: 'x', video_status: 'approved' }), MAX_TICKETS);
-  equal(MAX_TICKETS, 1 + BONUS.account + BONUS.newsletter + BONUS.instagram + BONUS.video);
+  equal(ticketsOf({ instagram_handle: 'x', video_status: 'approved' }), MAX_TICKETS);
+  equal(MAX_TICKETS, 1 + BONUS.instagram + BONUS.video);
+  equal(MAX_TICKETS, 5);
+});
+
+test('entry input is checked before anything is created', () => {
+  const ok = { name: 'Sam', email: 'sam@example.com', postal: 'L1W 3T9', eligible: true };
+  equal(checkEntryInput(ok), null);
+  assert(checkEntryInput({ ...ok, name: ' ' }));
+  assert(checkEntryInput({ ...ok, email: 'nope' }));
+  assert(checkEntryInput({ ...ok, postal: 'H2X 1Y4' }), 'Quebec is refused');
+  assert(checkEntryInput({ ...ok, eligible: false }));
+});
+
+test('the required-subscription wording names the sender, the frequency and how to stop', () => {
+  assert(/Bargain Bay/.test(GIVEAWAY_EMAIL_TEXT));
+  assert(/once a week/.test(GIVEAWAY_EMAIL_TEXT));
+  assert(/unsubscribe/i.test(GIVEAWAY_EMAIL_TEXT));
+  assert(/entry stays valid/.test(GIVEAWAY_EMAIL_TEXT), 'unsubscribing must not cost them the entry');
 });
 
 test('Instagram handles are cleaned up from however they were typed', () => {
@@ -234,31 +253,32 @@ test('an entry link verifies, and a tampered one does not', () => {
   equal(entryIdFromParam(''), null);
 });
 
-test('account, newsletter, Instagram and video each add entries, from the real tables', async () => {
+test('Instagram and an approved video add entries, from the real tables; account and newsletter do not', async () => {
   const { done } = await withTestDb();
   try {
     const { ensureConsentSchema, grantConsent, withdrawConsent } = await import('../lib/consent.js');
     await ensureConsentSchema();
-    const r = await enterGiveaway(G, person(1));
-    const id = r.id;
+    const id = (await enterGiveaway(G, person(1))).id;
     equal((await entryStatus(id)).tickets, 1);
 
-    // An account made LATER, with the same address (any case), is picked up.
     await query(`INSERT INTO users (email, name, password_hash) VALUES ('P1@Example.com','P1','x')`);
-    equal((await entryStatus(id)).tickets, 2);
+    await grantConsent({ channel: 'email', email: 'p1@example.com', source: 'giveaway', evidence: GIVEAWAY_EMAIL_TEXT });
+    const s1 = await entryStatus(id);
+    equal(s1.has_account, true, 'the account is still recorded, for the admin to see');
+    equal(s1.newsletter, true);
+    equal(s1.tickets, 1, 'but neither earns an extra entry');
 
-    await grantConsent({ channel: 'email', email: 'p1@example.com', source: 'giveaway', evidence: 'ticked' });
-    equal((await entryStatus(id)).tickets, 3);
+    // Unsubscribing later costs nothing: the entry keeps its tickets.
     await withdrawConsent({ channel: 'email', email: 'p1@example.com', source: 'unsubscribe_link' });
-    equal((await entryStatus(id)).tickets, 2, 'unsubscribing takes the bonus away');
+    equal((await entryStatus(id)).tickets, 1);
 
     await setInstagram(id, '@p1');
-    equal((await entryStatus(id)).tickets, 3);
+    equal((await entryStatus(id)).tickets, 2);
 
     await registerVideo(G, id, `${videoPrefix(G, id)}abc.mp4`, true);
-    equal((await entryStatus(id)).tickets, 3, 'pending does not count');
+    equal((await entryStatus(id)).tickets, 2, 'pending does not count');
     await reviewVideo(G, id, 'approved', 'admin');
-    equal((await entryStatus(id)).tickets, 6);
+    equal((await entryStatus(id)).tickets, 5);
   } finally { done(); }
 });
 
