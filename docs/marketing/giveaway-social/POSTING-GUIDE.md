@@ -49,7 +49,7 @@ Put the link in the bio (and a **link sticker** on every story: each story image
 People upload on the website, not on Instagram. You review each video at **/admin/giveaway** and approve or reject it. No kids' faces, no one else's face without permission, no copyrighted music (the checklist says so).
 
 ## The ad
-`video/thanksgiving-ad-vertical-1080p.mp4` for Reels/Stories and `video/thanksgiving-ad-wide-1080p.mp4` for Facebook/YouTube. Both are AI-generated: turn on the **AI info** label when you upload. The widescreen one also plays on bargainbay.ca/giveaway.
+The current ad is **v2** (ice bin + tongs, everyone's glass), widescreen, in `public/giveaway/thanksgiving-ad-v2.mp4`; it also plays on bargainbay.ca/giveaway and in Admin → Operations → Marketing posters. It is AI-generated: turn on the **AI info** label when you upload. The older v1 ads (with a bag of ice, including the only vertical cut) were kept locally only and are no longer used.
 
 ## Before you post
 - **Wordmark:** these were generated, and the "BARGAIN BAY" lettering is not our exact logo. For a polished brand look, drop the real logo over the top of it in Canva or your editor.
