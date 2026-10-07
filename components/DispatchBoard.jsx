@@ -691,6 +691,12 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   const [err, setErr] = useState('');
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);      // the job being corrected
+  const editPanel = useRef(null);
+  // The form renders above the columns. On a phone the columns stack, so Edit on
+  // a card halfway down opened the form off-screen and looked like a dead button.
+  useEffect(() => {
+    if (editing && editPanel.current) editPanel.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [editing]);
   const [closing, setClosing] = useState(null);   // the service visit being closed out
   // Everything dispatch does happens on this page — no tab-hopping to add a
   // client or chase a service call mid-shift.
@@ -1258,7 +1264,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
       {/* Correcting a stop that exists — same form, prefilled. A wrong number or
           a customer who moved shouldn't mean cancel-and-retype. */}
       {editing && (
-        <div className="panel">
+        <div className="panel" ref={editPanel} style={{ scrollMarginTop: 12 }}>
           <JobForm job={editing} date={editing.jobDate || board.date}
             clients={board.clients} drivers={board.drivers} canManageClients={canManageClients}
             onClientAdded={(c) => setBoard((b) => ({ ...b, clients: [...b.clients, c].sort((x, y) => x.name.localeCompare(y.name)) }))}
