@@ -9,6 +9,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
   const all = [
     { key: 'dashboard', label: 'Dashboards', href: '/admin/dashboard', sales: true },
     { key: 'copilot', label: 'Sarah', href: '/admin/agent' },
+    { key: 'bookings', label: 'Bookings', href: '/admin/bookings', sales: true },
     { key: 'quotes', label: 'Quotes', href: '/admin/quotes', sales: true },
     { key: 'invoices', label: 'Invoices', href: '/admin/invoices', sales: true },
     // The orders board used to be a fold on the admin-only Operations page, so
@@ -48,7 +49,8 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
   // no selling surfaces. Checked before salesOnly: the two are never both true,
   // but if they ever were, the narrower one should win.
   const items = dispatchOnly
-    ? [{ key: 'dispatch', label: 'Dispatch', href: '/admin/dispatch' }]
+    ? [{ key: 'dispatch', label: 'Dispatch', href: '/admin/dispatch' },
+       { key: 'bookings', label: 'Bookings', href: '/admin/bookings' }]
     : booksOnly
     ? [{ key: 'books', label: 'The books', href: '/admin/reports/books' },
        { key: 'pnl', label: 'Profit & loss', href: '/admin/reports/pnl' },
