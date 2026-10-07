@@ -2,7 +2,7 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import {
-  validateBooking, createBooking, checkBookingRate, listBookings, convertToTicket, setBookingStatus
+  bookingCorsHeaders, validateBooking, createBooking, checkBookingRate, listBookings, convertToTicket, setBookingStatus
 } from '../lib/bookings.js';
 
 const TODAY = '2026-10-07';
@@ -90,4 +90,14 @@ test('a move cannot become a ticket; a service call becomes exactly one', async 
     const row = (await listBookings({ status: 'converted' })).bookings[0];
     equal(row.ticket_number, t.ticket_number);
   } finally { done(); }
+});
+
+suite('Bookings — who may post from a browser');
+
+test('rssolutions.ca is allowed; any other origin gets no CORS headers', () => {
+  equal(bookingCorsHeaders('https://rssolutions.ca')['Access-Control-Allow-Origin'], 'https://rssolutions.ca');
+  equal(bookingCorsHeaders('https://www.rssolutions.ca')['Access-Control-Allow-Origin'], 'https://www.rssolutions.ca');
+  assert(!('Access-Control-Allow-Origin' in bookingCorsHeaders('https://evil.example')), 'other origin refused');
+  assert(!('Access-Control-Allow-Origin' in bookingCorsHeaders('https://rssolutions.ca.evil.example')), 'suffix tricks refused');
+  assert(!('Access-Control-Allow-Origin' in bookingCorsHeaders(null)), 'no origin, no headers');
 });
