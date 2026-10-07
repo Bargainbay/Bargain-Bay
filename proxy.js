@@ -19,8 +19,6 @@ const RS_HOSTS = new Set(
 //                      bounce every driver to a board they can't see.
 //   /api             — the board's own calls; blocking these breaks the page
 //   /invoice         — where an RS client lands from their invoice email
-//   /book            — the public page where a client requests a service call
-//                      or a moving quote (its form posts to /api/book)
 //   /login, /logout  — you can't reach /admin without being able to sign in
 //   /signup, /forgot-password, /reset-password
 //                    — the dispatch coordinator's account is created and recovered
@@ -36,7 +34,6 @@ const ALLOWED = [
   /^\/d\/[^/]+$/,
   /^\/api(\/|$)/,
   /^\/invoice(\/|$)/,
-  /^\/book$/,
   /^\/login$/,
   /^\/logout$/,
   /^\/signup$/,

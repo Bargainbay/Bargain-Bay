@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { hasDb } from '../../../lib/db';
 import { clientIp, userAgent, honeypotTripped, isDisposableEmail, isBlocked, ensureAbuseSchema } from '../../../lib/antifraud';
-import { validateBooking, checkBookingRate, createBooking, BOOKING_KINDS, TIME_WINDOWS, ACCESS_OPTIONS } from '../../../lib/bookings';
+import { bookingCorsHeaders, validateBooking, checkBookingRate, createBooking, BOOKING_KINDS, TIME_WINDOWS, ACCESS_OPTIONS } from '../../../lib/bookings';
 import { sendEmail, esc } from '../../../lib/email';
 import { dispatchDesk } from '../../../lib/constants';
 import { brandFor } from '../../../lib/brands';
@@ -13,7 +13,7 @@ const row = (k, v) => (v ? `<tr><td style="padding:3px 12px 3px 0;color:#666;ver
 
 // Public. Stores a request and tells the dispatch desk; it never creates a
 // ticket or a job by itself — a person decides that (see lib/bookings.js).
-export async function POST(req) {
+async function handle(req) {
   let body;
   try { body = await req.json(); } catch { body = {}; }
   if (!hasDb()) return NextResponse.json({ error: 'Booking is briefly unavailable — please call or email us.' }, { status: 503 });
@@ -76,4 +76,14 @@ export async function POST(req) {
   }).catch((e) => console.error('booking confirmation failed', e.message));
 
   return NextResponse.json({ ok: true, ref: r.ref });
+}
+
+export async function OPTIONS(req) {
+  return new NextResponse(null, { status: 204, headers: bookingCorsHeaders(req.headers.get('origin')) });
+}
+
+export async function POST(req) {
+  const res = await handle(req);
+  for (const [k, v] of Object.entries(bookingCorsHeaders(req.headers.get('origin')))) res.headers.set(k, v);
+  return res;
 }
