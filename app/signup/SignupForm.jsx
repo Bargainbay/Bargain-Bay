@@ -3,8 +3,9 @@ import { useState } from 'react';
 import HoneypotField from '../../components/HoneypotField';
 import MarketingOptIn, { CONSENT_TEXT } from '../../components/MarketingOptIn';
 import { useSearchParams } from 'next/navigation';
+import OAuthButtons from '../../components/OAuthButtons';
 
-export default function SignupForm() {
+export default function SignupForm({ providers = [] }) {
   const params = useSearchParams();
   const next = params.get('next') || '/account';
   const [form, setForm] = useState({ email: params.get('email') || '', name: '', phone: '', password: '', website: '', marketingOptIn: false });
@@ -38,6 +39,7 @@ export default function SignupForm() {
         <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Create account</h1>
         <p className="hint" style={{ marginBottom: 16 }}>Track orders, get pickup updates, and check out faster.</p>
         {error && <div className="error-box">{error}</div>}
+        <OAuthButtons providers={providers} next={next} verb="Sign up" />
         <form onSubmit={submit}>
           <HoneypotField value={form.website} onChange={set('website')} />
           <div className="field">

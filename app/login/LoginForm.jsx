@@ -1,13 +1,14 @@
 'use client';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import OAuthButtons from '../../components/OAuthButtons';
 
-export default function LoginForm() {
+export default function LoginForm({ providers = [] }) {
   const params = useSearchParams();
   const next = params.get('next') || '/account';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(params.get('error') || '');
   const [busy, setBusy] = useState(false);
 
   async function submit(e) {
@@ -35,6 +36,7 @@ export default function LoginForm() {
         <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Login</h1>
         <p className="hint" style={{ marginBottom: 16 }}>Track your orders and check out faster.</p>
         {error && <div className="error-box">{error}</div>}
+        <OAuthButtons providers={providers} next={next} />
         <form onSubmit={submit}>
           <div className="field">
             <label htmlFor="email">Email</label>
