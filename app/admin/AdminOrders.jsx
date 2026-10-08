@@ -197,7 +197,7 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
         customer never confirms their email (<b>⚠ Email unconfirmed</b>) — that badge is your best fake-order signal.
       </p>
       {error && <div className="error-box">{error}</div>}
-      <div className="table-wrap">
+      <div className="table-wrap tall">
         <table className="admin">
           <thead>
             <tr>
