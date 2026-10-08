@@ -293,7 +293,7 @@ export default function RepTrends() {
               {cmp.groups.map((g) => (
                 <tr key={g.key}><td>{g.name}</td><td style={{ textAlign: 'right' }}>{fmt(g.a)}</td><td style={{ textAlign: 'right' }}>{fmt(g.b)}</td><td style={{ textAlign: 'right', color: 'var(--muted)' }}>{change(g.a, g.b)}</td></tr>
               ))}
-              <tr style={{ fontWeight: 700 }}><td>Team</td><td style={{ textAlign: 'right' }}>{fmt(cmp.sumA)}</td><td style={{ textAlign: 'right' }}>{fmt(cmp.sumB)}</td><td style={{ textAlign: 'right' }}>{change(cmp.sumA, cmp.sumB)}</td></tr>
+              <tr style={{ fontWeight: 700 }}><td>Total</td><td style={{ textAlign: 'right' }}>{fmt(cmp.sumA)}</td><td style={{ textAlign: 'right' }}>{fmt(cmp.sumB)}</td><td style={{ textAlign: 'right' }}>{change(cmp.sumA, cmp.sumB)}</td></tr>
             </tbody>
           </table></div>
           <h3 style={{ margin: '18px 0 0', fontSize: 14, color: 'var(--charcoal)' }}>Running total by day · {rep === 'all' ? 'whole team' : repName[rep]}</h3>
