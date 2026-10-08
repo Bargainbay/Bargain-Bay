@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 // measure (not zero). A quota set now stays in force every month after until it
 // is changed, so this is a standing number, not a monthly chore.
 const FIELDS = [
-  ['revenue', 'Revenue $'], ['sales', 'Sales #'], ['ownRevenue', 'Own-lead revenue $'], ['ownSales', 'Own-lead sales #']
+  ['revenue', 'Revenue $'], ['sales', 'Sales #'], ['ownRevenue', 'Lead revenue $'], ['ownSales', 'Lead sales #']
 ];
 
 export default function QuotaEditor({ rows = [], monthLabel = '' }) {
@@ -32,7 +32,7 @@ export default function QuotaEditor({ rows = [], monthLabel = '' }) {
     <div style={{ flexBasis: '100%', marginTop: 12 }}>
       <p className="hint" style={{ marginTop: 0 }}>
         Targets for <b>{monthLabel}</b> and every month after, until you change them. Leave a box empty for no target.
-        Own-lead = sales where the &ldquo;sent by&rdquo; name is the rep.
+        Lead = sales that came from the rep&apos;s own leads (the &ldquo;sent by&rdquo; name is theirs), whoever closed them.
       </p>
       <div className="table-wrap"><table className="admin">
         <thead><tr><th>Rep</th>{FIELDS.map(([f, l]) => <th key={f} style={{ textAlign: 'right' }}>{l}</th>)}</tr></thead>

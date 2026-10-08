@@ -64,7 +64,7 @@ test('totals by rep respect the range', () => {
 });
 
 suite('repDaily — the feed');
-test('rows are per day per closing rep, pre-tax, with own-lead resolved', async () => {
+test('rows are per day per closing rep, pre-tax, with lead credit resolved to the sender', async () => {
   const { client, done } = await withTestDb();
   try {
     await client.query(`CREATE TABLE IF NOT EXISTS settings (key text PRIMARY KEY, value jsonb, updated_at timestamptz DEFAULT now())`);
@@ -76,10 +76,11 @@ test('rows are per day per closing rep, pre-tax, with own-lead resolved', async 
     await add('BB-R1', 'Roushi', 'roushi', 0);
     await add('BB-R2', 'Roushi', 'Sai', 0);
     await add('BB-R3', null, null, 0);
+    await add('BB-R4', 'Someone', 'Roushi', 0);                    // his lead, closed by another
     const d = await repDaily({});
     const mine = d.rows.filter((r) => r.rep === 'roushi');
     equal(mine.reduce((s, r) => s + r.sales, 0), 2);
-    equal(mine.reduce((s, r) => s + r.ownSales, 0), 1);
+    equal(mine.reduce((s, r) => s + r.ownSales, 0), 2, 'lead credit includes the sale another rep closed');
     equal(Math.round(mine.reduce((s, r) => s + r.revenue, 0)), 2000);
     assert(d.rows.some((r) => r.rep === ''), 'unassigned is its own row');
     assert(d.reps.some((r) => r.key === 'roushi'));

@@ -4,7 +4,7 @@ import { withTestDb } from './db.mjs';
 import { repScorecard } from '../lib/analytics.js';
 import { setQuota, quotasFor, firstOfMonth } from '../lib/quotas.js';
 import { setReps } from '../lib/reps.js';
-import { isOwnLead, standing, repKey } from '../lib/rep-match.js';
+import { isOwnLead, leadOwner, standing, repKey } from '../lib/rep-match.js';
 import { torontoToday } from '../lib/constants.js';
 
 // lib/settings and lib/reps provision their own tables lazily and remember that
@@ -48,30 +48,41 @@ test('standing: hit, on pace, close, behind, and no target', () => {
   equal(standing(10, null, 0.5), null);
 });
 
+test('leadOwner names the rep a sent-by belongs to, or nobody', () => {
+  equal(leadOwner('roushi', ['roushi sharaf', 'bishakha']), 'roushi sharaf');
+  equal(leadOwner('sai', ['roushi sharaf', 'bishakha']), '');
+  equal(leadOwner('', ['roushi']), '');
+});
+
 suite('rep scorecard');
-test('reps, own leads, unassigned, and lead generators add up', async () => {
+test('LEAD REVENUE BELONGS TO THE SENDER, WHOEVER CLOSED IT', async () => {
   const { client, done } = await fresh();
   try {
     await setReps(['Roushi', 'Bishaka']);
-    await order(client, { rep: 'Roushi', leadBy: 'roushi' });        // own
-    await order(client, { rep: 'Roushi', leadBy: 'Sai' });           // sent by Sai
+    await order(client, { rep: 'Roushi', leadBy: 'roushi' });        // Roushi's lead, Roushi closed
+    await order(client, { rep: 'Bishaka', leadBy: 'Roushi' });       // Roushi's lead, BISHAKA closed
+    await order(client, { rep: 'Roushi', leadBy: 'Sai' });           // sent by Sai (not a rep)
     await order(client, { rep: 'Bishaka', leadBy: 'Ravi' });         // sent by Ravi
     await order(client, { rep: 'Bishaka' });                         // company lead
-    await order(client, {});                                         // no rep
+    await order(client, { leadBy: 'Bishaka' });                      // Bishaka's lead, no closer recorded
     await order(client, { rep: 'Roushi', status: 'cancelled' });     // not a sale
     const s = await repScorecard('month');
     const by = Object.fromEntries(s.reps.map((r) => [r.name, r]));
-    equal(by.Roushi.sales, 2); equal(by.Roushi.ownSales, 1);
-    equal(by.Bishaka.sales, 2); equal(by.Bishaka.ownSales, 0);
+    // CLOSED: what each person closed
+    equal(by.Roushi.sales, 2); equal(by.Bishaka.sales, 3);
+    // LEAD: what each person's leads produced, closed by anyone
+    equal(by.Roushi.ownSales, 2, 'both of Roushi\'s leads, including the one Bishaka closed');
+    equal(Math.round(by.Roushi.ownRevenue), 2000);
+    equal(by.Bishaka.ownSales, 1, 'only her own lead — she does NOT get Roushi\'s');
     equal(s.unassigned.sales, 1);
-    equal(s.totals.sales, 5);
+    equal(s.totals.sales, 6);
     equal(Math.round(by.Roushi.revenue), 2000, 'pre-tax, not the taxed total');
+    equal(Math.round(by.Roushi.gross), 2260, 'with HST beside it');
     const gens = Object.fromEntries(s.leadGens.map((g) => [g.key, g]));
-    equal(gens.sai.sales, 1); equal(gens.ravi.sales, 1);
-    assert(gens.roushi.isRep, 'a rep who sent their own lead is flagged as a rep');
-    assert(!gens.sai.isRep);
+    equal(gens.roushi.sales, 2); equal(gens.sai.sales, 1); equal(gens.ravi.sales, 1);
+    equal(Math.round(gens.roushi.gross), 2260);
+    assert(gens.roushi.isRep && !gens.sai.isRep);
     equal(s.windows.reps.find((r) => r.name === 'Roushi').today.sales, 2);
-    equal(s.windows.total.month.sales, 5);
   } finally { done(); }
 });
 
@@ -100,9 +111,10 @@ test('quota progress is measured against this month’s actuals', async () => {
     await setQuota({ rep: 'Roushi', revenue: 2000, sales: 4, ownRevenue: 1000, ownSales: 1 });
     await order(client, { rep: 'Roushi', leadBy: 'Roushi' });
     await order(client, { rep: 'Roushi', leadBy: 'Sai' });
+    await order(client, { rep: 'Someone', leadBy: 'Roushi' });   // closed by another, still his lead
     const s = await repScorecard('today');
     const r = s.quota.rows.find((x) => x.name === 'Roushi');
-    equal(r.actual.sales, 2); equal(r.actual.ownSales, 1);
+    equal(r.actual.sales, 2); equal(r.actual.ownSales, 2, 'lead sales count a sale someone else closed');
     equal(r.standing.ownSales.status, 'hit');
     assert(r.standing.sales.pct === 50);
   } finally { done(); }
