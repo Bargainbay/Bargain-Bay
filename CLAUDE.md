@@ -3981,6 +3981,24 @@ Because there is no payment step, these stand in for it. All of them **degrade o
 - `orders.ip` / `orders.user_agent` are recorded so a burst from one source is actually visible — before this there was no way to characterise the traffic at all.
 - Admin: `/api/admin/blocklist` (POST with `cancelOrders: true` blocks an identifier *and* cancels+relists every unpaid order matching it in one call), and an **⚠ Email unconfirmed** badge on the order board.
 
+## Abandoned carts — a to-do list for staff, never a mailing (added 2026-10-08)
+`lib/abandoned-carts.js`, table `cart_sessions` (migration 0016), `components/CartCapture.jsx`
+(mounted in `SiteChrome`), `components/AbandonedCarts.jsx` on the Sales dashboard under My Day,
+`POST /api/cart-capture`, `GET /api/admin/abandoned-carts` (staff).
+
+- **Stored only once identifiable**: signed in (session, never the body) or an email/phone typed
+  on `/checkout`, captured on blur via `#co-email`/`#co-phone` ids. Anonymous carts are never kept.
+  Keep those input ids or capture silently stops.
+- **NO automated email or text, ever, from this.** A typed checkout email is not marketing
+  consent. Staff phone or personally email. Wanting automation means going through `filterAudience`.
+- **"Bought" is derived at read time** (an order for the same email/phone after the cart began),
+  so it holds for web, invoice and phone sales without a hook in checkout.
+- Each unit is labelled available / sold / held / no longer listed (qty-1 stock). A cart with
+  nothing left to sell raises no task.
+- **One UNASSIGNED `customer_tasks` row per customer** (title starts "Abandoned cart"), raised by
+  the nightly pass and by the first dashboard load; a cart is raised once (`tasked_at`).
+- Everything degrades open to "nothing"; the capture endpoint always answers 200.
+
 ## The sales team scorecard and quotas (added 2026-10-08)
 `repScorecard` in `lib/analytics.js`, `lib/rep-match.js` (no imports), `lib/quotas.js`,
 table `sales_quotas` (migration 0015), `components/RepScorecard.jsx`,
