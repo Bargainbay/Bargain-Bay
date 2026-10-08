@@ -407,12 +407,6 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
 
 /* ---------- tables (admin) ---------- */
 .table-wrap { overflow-x: auto; background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--radius); }
-/* A wide table with hundreds of rows scrolls sideways at the BOTTOM of the page,
-   which is where nobody is: the Orders board's Sheet column was simply cut off
-   with no scrollbar in sight. .table-wrap.tall bounds the height so the
-   horizontal scrollbar stays on screen, and keeps the header row visible. */
-.table-wrap.tall { max-height: calc(100vh - 120px); overflow: auto; }
-.table-wrap.tall table.admin th { position: sticky; top: 0; z-index: 1; }
 table.admin { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 760px; }
 table.admin th, table.admin td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
 table.admin th { background: var(--bg); color: var(--charcoal); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; font-family: var(--font-head); font-weight: 500; }
