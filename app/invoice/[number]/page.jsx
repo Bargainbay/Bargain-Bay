@@ -63,6 +63,8 @@ export default async function InvoicePage({ params, searchParams }) {
   const partialRefund = paid && refundTotal > 0;
   const amountPaid = Number(invoice.amountPaid) || 0;
   const balance = Number(invoice.balance) || 0;
+  const pdfQs = sParams?.t ? `?t=${encodeURIComponent(sParams.t)}` : guestEmail ? `?email=${encodeURIComponent(guestEmail)}` : '';
+  const pdfHref = `/invoice/${encodeURIComponent(invoice.number)}/pdf${pdfQs}`;
   const statusLabel = paid ? (partialRefund ? 'Paid · partial refund' : 'Paid') : refunded ? 'Refunded' : voided ? 'Void' : partial ? 'Partially paid' : 'Open';
 
   return (
@@ -81,6 +83,7 @@ export default async function InvoicePage({ params, searchParams }) {
       </div>
 
       <div style={{ marginBottom: 8 }}>
+        <a href={pdfHref} className="btn accent" style={{ float: 'right', fontSize: 13 }}>Download PDF</a>
         <span className={'pill ' + (paid ? 'ok' : (voided || refunded) ? 'sold' : 'warn')}>{statusLabel}</span>
         <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 10 }}>
           Issued {fmtDate(invoice.created_at)}{invoice.due_date && open ? ` · due ${fmtDate(invoice.due_date)}` : ''}
