@@ -23,7 +23,7 @@ export default function SiteChrome({ children, promo = null }) {
     : PAPER.test(path) ? null : <TeamAssistant />;
   const isDash = DASHBOARD_ROUTES.some((r) => path === r || path.startsWith(r + '/'));
   if (isDash) return <>{children}{crew}</>;
-  const isPortal = path.startsWith('/admin') || path.startsWith('/driver');
+  const isPortal = path.startsWith('/admin') || path.startsWith('/driver') || path.startsWith('/clock');
   if (isPortal) return <><main className="wrap">{children}</main>{crew}</>;
   return (
     <>
