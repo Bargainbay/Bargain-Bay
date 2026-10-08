@@ -161,7 +161,7 @@ export default function RepTrends() {
   const [rep, setRep] = useState('all');
   const [preset, setPreset] = useState('week');
   const [custom, setCustom] = useState({ a: '', b: '' });
-  const [aligned, setAligned] = useState(true);
+  const [aligned, setAligned] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function load(from) {
@@ -232,11 +232,14 @@ export default function RepTrends() {
     };
   }
   const days = (r) => daysBetween(r.from, r.to);
-  // When both periods were cut to the same length, the NAME says so everywhere —
-  // a column headed just "Last month" holding the first 8 days of it reads as the
-  // whole month, and that is how a correct number looks wrong.
+  // Periods are shown IN FULL by default: a week is seven days and a month is the
+  // whole month, and the one still running says "so far" instead of being quietly
+  // short. When "Same number of days" is ticked and cuts them, the name says which
+  // days remain — a column headed just "Last month" holding eight days of it reads
+  // as the whole month, which is how a correct number looks wrong.
   const span = (r) => (days(r) === 1 ? bucketLabel(r.from, 'day') : `${bucketLabel(r.from, 'day')}–${bucketLabel(addDays(r.to, -1), 'day')}`);
-  const nm = (r) => (ranges?.cut ? `${r.label} (${span(r)})` : r.label);
+  const running = (r) => r.to > addDays(today, 1);
+  const nm = (r) => (ranges?.cut ? `${r.label} (${span(r)})` : running(r) ? `${r.label} (so far)` : r.label);
   const fullTotal = (r) => Object.values(totalsByRep(data.rows, r, metric)).reduce((t, v) => t + v, 0);
   const rangeText = (r) => `${r.label} (${r.from === addDays(r.to, -1) ? r.from : `${r.from} → ${addDays(r.to, -1)}`})`;
   const change = (a, b) => (b ? `${a >= b ? '+' : '−'}${Math.abs(((a - b) / b) * 100).toFixed(0)}%` : a ? 'new' : '—');
@@ -288,7 +291,11 @@ export default function RepTrends() {
           </div>
           <p className="hint" style={{ marginTop: 8 }}>
             <b style={{ color: A_COLOR }}>■</b> {rangeText(ranges.a)} against <b style={{ color: B_COLOR }}>■</b> {rangeText(ranges.b)}.
-            {ranges.cut ? ` Both cut to the first ${ranges.cut} day${ranges.cut === 1 ? '' : 's'} so an unfinished period isn't judged against a finished one — untick "Same number of days" to see the full periods.` : ''}
+            {ranges.cut
+              ? ` Both cut to the first ${ranges.cut} day${ranges.cut === 1 ? '' : 's'}, so an unfinished period isn't judged against a finished one — untick "Same number of days" to see them in full.`
+              : (running(ranges.a) || running(ranges.b))
+                ? ` ${[ranges.a, ranges.b].filter(running).map((r) => r.label).join(' and ')} is still running, so it will read low until it catches up. Tick "Same number of days" to compare equal stretches.`
+                : ''}
           </p>
           <h3 style={{ margin: '14px 0 0', fontSize: 14, color: 'var(--charcoal)' }}>By rep</h3>
           <Legend items={[{ name: nm(ranges.a), color: A_COLOR }, { name: nm(ranges.b), color: B_COLOR }]} />
