@@ -4007,6 +4007,22 @@ old "By salesperson" panel on `/admin/dashboard`.
 - Reps are grouped on the folded `sales_rep`, so "Roushi" and "Roushi Sharma" are
   two reps until the team list and the invoice names agree; the panel lists names
   it found that are not on the team list.
+- **Trends and comparisons** (added 2026-10-08): `components/RepTrends.jsx`,
+  `lib/rep-periods.js` (no imports), `repDaily` in `lib/analytics.js`,
+  `GET /api/admin/rep-daily` (staff). The server returns ONE feed of daily rows per
+  closing rep (own-lead already resolved); day/week/month grouping, the measure,
+  the rep filter and every period comparison are arithmetic on those rows in the
+  browser, so filters are instant and cannot disagree. It refetches only when a
+  chosen month reaches back past what was loaded. It replaced the Today/week/month
+  table.
+  - **"Same number of days" is ON by default, and that is the point.** This week on
+    a Thursday set against a finished week reads as a 40% collapse; both are cut to
+    the shorter elapsed length and the screen says so. Unticking shows full periods.
+  - Ranges are half-open `[from, to)`, weeks start Monday, and "today" comes from
+    the SERVER in Toronto time (`repDaily().today`), never the browser's clock.
+  - Charts are hand-drawn SVG: stacked bars over time, grouped bars per rep for the
+    two periods, and a running-total line by day number. Each series is in a legend
+    and the tooltip, so colour is never the only signal.
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.

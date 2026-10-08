@@ -1,6 +1,7 @@
 import { money } from '../lib/constants';
 import RepsEditor from './RepsEditor';
 import QuotaEditor from './QuotaEditor';
+import RepTrends from './RepTrends';
 
 // The sales team, four ways: this month against quota, the period scorecard,
 // today/week/month side by side, and the people who SEND leads.
@@ -30,7 +31,7 @@ function Bar({ s, children }) {
 
 export default function RepScorecard({ data, period, admin }) {
   if (!data) return null;
-  const { reps, unassigned, totals, leadGens, windows, quota, unlisted, team } = data;
+  const { reps, unassigned, totals, leadGens, quota, unlisted, team } = data;
   const empty = reps.length === 0;
   const q = quota;
   const quotaRows = q.rows;
@@ -116,29 +117,7 @@ export default function RepScorecard({ data, period, admin }) {
             </p>
           </div>
 
-          <div className="panel" style={{ marginTop: 18 }}>
-            <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Today · this week · this month</h2>
-            <div className="table-wrap" style={{ marginTop: 8 }}><table className="admin">
-              <thead><tr><th>Rep</th>
-                <th style={R}>Today sales</th><th style={R}>Today revenue</th>
-                <th style={R}>Week sales</th><th style={R}>Week revenue</th>
-                <th style={R}>Month sales</th><th style={R}>Month revenue</th></tr></thead>
-              <tbody>
-                {[...windows.reps, { key: '_u', name: 'No rep recorded', ...windows.unassigned, muted: true }].map((r) => (
-                  <tr key={r.key} style={r.muted ? { color: 'var(--muted)' } : undefined}>
-                    <td>{r.name}</td>
-                    <td style={R}>{r.today.sales}</td><td style={R}>{money(r.today.revenue)}</td>
-                    <td style={R}>{r.week.sales}</td><td style={R}>{money(r.week.revenue)}</td>
-                    <td style={R}>{r.month.sales}</td><td style={{ ...R, fontWeight: 700 }}>{money(r.month.revenue)}</td>
-                  </tr>
-                ))}
-                <tr style={{ fontWeight: 700 }}><td>Total</td>
-                  <td style={R}>{windows.total.today.sales}</td><td style={R}>{money(windows.total.today.revenue)}</td>
-                  <td style={R}>{windows.total.week.sales}</td><td style={R}>{money(windows.total.week.revenue)}</td>
-                  <td style={R}>{windows.total.month.sales}</td><td style={R}>{money(windows.total.month.revenue)}</td></tr>
-              </tbody>
-            </table></div>
-          </div>
+          <RepTrends />
         </>
       )}
 
