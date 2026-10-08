@@ -3981,5 +3981,32 @@ Because there is no payment step, these stand in for it. All of them **degrade o
 - `orders.ip` / `orders.user_agent` are recorded so a burst from one source is actually visible — before this there was no way to characterise the traffic at all.
 - Admin: `/api/admin/blocklist` (POST with `cancelOrders: true` blocks an identifier *and* cancels+relists every unpaid order matching it in one call), and an **⚠ Email unconfirmed** badge on the order board.
 
+## The sales team scorecard and quotas (added 2026-10-08)
+`repScorecard` in `lib/analytics.js`, `lib/rep-match.js` (no imports), `lib/quotas.js`,
+table `sales_quotas` (migration 0015), `components/RepScorecard.jsx`,
+`components/QuotaEditor.jsx`, `POST /api/admin/quotas` (ADMIN). It replaced the
+old "By salesperson" panel on `/admin/dashboard`.
+
+- **Closer vs sender.** `orders.sales_rep` is who CLOSED it, `orders.lead_by` who
+  SENT it. A rep's **own lead** is a sale whose `lead_by` is that rep (`isOwnLead`):
+  exact folded match, or a one-word name equal to the first name of exactly ONE
+  rep. Two reps sharing a first name credit neither — the wrong person's quota is
+  worse than an untidy one.
+- **Revenue is pre-tax**, so reps + "No rep recorded" add up to the Revenue KPI.
+  The old panel summed the taxed `total`, which is why it never agreed with it.
+  **Unassigned is a row, not a gap** (storefront orders, pre-rep invoices).
+- **Quotas are monthly, judged against THIS calendar month whatever period the
+  page shows**, with four optional targets per rep: revenue, sales, own-lead
+  revenue, own-lead sales. NULL = no target, which is not zero. A row **carries
+  forward** to later months until changed; a **past month cannot be edited** (it
+  would rewrite how someone's month was judged). Setting them is admin; staff see
+  progress. Pace = day-of-month / days-in-month.
+- **Lead senders** (Sai, Ravi, Ruban…) are listed with sales, revenue and who
+  closed them. **Only leads that became a sale are counted** — a lead that never
+  bought is recorded nowhere, so cannot be reported.
+- Reps are grouped on the folded `sales_rep`, so "Roushi" and "Roushi Sharma" are
+  two reps until the team list and the invoice names agree; the panel lists names
+  it found that are not on the team list.
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
