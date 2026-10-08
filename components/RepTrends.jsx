@@ -185,7 +185,7 @@ export default function RepTrends() {
     if (preset === 'custom') { ak = custom.a || monthStart(today).slice(0, 7); bk = custom.b || addMonths(today, -1).slice(0, 7); }
     else { const p = COMPARE_PRESETS.find((x) => x.key === preset); ak = p.a; bk = p.b; }
     const a = presetRange(ak, today), b = presetRange(bk, today);
-    return a && b ? alignPair(a, b, today, aligned) : null;
+    return a && b ? { ...alignPair(a, b, today, aligned), fullA: a, fullB: b } : null;
   }, [today, preset, custom, aligned]);
 
   // A chosen period older than what was loaded → fetch further back.
@@ -232,6 +232,12 @@ export default function RepTrends() {
     };
   }
   const days = (r) => daysBetween(r.from, r.to);
+  // When both periods were cut to the same length, the NAME says so everywhere —
+  // a column headed just "Last month" holding the first 8 days of it reads as the
+  // whole month, and that is how a correct number looks wrong.
+  const span = (r) => (days(r) === 1 ? bucketLabel(r.from, 'day') : `${bucketLabel(r.from, 'day')}–${bucketLabel(addDays(r.to, -1), 'day')}`);
+  const nm = (r) => (ranges?.cut ? `${r.label} (${span(r)})` : r.label);
+  const fullTotal = (r) => Object.values(totalsByRep(data.rows, r, metric)).reduce((t, v) => t + v, 0);
   const rangeText = (r) => `${r.label} (${r.from === addDays(r.to, -1) ? r.from : `${r.from} → ${addDays(r.to, -1)}`})`;
   const change = (a, b) => (b ? `${a >= b ? '+' : '−'}${Math.abs(((a - b) / b) * 100).toFixed(0)}%` : a ? 'new' : '—');
 
@@ -285,10 +291,10 @@ export default function RepTrends() {
             {ranges.cut ? ` Both cut to the first ${ranges.cut} day${ranges.cut === 1 ? '' : 's'} so an unfinished period isn't judged against a finished one — untick "Same number of days" to see the full periods.` : ''}
           </p>
           <h3 style={{ margin: '14px 0 0', fontSize: 14, color: 'var(--charcoal)' }}>By rep</h3>
-          <Legend items={[{ name: ranges.a.label, color: A_COLOR }, { name: ranges.b.label, color: B_COLOR }]} />
-          <GroupedBars groups={cmp.groups} aName={ranges.a.label} bName={ranges.b.label} fmt={fmt} />
+          <Legend items={[{ name: nm(ranges.a), color: A_COLOR }, { name: nm(ranges.b), color: B_COLOR }]} />
+          <GroupedBars groups={cmp.groups} aName={nm(ranges.a)} bName={nm(ranges.b)} fmt={fmt} />
           <div className="table-wrap" style={{ marginTop: 10 }}><table className="admin">
-            <thead><tr><th>Rep</th><th style={{ textAlign: 'right' }}>{ranges.a.label}</th><th style={{ textAlign: 'right' }}>{ranges.b.label}</th><th style={{ textAlign: 'right' }}>Change</th></tr></thead>
+            <thead><tr><th>Rep</th><th style={{ textAlign: 'right' }}>{nm(ranges.a)}</th><th style={{ textAlign: 'right' }}>{nm(ranges.b)}</th><th style={{ textAlign: 'right' }}>Change</th></tr></thead>
             <tbody>
               {cmp.groups.map((g) => (
                 <tr key={g.key}><td>{g.name}</td><td style={{ textAlign: 'right' }}>{fmt(g.a)}</td><td style={{ textAlign: 'right' }}>{fmt(g.b)}</td><td style={{ textAlign: 'right', color: 'var(--muted)' }}>{change(g.a, g.b)}</td></tr>
@@ -296,9 +302,15 @@ export default function RepTrends() {
               <tr style={{ fontWeight: 700 }}><td>Total</td><td style={{ textAlign: 'right' }}>{fmt(cmp.sumA)}</td><td style={{ textAlign: 'right' }}>{fmt(cmp.sumB)}</td><td style={{ textAlign: 'right' }}>{change(cmp.sumA, cmp.sumB)}</td></tr>
             </tbody>
           </table></div>
+          {ranges.cut && (
+            <p className="hint" style={{ marginTop: 8 }}>
+              <b>In full:</b> {ranges.fullA.label} {fmt(fullTotal(ranges.fullA))}{ranges.fullA.to > addDays(today, 1) ? ' so far' : ''} · {ranges.fullB.label} {fmt(fullTotal(ranges.fullB))}{ranges.fullB.to > addDays(today, 1) ? ' so far' : ''}.
+              The figures above are only the first {ranges.cut} day{ranges.cut === 1 ? '' : 's'} of each.
+            </p>
+          )}
           <h3 style={{ margin: '18px 0 0', fontSize: 14, color: 'var(--charcoal)' }}>Running total by day · {rep === 'all' ? 'whole team' : repName[rep]}</h3>
-          <Legend items={[{ name: `${ranges.a.label} (solid)`, color: A_COLOR }, { name: `${ranges.b.label} (dashed)`, color: B_COLOR }]} />
-          <CumulativeLines a={cmp.ca} b={cmp.cb} aName={ranges.a.label} bName={ranges.b.label} fmt={fmt} />
+          <Legend items={[{ name: `${nm(ranges.a)} (solid)`, color: A_COLOR }, { name: `${nm(ranges.b)} (dashed)`, color: B_COLOR }]} />
+          <CumulativeLines a={cmp.ca} b={cmp.cb} aName={nm(ranges.a)} bName={nm(ranges.b)} fmt={fmt} />
           <p className="hint" style={{ marginTop: 6 }}>Day number along the bottom. The solid line stops at today if the period isn&apos;t over.</p>
         </>
       ) : (
