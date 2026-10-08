@@ -4032,9 +4032,13 @@ old "By salesperson" panel on `/admin/dashboard`.
 
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
-Built so far (Phase 1, slice 1): `db/migrations/0016_marketplace_foundation.sql`,
-`lib/marketplace-rules.js` (NO imports — clocks, strikes, commission, payout maths, in INTEGER
-CENTS), `lib/vendors.js`, `test/marketplace.test.mjs`. No screens yet, nothing reachable.
+Built so far (Phase 1, slices 1–2): `db/migrations/0016` (vendors, strikes, commission) and `0017`
+(listings, photos, events); `lib/marketplace-rules.js` (clocks, strikes, commission, payout maths, in
+INTEGER CENTS), `lib/listing-rules.js` (what a listing must contain; shared with the browser),
+`lib/image-checks.js` (photo pipeline, `sharp`), `lib/vendors.js`, `lib/marketplace-listings.js`,
+`lib/vendor-session.js`; APIs `app/api/vendor/*` and `app/api/admin/marketplace/*`; tests
+`test/marketplace*.test.mjs`. **No screens yet and nothing on the storefront** — a `live` listing is
+not shown anywhere until the storefront slice.
 
 - **A vendor-facing caller learns its vendor from the session** (`vendorAccess(email)`), never from
   a request parameter. Vendor access is DATABASE-backed (`vendor_users`) and a vendor is on no staff
@@ -4048,6 +4052,17 @@ CENTS), `lib/vendors.js`, `test/marketplace.test.mjs`. No screens yet, nothing r
   24h accept, 72h ready, calendar hours, off server timestamps only.
 - **Commission is a rate with a start date** (10% default is code, not a seeded row — a migration that
   seeds data makes a fresh database non-empty and breaks the backup restore tests).
+- **Photos are decoded and RE-ENCODED, never stored as uploaded** (EXIF/GPS gone). Vendors upload
+  files; the server never fetches a vendor-supplied URL. The rating plate is private `evidence`, never
+  public. A picture matching another vendor's is flagged for staff, not told to the vendor.
+- **The serial number is guarded by a partial UNIQUE index** across all vendors while a unit is in
+  review/for sale; a duplicate is refused without saying who holds it.
+- **A live listing can only have its price lowered**; any other change goes pause → reopen → review.
+- **Condition is the existing four labels** (`INTAKE_CONDITIONS`). "Used" is refused — a pre-owned unit
+  is Refurbished, and the warranty column's CHECK refuses under 12 months.
+- **sharp's `.stats()` reads the INPUT, not the pipeline** — measure filtered pixels yourself (that
+  bug made every photo look sharp). Don't run `next build` with a symlinked `node_modules` under
+  Turbopack; `next build --webpack` works.
 - Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
 
 ## What is NOT in this repo
