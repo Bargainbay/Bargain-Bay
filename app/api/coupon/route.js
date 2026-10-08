@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getMany } from '../../../lib/inventory';
 import { resolvePrices } from '../../../lib/pricing';
 import { getSession, normalizeEmail } from '../../../lib/auth';
-import { validateCoupon } from '../../../lib/coupons';
+import { validateCoupon, bestAutoCoupon } from '../../../lib/coupons';
 import { round2 } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +20,8 @@ export async function POST(req) {
   try { body = await req.json(); } catch { body = {}; }
 
   const code = String(body.code || '').trim();
-  if (!code) return NextResponse.json({ ok: false, error: 'Enter a promo code.' }, { status: 400 });
+  const wantsAuto = body.auto === true;
+  if (!code && !wantsAuto) return NextResponse.json({ ok: false, error: 'Enter a promo code.' }, { status: 400 });
 
   const skus = [...new Set((Array.isArray(body.skus) ? body.skus : []).filter((s) => typeof s === 'string'))].slice(0, 50);
   if (!skus.length) return NextResponse.json({ ok: false, error: 'Your cart is empty.' }, { status: 400 });
@@ -35,6 +36,19 @@ export async function POST(req) {
   const eligible = round2(items.filter((u) => !priced.get(u.id)?.onClearance).reduce((a, u) => a + priceOf(u), 0));
 
   const email = normalizeEmail(body.email || session?.email || '');
+
+  // "Is the cart worth an automatic promotion?" — what the checkout page shows
+  // with no code typed. /api/checkout works it out again from scratch.
+  if (!code) {
+    const auto = await bestAutoCoupon(items, priced, { email });
+    if (!auto) return NextResponse.json({ ok: true, none: true });
+    return NextResponse.json({
+      ok: true, auto: true, discount: auto.discount, capped: auto.capped,
+      code: auto.coupon.code,
+      label: auto.coupon.kind === 'percent' ? `${auto.coupon.value}% off` : `$${auto.coupon.value.toFixed(2)} off`
+    });
+  }
+
   const res = await validateCoupon(code, { subtotal, eligibleSubtotal: eligible, email }).catch(() => null);
   if (!res) return NextResponse.json({ ok: false, error: 'Promo codes are briefly unavailable — your order is unaffected.' }, { status: 200 });
   if (!res.ok) return NextResponse.json({ ok: false, error: res.error }, { status: 200 });
