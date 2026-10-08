@@ -197,11 +197,11 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
         customer never confirms their email (<b>⚠ Email unconfirmed</b>) — that badge is your best fake-order signal.
       </p>
       {error && <div className="error-box">{error}</div>}
-      <div className="table-wrap tall">
+      <div className="table-wrap">
         <table className="admin">
           <thead>
             <tr>
-              <th>Order</th><th>Customer</th><th>Items</th><th>Fulfilment</th><th>Total</th><th>Status</th><th>Sheet</th>
+              <th>Order</th><th>Customer</th><th>Items</th><th>Fulfilment</th><th>Total</th><th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -342,26 +342,26 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
                       </label>
                     </>
                   )}
-                </td>
-                <td style={{ fontSize: 12, color: 'var(--muted)', maxWidth: 150 }}>
+                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)' }}>
                   {o.status === 'cancelled'
-                    ? 'Cancelled — unit released back to the site.'
-                    : o.status === 'refunded'
-                      ? 'Refunded — unit(s) relisted, money off the books.'
-                      : o.status === 'pending_payment'
-                        ? 'Confirmed, awaiting payment — click Mark paid once it lands.'
-                        : 'Sold — see Tracker reconciliation below.'}
-                  {(o.pod_signature || (o.pod_photo_ids && o.pod_photo_ids.length > 0)) && (
-                    <div style={{ marginTop: 6, color: 'var(--charcoal)' }}>
-                      <b>POD:</b>{' '}
-                      {o.pod_signature && (
-                        <a href={`/api/admin/pod?sig=${o.id}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>signature</a>
-                      )}
-                      {(o.pod_photo_ids || []).map((pid, i) => (
-                        <span key={pid}>{(o.pod_signature || i > 0) ? ' · ' : ''}<a href={`/api/admin/pod?photo=${pid}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>photo {i + 1}</a></span>
-                      ))}
-                    </div>
-                  )}
+                      ? 'Cancelled — unit released back to the site.'
+                      : o.status === 'refunded'
+                        ? 'Refunded — unit(s) relisted, money off the books.'
+                        : o.status === 'pending_payment'
+                          ? 'Confirmed, awaiting payment — click Mark paid once it lands.'
+                          : 'Sold — see Tracker reconciliation below.'}
+                    {(o.pod_signature || (o.pod_photo_ids && o.pod_photo_ids.length > 0)) && (
+                      <div style={{ marginTop: 6, color: 'var(--charcoal)' }}>
+                        <b>POD:</b>{' '}
+                        {o.pod_signature && (
+                          <a href={`/api/admin/pod?sig=${o.id}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>signature</a>
+                        )}
+                        {(o.pod_photo_ids || []).map((pid, i) => (
+                          <span key={pid}>{(o.pod_signature || i > 0) ? ' · ' : ''}<a href={`/api/admin/pod?photo=${pid}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>photo {i + 1}</a></span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
