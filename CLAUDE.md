@@ -4030,5 +4030,25 @@ old "By salesperson" panel on `/admin/dashboard`.
     two periods, and a running-total line by day number. Each series is in a legend
     and the tooltip, so colour is never the only signal.
 
+## The marketplace (started 2026-10-08)
+Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
+Built so far (Phase 1, slice 1): `db/migrations/0016_marketplace_foundation.sql`,
+`lib/marketplace-rules.js` (NO imports — clocks, strikes, commission, payout maths, in INTEGER
+CENTS), `lib/vendors.js`, `test/marketplace.test.mjs`. No screens yet, nothing reachable.
+
+- **A vendor-facing caller learns its vendor from the session** (`vendorAccess(email)`), never from
+  a request parameter. Vendor access is DATABASE-backed (`vendor_users`) and a vendor is on no staff
+  list. Never put one in `SALES_EMAILS`.
+- **Vendor listings must NOT live in `products`**: `upsertProducts` rewrites every column and
+  deactivates anything absent from the tracker import, so they would be delisted on the next sync.
+- **Strikes never expire on a timer.** They come off only by a management revision (`reviseStrike`,
+  reason required, row kept). Revising does NOT reinstate a restricted vendor — `reinstateVendor` is
+  a separate decision. `strikesAwaitingReview` is the 90-day review queue.
+- **Clocks start at payment confirmation** (we confirm the e-transfer; the vendor is told only then):
+  24h accept, 72h ready, calendar hours, off server timestamps only.
+- **Commission is a rate with a start date** (10% default is code, not a seeded row — a migration that
+  seeds data makes a fresh database non-empty and breaks the backup restore tests).
+- Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
