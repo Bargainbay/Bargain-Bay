@@ -32,11 +32,28 @@ export default function CheckoutClient({ catalog, session, prefill }) {
   const [promoMsg, setPromoMsg] = useState('');
   const [promoBusy, setPromoBusy] = useState(false);
   const acDone = useRef(false);
+  // An automatic promotion the cart qualifies for (no code typed). Only a
+  // preview: /api/checkout works the real figure out again.
+  const [auto, setAuto] = useState(null);
 
   useEffect(() => {
     setSkus(getCart());
     return onCartChange(setSkus);
   }, []);
+
+  useEffect(() => {
+    if (!skus || skus.length === 0) { setAuto(null); return undefined; }
+    let live = true;
+    fetch('/api/coupon', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto: true, skus, email: form.email })
+    })
+      .then((r) => r.json())
+      .then((d) => { if (live) setAuto(d && d.ok && d.auto ? { auto: true, code: d.code, discount: Number(d.discount) || 0, label: d.label, capped: !!d.capped } : null); })
+      .catch(() => { if (live) setAuto(null); });
+    return () => { live = false; };
+  }, [skus, form.email]);
 
   // InitiateCheckout, once per visit, when there is something in the cart. The
   // helper in lib/fpixel.js existed and nothing called it, so Meta never saw a
@@ -95,7 +112,10 @@ export default function CheckoutClient({ catalog, session, prefill }) {
 
   const delivery = form.deliveryMethod === 'delivery' ? DELIVERY_FEE : 0;
   const subtotal = round2(items.reduce((a, u) => a + Number(u.price), 0));
-  const discount = applied ? Math.min(applied.discount, subtotal) : 0;
+  // A typed code and an automatic promotion never stack; the shopper gets the
+  // better one, exactly as the server will decide.
+  const shown = applied && (!auto || applied.discount >= auto.discount) ? applied : auto;
+  const discount = shown ? Math.min(shown.discount, subtotal) : 0;
   const hst = round2((subtotal - discount + delivery) * HST_RATE);
   const total = round2(subtotal - discount + delivery + hst);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -301,7 +321,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
             </div>
             {discount > 0 && (
               <div className="summary-row">
-                <span>Promo {applied.code}</span><span>−{money(discount)}</span>
+                <span>{shown.auto ? 'Automatic discount' : `Promo ${shown.code}`}{shown.label ? ` (${shown.label})` : ''}</span><span>−{money(discount)}</span>
               </div>
             )}
             <div className="summary-row"><span>{form.deliveryMethod === 'delivery' ? 'Local delivery' : 'Warehouse pickup'}</span><span>{delivery ? money(delivery) : 'Free'}</span></div>

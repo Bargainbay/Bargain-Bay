@@ -12,7 +12,7 @@ import { money } from '../lib/constants';
 const BLANK = {
   id: null, code: '', affiliate: '', commissionPct: '', kind: 'percent', value: '',
   minSubtotal: '', maxUses: '', perEmailLimit: '', startsAt: '', endsAt: '',
-  excludeClearance: false, note: '', active: true
+  excludeClearance: false, autoApply: false, note: '', active: true
 };
 
 export default function CouponsManager({ initialCoupons = [], initialAffiliates = [] }) {
@@ -68,7 +68,7 @@ export default function CouponsManager({ initialCoupons = [], initialAffiliates 
       kind: c.kind, value: c.value, minSubtotal: c.minSubtotal || '',
       maxUses: c.maxUses ?? '', perEmailLimit: c.perEmailLimit ?? '',
       startsAt: c.startsAt || '', endsAt: c.endsAt || '',
-      excludeClearance: c.excludeClearance, note: c.note, active: c.active
+      excludeClearance: c.excludeClearance, autoApply: c.autoApply, note: c.note, active: c.active
     });
     setOpen(true);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -81,6 +81,7 @@ export default function CouponsManager({ initialCoupons = [], initialAffiliates 
     if (c.maxUses != null) bits.push(`${c.usedCount}/${c.maxUses} used`);
     if (c.perEmailLimit != null) bits.push(`${c.perEmailLimit} per customer`);
     if (c.excludeClearance) bits.push('not on clearance');
+    if (c.autoApply) bits.push('applies automatically');
     if (c.startsAt || c.endsAt) bits.push(`${c.startsAt || '…'} → ${c.endsAt || '…'}`);
     return bits.join(' · ') || '—';
   };
@@ -167,6 +168,10 @@ export default function CouponsManager({ initialCoupons = [], initialAffiliates 
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, margin: '4px 0 10px' }}>
             <input type="checkbox" style={{ width: 'auto' }} checked={form.excludeClearance} onChange={set('excludeClearance')} />
             <span>Don’t apply to clearance units <span style={{ color: 'var(--muted)' }}>(they’re already marked down)</span></span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, margin: '4px 0 10px' }}>
+            <input type="checkbox" style={{ width: 'auto' }} checked={form.autoApply} onChange={set('autoApply')} />
+            <span>Apply automatically at checkout <span style={{ color: 'var(--muted)' }}>(no code needed; the best one the cart qualifies for wins, and it never takes a unit below cost, or below cost + 20% for vendor drop-offs)</span></span>
           </label>
           <div className="field">
             <label htmlFor="cp-note">Note</label>

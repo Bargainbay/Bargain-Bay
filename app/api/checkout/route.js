@@ -8,12 +8,12 @@ import {
   getSession, hashPassword, createSessionToken,
   sessionCookieOptions, SESSION_COOKIE, normalizeEmail, validEmail
 } from '../../../lib/auth';
-import { round2, HST_RATE, DELIVERY_FEE, CARD_PAYMENTS_ENABLED } from '../../../lib/constants';
+import { round2, money, HST_RATE, DELIVERY_FEE, CARD_PAYMENTS_ENABLED, SERVICE_EMAIL } from '../../../lib/constants';
 import { resolvePrices } from '../../../lib/pricing';
-import { sendOrderEmails } from '../../../lib/email';
+import { sendOrderEmails, sendEmail } from '../../../lib/email';
 import { readAttribution, ensureAttributionColumns } from '../../../lib/attribution';
 import { createAndSendInvoice } from '../../../lib/invoices';
-import { validateCoupon, redeemCouponWithClient, releaseCouponForOrder, ensureCouponSchema } from '../../../lib/coupons';
+import { validateCoupon, bestAutoCoupon, redeemCouponWithClient, releaseCouponForOrder, ensureCouponSchema } from '../../../lib/coupons';
 import { upsertCustomer } from '../../../lib/customers';
 import { grantConsent } from '../../../lib/consent';
 import {
@@ -161,6 +161,25 @@ export async function POST(req) {
     }
   }
 
+  // ---- automatic promotions ----
+  // A cart can qualify for a promotion with no code typed (tiers like 10% off
+  // $1,000+). It competes with a typed code on the same terms: the shopper gets
+  // whichever is worth more, never both. The discount is capped per unit at the
+  // unit's floor (cost; cost + 20% for consigned stock), so it can never be the
+  // reason something sells at a loss. Worked out here from scratch: what the
+  // cart page showed is only a preview.
+  try {
+    const auto = await bestAutoCoupon(items, priced, { email });
+    if (auto && auto.discount > discount) {
+      coupon = auto.coupon; discount = auto.discount; couponError = null;
+    }
+  } catch (e) {
+    console.error('automatic promotion check failed (continuing without)', e.message);
+  }
+  const promoLabel = coupon
+    ? (coupon.autoApply ? `Automatic discount (${coupon.code})` : `Promo code ${coupon.code}`)
+    : '';
+
   // ---- totals (the discount comes off the goods; HST applies to what's left,
   //      plus delivery — a third-party cost we pass through undiscounted) ----
   const subtotal = round2(items.reduce((a, u) => a + priceOf(u), 0));
@@ -293,7 +312,7 @@ export async function POST(req) {
         ...(deliveryFee ? [{ description: 'Local delivery (Pickering & area)', amount: deliveryFee, kind: 'service' }] : []),
         // The discount rides as a negative service line, so the invoice totals
         // what the customer actually pays and the code is on the paperwork.
-        ...(discount ? [{ description: `Promo code ${coupon.code}`, amount: -discount, kind: 'discount' }] : [])
+        ...(discount ? [{ description: promoLabel, amount: -discount, kind: 'discount' }] : [])
       ],
       addHst: hst > 0,
       // The order it attaches to was already stamped 'website' at insert; saying
@@ -323,7 +342,7 @@ export async function POST(req) {
           priceCents: Math.round(priceOf(u) * 100)
         })),
         ...(deliveryFee ? [{ name: 'Local delivery (Pickering & area)', priceCents: Math.round(deliveryFee * 100) }] : []),
-        ...(discount ? [{ name: `Promo code ${coupon.code}`, priceCents: -Math.round(discount * 100) }] : []),
+        ...(discount ? [{ name: promoLabel, priceCents: -Math.round(discount * 100) }] : []),
         { name: 'HST 13% (Ontario)', priceCents: Math.round(hst * 100) }
       ];
       const { url, sessionId } = await createCheckoutSession({
@@ -380,6 +399,30 @@ export async function POST(req) {
       discount, couponCode: coupon ? coupon.code : null, couponError,
       verifyEmailSent: !!verifyToken
     };
+  }
+
+  // ---- told, not discovered: goods sold for less than they cost ----
+  // The automatic promotions are floored per unit and cannot do this; a typed
+  // code, a member price or a below-cost clearance markdown still can, and the
+  // owner wants to hear about it the day it happens rather than find it in the
+  // books. A missing cost is unknown, never zero, so nothing is flagged on a
+  // guess. Awaited (this function is frozen once the response goes out) and
+  // best-effort: it never touches the order.
+  try {
+    const known = items.filter((u) => Number(u.cost) > 0);
+    const cost = round2(known.reduce((a, u) => a + Number(u.cost), 0));
+    const goodsNet = round2(known.reduce((a, u) => a + priceOf(u), 0) - (known.length === items.length ? discount : 0));
+    if (known.length && cost > 0 && goodsNet < cost) {
+      await sendEmail({
+        to: SERVICE_EMAIL,
+        subject: `Below-cost order ${order.orderNumber}: ${money(cost - goodsNet)} under cost`,
+        html: `<p>Order <b>${order.orderNumber}</b> sells goods for ${money(goodsNet)} against a cost of ${money(cost)} (${money(cost - goodsNet)} under).</p>`
+          + `<p>${discount ? `Discount applied: ${money(discount)} (${coupon ? coupon.code : ''}).` : 'No discount was applied, so the price itself is under cost (member or clearance price).'}</p>`
+          + `<p>${items.map((u) => `${u.id} ${u.make || ''} ${u.model || ''}: price ${money(priceOf(u))}, cost ${money(Number(u.cost) || 0)}`).join('<br>')}</p>`
+      });
+    }
+  } catch (e) {
+    console.error('below-cost alert failed', e.message);
   }
 
   const res = NextResponse.json(payload);
