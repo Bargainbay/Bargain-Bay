@@ -10,6 +10,15 @@ import RepTrends from './RepTrends';
 // Revenue KPI above — a scorecard that disagrees with the headline number is
 // one nobody trusts. "Own lead" = the sale's sent-by name is the rep.
 const R = { textAlign: 'right' };
+// Pre-tax figure with the HST-inclusive one beneath it. Pre-tax is the headline —
+// HST is collected for the CRA, not earned — but invoices are quoted with tax, and
+// a total that cannot be matched against an invoice looks wrong when it is not.
+const Rev = ({ v, g, bold }) => (
+  <>
+    <span style={bold ? { fontWeight: 700 } : undefined}>{money(v)}</span>
+    {g != null && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{money(g)} with HST</div>}
+  </>
+);
 const pctText = (n) => (n == null ? '—' : `${n.toFixed(0)}%`);
 const STATUS = {
   hit: ['ok', 'Hit'], on_pace: ['ok', 'On pace'], close: ['warn', 'Close'], behind: ['sold', 'Behind']
@@ -58,7 +67,7 @@ export default function RepScorecard({ data, period, admin }) {
               {!anyQuota && (admin ? ' No quotas set yet — press Set quotas.' : ' No quotas have been set yet.')}
             </p>
             <div className="table-wrap" style={{ marginTop: 10 }}><table className="admin">
-              <thead><tr><th>Rep</th><th>Revenue</th><th>Sales</th><th>Own-lead revenue</th><th>Own-lead sales</th></tr></thead>
+              <thead><tr><th>Rep</th><th>Revenue</th><th>Sales</th><th>Lead revenue</th><th>Lead sales</th></tr></thead>
               <tbody>{quotaRows.map((r) => (
                 <tr key={r.key}>
                   <td>{r.name}</td>
@@ -86,32 +95,33 @@ export default function RepScorecard({ data, period, admin }) {
             <div className="table-wrap" style={{ marginTop: 8 }}><table className="admin">
               <thead><tr>
                 <th>Rep</th><th style={R}>Sales</th><th style={R}>Revenue</th><th style={R}>Avg sale</th>
-                <th style={R}>Own-lead sales</th><th style={R}>Own-lead revenue</th><th style={R}>Own-lead %</th>
+                <th style={R}>Lead sales</th><th style={R}>Lead revenue</th>
                 <th style={R}>Quotes</th><th style={R}>Win rate</th>
               </tr></thead>
               <tbody>
                 {reps.map((r) => (
                   <tr key={r.key} style={r.sales === 0 ? { color: 'var(--muted)' } : undefined}>
                     <td>{r.name}</td><td style={R}>{r.sales}</td>
-                    <td style={{ ...R, fontWeight: 700 }}>{money(r.revenue)}</td>
+                    <td style={R}><Rev v={r.revenue} g={r.gross} bold /></td>
                     <td style={R}>{r.sales ? money(r.avg) : '—'}</td>
-                    <td style={R}>{r.ownSales}</td><td style={R}>{money(r.ownRevenue)}</td><td style={R}>{pctText(r.ownShare)}</td>
+                    <td style={R}>{r.ownSales}</td><td style={R}><Rev v={r.ownRevenue} g={r.ownGross} /></td>
                     <td style={R}>{r.quotes.total}</td><td style={R}>{pctText(r.quotes.winRate)}</td>
                   </tr>
                 ))}
                 <tr style={{ color: 'var(--muted)' }}>
-                  <td>No rep recorded</td><td style={R}>{unassigned.sales}</td><td style={R}>{money(unassigned.revenue)}</td>
-                  <td style={R}>{unassigned.sales ? money(unassigned.revenue / unassigned.sales) : '—'}</td><td style={R}>—</td><td style={R}>—</td><td style={R}>—</td><td style={R}>—</td><td style={R}>—</td>
+                  <td>No rep recorded</td><td style={R}>{unassigned.sales}</td><td style={R}><Rev v={unassigned.revenue} g={unassigned.gross} /></td>
+                  <td style={R}>{unassigned.sales ? money(unassigned.revenue / unassigned.sales) : '—'}</td><td style={R}>—</td><td style={R}>—</td><td style={R}>—</td><td style={R}>—</td>
                 </tr>
                 <tr style={{ fontWeight: 700 }}>
-                  <td>Total</td><td style={R}>{totals.sales}</td><td style={R}>{money(totals.revenue)}</td>
+                  <td>Total</td><td style={R}>{totals.sales}</td><td style={R}><Rev v={totals.revenue} g={totals.gross} /></td>
                   <td style={R}>{totals.sales ? money(totals.revenue / totals.sales) : '—'}</td>
-                  <td style={R}>{totals.ownSales}</td><td style={R}>{money(totals.ownRevenue)}</td>
-                  <td style={R}>{pctText(totals.revenue ? (totals.ownRevenue / totals.revenue) * 100 : null)}</td><td style={R}></td><td style={R}></td>
+                  <td style={R}>{totals.ownSales}</td><td style={R}><Rev v={totals.ownRevenue} g={totals.ownGross} /></td><td style={R}></td><td style={R}></td>
                 </tr>
               </tbody>
             </table></div>
             <p className="hint" style={{ marginTop: 10 }}>
+              <b>Sales and Revenue</b> are what that person closed. <b>Lead sales and Lead revenue</b> are every sale that came from that
+              person&apos;s leads, whoever closed it — a sale Roushi sent and Bishakha closed is Bishakha&apos;s revenue and Roushi&apos;s lead revenue.
               Revenue is before HST and adds up to the Revenue figure above. &ldquo;No rep recorded&rdquo; is storefront orders and anything raised before reps were credited.
               Quotes only count where a rep was tagged on the quote.
             </p>
@@ -133,7 +143,7 @@ export default function RepScorecard({ data, period, admin }) {
             <tbody>{leadGens.map((g) => (
               <tr key={g.key}>
                 <td>{g.name}{g.isRep && <span style={{ color: 'var(--muted)' }}> (sales rep)</span>}</td>
-                <td style={R}>{g.sales}</td><td style={{ ...R, fontWeight: 700 }}>{money(g.revenue)}</td>
+                <td style={R}>{g.sales}</td><td style={R}><Rev v={g.revenue} g={g.gross} bold /></td>
                 <td style={{ color: 'var(--muted)' }}>{g.closers.map((c) => `${c.name} ${c.sales}`).join(' · ')}</td>
               </tr>
             ))}</tbody>

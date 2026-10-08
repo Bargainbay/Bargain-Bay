@@ -3987,12 +3987,18 @@ table `sales_quotas` (migration 0015), `components/RepScorecard.jsx`,
 `components/QuotaEditor.jsx`, `POST /api/admin/quotas` (ADMIN). It replaced the
 old "By salesperson" panel on `/admin/dashboard`.
 
-- **Closer vs sender.** `orders.sales_rep` is who CLOSED it, `orders.lead_by` who
-  SENT it. A rep's **own lead** is a sale whose `lead_by` is that rep (`isOwnLead`):
-  exact folded match, or a one-word name equal to the first name of exactly ONE
-  rep. Two reps sharing a first name credit neither — the wrong person's quota is
-  worse than an untidy one.
-- **Revenue is pre-tax**, so reps + "No rep recorded" add up to the Revenue KPI.
+- **Closer vs sender — two different credits, and a sale can be both.**
+  `orders.sales_rep` is who CLOSED it, `orders.lead_by` who SENT it. **Closed
+  revenue** goes to the closer. **Lead revenue** goes to the SENDER, whoever closed
+  it: a sale Roushi sent and Bishakha closed is Bishakha's closed revenue and
+  Roushi's lead revenue, and is none of Bishakha's lead revenue. (The first cut
+  counted only leads a rep both sent AND closed — wrong, per the owner, 2026-10-08:
+  a lead number is what a person's leads produced.) `leadOwner` resolves a sent-by
+  name to a rep: exact folded match, or a one-word name equal to the first name of
+  exactly ONE rep; two reps sharing a first name credit neither. Quota and metric
+  keys are still `ownRevenue`/`ownSales` and DB columns `own_*`; they mean LEAD
+  revenue/sales. A sale with no closing rep still credits its sender.
+- **Revenue is pre-tax** (with the HST-inclusive figure printed beneath it, because invoices are quoted with tax and a total that can't be matched to an invoice looks wrong), so reps + "No rep recorded" add up to the Revenue KPI.
   The old panel summed the taxed `total`, which is why it never agreed with it.
   **Unassigned is a row, not a gap** (storefront orders, pre-rep invoices).
 - **Quotas are monthly, judged against THIS calendar month whatever period the
