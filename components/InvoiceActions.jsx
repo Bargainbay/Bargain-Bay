@@ -62,6 +62,7 @@ export default function InvoiceActions({ invoice }) {
   return (
     <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13 }}>
       {hostedUrl && <a href={hostedUrl} target="_blank" rel="noopener noreferrer" style={link}>View</a>}
+      <a href={`/invoice/${encodeURIComponent(number)}/pdf`} style={link}>PDF</a>
       <a href={`/admin/packing-slip/${number}`} target="_blank" rel="noopener noreferrer" style={link}>Packing slip</a>
       {orderNumber && <a href="/admin/operations" style={link} title={`Fulfilment order ${orderNumber}`}>{orderNumber}</a>}
 
