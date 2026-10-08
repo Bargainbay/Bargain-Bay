@@ -2,14 +2,13 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
-import { revenueDashboard, hstRemittance, leadReport, DASH_PERIODS } from '../../../lib/analytics';
+import { revenueDashboard, hstRemittance, leadReport, repScorecard, DASH_PERIODS } from '../../../lib/analytics';
 import { getSetting } from '../../../lib/settings';
-import { listReps } from '../../../lib/reps';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
 import MyDay from '../../../components/MyDay';
 import GoalEditor from '../../../components/GoalEditor';
-import RepsEditor from '../../../components/RepsEditor';
+import RepScorecard from '../../../components/RepScorecard';
 import TaxOwed from '../../../components/TaxOwed';
 import LeadSources from '../../../components/LeadSources';
 import { Kpi, Donut, Funnel, TrendChart } from '../../../components/charts';
@@ -46,15 +45,16 @@ export default async function SalesDashboardPage({ searchParams }) {
 
   const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
 
-  let data = null, goal = 0, repList = [], tax = null, leads = null, error = '';
+  let data = null, goal = 0, tax = null, leads = null, team = null, error = '';
   try {
     // The tax panel is owner-only, so a sales associate's page never pays for it.
     // Where the sales came from is NOT owner-only: it is the selling side's own
     // work, and the rep who recorded the answer should be able to see it land.
-    [data, goal, repList, tax, leads] = await Promise.all([
-      revenueDashboard(period), getSetting('revenue_goal_monthly', 0), listReps(),
+    [data, goal, tax, leads, team] = await Promise.all([
+      revenueDashboard(period), getSetting('revenue_goal_monthly', 0),
       salesOnly ? null : hstRemittance(period).catch(() => null),
-      leadReport(period).catch(() => null)
+      leadReport(period).catch(() => null),
+      repScorecard(period).catch((e) => { console.error('repScorecard failed', e.message); return null; })
     ]);
   } catch (e) {
     console.error('sales dashboard load failed', e.message);
@@ -67,7 +67,6 @@ export default async function SalesDashboardPage({ searchParams }) {
   const k = data.kpis;
   const pipe = data.pipeline;
   const deals = data.deals;
-  const reps = data.reps || [];
   const vs = data.hasPrev ? ` vs ${data.prevLabel}` : '';
   const goalN = Number(goal) || 0;
   const goalPct = goalN > 0 ? Math.min((k.revenue / goalN) * 100, 100) : 0;
@@ -162,35 +161,10 @@ export default async function SalesDashboardPage({ searchParams }) {
         </div>
       </div>
 
-      {/* Team & attribution */}
-      <div className="panel" style={{ marginTop: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-          <h2 style={{ marginTop: 0, marginBottom: 0, color: 'var(--charcoal)' }}>By salesperson · {periodLabel(period)}</h2>
-          <RepsEditor current={repList} />
-        </div>
-        {reps.length > 0 ? (
-          <div className="table-wrap" style={{ marginTop: 12 }}><table className="admin">
-            <thead><tr><th>Rep</th><th style={{ textAlign: 'right' }}>Orders</th><th style={{ textAlign: 'right' }}>Revenue</th><th style={{ textAlign: 'right' }}>Share</th></tr></thead>
-            <tbody>
-              {reps.map((r) => (
-                <tr key={r.rep}>
-                  <td>{r.rep}</td>
-                  <td style={{ textAlign: 'right' }}>{r.orders}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(r.revenue)}</td>
-                  <td style={{ textAlign: 'right', color: 'var(--muted)' }}>{k.revenue > 0 ? ((r.revenue / k.revenue) * 100).toFixed(0) : 0}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table></div>
-        ) : (
-          <p className="hint" style={{ marginTop: 10 }}>
-            {repList.length === 0
-              ? 'Add your salespeople, then tag each order with a rep in Operations to see per-person revenue here.'
-              : 'No tagged sales in this period yet — tag orders with a rep in '}
-            {repList.length > 0 && <a href="/admin/operations" style={{ textDecoration: 'underline' }}>Operations</a>}.
-          </p>
-        )}
-      </div>
+      {/* Team: quotas, the scorecard, and who sends the leads */}
+      {team ? <RepScorecard data={team} period={periodLabel(period)} admin={!salesOnly} /> : (
+        <div className="panel" style={{ marginTop: 18 }}><p className="hint" style={{ margin: 0 }}>The sales team scorecard couldn&apos;t load — try again in a moment.</p></div>
+      )}
 
       <LeadSources data={leads} period={periodLabel(period)} />
 
