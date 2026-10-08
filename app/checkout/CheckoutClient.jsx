@@ -5,6 +5,7 @@ import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS, CARD_PAYMENTS_EN
 import { loadGoogleMaps, placesReady, mapsKey } from '../../lib/maps';
 import HoneypotField from '../../components/HoneypotField';
 import MarketingOptIn, { CONSENT_TEXT } from '../../components/MarketingOptIn';
+import { initiateCheckout, purchase, newEventId } from '../../lib/fpixel';
 
 export default function CheckoutClient({ catalog, session, prefill }) {
   const [skus, setSkus] = useState(null);
@@ -36,6 +37,22 @@ export default function CheckoutClient({ catalog, session, prefill }) {
     setSkus(getCart());
     return onCartChange(setSkus);
   }, []);
+
+  // InitiateCheckout, once per visit, when there is something in the cart. The
+  // helper in lib/fpixel.js existed and nothing called it, so Meta never saw a
+  // checkout start — which is also why it could not optimise past Add to cart.
+  const checkoutTracked = useRef(false);
+  useEffect(() => {
+    if (checkoutTracked.current || !skus || skus.length === 0) return;
+    const items = skus.map((sku) => catalog.find((u) => u.id === sku)).filter(Boolean);
+    if (items.length === 0) return;
+    checkoutTracked.current = true;
+    initiateCheckout({
+      ids: items.map((u) => u.id),
+      value: round2(items.reduce((a, u) => a + Number(u.price), 0)),
+      numItems: items.length
+    }, newEventId());
+  }, [skus, catalog]);
 
   // Google Places autocomplete on the delivery street address (same pattern as
   // the admin invoice form): attach on first focus, poll until Places is
@@ -138,6 +155,21 @@ export default function CheckoutClient({ catalog, session, prefill }) {
       if (applied && data.couponError) {
         setApplied(null);
         setError(`${data.couponError} Your order was placed at full price — check the summary before you send payment.`);
+      }
+      // Card payments are off, so an order is placed with no payment step and
+      // the order page's `status=success` Purchase never fires — Meta saw zero
+      // purchases. Count the placed order here, ONLY when there is no card
+      // redirect (a Stripe order is counted by the order page once it is paid,
+      // and counting it here too would double it). Same localStorage key as
+      // PixelPurchase so one order can never be counted by both.
+      if (!data.url && data.orderNumber) {
+        try {
+          const key = 'bb_purchase_' + data.orderNumber;
+          if (!localStorage.getItem(key)) {
+            localStorage.setItem(key, '1');
+            purchase({ ids: items.map((u) => u.id), value: total }, newEventId());
+          }
+        } catch {}
       }
       clearCart();
       window.location.href = data.url || data.orderUrl;
