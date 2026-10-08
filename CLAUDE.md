@@ -3981,6 +3981,22 @@ Because there is no payment step, these stand in for it. All of them **degrade o
 - `orders.ip` / `orders.user_agent` are recorded so a burst from one source is actually visible — before this there was no way to characterise the traffic at all.
 - Admin: `/api/admin/blocklist` (POST with `cancelOrders: true` blocks an identifier *and* cancels+relists every unpaid order matching it in one call), and an **⚠ Email unconfirmed** badge on the order board.
 
+## Sign in with Google / Microsoft (added 2026-10-08)
+`lib/oauth.js`, `user_identities` (migration 0017), `/api/auth/oauth/[provider]` (+ `/callback`),
+`components/OAuthButtons.jsx` on `/login` and `/signup`. Plain authorization-code flow, no library.
+Dormant until env vars are set: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and
+`MS_LOGIN_CLIENT_ID`/`MS_LOGIN_CLIENT_SECRET` (NOT `MS_CLIENT_ID` — that is the CDA watcher's app
+with Files.Read.All). Register the redirect URI `<SITE_URL>/api/auth/oauth/<google|microsoft>/callback`.
+Microsoft app must be "any org + personal accounts".
+
+- **Email is trusted only if verified**: Google `email_verified`; Microsoft **personal accounts only**
+  (tenant id check) because an org tenant admin controls the `email` claim (nOAuth). Work accounts are refused.
+- **Match is by (provider, subject)**; email only attaches the identity to an existing account the first time.
+- **First link to a password account resets its password and bumps `token_version`**: signup does not verify
+  email, so that account may have been pre-registered by someone else. The owner uses "forgot password".
+- Same abuse gates as password signup (blocklist, disposable domains, per-IP rate). OAuth signup grants NO
+  marketing consent. `next` is validated to a local path; state is an httpOnly cookie checked in the callback.
+
 ## Abandoned carts — a to-do list for staff, never a mailing (added 2026-10-08)
 `lib/abandoned-carts.js`, table `cart_sessions` (migration 0016), `components/CartCapture.jsx`
 (mounted in `SiteChrome`), `components/AbandonedCarts.jsx` on the Sales dashboard under My Day,
