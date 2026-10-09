@@ -4093,7 +4093,7 @@ migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
-Built so far (Phase 1, slices 1–3): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
+Built so far (Phase 1, slices 1–4): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
 commission), `0017_marketplace_listings` (listings, photos, events) and `0018_marketplace_payouts` (bank
 accounts, ledger, payouts); `lib/marketplace-rules.js` (clocks, strikes, commission, payout maths, in
 INTEGER CENTS), `lib/listing-rules.js` (what a listing must contain; shared with the browser),
@@ -4146,6 +4146,16 @@ not shown anywhere until the storefront slice.
 - Migrations `0016` and `0017` each exist twice on main (`cart_sessions` / `user_identities` merged
   alongside the marketplace ones). The runner keys on the full filename so it works; pick the next
   free number when adding one.
+- **The screens (slice 4).** Vendor portal at `/vendor` (home with standing + strike meter + balances,
+  listings and the listing editor with photo upload, payouts with the bank form, performance with the
+  rules); public application at `/marketplace/sell`; staff/admin at `/admin/marketplace` (Applications,
+  Listings to review, Vendors; and for admins only Bank accounts, Payouts, Strike review — those tabs'
+  data is not even sent to a staff browser). Vendor pages gate with `lib/vendor-page.js` `vendorGate`
+  and take the vendor id from the SESSION; another vendor's listing id is a plain 404. Onboarding
+  (approve/reject, a staff-role login) is staff; the OWNER login, tiers, strikes, commission, balances
+  and bank are admin. A vendor signs up at /signup with the email that was approved.
+- Order countdowns and the order scorecard are NOT on the dashboard yet — they need the checkout slice;
+  the home page says so rather than showing invented zeros.
 - Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
 
 ## What is NOT in this repo

@@ -32,6 +32,9 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // The parts shelf — the OFFICE's view (prices, requests, history). Admin: the
     // floor works in RS Ops' own Parts tab against the same records.
     { key: 'parts', label: 'Parts', href: '/admin/parts' },
+    // Vendors who sell on our site: applications, listing review, strikes, bank details and
+    // payouts. Staff onboard and review; the money tabs inside are admin-only.
+    { key: 'marketplace', label: 'Marketplace', href: '/admin/marketplace', sales: true },
     { key: 'campaigns', label: 'Campaigns', href: '/admin/campaigns' },
     { key: 'coupons', label: 'Coupons', href: '/admin/coupons' },
     { key: 'giveaway', label: 'Giveaway', href: '/admin/giveaway' },
