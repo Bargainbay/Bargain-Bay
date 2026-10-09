@@ -288,7 +288,7 @@ test('SETTLEMENT: delivery books the sale to the vendor\'s ledger, net of commis
     await acceptVendorOrder(a.id, id, { insurance: 'insured', now: plus(1) }); await markVendorOrderReady(a.id, id, { now: plus(30) });
     await onOrderStatus(o.id, 'delivered');
     equal((await vo(o.id, 'A')).status, 'delivered');
-    const want = payoutBreakdown({ itemCents: 100000, deliveryServiceCents: 8900, insuranceCents: 1500 });
+    const want = payoutBreakdown({ itemCents: 100000, deliveryServiceCents: 8900, insuranceCents: 1500, hstOnSaleCents: 13000 });   // 13% HST the customer paid on the item, handed to the seller
     const bal = await vendorBalance(a.id, new Date(Date.now() + 10 * 24 * H));
     equal(bal.availableCents, want.payable); equal(bal.reserveHeldCents, want.reserve);
     await onOrderStatus(o.id, 'delivered');                      // a second delivery event writes nothing
@@ -309,7 +309,7 @@ test('Lane C is delivered by staff once the carrier confirms, and the seller get
     await onOrderStatus(o.id, 'delivered');                      // the order board does NOT settle a seller-shipped unit
     equal((await vo(o.id, 'C')).status, 'ready');
     await deliverVendorOrder(id, { by: 'staff@bb.ca' });
-    const want = payoutBreakdown({ itemCents: 50000, laneCDeliveryCents: 6320 });
+    const want = payoutBreakdown({ itemCents: 50000, laneCDeliveryCents: 6320, hstOnSaleCents: 7322 });   // 13% of the item plus the delivery share
     equal((await vendorBalance(a.id, new Date(Date.now() + 10 * 24 * H))).availableCents, want.payable);
     equal((await allVendorOrders()).find((x) => x.id === id).status, 'delivered');
   } finally { done(); }

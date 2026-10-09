@@ -172,7 +172,7 @@ test('a settled order books the sale, commission, fees and the 2% hold — and n
     const bal = await vendorBalance(v.id);
     equal(bal.availableCents, r.breakdown.payable);
     equal(bal.reserveHeldCents, r.breakdown.reserve);
-    equal(bal.availableCents, 100000 - 10000 - 5900 - 1500 - r.breakdown.reserve);
+    equal(bal.availableCents, 100000 - 10000 - 5900 - 1500 - r.breakdown.reserve - r.breakdown.hstOnFeesCents);
   } finally { done(); }
 });
 
@@ -182,7 +182,7 @@ test('settling the same order twice writes nothing the second time', async () =>
     const v = await vendor('Alpha');
     const a = await sale(v.id, 'BB-1'); const b = await sale(v.id, 'BB-1');
     equal(a.alreadyBooked, false); equal(b.alreadyBooked, true);
-    equal((await vendorStatement(v.id)).length, 3);                  // sale, commission, warranty hold
+    equal((await vendorStatement(v.id)).length, 4);                  // sale, commission, warranty hold, HST on our commission
   } finally { done(); }
 });
 

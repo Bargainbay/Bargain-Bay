@@ -4104,7 +4104,7 @@ migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
-Built so far (Phase 1, slices 1–6): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
+Built so far (Phase 1, slices 1–7): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
 commission), `0017_marketplace_listings` (listings, photos, events) and `0018_marketplace_payouts` (bank
 accounts, ledger, payouts); `lib/marketplace-rules.js` (clocks, strikes, commission, payout maths, in
 INTEGER CENTS), `lib/listing-rules.js` (what a listing must contain; shared with the browser),
@@ -4182,11 +4182,9 @@ not shown anywhere until the storefront slice.
   false for a vendor's unit. Photos are served by `/api/mp-photo/<id>` — a public photo of a live
   listing only, never the rating plate.
 - **The checkout split (slice 6), behind a DOUBLE interlock.** Ordering needs BOTH
-  `MARKETPLACE_ORDERING=1` and `MARKETPLACE_BOOKS_READY=1` (`orderingOn()`). **Do not set the second until the
-  books are dealt with**: the revenue dashboard, P&L and ledger all read `orders`, so a seller's sale would be
-  counted as OUR revenue (and our cost of it is 0, so its profit reads 100%), and our HST position on it is
-  unconfirmed with the accountant. Not yet done: exclude vendor lines from the four `SALE` predicates and
-  book commission as revenue + *Owed to marketplace vendors* as a liability in `lib/ledger.js`. The mechanics:
+  `MARKETPLACE_ORDERING=1` and `MARKETPLACE_BOOKS_READY=1` (`orderingOn()`). The books are now built (slice 7,
+  below); the second switch means **your accountant has confirmed the HST treatment** the code implements.
+  The mechanics:
   one customer order and one web invoice as always; `vendor_orders` (migration 0019, one per vendor+lane) is the
   vendor's part. Created INSIDE the checkout transaction (`createVendorOrdersTx`, which re-verifies every unit is
   still live). **The vendor hears nothing, and no clock runs, until `updateOrderStatus(id,'confirmed')`** — that
@@ -4200,9 +4198,28 @@ not shown anywhere until the storefront slice.
   never reach the tracker. The delivery-service rates (`delivery_service_rates`) are UNSET until an admin sets
   them on Admin -> Marketplace -> Orders; unset means $0. Insurance premium (1.5%) is a placeholder until the
   broker confirms our cover reaches vendors' goods.
+- **THE BOOKS (slice 7, migration 0020): a seller's sale is not our revenue.** The seller is the seller of
+  record; we are the agent. The customer's order and invoice carry the seller's items, but
+  `orders.vendor_subtotal` (their item prices + the delivery fee a self-shipping seller keeps most of) and
+  `orders.vendor_hst` (the HST on those) remember how much of it is theirs, and EVERY revenue figure subtracts
+  them: the analytics dashboards, the HST remittance, the P&L (`lib/pnl.js`), the weekly report, the daily P&L,
+  the records pack (`lib/books.js`). A seller's order lines are also left out of units sold, category revenue and
+  cost of goods (`oi.vendor_id IS NULL`). **What IS revenue is commission + delivery-service fee + insurance
+  premium, recognised when the sale settles (delivery)** — `lib/marketplace-revenue.js` reads it from
+  `vendor_ledger` and the P&L/dashboards show it on its own line, with GMV (the sellers' sales) shown separately
+  so nobody mistakes it for revenue. The general ledger (`lib/ledger.js`): the invoice credits Sales/HST only for
+  OUR part and **2160 "Owed to marketplace vendors"** for the rest (carved out from `vendor_orders`, read in its
+  own section so a missing table can't take the invoices out); settlement draws 2160 down into **4300 commission /
+  4310 fees / 2000 HST**; a refund whose reason is `VENDOR_REFUND_REASON` ("Seller could not fulfil") draws 2160
+  down, not Sales; a paid payout is Dr 2160 / Cr 1000; a cancelled seller's delivery share becomes ours.
+  **Invariant (tested): 2160 = every seller's ledger balance + their warranty reserve.** Not journalled yet: the
+  `refund`/`guarantee_claim`/`chargeback`/`adjustment` ledger kinds (nothing creates them from a screen).
+  Seller ledger kinds `hst_on_sale` (+, passed to the seller) and `hst_on_fees` (−, 13% of commission +
+  delivery service; insurance treated as exempt). **Only HST-registered sellers are orderable** (a small supplier
+  has no HST to remit). `trialBalance(asAt)` is EXCLUSIVE of `asAt`.
 - **Test gotcha:** the checkout route's runtime-DDL helpers (`ensureAttributionColumns` etc.) memoise "done" in
-  module scope, so a second FRESH test database never gets their columns. `test/marketplace-checkout.test.mjs`
-  shares one database for the file for that reason.
+  module scope, so a second FRESH test database never gets their columns. Every test file that drives the real
+  route uses `test/shared-checkout-db.mjs` (one database, re-installed on each call).
 - Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
 
 ## What is NOT in this repo
