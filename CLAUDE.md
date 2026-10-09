@@ -4093,8 +4093,9 @@ migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
-Built so far (Phase 1, slices 1–2): `db/migrations/0016` (vendors, strikes, commission) and `0017`
-(listings, photos, events); `lib/marketplace-rules.js` (clocks, strikes, commission, payout maths, in
+Built so far (Phase 1, slices 1–3): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
+commission), `0017_marketplace_listings` (listings, photos, events) and `0018_marketplace_payouts` (bank
+accounts, ledger, payouts); `lib/marketplace-rules.js` (clocks, strikes, commission, payout maths, in
 INTEGER CENTS), `lib/listing-rules.js` (what a listing must contain; shared with the browser),
 `lib/image-checks.js` (photo pipeline, `sharp`), `lib/vendors.js`, `lib/marketplace-listings.js`,
 `lib/vendor-session.js`; APIs `app/api/vendor/*` and `app/api/admin/marketplace/*`; tests
@@ -4124,6 +4125,27 @@ not shown anywhere until the storefront slice.
 - **sharp's `.stats()` reads the INPUT, not the pipeline** — measure filtered pixels yourself (that
   bug made every photo look sharp). Don't run `next build` with a symlinked `node_modules` under
   Turbopack; `next build --webpack` works.
+- **Bank details are encrypted and the owner alone can change them** (`lib/secret-box.js`,
+  `lib/vendor-bank.js`, env `BANK_ENCRYPTION_KEY` — unset means nothing can be saved, on purpose, and
+  the key must NOT be changed once accounts exist). The ciphertext is bound to the vendor id, so
+  swapping blobs between rows will not decrypt. A vendor can only ever read the last four digits; the
+  full number leaves the database only in `payoutFile`, one logged reveal per row. An admin verifies an
+  account and attests the name matches; replacing an account in use starts a 5-day cooling-off during
+  which the OLD account keeps being paid.
+- **A vendor's balance is never stored** — it is `SUM(vendor_ledger.amount_cents)`, and the table is
+  append-only (a trigger refuses UPDATE/DELETE; a CHECK keeps each kind on its side of zero). An
+  order's settlement is a set of keyed rows (`recordOrderSettlement`), idempotent per order; all of
+  them share one `available_at` = delivery + the tier's hold. Nothing calls it yet — the checkout
+  slice will.
+- **Payouts: proposed → approved (admin) → paid.** The ledger debit is written at approval inside a
+  transaction that re-checks the balance, so a refund landing in between cancels the proposal rather
+  than overpaying. Eligibility FAILS CLOSED. The weekly run reports every vendor it skipped and why.
+  At/above $2,000 the approver must not be the proposer (the system's own proposals don't count).
+- **A `Date` is not a date string**: `String(new Date())` is "Sat Oct 03 …". Use `toISOString()`.
+  (This bit `commissionBpsFor` again in the ledger; see the CRM and purchase-order landmines.)
+- Migrations `0016` and `0017` each exist twice on main (`cart_sessions` / `user_identities` merged
+  alongside the marketplace ones). The runner keys on the full filename so it works; pick the next
+  free number when adding one.
 - Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
 
 ## What is NOT in this repo
