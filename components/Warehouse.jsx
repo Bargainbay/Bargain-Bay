@@ -990,6 +990,10 @@ function LabelsTab() {
             href={labelsHref({ type: 'spots', codes: 'PD1,PD2,PD3,PD4,PD5,PD6,PD7,PD8', format: 'contents' })}>
             Drawer contents labels (PD1–PD8)
           </a>
+          <a className="btn" target="_blank" rel="noopener noreferrer"
+            href={labelsHref({ type: 'spots', area: 'parts-shelves', format: 'contents' })}>
+            Shelf contents labels (P1-1–P4-4)
+          </a>
         </div>
       </div>
       <div className="panel">
