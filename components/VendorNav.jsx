@@ -9,6 +9,7 @@ export default function VendorNav({ active, name }) {
     { key: 'listings', label: 'Listings', href: '/vendor/listings' },
     { key: 'payouts', label: 'Payouts', href: '/vendor/payouts' },
     { key: 'performance', label: 'Performance', href: '/vendor/performance' },
+    { key: 'guides', label: 'Guides', href: '/marketplace/guides' },
     { key: 'policies', label: 'Policies', href: '/vendor/policies' }
   ];
   return (
