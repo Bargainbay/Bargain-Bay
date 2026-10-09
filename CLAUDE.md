@@ -4104,7 +4104,7 @@ migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
-Built so far (Phase 1, slices 1–7): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
+Built so far (Phase 1, slices 1–8): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
 commission), `0017_marketplace_listings` (listings, photos, events) and `0018_marketplace_payouts` (bank
 accounts, ledger, payouts); `lib/marketplace-rules.js` (clocks, strikes, commission, payout maths, in
 INTEGER CENTS), `lib/listing-rules.js` (what a listing must contain; shared with the browser),
@@ -4217,6 +4217,20 @@ not shown anywhere until the storefront slice.
   Seller ledger kinds `hst_on_sale` (+, passed to the seller) and `hst_on_fees` (−, 13% of commission +
   delivery service; insurance treated as exempt). **Only HST-registered sellers are orderable** (a small supplier
   has no HST to remit). `trialBalance(asAt)` is EXCLUSIVE of `asAt`.
+- **The written policies (slice 8): `lib/marketplace-policies.js`.** Twelve documents (Seller Code of Conduct,
+  Prohibited Items, Listing & Photo Standards, Condition Grading, Fulfilment & Delivery, Returns/Warranty/Guarantee,
+  Fees & Payouts, Enforcement & Appeals; and the Vendor Agreement, IP/Takedown, Buyer Protection and Marketplace
+  Terms) served at `/marketplace/policies[/slug]`. **Every number in them is imported from the code that enforces
+  it** (the 24/72 hours, three strikes, 10%, hold days, photo counts…), so a policy can't say one thing while the
+  system does another — `test/marketplace-policies.test.mjs` pins it. **If you change a rule, change it where it is
+  enforced and the pages follow; if you write a sentence that promises a feature, check it exists** (the test greps
+  for phrases we removed because they promised unbuilt things). Each document is `published` or `draft`: the four
+  legal/customer-facing ones are DRAFTS pending a lawyer/the owner (banner, noindex, not required of anyone).
+  Publishing a draft or bumping `version` asks every seller to accept it again. **Acceptance** (`policy_acceptances`,
+  migration 0021, `lib/policy-acceptance.js`): the account OWNER accepts the current version of every published
+  `acceptRequired` document; the versions shown travel with the click so a changed policy is refused, not silently
+  accepted; until then `createDraft` and `submitListing` refuse — but nothing about an order already paid for
+  ever checks it. The Vendor Agreement is a skeleton with `[Lawyer: …]` placeholders; it needs a real lawyer.
 - **Test gotcha:** the checkout route's runtime-DDL helpers (`ensureAttributionColumns` etc.) memoise "done" in
   module scope, so a second FRESH test database never gets their columns. Every test file that drives the real
   route uses `test/shared-checkout-db.mjs` (one database, re-installed on each call).

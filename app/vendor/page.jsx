@@ -6,6 +6,7 @@ import { vendorBalance } from '../../lib/vendor-ledger';
 import { bankSummary } from '../../lib/vendor-bank';
 import { listVendorListings } from '../../lib/marketplace-listings';
 import { listVendorOrders } from '../../lib/vendor-orders';
+import { pendingPolicies } from '../../lib/policy-acceptance';
 import { ACCEPT_HOURS, READY_HOURS, STRIKE_REASONS, TIERS } from '../../lib/marketplace-rules';
 
 export const dynamic = 'force-dynamic';
@@ -26,11 +27,13 @@ export default async function VendorHome() {
     strikeMeter(vendor.id), vendorBalance(vendor.id), bankSummary(vendor.id), listVendorListings(vendor.id),
     listVendorOrders(vendor.id).catch(() => [])
   ]);
+  const policiesPending = await pendingPolicies(vendor.id).catch(() => []);
   const waiting = orders.filter((o) => o.status === 'awaiting_accept').length;
   const toReady = orders.filter((o) => o.status === 'accepted').length;
   const by = (s) => listings.filter((l) => l.status === s).length;
   const [tone, label] = BANNER[meter.standing] || ['ok', meter.standing];
   const todo = [];
+  if (policiesPending.length) todo.push({ text: `Read and accept our marketplace policies (${policiesPending.length}) — you can't list until the account owner has.`, href: '/vendor/policies' });
   if (!bank.payable && !bank.waiting.length) todo.push({ text: 'Add your banking details so we can pay you.', href: '/vendor/payouts' });
   if (waiting) todo.push({ text: `${waiting} order(s) are waiting for you to accept — the 24-hour clock is running.`, href: '/vendor/orders' });
   if (toReady) todo.push({ text: `${toReady} accepted order(s) still need to be made ready (72-hour clock).`, href: '/vendor/orders' });
