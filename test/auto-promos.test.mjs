@@ -5,6 +5,7 @@ import { suite, test, equal, assert } from './_harness.mjs';
 import { autoDiscountFor } from '../lib/coupons.js';
 import { upliftedPrice, vendorUpliftPct } from '../lib/constants.js';
 import { parseTrackerCsv } from '../lib/csv.js';
+import { wrapPriceFormula, unwrapPriceFormula, isWrapped } from '../lib/vendor-formula.js';
 
 const pct = (value) => ({ kind: 'percent', value });
 const unit = (price, floor, eligible = true) => ({ price, floor, eligible });
@@ -56,15 +57,15 @@ test('a unit already at or under its floor gives nothing', () => {
 
 suite('lib/constants: a vendor uplift lifts the public price');
 
-test('Abi units are +10%, however the vendor name is spelled', () => {
-  equal(vendorUpliftPct('Abi'), 10);
-  equal(vendorUpliftPct(' ABI '), 10);
+test('Abi units are +20% (the 10% rule plus a further 10%), however the vendor name is spelled', () => {
+  equal(vendorUpliftPct('Abi'), 20);
+  equal(vendorUpliftPct(' ABI '), 20);
   equal(vendorUpliftPct('SecondShop'), 0);
   equal(vendorUpliftPct(null), 0);
 });
 
 test('the uplift is applied to the tracker price', () => {
-  equal(upliftedPrice(1860, 2595, 'Abi'), 2046);
+  equal(upliftedPrice(1860, 2595, 'Abi'), 2232);
 });
 
 test('another vendor, or no vendor, is untouched', () => {
@@ -74,7 +75,7 @@ test('another vendor, or no vendor, is untouched', () => {
 
 test('it never goes past retail, and never below the price it started at', () => {
   equal(upliftedPrice(1000, 1050, 'Abi'), 1050);
-  equal(upliftedPrice(1100, 1000, 'Abi'), 1210);   // retail below price: no cap to hold it to
+  equal(upliftedPrice(1100, 1000, 'Abi'), 1320);   // retail below price: no cap to hold it to
   equal(upliftedPrice(0, 500, 'Abi'), 0);
 });
 
@@ -83,10 +84,10 @@ suite('lib/csv: the tracker read applies the vendor uplift once');
 const HEAD = 'Lot Number,Item ID / SKU,Category,Make,Model,Description,Serial Number,Vendor / Supplier,Retail Price,Condition,Condition %,Suggested Sale Price,Status,Total Cost';
 const row = (sku, vendor) => `L1,${sku},Laundry,LG,WKEX200HBA,LG tower,123,${vendor},2000,New Open Box,80%,1600,Tested Working,1000`;
 
-test("an Abi row is priced 10% over Retail x Condition %, and everyone else's is not", () => {
+test("an Abi row is priced 20% over Retail x Condition %, and everyone else's is not", () => {
   const { units } = parseTrackerCsv([HEAD, row('VD-1', 'Abi'), row('SS-1', 'SecondShop'), row('X-1', '')].join('\n'));
   const price = (id) => units.find((u) => u.id === id).price;
-  equal(price('VD-1'), 1760);
+  equal(price('VD-1'), 1920);
   equal(price('SS-1'), 1600);
   equal(price('X-1'), 1600);
 });
@@ -103,4 +104,30 @@ test('a 10% referral code on a unit that cannot spare it gives only what it can'
   const r = autoDiscountFor(pct(10), [unit(1860, 1860), unit(1000, 0)]);
   equal(r.discount, 100);
   assert(r.capped, 'capped on the vendor unit');
+});
+
+suite('lib/vendor-formula: the sheet formula wraps, and unwraps exactly');
+
+const OPT = { vendorCell: 'H854', factor: '1.2' };
+
+test('it wraps the existing formula and the vendor test reads this row', () => {
+  const w = wrapPriceFormula('=ROUND(K854*M854,2)', OPT);
+  equal(w, '=IF(LOWER(TRIM(H854))="abi",ROUND((ROUND(K854*M854,2))*1.2,2),ROUND(K854*M854,2))');
+});
+
+test('unwrapping gives back the original, character for character', () => {
+  for (const f of ['=ROUND(K854*M854,2)', '=IFERROR(K854*M854,"")', '=IF(M854="","",K854*M854)']) {
+    equal(unwrapPriceFormula(wrapPriceFormula(f, OPT)), f);
+  }
+});
+
+test('wrapping twice changes nothing', () => {
+  const once = wrapPriceFormula('=K854*M854', OPT);
+  equal(wrapPriceFormula(once, OPT), once);
+  assert(isWrapped(once));
+});
+
+test('a typed value is a deliberate override: never wrapped', () => {
+  equal(wrapPriceFormula('1996', OPT), null);
+  equal(unwrapPriceFormula('=K854*M854'), null);
 });
