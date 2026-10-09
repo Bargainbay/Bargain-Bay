@@ -3,6 +3,7 @@
 // (2026-10-08): WRT541SZDZ priced $987 against a $790.25 cost loses money at 20%.
 import { suite, test, equal, assert } from './_harness.mjs';
 import { autoDiscountFor } from '../lib/coupons.js';
+import { upliftedPrice, vendorUpliftPct } from '../lib/constants.js';
 
 const pct = (value) => ({ kind: 'percent', value });
 const unit = (price, floor, eligible = true) => ({ price, floor, eligible });
@@ -50,4 +51,28 @@ test('a flat amount is capped by what the cart can spare', () => {
 
 test('a unit already at or under its floor gives nothing', () => {
   equal(autoDiscountFor(pct(10), [unit(700, 750)]), { discount: 0, capped: true });
+});
+
+suite('lib/constants: a vendor uplift lifts the public price');
+
+test('Abi units are +10%, however the vendor name is spelled', () => {
+  equal(vendorUpliftPct('Abi'), 10);
+  equal(vendorUpliftPct(' ABI '), 10);
+  equal(vendorUpliftPct('SecondShop'), 0);
+  equal(vendorUpliftPct(null), 0);
+});
+
+test('the uplift is applied to the tracker price', () => {
+  equal(upliftedPrice(1860, 2595, 'Abi'), 2046);
+});
+
+test('another vendor, or no vendor, is untouched', () => {
+  equal(upliftedPrice(1860, 2595, 'SecondShop'), 1860);
+  equal(upliftedPrice(1860, 2595, null), 1860);
+});
+
+test('it never goes past retail, and never below the price it started at', () => {
+  equal(upliftedPrice(1000, 1050, 'Abi'), 1050);
+  equal(upliftedPrice(1100, 1000, 'Abi'), 1210);   // retail below price: no cap to hold it to
+  equal(upliftedPrice(0, 500, 'Abi'), 0);
 });
