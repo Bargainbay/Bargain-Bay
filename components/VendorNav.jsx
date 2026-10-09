@@ -16,6 +16,7 @@ export default function VendorNav({ active, name }) {
         {items.map((i) => (
           <a key={i.key} href={i.href} className={`admin-nav-link${active === i.key ? ' active' : ''}`}>{i.label}</a>
         ))}
+        <a href="/shop" className="admin-nav-link">View store →</a>
         <NavSignOut />
       </div>
     </div>

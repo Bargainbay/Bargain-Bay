@@ -42,6 +42,8 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
     setErr('');
     try { setVendorOpen(await api(`/api/admin/marketplace/vendors?id=${id}`, 'GET')); } catch (e) { setErr(e.message); }
   }
+  // Any vendor name on any tab is a button to that vendor's page — nobody should have to hunt for it.
+  function goVendor(id) { setTab('vendors'); setListingOpen(null); openVendor(id); }
   async function openListing(id) {
     setErr('');
     try { setListingOpen(await api(`/api/admin/marketplace/listings?id=${id}`, 'GET')); } catch (e) { setErr(e.message); }
@@ -79,7 +81,7 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
             {queue.map((q) => (
               <tr key={q.id}><td>{day(q.submitted_at)}</td><td style={{ fontFamily: 'ui-monospace, monospace' }}>{q.sku}</td>
                 <td>{q.title || `${q.make} ${q.model}`}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{q.condition}</div></td>
-                <td>{q.vendor} <span className="pill">{TIERS[q.tier]}</span></td><td>{q.lane}</td><td>${Number(q.price).toLocaleString('en-CA')}</td>
+                <td><VendorLink id={q.vendor_id} onOpen={goVendor}>{q.vendor}</VendorLink> <span className="pill">{TIERS[q.tier]}</span></td><td>{q.lane}</td><td>${Number(q.price).toLocaleString('en-CA')}</td>
                 <td><button className="btn" onClick={() => openListing(q.id)}>Review</button></td></tr>
             ))}
           </tbody></table></div>
@@ -110,12 +112,12 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
       )}
 
       {tab === 'bank' && isAdmin && (
-        <BankTab banks={banks} busy={busy}
+        <BankTab banks={banks} busy={busy} onVendor={goVendor}
           verify={(id, how) => act(() => post('/api/admin/marketplace/bank', { action: 'verify', id, how, nameMatched: true }), 'Verified.')}
           reject={(id, reason) => act(() => post('/api/admin/marketplace/bank', { action: 'reject', id, reason }), 'Rejected.')} />
       )}
       {tab === 'payouts' && isAdmin && (
-        <PayoutsTab payouts={payouts} busy={busy}
+        <PayoutsTab payouts={payouts} busy={busy} onVendor={goVendor}
           run={(body, ok) => act(() => post('/api/admin/marketplace/payouts', body), ok)}
           exportFile={async (ids) => {
             setBusy(true); setErr('');
@@ -132,7 +134,7 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
         <div className="panel">
           <h2 style={{ marginTop: 0, fontSize: 17 }}>Strikes due for review</h2>
           <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>Strikes never expire by themselves. Each one resurfaces here every 90 days until you keep or remove it. Removing needs a reason and stays on the record as revised.</p>
-          {due.length === 0 ? <p style={{ margin: 0 }}>Nothing due.</p> : due.map((s) => <StrikeReviewRow key={s.id} s={s} strikeReasons={strikeReasons} busy={busy}
+          {due.length === 0 ? <p style={{ margin: 0 }}>Nothing due.</p> : due.map((s) => <StrikeReviewRow key={s.id} s={s} strikeReasons={strikeReasons} busy={busy} onVendor={goVendor}
             keep={() => act(() => post('/api/admin/marketplace/vendors', { action: 'keep_strike', strikeId: s.id }), 'Kept — it will come back in 90 days.')}
             remove={(reason) => act(() => post('/api/admin/marketplace/vendors', { action: 'revise_strike', strikeId: s.id, reason }), 'Strike removed.')} />)}
         </div>
@@ -289,7 +291,7 @@ function ClearFirst({ vendorId }) {
   );
 }
 
-function BankTab({ banks, busy, verify, reject }) {
+function BankTab({ banks, busy, verify, reject, onVendor }) {
   const [how, setHow] = useState('void_cheque');
   const [reason, setReason] = useState({});
   return (
@@ -298,7 +300,7 @@ function BankTab({ banks, busy, verify, reject }) {
       <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>Only verify after you have seen a void cheque or bank letter (or a test deposit landed), and the holder&rsquo;s name matches the business. Verifying attests that, under your name.</p>
       {banks.length === 0 ? <p style={{ margin: 0 }}>Nothing waiting.</p> : banks.map((b) => (
         <div key={b.id} style={{ borderTop: '1px solid var(--line-soft)', padding: '12px 0' }}>
-          <strong>{b.vendor}</strong> <span style={{ fontSize: 13, color: 'var(--muted)' }}>({b.legalName})</span>
+          <strong><VendorLink id={b.vendorId} onOpen={onVendor}>{b.vendor}</VendorLink></strong> <span style={{ fontSize: 13, color: 'var(--muted)' }}>({b.legalName})</span>
           {b.replacesExisting && <span className="pill warn" style={{ marginLeft: 8 }}>Replaces an account in use — 5-day safety wait</span>}
           <div style={{ fontSize: 14 }}>Holder: <strong>{b.holderName}</strong> {b.nameLooksRight ? <span className="pill ok">looks like the business</span> : <span className="pill warn">does NOT look like the business</span>}
             <br />Institution {b.institution} · transit {b.transit} · account ••••{b.last4} · {b.method.replace('_', ' ')} · submitted {day(b.submittedAt)} by {b.submittedBy}</div>
@@ -313,7 +315,7 @@ function BankTab({ banks, busy, verify, reject }) {
   );
 }
 
-function PayoutsTab({ payouts, busy, run, exportFile }) {
+function PayoutsTab({ payouts, busy, run, exportFile, onVendor }) {
   const [ref, setRef] = useState({});
   const approved = payouts.filter((p) => p.status === 'approved');
   return (
@@ -327,7 +329,7 @@ function PayoutsTab({ payouts, busy, run, exportFile }) {
       <div className="table-wrap"><table className="admin"><thead><tr><th>Proposed</th><th>Vendor</th><th>Amount</th><th>Status</th><th>By</th><th /></tr></thead><tbody>
         {payouts.length === 0 && <tr><td colSpan={6} style={{ color: 'var(--muted)' }}>No payouts yet.</td></tr>}
         {payouts.map((p) => (
-          <tr key={p.id}><td>{day(p.proposed_at)}</td><td>{p.vendor}</td><td>{cents(p.amount_cents)}</td><td>{p.status}{p.paid_ref ? ` · ${p.paid_ref}` : ''}{p.note ? ` — ${p.note}` : ''}</td><td>{p.proposed_by}</td>
+          <tr key={p.id}><td>{day(p.proposed_at)}</td><td><VendorLink id={p.vendor_id} onOpen={onVendor}>{p.vendor}</VendorLink></td><td>{cents(p.amount_cents)}</td><td>{p.status}{p.paid_ref ? ` · ${p.paid_ref}` : ''}{p.note ? ` — ${p.note}` : ''}</td><td>{p.proposed_by}</td>
             <td style={{ whiteSpace: 'nowrap' }}>
               {p.status === 'proposed' && <><button className="btn primary" disabled={busy} onClick={() => run({ action: 'approve', id: p.id }, 'Approved.')}>Approve</button>{' '}
                 <button className="btn" disabled={busy} onClick={() => run({ action: 'cancel', id: p.id, note: 'Cancelled by admin' }, 'Cancelled.')}>Cancel</button></>}
@@ -340,11 +342,11 @@ function PayoutsTab({ payouts, busy, run, exportFile }) {
   );
 }
 
-function StrikeReviewRow({ s, strikeReasons, busy, keep, remove }) {
+function StrikeReviewRow({ s, strikeReasons, busy, keep, remove, onVendor }) {
   const [reason, setReason] = useState('');
   return (
     <div style={{ borderTop: '1px solid var(--line-soft)', padding: '10px 0', fontSize: 14 }}>
-      <strong>{s.trade_name || s.legal_name}</strong> ({s.status}) — {strikeReasons[s.reason_code]}{s.order_ref ? ` · ${s.order_ref}` : ''}{s.note ? ` · ${s.note}` : ''}
+      <strong><VendorLink id={s.vendor_id} onOpen={onVendor}>{s.trade_name || s.legal_name}</VendorLink></strong> ({s.status}) — {strikeReasons[s.reason_code]}{s.order_ref ? ` · ${s.order_ref}` : ''}{s.note ? ` · ${s.note}` : ''}
       <div style={{ color: 'var(--muted)', fontSize: 12 }}>Issued {day(s.issued_at)} · last looked at {day(s.last_review_at)}</div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
         <button className="btn" disabled={busy} onClick={keep}>Keep (review again in 90 days)</button>
@@ -353,4 +355,8 @@ function StrikeReviewRow({ s, strikeReasons, busy, keep, remove }) {
       </div>
     </div>
   );
+}
+
+function VendorLink({ id, onOpen, children }) {
+  return <a href="#" onClick={(e) => { e.preventDefault(); onOpen(id); }}>{children}</a>;
 }
