@@ -3,7 +3,7 @@ import VendorGateView from '../../../components/VendorGateView';
 import { vendorGate } from '../../../lib/vendor-page';
 import { strikeMeter } from '../../../lib/vendors';
 import {
-  ACCEPT_HOURS, READY_HOURS, STRIKE_LIMIT, STRIKE_REASONS, WARRANTY_MONTHS, TIERS, HOLD_DAYS_BY_TIER
+  ACCEPT_HOURS, READY_HOURS, CLAIM_RESPOND_HOURS, CLAIM_RESOLVE_DAYS, STRIKE_LIMIT, STRIKE_REASONS, WARRANTY_MONTHS, TIERS, HOLD_DAYS_BY_TIER
 } from '../../../lib/marketplace-rules';
 import { TIER_LIMITS } from '../../../lib/listing-rules';
 
@@ -26,7 +26,7 @@ export default async function Performance() {
           <tr><td>Order ready</td><td>Within {READY_HOURS} hours of payment confirmation (tracking submitted if you ship yourself)</td><td>Customer may cancel for a full refund, strike</td></tr>
           <tr><td>Cancel a paid order</td><td>Allowed (e.g. out of stock), customer refunded in full</td><td>A strike, every time</td></tr>
           <tr><td>Unit as described</td><td>Matches the listing when we receive it</td><td>Strike and charge-back</td></tr>
-          <tr><td>Warranty</td><td>Every unit carries at least {WARRANTY_MONTHS} months from you; respond to a claim in 48 hours</td><td>Strike; the 2% reserve funds the claim</td></tr>
+          <tr><td>Warranty</td><td>Every unit carries at least {WARRANTY_MONTHS} months from you; respond to a claim in {CLAIM_RESPOND_HOURS} hours and resolve it in {CLAIM_RESOLVE_DAYS} days (see <a href="/vendor/claims">Claims</a>)</td><td>Strike; the 2% reserve funds the claim</td></tr>
         </tbody></table></div>
         <p style={{ fontSize: 14, marginBottom: 0 }}>
           {STRIKE_LIMIT} active strikes restrict your account (no new listings or sales; paid orders must still be fulfilled).

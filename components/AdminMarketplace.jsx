@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { TIERS } from '../lib/marketplace-rules';
+import { TIERS, DEDUCTION_REASONS, CLAIM_RESPOND_HOURS, CLAIM_RESOLVE_DAYS, CLAIM_RESOLUTIONS } from '../lib/marketplace-rules';
+import MarketplaceClaims from './MarketplaceClaims';
 
 const cents = (n) => `${n < 0 ? '−' : ''}$${(Math.abs(Number(n || 0)) / 100).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const day = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '—');
@@ -13,12 +14,13 @@ async function api(url, method, body) {
   return d;
 }
 
-export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, payouts, orders = [], rates = null, serverNow, rejectReasons, strikeReasons }) {
+export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, payouts, orders = [], claims = [], rates = null, serverNow, rejectReasons, strikeReasons }) {
   const apps = vendors.filter((v) => v.status === 'applied');
   const tabs = [
     ['apps', `Applications${apps.length ? ` (${apps.length})` : ''}`],
     ['review', `Listings to review${queue.length ? ` (${queue.length})` : ''}`],
     ['orders', `Orders${orders.filter((o) => ['awaiting_accept', 'accepted'].includes(o.status)).length ? ` (${orders.filter((o) => ['awaiting_accept', 'accepted'].includes(o.status)).length} open)` : ''}`],
+    ['claims', `Claims${claims.filter((c) => ['open', 'responded', 'awaiting_refund'].includes(c.status)).length ? ` (${claims.filter((c) => ['open', 'responded', 'awaiting_refund'].includes(c.status)).length} open)` : ''}`],
     ['vendors', 'Vendors'],
     ...(isAdmin ? [
       ['bank', `Bank accounts${banks.length ? ` (${banks.length})` : ''}`],
@@ -118,6 +120,10 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
           deliver={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'deliver', id }), 'Marked delivered — the sale is booked to the vendor.')}
           setRate={(sizeClass, dollars) => act(() => post('/api/admin/marketplace/orders', { action: 'set_rate', sizeClass, dollars }), 'Fee saved.')} />
       )}
+      {tab === 'claims' && (
+        <MarketplaceClaims claims={claims} orders={orders} isAdmin={isAdmin} busy={busy} now={new Date(serverNow || Date.now())}
+          rules={{ respondHours: CLAIM_RESPOND_HOURS, resolveDays: CLAIM_RESOLVE_DAYS, resolutions: CLAIM_RESOLUTIONS }} post={post} act={act} />
+      )}
       {tab === 'bank' && isAdmin && (
         <BankTab banks={banks} busy={busy} onVendor={goVendor}
           verify={(id, how) => act(() => post('/api/admin/marketplace/bank', { action: 'verify', id, how, nameMatched: true }), 'Verified.')}
@@ -215,6 +221,50 @@ function ListingReview({ data, busy, rejectReasons, onClose, onDecide }) {
   );
 }
 
+// Money that comes off a seller after a sale. A fixed list of reasons (so they stay countable); an
+// adjustment needs a written reason. The key is made once per form so a double click records it once.
+function DeductionForm({ vendorId, refs }) {
+  const [f, setF] = useState({ reason: '', dollars: '', orderRef: '', memo: '', direction: 'take', drawReserve: true, bookedElsewhere: false });
+  const [key, setKey] = useState(() => Math.random().toString(36).slice(2) + Date.now().toString(36));
+  const [state, setState] = useState({ busy: false, err: '', ok: '' });
+  const r = DEDUCTION_REASONS[f.reason];
+  async function go() {
+    setState({ busy: true, err: '', ok: '' });
+    try {
+      const d = await api('/api/admin/marketplace/ledger', 'POST', { vendorId, key, ...f, dollars: Number(f.dollars) });
+      setState({ busy: false, err: '', ok: d.duplicate ? 'Already recorded.' : `Recorded${d.drawnCents ? ` — $${(d.drawnCents / 100).toFixed(2)} came from the warranty reserve` : ''}.` });
+      setKey(Math.random().toString(36).slice(2) + Date.now().toString(36));
+      setTimeout(() => window.location.reload(), 900);
+    } catch (e) { setState({ busy: false, err: e.message, ok: '' }); }
+  }
+  return (
+    <div style={{ border: '1px solid var(--border, #ddd)', borderRadius: 6, padding: 12, marginBottom: 16 }}>
+      <h3 style={{ fontSize: 15, marginTop: 0 }}>Take money off this seller (or correct their balance)</h3>
+      {state.err && <div className="error-box">{state.err}</div>}
+      {state.ok && <div style={{ color: 'var(--ok)', fontSize: 14 }}>{state.ok}</div>}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} style={{ width: 'auto' }}>
+          <option value="">Reason…</option>{Object.entries(DEDUCTION_REASONS).map(([k, x]) => <option key={k} value={k}>{x.label}</option>)}</select>
+        <input placeholder="$ amount" value={f.dollars} onChange={(e) => setF({ ...f, dollars: e.target.value })} style={{ width: 100 }} />
+        {r?.kind === 'adjustment' && (
+          <select value={f.direction} onChange={(e) => setF({ ...f, direction: e.target.value })} style={{ width: 'auto' }}>
+            <option value="take">Comes OFF what we owe them</option><option value="add">ADDS to what we owe them</option></select>)}
+        {r && r.kind !== 'adjustment' && (
+          <>
+            <input list={`refs${vendorId}`} placeholder="Order ref (for the reserve)" value={f.orderRef} onChange={(e) => setF({ ...f, orderRef: e.target.value })} style={{ width: 200 }} />
+            <datalist id={`refs${vendorId}`}>{refs.map((x) => <option key={x} value={x} />)}</datalist>
+          </>)}
+        <input placeholder={r?.kind === 'adjustment' ? 'Written reason (required)' : 'Note'} value={f.memo} onChange={(e) => setF({ ...f, memo: e.target.value })} style={{ width: 260 }} />
+      </div>
+      {r?.kind === 'guarantee_claim' && <label style={{ display: 'block', fontSize: 13, marginTop: 6 }}><input type="checkbox" checked={f.drawReserve} onChange={(e) => setF({ ...f, drawReserve: e.target.checked })} /> Take it from that order&rsquo;s warranty reserve first, then the balance</label>}
+      {r?.kind === 'refund' && <label style={{ display: 'block', fontSize: 13, marginTop: 6 }}><input type="checkbox" checked={f.bookedElsewhere} onChange={(e) => setF({ ...f, bookedElsewhere: e.target.checked })} /> I already recorded this refund on the invoice (the bank side is booked) — only reduce the seller&rsquo;s ledger</label>}
+      {r && <p style={{ fontSize: 12, color: 'var(--muted)', margin: '6px 0' }}>{r.cash ? 'Use this when we have paid a customer from our bank on the seller\'s behalf: it is booked as money out of the bank and off what we owe them.' : 'Between us and the seller only — no cash moves; it changes what we owe them and our income.'}</p>}
+      <button className="btn danger" disabled={state.busy || !f.reason || !(Number(f.dollars) > 0) || (r?.kind === 'adjustment' && !f.memo.trim())}
+        onClick={() => confirm('Record this against the seller\'s ledger? Ledger entries cannot be edited; a mistake is corrected with another entry.') && go()}>Record</button>
+    </div>
+  );
+}
+
 function VendorPanel({ d, isAdmin, busy, strikeReasons, onClose, run }) {
   const v = d.vendor;
   const [email, setEmail] = useState('');
@@ -240,6 +290,8 @@ function VendorPanel({ d, isAdmin, busy, strikeReasons, onClose, run }) {
           · first payout {v.firstPayoutClearedAt ? 'cleared' : <ClearFirst vendorId={v.id} />}
         </p>
       )}
+
+      {isAdmin && d.balance && <DeductionForm vendorId={v.id} refs={d.settledRefs || []} />}
 
       <h3 style={{ fontSize: 15 }}>People who can act for this vendor</h3>
       <table className="admin" style={{ minWidth: 0 }}><tbody>

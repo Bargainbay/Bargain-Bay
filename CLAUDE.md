@@ -4368,6 +4368,34 @@ not shown anywhere until the storefront slice.
   module scope, so a second FRESH test database never gets their columns. Every test file that drives the real
   route uses `test/shared-checkout-db.mjs` (one database, re-installed on each call).
 - Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
+- **Warranty claims and seller deductions (`lib/warranty-claims.js`, migration 0025).** The customer contacts
+  US; staff open a claim on a DELIVERED vendor order inside its 12 months (Admin > Marketplace > Claims). The
+  seller has `CLAIM_RESPOND_HOURS` (48) to respond and `CLAIM_RESOLVE_DAYS` (7) to resolve, on their Claims page.
+  Photos on a claim are NOT built; do not promise them.
+  - **No customer contact is stored on a claim**, so a seller can never be shown it; internal notes are
+    flagged and never sent to the seller. Every seller call takes the vendor id from the session.
+  - **ONE strike per claim, whichever deadline is missed first** (`warranty_response`). The sweep marks the row
+    (`strike_pending_at`) BEFORE issuing the strike, so overlapping sweeps cannot both strike, and a strike
+    that fails to issue clears the mark. Runs inside the half-hourly `sweepVendorOrders` (result under
+    `claims`), which now also calls `releaseWarrantyReserves` with `openClaimRefs()` as `blocked` — until this,
+    nothing in production released a reserve at all.
+  - **Seller "refund" means "we refund, and I accept the charge"**: their deadline is met (`vendor_done_at`) but
+    the claim stays `awaiting_refund` until staff act. Money out is ADMIN only (`chargeClaim`, and the cost
+    figures are stripped from the staff browser by `claimsForViewer`).
+  - **The reserve pays first, per ORDER** (`deduct` with `drawReserve`): a `warranty_release` of exactly what is
+    drawn, then the full deduction; one transaction, idempotent by key. `releaseWarrantyReserves` now releases
+    what REMAINS (hold less releases) — a partial draw must not be released again. A claim bigger than reserve
+    + balance leaves the balance negative: a debt, which payout eligibility will not pay out.
+  - **Journal (`lib/ledger.js` 5g) — cash or not decides the other side:** refund / guarantee_claim (we paid a
+    customer) = Dr 2160 / Cr 1000; chargeback and adjustment (between us and the seller) = 2160 against new
+    income account 4320, never cash. A refund recorded `booked-elsewhere` (already through the invoice refund
+    path, which debits 2160 itself) reduces the seller's ledger but is not journalled again. The reserve draw
+    is not journalled (2160 is balance + reserve). Amounts are gross; whose HST that is stays with the seller.
+    **Ask the accountant to confirm 4320 and the gross treatment.** The 2160 == ledger invariant is tested with
+    every kind in `test/marketplace-books.test.mjs`.
+  - Admin > Marketplace > Vendors > a vendor has a "Take money off this seller" form (`/api/admin/marketplace/ledger`,
+    admin only): fixed reasons, an adjustment needs a written reason, and the form's key makes a double click
+    record once.
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
