@@ -8,11 +8,12 @@ export const dynamic = 'force-dynamic';
 export async function GET(req, { params }) {
   const { provider } = await params;
   const next = safeNext(new URL(req.url).searchParams.get('next'));
+  const optin = new URL(req.url).searchParams.get('optin') === '1';
   const state = newState();
   const url = isProvider(provider) ? authorizeUrl(provider, { state }) : null;
   if (!url) return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent('That sign-in method is not available.')}`, req.url));
   const res = NextResponse.redirect(url);
-  res.cookies.set(STATE_COOKIE, JSON.stringify({ state, next }), {
+  res.cookies.set(STATE_COOKIE, JSON.stringify({ state, next, optin }), {
     httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 600
   });
   return res;

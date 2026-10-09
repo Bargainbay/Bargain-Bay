@@ -10,9 +10,8 @@
 // the specific thing the legislation was written about, and a consent record
 // created from one is worth less than no record at all, because it looks like
 // proof.
-export const CONSENT_TEXT =
-  'Email me occasional deals and new arrivals from Bargain Bay. ' +
-  'You can unsubscribe at any time using the link in any of those emails.';
+import { CONSENT_TEXT } from '../lib/consent-text';
+export { CONSENT_TEXT };
 
 export default function MarketingOptIn({ checked, onChange, id = 'marketing-opt-in' }) {
   return (
