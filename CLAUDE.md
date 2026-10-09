@@ -3445,6 +3445,23 @@ performs a real dump and restore against a real Postgres (PGlite):
 - `backups/` is gitignored — a dump holds every customer's name, address, phone
   and order history.
 
+## Is it running? Heartbeats, the health email, off-site backups (added 2026-10-09)
+`lib/heartbeat.js`, `lib/health.js`, `lib/offsite-backup.js`, migration 0020,
+`/api/cron/health` (daily 11:00 UTC), `/api/cron/backup-offsite` (hourly).
+
+- **Every scheduled route is wrapped in `withHeartbeat(name, run)`**, which records
+  its last run and last success in `cron_heartbeats`. Vercel only says a cron is
+  registered, never that it ran. **A new cron must be wrapped AND added to
+  `EXPECTED` in `lib/health.js`**, or it is invisible to the health email.
+- A heartbeat records the HTTP status only. A job that returns 200 with
+  `{ ok: false }` in the body still counts as a success - make failing jobs
+  return a 5xx.
+- **The health email is sent every day, all clear included**: a message that only
+  arrives on failure cannot tell you the checker died. It also flags missing
+  `SENTRY_DSN` / `CRON_SECRET` / `RESEND_API_KEY` / `BACKUP_DRIVE_FOLDER_ID`.
+- Off-site backup copies the tracker (daily) and new Blob files to a Drive folder;
+  setup is in `docs/BACKUP.md`. It only adds, never deletes. Production only.
+
 ## Staff roles live in the database now (added 2026-09-25)
 `lib/staff.js`, table `staff_access` (migration 0002), **Staff access** on
 `/admin/operations`, `/api/admin/staff` (admin only).

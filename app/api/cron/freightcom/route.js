@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { watchFreightcom } from '../../../../lib/freightcom-watch';
 import { cronAuthorized } from '../../../../lib/cron-auth';
+import { withHeartbeat } from '../../../../lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,5 +29,6 @@ async function run(req) {
   }
 }
 
-export const GET = run;
-export const POST = run;
+const beat = withHeartbeat('freightcom', run);
+export const GET = beat;
+export const POST = beat;

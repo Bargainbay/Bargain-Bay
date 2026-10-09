@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cronAuthorized } from '../../../../lib/cron-auth';
 import { sweepVendorOrders } from '../../../../lib/vendor-orders';
 import { hasDb } from '../../../../lib/db';
+import { withHeartbeat } from '../../../../lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,5 +21,6 @@ async function run(req) {
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
   }
 }
-export async function GET(req) { return run(req); }
-export async function POST(req) { return run(req); }
+const beat = withHeartbeat('vendor-orders', run);
+export const GET = beat;
+export const POST = beat;
