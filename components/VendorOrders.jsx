@@ -100,7 +100,10 @@ export default function VendorOrders({ initial, serverNow, cancelReasons, carrie
           )}
 
           {o.status === 'ready' && o.lane === 'C' && <p style={{ fontSize: 14, marginBottom: 0 }}>Shipped with {o.carrier}, tracking {o.trackingNumber}.</p>}
-          {o.status === 'ready' && o.lane !== 'C' && <p style={{ fontSize: 14, marginBottom: 0 }}>Ready. We will collect or receive it. Insurance: {o.insuranceChoice}.</p>}
+          {o.status === 'ready' && o.lane !== 'C' && <p style={{ fontSize: 14, marginBottom: 0 }}>{o.collectedAt
+            ? <>Our crew collected it on {new Date(o.collectedAt).toISOString().slice(0, 10)}. Insurance: {o.insuranceChoice}.</>
+            : o.lane === 'B' ? <>Ready. We have booked a crew to collect it; they will check the model and serial against your listing. Insurance: {o.insuranceChoice}.</>
+              : <>Ready. We will receive it. Insurance: {o.insuranceChoice}.</>}</p>}
 
           <details style={{ marginTop: 12 }}>
             <summary style={{ cursor: 'pointer', fontSize: 13 }}>Cancel this order</summary>

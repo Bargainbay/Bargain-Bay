@@ -28,6 +28,15 @@ const FAIL_REASONS = {
   rescheduled: 'Customer rescheduled', other: 'Other'
 };
 
+const PICKUP_FAIL_REASONS = {
+  not_as_described: 'Unit does not match the listing (model / serial / condition)',
+  no_answer: 'Nobody there to hand it over',
+  no_access: "Wouldn't fit / no access",
+  damaged: 'Item damaged',
+  rescheduled: 'Seller rescheduled',
+  other: 'Other'
+};
+
 const hhmm = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' }) : null);
 const minsBetween = (a, b) => Math.max(0, Math.round((new Date(b) - new Date(a)) / 60000));
 const asDuration = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`);
@@ -227,9 +236,12 @@ export default function DriverStops({ initial, driverName }) {
   );
 
   function couldNot(stop) {
-    const keys = Object.keys(FAIL_REASONS);
+    // A collection from a vendor has its own reasons: "customer refused" makes no sense at a loading
+    // dock, and "does not match the listing" is the one that matters there.
+    const reasons = stop.vendorOrderId ? PICKUP_FAIL_REASONS : FAIL_REASONS;
+    const keys = Object.keys(reasons);
     const answer = window.prompt(
-      `Why couldn't it be completed?\n${keys.map((k, i) => `${i + 1}. ${FAIL_REASONS[k]}`).join('\n')}\n\nEnter a number:`
+      `Why couldn't it be completed?\n${keys.map((k, i) => `${i + 1}. ${reasons[k]}`).join('\n')}\n\nEnter a number:`
     );
     const pick = keys[Number(answer) - 1];
     if (!pick) return;
@@ -562,7 +574,7 @@ function StopCard({ stop, n, done, preview, me, onStart, onArrive, onFinish, onF
         <>
           <div className="drv-doneline">
             {stop.status === 'failed'
-              ? (FAIL_REASONS[stop.failReason] || "Couldn't complete")
+              ? (FAIL_REASONS[stop.failReason] || PICKUP_FAIL_REASONS[stop.failReason] || "Couldn't complete")
               : `Done${stop.hasSignature ? ' · signed' : ''}${stop.photoCount ? ` · ${stop.photoCount} photo${stop.photoCount === 1 ? '' : 's'}` : ''}`}
             {/* Two men ride one stop. When the mate closes it, this card is the
                 only thing on the other's phone that can say so — without it, a
