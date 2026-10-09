@@ -10,6 +10,7 @@ import MyDay from '../../../components/MyDay';
 import AbandonedCarts from '../../../components/AbandonedCarts';
 import GoalEditor from '../../../components/GoalEditor';
 import RepScorecard from '../../../components/RepScorecard';
+import MyQuota from '../../../components/MyQuota';
 import TaxOwed from '../../../components/TaxOwed';
 import LeadSources from '../../../components/LeadSources';
 import { Kpi, Donut, Funnel, TrendChart } from '../../../components/charts';
@@ -55,7 +56,7 @@ export default async function SalesDashboardPage({ searchParams }) {
       revenueDashboard(period), getSetting('revenue_goal_monthly', 0),
       salesOnly ? null : hstRemittance(period).catch(() => null),
       leadReport(period).catch(() => null),
-      repScorecard(period).catch((e) => { console.error('repScorecard failed', e.message); return null; })
+      repScorecard(period, { name: session.name, email: session.email }).catch((e) => { console.error('repScorecard failed', e.message); return null; })
     ]);
   } catch (e) {
     console.error('sales dashboard load failed', e.message);
@@ -79,6 +80,9 @@ export default async function SalesDashboardPage({ searchParams }) {
         <h1 style={{ margin: 0 }}>Sales performance</h1>
         <span className="hint" style={{ margin: 0 }}>Showing <strong>{periodLabel(period)}</strong>{vs ? ` — compared${vs}` : ''}</span>
       </div>
+
+      {/* A rep's own quota comes first: it is the number they are working to. */}
+      {team?.me && <MyQuota data={team} />}
 
       {/* Before the numbers. A dashboard tells you how the month went; this is
           the only thing on the page that is owed to somebody TODAY. */}

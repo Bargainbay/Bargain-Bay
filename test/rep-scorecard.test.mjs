@@ -119,3 +119,34 @@ test('quota progress is measured against this month’s actuals', async () => {
     assert(r.standing.sales.pct === 50);
   } finally { done(); }
 });
+
+suite('which rep is this person?');
+test('the account name finds the rep: exact, first name, and nobody else', async () => {
+  const { client, done } = await fresh();
+  try {
+    await setReps(['Roushi Sharaf', 'Bishakha']);
+    await order(client, { rep: 'Roushi Sharaf' });
+    const exact = await repScorecard('month', { name: 'Roushi Sharaf', email: 'r@x.ca' });
+    equal(exact.me, 'roushi sharaf');
+    const first = await repScorecard('month', { name: 'Roushi', email: 'r@x.ca' });
+    equal(first.me, 'roushi sharaf', 'a first name on the account is enough when unambiguous');
+    const stranger = await repScorecard('month', { name: 'Somebody Else', email: 'nobody@x.ca' });
+    equal(stranger.me, '', 'no card is better than somebody else\'s quota');
+    equal((await repScorecard('month')).me, '');
+  } finally { done(); }
+});
+test('a login whose name differs is matched by the invoices they raised', async () => {
+  const { client, done } = await fresh();
+  try {
+    await setReps(['Bishakha']);
+    await client.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by text');
+    await client.query('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by_name text');
+    const cols = (await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name='invoices' AND is_nullable='NO' AND column_default IS NULL`)).rows.map((r) => r.column_name);
+    const fill = { email: "'c@x.ca'", number: "'INV-T1'", name: "'C'", subtotal: '0', total: '0', status: "'open'" };
+    const extra = cols.filter((c) => fill[c]);
+    await client.query(`INSERT INTO invoices (created_by, created_by_name${extra.map((c) => ', ' + c).join('')})
+      VALUES ('bish@x.ca','Bishakha'${extra.map((c) => ', ' + fill[c]).join('')})`);
+    const s = await repScorecard('month', { name: 'B. Rai', email: 'Bish@x.ca' });
+    equal(s.me, 'bishakha');
+  } finally { done(); }
+});

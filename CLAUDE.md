@@ -4033,6 +4033,16 @@ old "By salesperson" panel on `/admin/dashboard`.
   exactly ONE rep; two reps sharing a first name credit neither. Quota and metric
   keys are still `ownRevenue`/`ownSales` and DB columns `own_*`; they mean LEAD
   revenue/sales. A sale with no closing rep still credits its sender.
+- **"Your quota" card** (added 2026-10-08, `components/MyQuota.jsx`): the first thing
+  on the sales dashboard for any signed-in person who resolves to a rep. Total
+  revenue and lead revenue as `$have of $target`, a bar with a tick where it
+  should be by today, what is left and what that is per day over the days
+  remaining (today counts), and sales-count targets underneath when set. Always
+  this calendar month. **The login is matched to a rep by NAME** (`resolveViewerRep`
+  in `lib/analytics.js`): the account name exactly, then as an unambiguous first
+  name, then whatever name their own invoices were stamped with. **No match shows
+  no card** — somebody else's quota is worse than none. If a rep's card is missing,
+  their account name and the name on their invoices disagree.
 - **Revenue is pre-tax** (with the HST-inclusive figure printed beneath it, because invoices are quoted with tax and a total that can't be matched to an invoice looks wrong), so reps + "No rep recorded" add up to the Revenue KPI.
   The old panel summed the taxed `total`, which is why it never agreed with it.
   **Unassigned is a row, not a gap** (storefront orders, pre-rep invoices).
