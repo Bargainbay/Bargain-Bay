@@ -6,6 +6,7 @@ import { COLLECTIONS } from '../lib/constants';
 export default function Header({ promo = null }) {
   const [count, setCount] = useState(0);
   const [user, setUser] = useState(null);
+  const [portals, setPortals] = useState({});
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -13,7 +14,7 @@ export default function Header({ promo = null }) {
     const unsub = onCartChange((cart) => setCount(cart.length));
     fetch('/api/auth/me')
       .then((r) => (r.ok ? r.json() : { user: null }))
-      .then((d) => setUser(d.user || null))
+      .then((d) => { setUser(d.user || null); setPortals(d.portals || {}); })
       .catch(() => {});
     return unsub;
   }, []);
@@ -38,6 +39,9 @@ export default function Header({ promo = null }) {
             <a href="/contact">Contact</a>
           </nav>
           <div className="header-actions">
+            {/* One click back to wherever they work — nobody should have to type a URL. */}
+            {portals.staff && <a href="/admin" className="btn primary" style={{ padding: '7px 12px' }}>← {portals.admin ? 'Admin dashboard' : 'Sales portal'}</a>}
+            {portals.vendor && <a href="/vendor" className="btn primary" style={{ padding: '7px 12px' }}>Vendor portal</a>}
             <a href={user ? '/account' : '/login'} className="btn" style={{ padding: '7px 12px' }}>
               {user ? (user.name ? user.name.split(' ')[0] : 'Account') : 'Login'}
             </a>
