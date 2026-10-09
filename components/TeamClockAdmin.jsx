@@ -7,6 +7,23 @@ const toLocal = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-CA', { hour
 const day = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
 const CO = { bargain_bay: 'Bargain Bay', rs_solutions: 'RS Solutions' };
 const coName = (c) => CO[c] || 'Unassigned';
+// "Name, email, company, rate" per line. Company is bb / rs (or the full name);
+// rate is optional. Returns the people it understood and the lines it did not.
+function parseList(text) {
+  const people = [], bad = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const parts = line.split(/[,\t]/).map((x) => x.trim());
+    const email = parts.find((x) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x));
+    const co = parts.map((x) => x.toLowerCase()).map((x) => (/^(bb|bargain)/.test(x) ? 'bargain_bay' : /^rs/.test(x) ? 'rs_solutions' : '')).find(Boolean) || '';
+    const rate = parts.find((x) => /^\$?\d+(\.\d+)?$/.test(x));
+    const name = parts.find((x) => x && x !== email && !/^\$?\d+(\.\d+)?$/.test(x) && !/^(bb|bargain|rs)/i.test(x));
+    if (!email) { bad.push(line); continue; }
+    people.push({ email, name: name || '', company: co, hourlyRate: rate ? rate.replace('$', '') : '' });
+  }
+  return { people, bad };
+}
 const hm = (m) => (m == null ? 'open' : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`);
 
 // Admin: who may clock in (and at what rate), and the hours they've logged.
@@ -14,6 +31,8 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
   const router = useRouter();
   const [emp, setEmp] = useState({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '' });
   const [fix, setFix] = useState(null);
+  const [list, setList] = useState('');
+  const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -69,6 +88,20 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
         <input style={{ ...input, width: 100 }} type="number" min="0" step="0.25" inputMode="decimal" placeholder="$/hour" value={emp.hourlyRate} onChange={(e) => setEmp({ ...emp, hourlyRate: e.target.value })} />
         <button type="button" className="dash-filter active" disabled={busy} onClick={() => send({ action: 'save_employee', ...emp }, () => setEmp({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '' }))}>Save employee</button>
       </div>
+      <details style={{ margin: '10px 0' }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Add several people at once</summary>
+        <p className="hint">One person per line: <b>name, email, company, rate</b>. Company is <b>BB</b> or <b>RS</b>; rate is optional.<br />
+          Example: <code>Dinesh, dinesh@example.com, RS, 25</code></p>
+        <textarea style={{ ...input, width: '100%', minHeight: 110 }} value={list} onChange={(e) => setList(e.target.value)} placeholder={'Name, email, BB or RS, rate'} />
+        <div style={{ marginTop: 6 }}>
+          <button type="button" className="dash-filter active" disabled={busy || !list.trim()} onClick={() => {
+            const { people, bad } = parseList(list);
+            if (bad.length) { setErr(`No email on: ${bad.join(' | ')}`); return; }
+            send({ action: 'save_many', people }, () => { setList(''); setMsg(`Saved ${people.length}.`); });
+          }}>Save all</button>
+          {msg && <span className="hint" style={{ marginLeft: 8 }}>{msg}</span>}
+        </div>
+      </details>
       <p className="hint">A rate change applies to shifts started from now on; past shifts keep the rate they had.</p>
       {err && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</p>}
 
