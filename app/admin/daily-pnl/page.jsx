@@ -20,7 +20,7 @@ export default async function DailyPnlPage({ searchParams }) {
     return (<div className="narrow"><div className="panel"><h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
       <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the admin list.</p></div></div>);
   }
-  if (!hasDb()) return (<div><AdminNav active="reports" /><div className="panel">Database not configured.</div></div>);
+  if (!hasDb()) return (<div><AdminNav active="daily-pnl" /><div className="panel">Database not configured.</div></div>);
 
   const today = torontoToday();
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp?.to || '') ? sp.to : today;
@@ -30,7 +30,7 @@ export default async function DailyPnlPage({ searchParams }) {
 
   return (
     <div>
-      <AdminNav active="reports" />
+      <AdminNav active="daily-pnl" />
       <div className="panel">
         <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Daily profit &amp; loss</h1>
         <p className="hint">

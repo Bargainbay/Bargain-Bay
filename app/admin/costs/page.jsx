@@ -17,7 +17,7 @@ export default async function CostsPage() {
   }
   return (
     <div>
-      <AdminNav active="reports" />
+      <AdminNav active="daily-pnl" />
       {!hasDb() ? <div className="panel">Database not configured.</div> : <CostList costs={await listCosts()} />}
     </div>
   );
