@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { runExpireReservations } from '../../../../lib/cron-jobs';
 import { cronAuthorized } from '../../../../lib/cron-auth';
+import { withHeartbeat } from '../../../../lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,5 +18,6 @@ async function run(req) {
   }
 }
 
-export async function GET(req) { return run(req); }
-export async function POST(req) { return run(req); }
+const beat = withHeartbeat('expire-reservations', run);
+export const GET = beat;
+export const POST = beat;

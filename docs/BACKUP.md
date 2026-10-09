@@ -8,14 +8,14 @@ backed up by anything today.**
 | Store | Holds | Backed up? |
 |---|---|---|
 | **Postgres** (Neon) | orders, invoices, jobs, customers, consent, the ledger | **Yes** — Neon point-in-time restore, plus `npm run backup` |
-| **The master tracker** (Google Sheet) | inventory — the source of truth for what we own and what it cost | **Google's version history only.** Not in this repo, not in any backup we take. |
-| **Vercel Blob** | proof-of-delivery **signatures**, delivery photos, unit photos, driver fuel receipts | **No. Nothing backs this up.** |
+| **The master tracker** (Google Sheet) | inventory — the source of truth for what we own and what it cost | **Daily copy into a Drive folder** once `BACKUP_DRIVE_FOLDER_ID` is set (see Off-site copies below). Google's version history otherwise. |
+| **Vercel Blob** | proof-of-delivery **signatures**, delivery photos, unit photos, driver fuel receipts | **Hourly copy of anything new into the same Drive folder** once `BACKUP_DRIVE_FOLDER_ID` is set. Nothing else backs it up. |
 
 Postgres stores only the *paths* into Blob. Restoring the database alone gives
 you rows pointing at pictures that are gone — including the signed PODs that are
 the evidence in a damage claim, and the fuel receipts that are tax records.
 
-That gap is real and is not closed by this document. It is named here so nobody
+Until the Drive folder is configured the gap is real. It is named here so nobody
 reads "we have backups" and believes it covers a signature.
 
 ---
@@ -137,3 +137,30 @@ evidence, they are small, and there are not many of them.
 4. **Blobs involved?** They are not recoverable. Work out what is referenced but
    missing before telling anyone the restore is complete.
 5. **Inventory wrong?** The tracker, not the database. Google's version history.
+
+
+---
+
+## Off-site copies of the tracker and Blob (added 2026-10-09)
+
+`lib/offsite-backup.js`, `/api/cron/backup-offsite` (hourly), `offsite_backup_blobs`
+(migration 0020). **It does nothing until `BACKUP_DRIVE_FOLDER_ID` is set**, and the
+daily health email says so every morning until it is.
+
+Setup, once:
+1. In Google Drive create a folder, e.g. "Bargain Bay backups".
+2. Share it as **Editor** with the service account in `GOOGLE_CREDENTIALS`
+   (its `client_email`).
+3. Put the folder's ID (the last part of its URL) in Vercel as `BACKUP_DRIVE_FOLDER_ID`
+   and redeploy.
+
+What lands there: `tracker/tracker-YYYY-MM-DD` (one copy a day) and
+`blobs/<epoch>__<path>` (one file per Blob object). It only **adds** - nothing
+deletes from Drive or Blob. Files over 40 MB are skipped and counted. The first
+runs catch up over several hourly passes.
+
+**Restoring a Blob file:** find it in `blobs/`, the name is the original path with
+`/` as `__`. Re-upload it to the same pathname.
+
+**Not covered:** Postgres older than Neon's retention still relies on
+`npm run backup` run by hand. Worth scheduling next.

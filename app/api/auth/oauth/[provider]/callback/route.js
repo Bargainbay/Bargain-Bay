@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSessionToken, sessionCookieOptions, SESSION_COOKIE } from '../../../../../../lib/auth';
-import { isProvider, fetchIdentity, resolveOAuthUser, safeNext, STATE_COOKIE } from '../../../../../../lib/oauth';
+import { isProvider, fetchIdentity, resolveOAuthUser, recordOAuthOptIn, safeNext, STATE_COOKIE } from '../../../../../../lib/oauth';
 import { clientIp } from '../../../../../../lib/antifraud';
 import { notifyOwner, esc } from '../../../../../../lib/email';
 
@@ -28,6 +28,7 @@ export async function GET(req, { params }) {
     const r = await resolveOAuthUser({ provider, ...id, ip: clientIp(req) });
     if (!r.ok) return fail(r.error);
 
+    await recordOAuthOptIn({ created: r.created, optin: saved.optin, email: r.user.email, provider, ip: clientIp(req) });
     if (r.created) {
       notifyOwner(
         `New account: ${r.user.name} (${r.user.email})`,

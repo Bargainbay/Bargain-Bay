@@ -224,3 +224,21 @@ test('the email names the sender, never claims a countdown', () => {
   assert(html.includes('Bargain Bay') && html.includes('Unsubscribe'));
   assert(!/hours? left|expires|only \d+ left/i.test(html));
 });
+
+suite('Sign in with Google/Microsoft opt-in');
+import { recordOAuthOptIn } from '../lib/oauth.js';
+import { consentStatus } from '../lib/consent.js';
+
+test('consent is recorded only for a NEW account that ticked the box', async () => {
+  const { done } = await withTestDb();
+  try {
+    const st = async (e) => (await consentStatus([e], 'email')).get(e).basis;
+    equal(await recordOAuthOptIn({ created: true, optin: false, email: 'a@x.ca', provider: 'google' }), false);
+    equal(await recordOAuthOptIn({ created: false, optin: true, email: 'b@x.ca', provider: 'google' }), false);
+    equal(await st('a@x.ca'), 'none'); equal(await st('b@x.ca'), 'none');
+    equal(await recordOAuthOptIn({ created: true, optin: true, email: 'c@x.ca', provider: 'microsoft' }), true);
+    equal(await st('c@x.ca'), 'express');
+    const ev = (await query(`SELECT evidence, source FROM consent_events WHERE identity='c@x.ca'`)).rows[0];
+    assert(ev.evidence.includes('Email me occasional deals') && ev.evidence.includes('microsoft'));
+  } finally { done(); }
+});

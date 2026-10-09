@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { nudgeOpenShifts } from '../../../../lib/shift-nudge';
 import { cronAuthorized } from '../../../../lib/cron-auth';
+import { withHeartbeat } from '../../../../lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,5 +30,6 @@ async function run(req) {
     return NextResponse.json({ ok: false, error: e?.message || 'nudge failed' }, { status: 500 });
   }
 }
-export async function GET(req) { return run(req); }
-export async function POST(req) { return run(req); }
+const beat = withHeartbeat('shift-nudge', run);
+export const GET = beat;
+export const POST = beat;
