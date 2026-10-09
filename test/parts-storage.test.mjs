@@ -16,6 +16,9 @@ test('8 drawers and 16 shelf sections exist, in their own areas', async () => {
     equal(spots.filter((s) => s.area === 'parts-shelves').length, 16);
     equal((await listAreas()).some((a) => a.key === 'parts-shelves'), true);
     equal(spots.some((s) => s.code === 'L1-1'), true, 'default layout still seeded');
+    const have = new Set(spots.map((x) => x.code));
+    for (const c of ['L8-1', 'L8-3', 'L9-1', 'L9-3', 'R1-4', 'R2-4']) equal(have.has(c), true, c);
+    equal(have.has('R3-4'), false, 'only R1 and R2 gained a shelf');
     // Retired once, it stays retired: the seed is guarded by the area row.
     await updateSpot('PD8', { active: false }, { admin: true });
     equal((await listLocations()).find((x) => x.code === 'PD8').active, false);
