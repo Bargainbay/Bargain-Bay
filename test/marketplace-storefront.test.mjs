@@ -14,7 +14,7 @@ import { decorate } from '../lib/pricing.js';
 import { imageFor } from '../lib/images.js';
 
 function flags(vars, fn) {
-  const keys = ['MARKETPLACE_STOREFRONT', 'MARKETPLACE_ORDERING'];
+  const keys = ['MARKETPLACE_STOREFRONT', 'MARKETPLACE_ORDERING', 'MARKETPLACE_BOOKS_READY'];
   const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   const restore = () => { for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } };
   for (const k of keys) delete process.env[k];
@@ -121,7 +121,7 @@ test('OPT-IN: the default readers never include a vendor unit, even with the fla
   const { done } = await withTestDb();
   try {
     const v = await vendor('Alpha'); const l = await listing(v.id);
-    await flags({ MARKETPLACE_STOREFRONT: '1', MARKETPLACE_ORDERING: '1' }, async () => {
+    await flags({ MARKETPLACE_STOREFRONT: '1', MARKETPLACE_ORDERING: '1', MARKETPLACE_BOOKS_READY: '1' }, async () => {
       assert(!(await loadUnits()).some((u) => u.marketplace), 'loadUnits');
       assert(!(await getAll()).some((u) => u.marketplace), 'getAll() — feeds, sitemap, Sarah, the pickers');
       assert(!(await getAll({ strict: true, marketplace: true })).some((u) => u.marketplace), 'strict is never mixed');

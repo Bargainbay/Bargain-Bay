@@ -5,6 +5,7 @@ import { strikeMeter } from '../../lib/vendors';
 import { vendorBalance } from '../../lib/vendor-ledger';
 import { bankSummary } from '../../lib/vendor-bank';
 import { listVendorListings } from '../../lib/marketplace-listings';
+import { listVendorOrders } from '../../lib/vendor-orders';
 import { ACCEPT_HOURS, READY_HOURS, STRIKE_REASONS, TIERS } from '../../lib/marketplace-rules';
 
 export const dynamic = 'force-dynamic';
@@ -21,13 +22,18 @@ export default async function VendorHome() {
   const gate = await vendorGate('/vendor');
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
-  const [meter, bal, bank, listings] = await Promise.all([
-    strikeMeter(vendor.id), vendorBalance(vendor.id), bankSummary(vendor.id), listVendorListings(vendor.id)
+  const [meter, bal, bank, listings, orders] = await Promise.all([
+    strikeMeter(vendor.id), vendorBalance(vendor.id), bankSummary(vendor.id), listVendorListings(vendor.id),
+    listVendorOrders(vendor.id).catch(() => [])
   ]);
+  const waiting = orders.filter((o) => o.status === 'awaiting_accept').length;
+  const toReady = orders.filter((o) => o.status === 'accepted').length;
   const by = (s) => listings.filter((l) => l.status === s).length;
   const [tone, label] = BANNER[meter.standing] || ['ok', meter.standing];
   const todo = [];
   if (!bank.payable && !bank.waiting.length) todo.push({ text: 'Add your banking details so we can pay you.', href: '/vendor/payouts' });
+  if (waiting) todo.push({ text: `${waiting} order(s) are waiting for you to accept — the 24-hour clock is running.`, href: '/vendor/orders' });
+  if (toReady) todo.push({ text: `${toReady} accepted order(s) still need to be made ready (72-hour clock).`, href: '/vendor/orders' });
   if (by('changes_requested')) todo.push({ text: `${by('changes_requested')} listing(s) need changes before they can go live.`, href: '/vendor/listings?status=changes_requested' });
   if (by('draft')) todo.push({ text: `${by('draft')} draft listing(s) are not submitted yet.`, href: '/vendor/listings?status=draft' });
   if (by('awaiting_checkin')) todo.push({ text: `${by('awaiting_checkin')} approved unit(s) are waiting to be delivered to our warehouse.`, href: '/vendor/listings?status=awaiting_checkin' });
@@ -62,8 +68,10 @@ export default async function VendorHome() {
           <strong> accept within {ACCEPT_HOURS} hours</strong> and <strong>have it ready (or tracking submitted) within {READY_HOURS} hours</strong>.
           Missing either, or cancelling a paid order, is a strike. Three strikes restrict the account.
         </p>
-        <p style={{ marginBottom: 0, fontSize: 14, color: 'var(--muted)' }}>
-          No orders yet — this is where each order&rsquo;s countdown will appear, green, then amber under six hours, then red.
+        <p style={{ marginBottom: 0, fontSize: 14 }}>
+          {waiting + toReady > 0
+            ? <><b>{waiting}</b> to accept · <b>{toReady}</b> to make ready — <a href="/vendor/orders">open your orders and see the countdowns →</a></>
+            : <span style={{ color: 'var(--muted)' }}>No open orders. Each one shows a live countdown — green, amber under six hours, red when overdue. <a href="/vendor/orders">Orders →</a></span>}
         </p>
       </div>
 

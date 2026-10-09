@@ -8,6 +8,7 @@ import { reviewQueue } from '../../../lib/marketplace-listings';
 import { strikesAwaitingReview } from '../../../lib/vendors';
 import { pendingBankAccounts } from '../../../lib/vendor-bank';
 import { listPayouts } from '../../../lib/payouts';
+import { allVendorOrders, deliveryRates } from '../../../lib/vendor-orders';
 import { REJECT_REASONS } from '../../../lib/listing-rules';
 import { STRIKE_REASONS } from '../../../lib/marketplace-rules';
 
@@ -27,12 +28,14 @@ export default async function MarketplacePage() {
   if (!hasDb()) return <div><AdminNav active="marketplace" /><div className="panel">Database not configured — set POSTGRES_URL.</div></div>;
   const admin = isAdmin(session);
   const soft = (p, fallback) => p.catch((e) => { console.error('marketplace page', e?.message || e); return fallback; });
-  const [vendors, queue, due, banks, payouts] = await Promise.all([
+  const [vendors, queue, due, banks, payouts, orders, rates] = await Promise.all([
     soft(listVendors(), []),
     soft(reviewQueue(), []),
     admin ? soft(strikesAwaitingReview(), []) : [],
     admin ? soft(pendingBankAccounts(), []) : [],
-    admin ? soft(listPayouts(), []) : []
+    admin ? soft(listPayouts(), []) : [],
+    soft(allVendorOrders(), []),
+    admin ? soft(deliveryRates(), null) : null
   ]);
   return (
     <div>
@@ -44,6 +47,9 @@ export default async function MarketplacePage() {
         due={JSON.parse(JSON.stringify(due))}
         banks={JSON.parse(JSON.stringify(banks))}
         payouts={JSON.parse(JSON.stringify(payouts))}
+        orders={JSON.parse(JSON.stringify(orders))}
+        rates={rates}
+        serverNow={new Date().toISOString()}
         rejectReasons={REJECT_REASONS}
         strikeReasons={STRIKE_REASONS}
       />

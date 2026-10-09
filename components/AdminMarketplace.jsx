@@ -13,11 +13,12 @@ async function api(url, method, body) {
   return d;
 }
 
-export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, payouts, rejectReasons, strikeReasons }) {
+export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, payouts, orders = [], rates = null, serverNow, rejectReasons, strikeReasons }) {
   const apps = vendors.filter((v) => v.status === 'applied');
   const tabs = [
     ['apps', `Applications${apps.length ? ` (${apps.length})` : ''}`],
     ['review', `Listings to review${queue.length ? ` (${queue.length})` : ''}`],
+    ['orders', `Orders${orders.filter((o) => ['awaiting_accept', 'accepted'].includes(o.status)).length ? ` (${orders.filter((o) => ['awaiting_accept', 'accepted'].includes(o.status)).length} open)` : ''}`],
     ['vendors', 'Vendors'],
     ...(isAdmin ? [
       ['bank', `Bank accounts${banks.length ? ` (${banks.length})` : ''}`],
@@ -111,6 +112,12 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
           run={(body, ok) => act(() => post('/api/admin/marketplace/vendors', { vendorId: vendorOpen.vendor.id, ...body }), ok, { reload: false }).then(() => openVendor(vendorOpen.vendor.id))} />
       )}
 
+      {tab === 'orders' && (
+        <OrdersTab orders={orders} rates={rates} isAdmin={isAdmin} busy={busy} now={new Date(serverNow || Date.now())}
+          onVendor={goVendor}
+          deliver={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'deliver', id }), 'Marked delivered — the sale is booked to the vendor.')}
+          setRate={(sizeClass, dollars) => act(() => post('/api/admin/marketplace/orders', { action: 'set_rate', sizeClass, dollars }), 'Fee saved.')} />
+      )}
       {tab === 'bank' && isAdmin && (
         <BankTab banks={banks} busy={busy} onVendor={goVendor}
           verify={(id, how) => act(() => post('/api/admin/marketplace/bank', { action: 'verify', id, how, nameMatched: true }), 'Verified.')}
@@ -359,4 +366,49 @@ function StrikeReviewRow({ s, strikeReasons, busy, keep, remove, onVendor }) {
 
 function VendorLink({ id, onOpen, children }) {
   return <a href="#" onClick={(e) => { e.preventDefault(); onOpen(id); }}>{children}</a>;
+}
+
+function OrdersTab({ orders, rates, isAdmin, busy, now, onVendor, deliver, setRate }) {
+  const [dollars, setDollars] = useState({});
+  const hrs = (d) => (new Date(d) - now) / 3600000;
+  const clock = (o) => {
+    if (o.status === 'awaiting_accept') { const h = hrs(o.acceptBy); return h < 0 ? 'ACCEPT OVERDUE' : `accept in ${h.toFixed(1)} h`; }
+    if (o.status === 'accepted') { const h = hrs(o.readyBy); return h < 0 ? 'READY OVERDUE' : `ready in ${h.toFixed(1)} h`; }
+    return '';
+  };
+  const SIZES = [['small', 'Small', '≤ 70 lb and ≤ 36 in'], ['standard', 'Standard', '≤ 200 lb and ≤ 72 in'], ['oversize', 'Oversize', 'heavier or taller']];
+  return (
+    <div>
+      <div className="panel">
+        <h2 style={{ marginTop: 0, fontSize: 17 }}>Vendor orders</h2>
+        <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>Orders appear here once you have confirmed the customer&rsquo;s e-transfer — that is when the vendor&rsquo;s 24-hour and 72-hour clocks start. Overdue ones have already been struck. Lane A/B orders are booked to the vendor when you mark the customer&rsquo;s order Delivered; a seller who ships (Lane C) is booked here once the carrier confirms delivery.</p>
+        <div className="table-wrap"><table className="admin"><thead><tr><th>Order</th><th>Vendor</th><th>Lane</th><th>Amount</th><th>Status</th><th>Clock</th><th>Detail</th><th /></tr></thead><tbody>
+          {orders.length === 0 && <tr><td colSpan={8} style={{ color: 'var(--muted)' }}>No vendor orders yet.</td></tr>}
+          {orders.map((o) => (
+            <tr key={o.id}><td>{o.orderNumber}</td><td><VendorLink id={o.vendorId} onOpen={onVendor}>{o.vendor}</VendorLink></td><td>{o.lane}</td><td>{cents(o.itemCents)}</td>
+              <td>{o.status.replace('_', ' ')}</td>
+              <td style={{ color: clock(o).includes('OVERDUE') ? 'var(--danger)' : undefined }}>{clock(o)}</td>
+              <td style={{ fontSize: 12 }}>{o.lane === 'C' && o.trackingNumber ? `${o.carrier} ${o.trackingNumber}` : o.insuranceChoice ? `insurance: ${o.insuranceChoice}` : ''}{o.status === 'cancelled' ? ` ${o.cancelCode}` : ''}</td>
+              <td>{o.lane === 'C' && ['accepted', 'ready'].includes(o.status) && <button className="btn" disabled={busy} onClick={() => confirm('Mark delivered? Only after the carrier has confirmed delivery.') && deliver(o.id)}>Mark delivered</button>}</td></tr>
+          ))}
+        </tbody></table></div>
+      </div>
+      {isAdmin && rates && (
+        <div className="panel">
+          <h2 style={{ marginTop: 0, fontSize: 17 }}>Delivery service fee (billed to the vendor)</h2>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>What we charge a vendor to collect and deliver one unit, by size. It is copied onto each order when the vendor accepts it, so changing it never alters a past statement. Set these from what a pickup actually costs us (the dispatch Profit tab shows it). Lane C (the vendor ships) is not charged.</p>
+          {rates.unset.length > 0 && <div className="error-box">Not set yet: {rates.unset.join(', ')}. Until set, vendors are charged $0 for those sizes.</div>}
+          {SIZES.map(([k, label, hint]) => (
+            <div key={k} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{ width: 90 }}><b>{label}</b></span><span style={{ width: 160, fontSize: 12, color: 'var(--muted)' }}>{hint}</span>
+              <span>$</span><input style={{ width: 100 }} inputMode="decimal" placeholder={rates.rates[k] != null ? (rates.rates[k] / 100).toFixed(2) : 'not set'}
+                value={dollars[k] ?? ''} onChange={(e) => setDollars({ ...dollars, [k]: e.target.value })} />
+              <button className="btn" disabled={busy || dollars[k] === undefined || dollars[k] === ''} onClick={() => setRate(k, dollars[k])}>Save</button>
+              {rates.rates[k] != null && <span style={{ fontSize: 12 }}>currently ${(rates.rates[k] / 100).toFixed(2)}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

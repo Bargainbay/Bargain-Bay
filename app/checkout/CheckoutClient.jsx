@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { getCart, removeFromCart, clearCart, onCartChange } from '../../lib/cart';
 import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS, CARD_PAYMENTS_ENABLED, ETRANSFER_EMAIL } from '../../lib/constants';
+import { shipmentCount, notPickable } from '../../lib/marketplace-rules';
 import { loadGoogleMaps, placesReady, mapsKey } from '../../lib/maps';
 import HoneypotField from '../../components/HoneypotField';
 import MarketingOptIn, { CONSENT_TEXT } from '../../components/MarketingOptIn';
@@ -110,7 +111,13 @@ export default function CheckoutClient({ catalog, session, prefill }) {
     );
   }
 
-  const delivery = form.deliveryMethod === 'delivery' ? DELIVERY_FEE : 0;
+  // A seller's unit that is not in our building (collected by our crew, or shipped by the seller)
+  // cannot be picked up at the warehouse, so those carts are delivery-only. Each separate shipment
+  // — everything WE move is one, and each self-shipping seller is another — carries its own fee.
+  const mustDeliver = items.some(notPickable);
+  const method = mustDeliver ? 'delivery' : form.deliveryMethod;
+  const shipments = Math.max(1, shipmentCount(items));
+  const delivery = method === 'delivery' ? round2(DELIVERY_FEE * shipments) : 0;
   const subtotal = round2(items.reduce((a, u) => a + Number(u.price), 0));
   // A typed code and an automatic promotion never stack; the shopper gets the
   // better one, exactly as the server will decide.
@@ -153,7 +160,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          skus, ...form,
+          skus, ...form, deliveryMethod: method,
           couponCode: applied ? applied.code : '',
           // The sentence they were actually shown travels with the tick. That
           // wording is what makes the consent record proof of anything.
@@ -240,21 +247,23 @@ export default function CheckoutClient({ catalog, session, prefill }) {
 
             <div className="panel">
               <h2>Pickup or delivery</h2>
-              <label className={'radio-card' + (form.deliveryMethod === 'pickup' ? ' active' : '')}>
-                <input type="radio" name="deliveryMethod" value="pickup" checked={form.deliveryMethod === 'pickup'} onChange={() => setForm((f) => ({ ...f, deliveryMethod: 'pickup' }))} />
+              <label className={'radio-card' + (method === 'pickup' ? ' active' : '')}>
+                <input type="radio" name="deliveryMethod" value="pickup" disabled={mustDeliver} checked={method === 'pickup'} onChange={() => setForm((f) => ({ ...f, deliveryMethod: 'pickup' }))} />
                 <span>
                   <b>Warehouse pickup — Free</b>
-                  <span className="sub" style={{ display: 'block' }}>{PICKUP_ADDRESS}. By appointment — we&apos;ll email you to schedule.</span>
+                  <span className="sub" style={{ display: 'block' }}>{mustDeliver
+                    ? 'Not available for this cart — an item is with one of our marketplace sellers, so it has to be delivered.'
+                    : <>{PICKUP_ADDRESS}. By appointment — we&apos;ll email you to schedule.</>}</span>
                 </span>
               </label>
-              <label className={'radio-card' + (form.deliveryMethod === 'delivery' ? ' active' : '')}>
-                <input type="radio" name="deliveryMethod" value="delivery" checked={form.deliveryMethod === 'delivery'} onChange={() => setForm((f) => ({ ...f, deliveryMethod: 'delivery', paymentMethod: 'etransfer' }))} />
+              <label className={'radio-card' + (method === 'delivery' ? ' active' : '')}>
+                <input type="radio" name="deliveryMethod" value="delivery" checked={method === 'delivery'} onChange={() => setForm((f) => ({ ...f, deliveryMethod: 'delivery', paymentMethod: 'etransfer' }))} />
                 <span>
-                  <b>Local delivery — {money(DELIVERY_FEE)} flat</b>
+                  <b>Local delivery — {shipments > 1 ? `${money(DELIVERY_FEE)} × ${shipments} shipments` : `${money(DELIVERY_FEE)} flat`}</b>
                   <span className="sub" style={{ display: 'block' }}>Pickering &amp; area (within ~50 km of Pickering). To your door / ground floor. Farther out? Email us for a freight quote.</span>
                 </span>
               </label>
-              {form.deliveryMethod === 'delivery' && (
+              {method === 'delivery' && (
                 <div style={{ marginTop: 12 }}>
                   <div className="field">
                     <label htmlFor="co-addr">Street address</label>
@@ -281,7 +290,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
                 <h2>How you&apos;ll pay</h2>
                 <p className="hint" style={{ marginTop: 0 }}>
                   We&apos;re not taking card payments online right now. Place your order and pay by Interac e-transfer
-                  {form.deliveryMethod === 'pickup' ? ' (or in person at pickup)' : ''} — we hold your unit for 24 hours
+                  {method === 'pickup' ? ' (or in person at pickup)' : ''} — we hold your unit for 24 hours
                   while we confirm payment.
                 </p>
                 <label className={'radio-card' + (form.paymentMethod === 'etransfer' ? ' active' : '')}>
@@ -293,7 +302,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
                     </span>
                   </span>
                 </label>
-                {form.deliveryMethod === 'pickup' && (
+                {method === 'pickup' && (
                   <label className={'radio-card' + (form.paymentMethod === 'in_person' ? ' active' : '')}>
                     <input type="radio" name="paymentMethod" value="in_person" checked={form.paymentMethod === 'in_person'} onChange={set('paymentMethod')} />
                     <span>
@@ -324,7 +333,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
                 <span>{shown.auto ? 'Automatic discount' : `Promo ${shown.code}`}{shown.label ? ` (${shown.label})` : ''}</span><span>−{money(discount)}</span>
               </div>
             )}
-            <div className="summary-row"><span>{form.deliveryMethod === 'delivery' ? 'Local delivery' : 'Warehouse pickup'}</span><span>{delivery ? money(delivery) : 'Free'}</span></div>
+            <div className="summary-row"><span>{method === 'delivery' ? 'Local delivery' : 'Warehouse pickup'}</span><span>{delivery ? money(delivery) : 'Free'}</span></div>
             <div style={{ margin: '10px 0 4px' }}>
               {applied ? (
                 <div className="hint" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
@@ -357,7 +366,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
                 ? 'Each unit is held for you for 30 minutes while you complete payment.'
                 : form.paymentMethod === 'etransfer'
                   ? <>After you place the order, send your e-transfer to <b>{ETRANSFER_EMAIL}</b> with your order number. We hold your unit until it arrives.</>
-                  : <>We&apos;ll hold your unit and email you to arrange {form.deliveryMethod === 'delivery' ? 'delivery' : 'pickup'} — pay in person then.</>}
+                  : <>We&apos;ll hold your unit and email you to arrange {method === 'delivery' ? 'delivery' : 'pickup'} — pay in person then.</>}
             </div>
           </div>
         </div>

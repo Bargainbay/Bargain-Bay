@@ -4094,7 +4094,7 @@ migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
-Built so far (Phase 1, slices 1–5): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
+Built so far (Phase 1, slices 1–6): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
 commission), `0017_marketplace_listings` (listings, photos, events) and `0018_marketplace_payouts` (bank
 accounts, ledger, payouts); `lib/marketplace-rules.js` (clocks, strikes, commission, payout maths, in
 INTEGER CENTS), `lib/listing-rules.js` (what a listing must contain; shared with the browser),
@@ -4171,6 +4171,28 @@ not shown anywhere until the storefront slice.
   (`marketplaceConditionCopy`): the shop's `conditionCopy` says "our technicians tested it", which is
   false for a vendor's unit. Photos are served by `/api/mp-photo/<id>` — a public photo of a live
   listing only, never the rating plate.
+- **The checkout split (slice 6), behind a DOUBLE interlock.** Ordering needs BOTH
+  `MARKETPLACE_ORDERING=1` and `MARKETPLACE_BOOKS_READY=1` (`orderingOn()`). **Do not set the second until the
+  books are dealt with**: the revenue dashboard, P&L and ledger all read `orders`, so a seller's sale would be
+  counted as OUR revenue (and our cost of it is 0, so its profit reads 100%), and our HST position on it is
+  unconfirmed with the accountant. Not yet done: exclude vendor lines from the four `SALE` predicates and
+  book commission as revenue + *Owed to marketplace vendors* as a liability in `lib/ledger.js`. The mechanics:
+  one customer order and one web invoice as always; `vendor_orders` (migration 0019, one per vendor+lane) is the
+  vendor's part. Created INSIDE the checkout transaction (`createVendorOrdersTx`, which re-verifies every unit is
+  still live). **The vendor hears nothing, and no clock runs, until `updateOrderStatus(id,'confirmed')`** — that
+  is when we confirm the e-transfer (`onOrderStatus` -> `confirmVendorOrders`): 24h to accept, 72h in total to be
+  ready, units marked `sold`. Lanes A/B must choose insurance at accept (no default). A seller's cancellation is
+  a refund (through the invoice refund path) plus a strike, every time. `sweepVendorOrders` (cron, every 30 min)
+  lapses/strikes/reminds idempotently. Delivery: the order going `delivered` settles Lane A/B to the vendor's
+  ledger; Lane C is settled by STAFF once the carrier confirms. Delivery fee is per SHIPMENT (everything we move
+  is one; each self-shipping seller another), and Lane B/C units are not warehouse pickups. Promo codes and
+  automatic promotions never touch a seller's unit. `markUnitsSold`/`reverseTrackerSale` skip `MP-` SKUs so they
+  never reach the tracker. The delivery-service rates (`delivery_service_rates`) are UNSET until an admin sets
+  them on Admin -> Marketplace -> Orders; unset means $0. Insurance premium (1.5%) is a placeholder until the
+  broker confirms our cover reaches vendors' goods.
+- **Test gotcha:** the checkout route's runtime-DDL helpers (`ensureAttributionColumns` etc.) memoise "done" in
+  module scope, so a second FRESH test database never gets their columns. `test/marketplace-checkout.test.mjs`
+  shares one database for the file for that reason.
 - Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
 
 ## What is NOT in this repo
