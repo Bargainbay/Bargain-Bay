@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { audit } from '../../../../lib/audit';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { listCoupons, saveCoupon, setCouponActive, deleteCoupon, affiliateReport } from '../../../../lib/coupons';
@@ -40,6 +41,7 @@ export async function POST(req) {
   try { body = await req.json(); } catch { body = {}; }
   try {
     const coupon = await saveCoupon(body);
+    await audit(await getSession(), { action: body.id ? 'coupon.edit' : 'coupon.create', entity: 'coupon', entityId: coupon?.code || coupon?.id || body.id, summary: `Coupon ${coupon?.code || ''} saved`, detail: { type: coupon?.type ?? null, value: coupon?.value ?? null } });
     return NextResponse.json({ ok: true, coupon });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not save that coupon.' }, { status: 400 });
@@ -57,6 +59,7 @@ export async function PATCH(req) {
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'id is required.' }, { status: 400 });
   try {
     const coupon = await setCouponActive(id, !!body.active);
+    await audit(await getSession(), { action: body.active ? 'coupon.on' : 'coupon.off', entity: 'coupon', entityId: coupon?.code || id, summary: `Coupon ${coupon?.code || id} switched ${body.active ? 'on' : 'off'}` });
     return NextResponse.json({ ok: true, coupon });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not update that coupon.' }, { status: 400 });
@@ -74,6 +77,7 @@ export async function DELETE(req) {
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'id is required.' }, { status: 400 });
   try {
     const r = await deleteCoupon(id);
+    await audit(await getSession(), { action: 'coupon.delete', entity: 'coupon', entityId: id, summary: 'Coupon deleted (or switched off if it had been used)' });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not delete that coupon.' }, { status: 400 });

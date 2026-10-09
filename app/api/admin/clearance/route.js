@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { audit } from '../../../../lib/audit';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { listClearanceAdmin, searchCatalog, upsertClearance, removeClearance } from '../../../../lib/clearance';
@@ -48,6 +49,7 @@ export async function POST(req) {
   try {
     const r = await upsertClearance({ sku, price, warrantyMonths: body.warrantyMonths, note: body.note, active: body.active });
     if (r && r.found === false) return NextResponse.json({ error: `No product with SKU ${sku}.` }, { status: 404 });
+    await audit(await getSession(), { action: 'clearance.set', entity: 'clearance', entityId: sku, summary: `Clearance price ${money(price)}${body.active === false ? ' (switched off)' : ''}`, detail: { price, warrantyMonths: body.warrantyMonths ?? null, active: body.active ?? null } });
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -63,6 +65,7 @@ export async function DELETE(req) {
   if (!sku) return NextResponse.json({ error: 'sku required' }, { status: 400 });
   try {
     const removed = await removeClearance(sku);
+    await audit(await getSession(), { action: 'clearance.remove', entity: 'clearance', entityId: sku, summary: 'Clearance markdown removed' });
     return NextResponse.json({ ok: true, removed });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });

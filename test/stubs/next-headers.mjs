@@ -15,6 +15,14 @@ const nope = (name) => () => {
   );
 };
 
-export const cookies = nope('cookies');
+// The ONE opt-in: a test that has deliberately set a cookie jar gets it back from
+// cookies(), so a route handler can be called as somebody. With no jar set this
+// still throws exactly as before, so a test cannot get an empty jar by accident.
+let jar = null;
+export function __setTestCookies(obj) { jar = obj ? { ...obj } : null; }
+export const cookies = async () => {
+  if (!jar) nope('cookies')();
+  return { get: (name) => (name in jar ? { name, value: jar[name] } : undefined), getAll: () => Object.entries(jar).map(([name, value]) => ({ name, value })), has: (name) => name in jar };
+};
 export const headers = nope('headers');
 export const draftMode = nope('draftMode');
