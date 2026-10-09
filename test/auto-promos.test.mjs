@@ -4,6 +4,7 @@
 import { suite, test, equal, assert } from './_harness.mjs';
 import { autoDiscountFor } from '../lib/coupons.js';
 import { upliftedPrice, vendorUpliftPct } from '../lib/constants.js';
+import { parseTrackerCsv } from '../lib/csv.js';
 
 const pct = (value) => ({ kind: 'percent', value });
 const unit = (price, floor, eligible = true) => ({ price, floor, eligible });
@@ -75,4 +76,31 @@ test('it never goes past retail, and never below the price it started at', () =>
   equal(upliftedPrice(1000, 1050, 'Abi'), 1050);
   equal(upliftedPrice(1100, 1000, 'Abi'), 1210);   // retail below price: no cap to hold it to
   equal(upliftedPrice(0, 500, 'Abi'), 0);
+});
+
+suite('lib/csv: the tracker read applies the vendor uplift once');
+
+const HEAD = 'Lot Number,Item ID / SKU,Category,Make,Model,Description,Serial Number,Vendor / Supplier,Retail Price,Condition,Condition %,Suggested Sale Price,Status,Total Cost';
+const row = (sku, vendor) => `L1,${sku},Laundry,LG,WKEX200HBA,LG tower,123,${vendor},2000,New Open Box,80%,1600,Tested Working,1000`;
+
+test("an Abi row is priced 10% over Retail x Condition %, and everyone else's is not", () => {
+  const { units } = parseTrackerCsv([HEAD, row('VD-1', 'Abi'), row('SS-1', 'SecondShop'), row('X-1', '')].join('\n'));
+  const price = (id) => units.find((u) => u.id === id).price;
+  equal(price('VD-1'), 1760);
+  equal(price('SS-1'), 1600);
+  equal(price('X-1'), 1600);
+});
+
+test('the strike-through retail is never touched', () => {
+  const { units } = parseTrackerCsv([HEAD, row('VD-1', 'Abi')].join('\n'));
+  equal(units[0].compareAt, 2000);
+});
+
+suite('lib/coupons: a typed code may not take a vendor unit under its floor');
+
+test('a 10% referral code on a unit that cannot spare it gives only what it can', () => {
+  // priced 1860, floor 1860: nothing to give. Our own unit beside it gives the full 10%.
+  const r = autoDiscountFor(pct(10), [unit(1860, 1860), unit(1000, 0)]);
+  equal(r.discount, 100);
+  assert(r.capped, 'capped on the vendor unit');
 });

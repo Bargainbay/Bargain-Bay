@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getMany } from '../../../lib/inventory';
 import { resolvePrices } from '../../../lib/pricing';
 import { getSession, normalizeEmail } from '../../../lib/auth';
-import { validateCoupon, bestAutoCoupon } from '../../../lib/coupons';
+import { validateCoupon, bestAutoCoupon, typedCodeUnits } from '../../../lib/coupons';
 import { round2 } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -49,7 +49,7 @@ export async function POST(req) {
     });
   }
 
-  const res = await validateCoupon(code, { subtotal, eligibleSubtotal: eligible, email }).catch(() => null);
+  const res = await validateCoupon(code, { subtotal, eligibleSubtotal: eligible, email, units: await typedCodeUnits(items, priced).catch(() => null) }).catch(() => null);
   if (!res) return NextResponse.json({ ok: false, error: 'Promo codes are briefly unavailable — your order is unaffected.' }, { status: 200 });
   if (!res.ok) return NextResponse.json({ ok: false, error: res.error }, { status: 200 });
 

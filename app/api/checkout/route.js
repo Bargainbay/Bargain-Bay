@@ -13,7 +13,7 @@ import { resolvePrices } from '../../../lib/pricing';
 import { sendOrderEmails, sendEmail } from '../../../lib/email';
 import { readAttribution, ensureAttributionColumns } from '../../../lib/attribution';
 import { createAndSendInvoice } from '../../../lib/invoices';
-import { validateCoupon, bestAutoCoupon, redeemCouponWithClient, releaseCouponForOrder, ensureCouponSchema } from '../../../lib/coupons';
+import { validateCoupon, bestAutoCoupon, typedCodeUnits, redeemCouponWithClient, releaseCouponForOrder, ensureCouponSchema } from '../../../lib/coupons';
 import { upsertCustomer } from '../../../lib/customers';
 import { grantConsent } from '../../../lib/consent';
 import {
@@ -152,7 +152,7 @@ export async function POST(req) {
     try {
       const goods = round2(items.reduce((a, u) => a + priceOf(u), 0));
       const eligible = round2(items.filter((u) => !priced.get(u.id)?.onClearance).reduce((a, u) => a + priceOf(u), 0));
-      const check = await validateCoupon(couponCode, { subtotal: goods, eligibleSubtotal: eligible, email });
+      const check = await validateCoupon(couponCode, { subtotal: goods, eligibleSubtotal: eligible, email, units: await typedCodeUnits(items, priced) });
       if (check.ok) { coupon = check.coupon; discount = check.discount; }
       else couponError = check.error;
     } catch (e) {
