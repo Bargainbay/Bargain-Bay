@@ -4194,7 +4194,7 @@ migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
-Built so far (Phase 1, slices 1–8): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
+Built so far (Phase 1, slices 1–9): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
 commission), `0017_marketplace_listings` (listings, photos, events) and `0018_marketplace_payouts` (bank
 accounts, ledger, payouts); `lib/marketplace-rules.js` (clocks, strikes, commission, payout maths, in
 INTEGER CENTS), `lib/listing-rules.js` (what a listing must contain; shared with the browser),
@@ -4321,6 +4321,19 @@ not shown anywhere until the storefront slice.
   `acceptRequired` document; the versions shown travel with the click so a changed policy is refused, not silently
   accepted; until then `createDraft` and `submitListing` refuse — but nothing about an order already paid for
   ever checks it. The Vendor Agreement is a skeleton with `[Lawyer: …]` placeholders; it needs a real lawyer.
+- **The seller guides (slice 9): `lib/marketplace-guides.js`** — Getting Started, Photo Shot Guide, Packing &
+  Handover Checklist (printable: `.doc-print` hides the site chrome in print), at `/marketplace/guides`. They are
+  HOW-TOs, not rules: they never add a rule, and any deadline/limit/fee/count in them is imported from the code
+  that enforces it (same discipline as the policies; `test/marketplace-guides.test.mjs` pins it and greps for
+  phrases that once promised unbuilt things — e.g. a driver-phone SIGNATURE at handover is NOT built; the crew
+  checks the unit and photographs it). `components/DocBody.jsx` renders both policies and guides. The vendor home
+  shows **live onboarding progress** (`lib/onboarding.js`): policies accepted → bank VERIFIED (submitted isn't
+  enough) → first listing → submitted → on sale → first order delivered → first payout, all computed from what is
+  on record, never a tick box. **Known gap:** a Lane B order does not yet create a dispatch pickup job — staff
+  schedule the collection by hand (the policies say "our crew collects it", which is true only once somebody
+  books the stop). **Test gotcha:** a test that installs a database with `__useTestDatabase` MUST release it
+  (`done()` / `__useTestDatabase(null)`) — `test/partial.test.mjs` depends on there being none, and a leak makes it
+  fail three tests in a different file.
 - **Test gotcha:** the checkout route's runtime-DDL helpers (`ensureAttributionColumns` etc.) memoise "done" in
   module scope, so a second FRESH test database never gets their columns. Every test file that drives the real
   route uses `test/shared-checkout-db.mjs` (one database, re-installed on each call).

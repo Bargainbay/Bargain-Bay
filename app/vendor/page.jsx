@@ -7,6 +7,7 @@ import { bankSummary } from '../../lib/vendor-bank';
 import { listVendorListings } from '../../lib/marketplace-listings';
 import { listVendorOrders } from '../../lib/vendor-orders';
 import { pendingPolicies } from '../../lib/policy-acceptance';
+import { onboardingProgress } from '../../lib/onboarding';
 import { ACCEPT_HOURS, READY_HOURS, STRIKE_REASONS, TIERS } from '../../lib/marketplace-rules';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,7 @@ export default async function VendorHome() {
     listVendorOrders(vendor.id).catch(() => [])
   ]);
   const policiesPending = await pendingPolicies(vendor.id).catch(() => []);
+  const onboarding = await onboardingProgress(vendor.id).catch(() => null);
   const waiting = orders.filter((o) => o.status === 'awaiting_accept').length;
   const toReady = orders.filter((o) => o.status === 'accepted').length;
   const by = (s) => listings.filter((l) => l.status === s).length;
@@ -50,6 +52,26 @@ export default async function VendorHome() {
         <span style={{ fontSize: 14 }}>Strikes: <strong>{meter.active} of {meter.limit}</strong></span>
         <a href="/vendor/performance" style={{ marginLeft: 'auto', fontSize: 13 }}>See the rules and your record →</a>
       </div>
+
+      {onboarding && !onboarding.complete && (
+        <div className="panel">
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+            <h2 style={{ margin: 0, fontSize: 17 }}>Getting started — {onboarding.done} of {onboarding.total}</h2>
+            <a href="/marketplace/guides/getting-started" style={{ fontSize: 13 }}>Read the getting-started guide →</a>
+            <a href="/marketplace/guides/packing-and-handover" style={{ fontSize: 13 }}>Packing &amp; handover checklist →</a>
+          </div>
+          <div className="goalbar" style={{ margin: '10px 0' }}><span style={{ width: `${(onboarding.done / onboarding.total) * 100}%` }} /></div>
+          <ol style={{ margin: 0, paddingLeft: 20, fontSize: 14 }}>
+            {onboarding.steps.map((st) => (
+              <li key={st.key} style={{ margin: '4px 0', color: st.done ? 'var(--muted)' : undefined }}>
+                {st.done ? <>✓ <s>{st.label}</s></> : <a href={st.href}><b>{st.label}</b></a>}
+                {!st.done && st.note ? <span style={{ color: 'var(--muted)' }}> — {st.note}</span> : null}
+                {onboarding.next && onboarding.next.key === st.key ? <span className="pill warn" style={{ marginLeft: 8 }}>Next</span> : null}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 12, marginBottom: 16 }}>
         <div className="kpi-card"><div className="kpi-value">{cents(bal.availableCents)}</div><div style={{ fontSize: 13 }}>Available to be paid</div></div>

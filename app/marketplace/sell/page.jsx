@@ -12,6 +12,7 @@ export default function SellPage() {
         <p style={{ fontSize: 14 }}><strong>How it works.</strong> We approve every vendor by hand. You list real units with real photos; we review each listing. When a customer pays, you have {ACCEPT_HOURS} hours to accept and {READY_HOURS} hours to have it ready — we collect and deliver it, or you ship it yourself once you reach Standard tier. We take {DEFAULT_COMMISSION_BPS / 100}% of the item price and pay you by direct deposit or wire.</p>
         <p style={{ fontSize: 14 }}><strong>What we ask.</strong> Every unit carries at least a {WARRANTY_MONTHS}-month warranty from you. Pre-owned units are sold as Refurbished and never described as new. {STRIKE_LIMIT} strikes (missed deadlines, cancellations, misdescribed units) restrict an account.</p>
       </div>
+      <p style={{ fontSize: 14 }}>Not sure yet? Read the <a href="/marketplace/guides/getting-started">getting-started guide</a>, the <a href="/marketplace/guides/packing-and-handover">packing guide</a> and the <a href="/marketplace/policies">policies</a> — everything is out in the open.</p>
       <div className="panel"><VendorApplyForm /></div>
     </div>
   );

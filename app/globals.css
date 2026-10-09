@@ -1758,3 +1758,18 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .sold-by b { color: var(--charcoal); font-weight: 600; }
 .sold-by-lg { font-size: 14px; margin: 6px 0 2px; }
 .sold-by-lg a { color: var(--charcoal); text-decoration: underline; }
+
+/* ── Marketplace guides (checklists the loading bay can print) ───────────── */
+.prose .doc-checklist { list-style: none; padding-left: 4px; }
+.prose .doc-checklist li { margin: 6px 0; }
+.prose .doc-checklist li span { display: inline-block; width: 1.4em; font-size: 1.1em; }
+@media print {
+  /* A guide marked .doc-print prints as the guide alone: no site header, footer or chat button. */
+  body:has(.doc-print) .site-header,
+  body:has(.doc-print) .site-footer,
+  body:has(.doc-print) .bb-chat-fab,
+  body:has(.doc-print) .bb-chat-panel,
+  body:has(.doc-print) .noprint { display: none !important; }
+  .doc-print { max-width: none; }
+  .doc-print section { break-inside: avoid; }
+}
