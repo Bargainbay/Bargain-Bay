@@ -5,6 +5,7 @@ import NavSignOut from './NavSignOut';
 export default function VendorNav({ active, name }) {
   const items = [
     { key: 'home', label: 'Home', href: '/vendor' },
+    { key: 'orders', label: 'Orders', href: '/vendor/orders' },
     { key: 'listings', label: 'Listings', href: '/vendor/listings' },
     { key: 'payouts', label: 'Payouts', href: '/vendor/payouts' },
     { key: 'performance', label: 'Performance', href: '/vendor/performance' }

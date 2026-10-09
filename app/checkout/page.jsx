@@ -11,5 +11,5 @@ export default async function CheckoutPage() {
   // Returning customers get their last known phone + delivery address
   // prefilled from the client database (best-effort — null for new/guest).
   const prefill = session ? await contactForEmail(session.email) : null;
-  return <CheckoutClient catalog={await getAll()} session={session} prefill={prefill} />;
+  return <CheckoutClient catalog={await getAll({ marketplace: true })} session={session} prefill={prefill} />;
 }

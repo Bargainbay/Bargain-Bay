@@ -26,8 +26,13 @@ export async function POST(req) {
   const skus = [...new Set((Array.isArray(body.skus) ? body.skus : []).filter((s) => typeof s === 'string'))].slice(0, 50);
   if (!skus.length) return NextResponse.json({ ok: false, error: 'Your cart is empty.' }, { status: 400 });
 
+  // Promo codes never touch a marketplace seller's units: getMany() without the marketplace opt-in
+  // returns only our own stock, which is exactly the part of the cart a code may discount.
   const items = await getMany(skus);
-  if (!items.length) return NextResponse.json({ ok: false, error: 'Your cart is empty.' }, { status: 400 });
+  if (!items.length) {
+    const onlyVendor = skus.every((s) => /^MP-\d+-\d+$/.test(s));
+    return NextResponse.json({ ok: false, error: onlyVendor ? 'Promo codes don’t apply to marketplace items.' : 'Your cart is empty.' }, { status: 400 });
+  }
 
   const session = await getSession();
   const priced = await resolvePrices(items, session);

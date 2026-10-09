@@ -9,6 +9,8 @@ import {
   sessionCookieOptions, SESSION_COOKIE, normalizeEmail, validEmail
 } from '../../../lib/auth';
 import { round2, money, HST_RATE, DELIVERY_FEE, CARD_PAYMENTS_ENABLED, SERVICE_EMAIL } from '../../../lib/constants';
+import { shipmentCount, planVendorOrders } from '../../../lib/marketplace-rules';
+import { createVendorOrdersTx } from '../../../lib/vendor-orders';
 import { resolvePrices } from '../../../lib/pricing';
 import { sendOrderEmails, sendEmail } from '../../../lib/email';
 import { readAttribution, ensureAttributionColumns } from '../../../lib/attribution';
@@ -116,7 +118,8 @@ export async function POST(req) {
   // a unit abandoned mid-checkout is purchasable again without waiting for cron.
   expireReservations().catch((e) => console.error('opportunistic expiry failed', e.message));
 
-  const items = await getMany(skus);
+  // { marketplace: true } is how a vendor's unit reaches checkout — and only while ordering is open.
+  const items = await getMany(skus, { marketplace: true });
   if (items.length !== skus.length) {
     const found = new Set(items.map((u) => u.id));
     return NextResponse.json(
@@ -134,6 +137,10 @@ export async function POST(req) {
     );
   }
 
+  // A seller's unit that is not in our building cannot be picked up at the warehouse.
+  const pickable = planVendorOrders(items, { deliveryMethod, feeCents: 0 });
+  if (pickable.errors.length) return NextResponse.json({ error: pickable.errors[0] }, { status: 400 });
+
   // ---- authoritative pricing (clearance + member tier; never trust the client) ----
   const session = await getSession();
   const priced = await resolvePrices(items, session);
@@ -150,9 +157,11 @@ export async function POST(req) {
   let couponError = null;
   if (couponCode) {
     try {
-      const goods = round2(items.reduce((a, u) => a + priceOf(u), 0));
-      const eligible = round2(items.filter((u) => !priced.get(u.id)?.onClearance).reduce((a, u) => a + priceOf(u), 0));
-      const check = await validateCoupon(couponCode, { subtotal: goods, eligibleSubtotal: eligible, email, units: await typedCodeUnits(items, priced) });
+      // A seller's units are never discounted by our codes: only our own stock counts.
+      const own = items.filter((u) => !u.marketplace);
+      const goods = round2(own.reduce((a, u) => a + priceOf(u), 0));
+      const eligible = round2(own.filter((u) => !priced.get(u.id)?.onClearance).reduce((a, u) => a + priceOf(u), 0));
+      const check = await validateCoupon(couponCode, { subtotal: goods, eligibleSubtotal: eligible, email, units: await typedCodeUnits(own, priced) });
       if (check.ok) { coupon = check.coupon; discount = check.discount; }
       else couponError = check.error;
     } catch (e) {
@@ -169,7 +178,7 @@ export async function POST(req) {
   // reason something sells at a loss. Worked out here from scratch: what the
   // cart page showed is only a preview.
   try {
-    const auto = await bestAutoCoupon(items, priced, { email });
+    const auto = await bestAutoCoupon(items.filter((u) => !u.marketplace), priced, { email });
     if (auto && auto.discount > discount) {
       coupon = auto.coupon; discount = auto.discount; couponError = null;
     }
@@ -183,7 +192,9 @@ export async function POST(req) {
   // ---- totals (the discount comes off the goods; HST applies to what's left,
   //      plus delivery — a third-party cost we pass through undiscounted) ----
   const subtotal = round2(items.reduce((a, u) => a + priceOf(u), 0));
-  const deliveryFee = deliveryMethod === 'delivery' ? DELIVERY_FEE : 0;
+  // One fee per shipment: everything we move is one delivery, and each self-shipping seller is another.
+  const shipments = Math.max(1, shipmentCount(items));
+  const deliveryFee = deliveryMethod === 'delivery' ? round2(DELIVERY_FEE * shipments) : 0;
   const discounted = round2(Math.max(0, subtotal - discount));
   const hst = round2((discounted + deliveryFee) * HST_RATE);
   const total = round2(discounted + deliveryFee + hst);
@@ -266,6 +277,11 @@ export async function POST(req) {
       // Book the redemption in the same transaction as the order it belongs to —
       // a coupon must never be counted against an order that failed to be created.
       if (coupon) await redeemCouponWithClient(client, coupon, { orderId, email, subtotal, discount });
+      // A seller's units: re-verify they are still on sale, then write each seller's part of the order.
+      await createVendorOrdersTx(client, {
+        orderId, orderNumber: numbered[0].order_number, units: items, deliveryMethod,
+        feeCents: Math.round(DELIVERY_FEE * 100)
+      });
       return { id: orderId, orderNumber: numbered[0].order_number };
     });
   } catch (e) {
@@ -275,6 +291,7 @@ export async function POST(req) {
         { status: 409 }
       );
     }
+    if (e.code === 'NOT_PICKABLE') return NextResponse.json({ error: e.message }, { status: 400 });
     console.error('checkout transaction failed', e);
     return NextResponse.json({ error: 'Could not create your order. Please try again.' }, { status: 500 });
   }
@@ -309,7 +326,7 @@ export async function POST(req) {
       name, email, phone,
       items: [
         ...items.map((u) => ({ description: u.title || `${u.make} ${u.model}`, amount: priceOf(u), sku: u.id })),
-        ...(deliveryFee ? [{ description: 'Local delivery (Pickering & area)', amount: deliveryFee, kind: 'service' }] : []),
+        ...(deliveryFee ? [{ description: shipments > 1 ? `Delivery (${shipments} shipments)` : 'Local delivery (Pickering & area)', amount: deliveryFee, kind: 'service' }] : []),
         // The discount rides as a negative service line, so the invoice totals
         // what the customer actually pays and the code is on the paperwork.
         ...(discount ? [{ description: promoLabel, amount: -discount, kind: 'discount' }] : [])

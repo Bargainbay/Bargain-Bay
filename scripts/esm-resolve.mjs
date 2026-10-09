@@ -22,6 +22,13 @@ export async function resolve(specifier, context, next) {
     return next(new URL(TEST_STUBS[specifier], import.meta.url).href, context);
   }
 
+  // Next's own server helpers are CommonJS subpath exports that plain Node ESM will not resolve
+  // without the extension. Not a stub — the REAL module — so a route handler can be imported by a
+  // test and called with a Request. Test-only, like the stubs above.
+  if (process.env.BB_TEST_STUBS === '1' && specifier === 'next/server') {
+    return next('next/server.js', context);
+  }
+
   // `import x from './db'` -> './db.js'
   if (specifier.startsWith('.') && !/\.[a-z]+$/i.test(specifier)) {
     for (const ext of ['.js', '.jsx', '.mjs', '/index.js']) {
