@@ -34,6 +34,7 @@ export default function Header({ promo = null }) {
             <a href="/shop">Shop</a>
             <a href="/deals" className="nav-clearance">Deals</a>
             <a href="/clearance" className="nav-clearance">Clearance</a>
+            <a href="/refurbished" className="nav-refurb">Refurbished</a>
             <a href="/bundle">Bundle &amp; Save</a>
             <a href="/track">Track Order</a>
             <a href="/contact">Contact</a>
@@ -56,6 +57,7 @@ export default function Header({ promo = null }) {
             <a key={c.slug} href={`/shop?collection=${c.slug}`}>{c.label}</a>
           ))}
           <a href="/clearance" className="cats-clearance">Clearance</a>
+          <a href="/refurbished" className="cats-refurb">Refurbished</a>
         </div>
       </div>
     </header>
