@@ -6,7 +6,6 @@
 import { getAll } from '../../lib/inventory';
 import { decorate as decorateClearance } from '../../lib/clearance';
 import { consignmentFloors } from '../../lib/consignment';
-import { upliftedPrice } from '../../lib/constants';
 import { unavailableSkus } from '../../lib/reservations';
 import { hasRealImage, imageFor } from '../../lib/images';
 import { seoDescription } from '../../lib/specs';
@@ -43,16 +42,15 @@ const fmt = (n) => `${Number(n).toFixed(2)} CAD`;
 
 export async function GET() {
   const cleared = await decorateClearance(await getAll()); // clearance markdowns applied
-  // A vendor drop-off is priced by the same rule as at checkout: the vendor's
-  // uplift, then the cost + 20% floor. This feed used to skip both, so an ad
-  // could show a consigned unit at a price the site then refused to charge.
+  // A vendor drop-off is held to the same cost + 20% floor as at checkout. This
+  // feed used to skip it, so an ad could show a consigned unit at a price the
+  // site then refused to charge. (The vendor uplift is in u.price already.)
   // Soft-fails to "nothing is consigned", like every other read of that table.
   const floors = await consignmentFloors(cleared.map((u) => u.id));
   const units = cleared.map((u) => {
     const info = floors.get(u.id);
     if (!info) return u;
-    const base = u.onClearance ? u.price : upliftedPrice(u.price, u.compareAt, info.vendor);
-    return { ...u, price: Math.max(base, info.floor || 0) };
+    return { ...u, price: Math.max(u.price, info.floor || 0) };
   });
   const blocked = await unavailableSkus();          // sold / reserved units
 
