@@ -4066,7 +4066,7 @@ old "By salesperson" panel on `/admin/dashboard`.
 
 ## Daily P&L, the cost list, and everyone's clock (added 2026-10-08)
 `lib/daily-pnl.js`, `lib/daily-cost-math.js` (no imports), `lib/team-clock.js`,
-migration 0016 (`employees`, `staff_shifts`, `recurring_costs`), pages
+migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
 `/admin/daily-pnl`, `/admin/costs`, `/admin/team-clock` (ADMIN) and `/clock`
 (any employee). Linked from the Reports hub and the nav.
 
@@ -4091,6 +4091,40 @@ migration 0016 (`employees`, `staff_shifts`, `recurring_costs`), pages
   `profitReport`. An office "Fix times" on Team clock repairs a forgotten clock-out.
 - **Not built:** an xlsx/Sheet export of the daily table, service-line revenue
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
+## The marketplace (started 2026-10-08)
+Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
+Built so far (Phase 1, slices 1–2): `db/migrations/0016` (vendors, strikes, commission) and `0017`
+(listings, photos, events); `lib/marketplace-rules.js` (clocks, strikes, commission, payout maths, in
+INTEGER CENTS), `lib/listing-rules.js` (what a listing must contain; shared with the browser),
+`lib/image-checks.js` (photo pipeline, `sharp`), `lib/vendors.js`, `lib/marketplace-listings.js`,
+`lib/vendor-session.js`; APIs `app/api/vendor/*` and `app/api/admin/marketplace/*`; tests
+`test/marketplace*.test.mjs`. **No screens yet and nothing on the storefront** — a `live` listing is
+not shown anywhere until the storefront slice.
+
+- **A vendor-facing caller learns its vendor from the session** (`vendorAccess(email)`), never from
+  a request parameter. Vendor access is DATABASE-backed (`vendor_users`) and a vendor is on no staff
+  list. Never put one in `SALES_EMAILS`.
+- **Vendor listings must NOT live in `products`**: `upsertProducts` rewrites every column and
+  deactivates anything absent from the tracker import, so they would be delisted on the next sync.
+- **Strikes never expire on a timer.** They come off only by a management revision (`reviseStrike`,
+  reason required, row kept). Revising does NOT reinstate a restricted vendor — `reinstateVendor` is
+  a separate decision. `strikesAwaitingReview` is the 90-day review queue.
+- **Clocks start at payment confirmation** (we confirm the e-transfer; the vendor is told only then):
+  24h accept, 72h ready, calendar hours, off server timestamps only.
+- **Commission is a rate with a start date** (10% default is code, not a seeded row — a migration that
+  seeds data makes a fresh database non-empty and breaks the backup restore tests).
+- **Photos are decoded and RE-ENCODED, never stored as uploaded** (EXIF/GPS gone). Vendors upload
+  files; the server never fetches a vendor-supplied URL. The rating plate is private `evidence`, never
+  public. A picture matching another vendor's is flagged for staff, not told to the vendor.
+- **The serial number is guarded by a partial UNIQUE index** across all vendors while a unit is in
+  review/for sale; a duplicate is refused without saying who holds it.
+- **A live listing can only have its price lowered**; any other change goes pause → reopen → review.
+- **Condition is the existing four labels** (`INTAKE_CONDITIONS`). "Used" is refused — a pre-owned unit
+  is Refurbished, and the warranty column's CHECK refuses under 12 months.
+- **sharp's `.stats()` reads the INPUT, not the pipeline** — measure filtered pixels yourself (that
+  bug made every photo look sharp). Don't run `next build` with a symlinked `node_modules` under
+  Turbopack; `next build --webpack` works.
+- Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
