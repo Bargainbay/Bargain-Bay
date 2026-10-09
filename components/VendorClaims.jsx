@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import ClaimPhotos from './ClaimPhotos';
 
 const OPEN = ['open', 'responded', 'awaiting_refund'];
 const LABEL = { open: 'Needs your answer', responded: 'You have answered', awaiting_refund: 'Refund agreed — we are paying the customer', resolved: 'Resolved', closed: 'Closed' };
@@ -55,6 +56,7 @@ export default function VendorClaims({ initial, serverNow, rules }) {
           <p style={{ fontSize: 14, margin: '8px 0' }}>{c.description}</p>
           <Clock label={`Respond within ${rules.respondHours} h`} deadline={c.respondBy} done={c.vendorRespondedAt} now={now} />
           <Clock label={`Resolve within ${rules.resolveDays} days`} deadline={c.resolveBy} done={c.vendorDoneAt} now={now} />
+          <ClaimPhotos claim={c} base="/api/vendor/claims/photos" canAdd onDone={refresh} />
           {c.notes.length > 0 && <ul style={{ fontSize: 13, paddingLeft: 18 }}>{c.notes.map((n, i) => <li key={i}>{n.side === 'vendor' ? 'You' : 'Bargain Bay'}: {n.note}</li>)}</ul>}
           {!c.vendorDoneAt && (
             <div style={{ display: 'grid', gap: 8, marginTop: 10, maxWidth: 560 }}>

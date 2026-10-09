@@ -4371,7 +4371,9 @@ not shown anywhere until the storefront slice.
 - **Warranty claims and seller deductions (`lib/warranty-claims.js`, migration 0025).** The customer contacts
   US; staff open a claim on a DELIVERED vendor order inside its 12 months (Admin > Marketplace > Claims). The
   seller has `CLAIM_RESPOND_HOURS` (48) to respond and `CLAIM_RESOLVE_DAYS` (7) to resolve, on their Claims page.
-  Photos on a claim are NOT built; do not promise them.
+  Photos (migration 0026): staff attach the fault, the seller attaches the repair; each side sees all of a
+  claim's photos, max 12, private Blob store, re-encoded (no EXIF/GPS) through `processListingImage(…,
+  { lenient: true })` — a customer's phone picture of a fault is accepted small or soft, with a warning.
   - **No customer contact is stored on a claim**, so a seller can never be shown it; internal notes are
     flagged and never sent to the seller. Every seller call takes the vendor id from the session.
   - **ONE strike per claim, whichever deadline is missed first** (`warranty_response`). The sweep marks the row

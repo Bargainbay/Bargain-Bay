@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { claimState } from '../lib/claim-state';
+import ClaimPhotos from './ClaimPhotos';
 
 const day = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '—');
 
@@ -47,6 +48,7 @@ export default function MarketplaceClaims({ claims, orders, isAdmin, busy, now, 
               {c.resolution ? ` · ${c.resolution}` : ''}{c.closedReason ? ` · closed: ${c.closedReason}` : ''}
               {isAdmin && c.costCents != null ? ` · we paid $${(c.costCents / 100).toFixed(2)}, charged ${day(c.chargedAt)}` : (!isAdmin && c.charged ? ' · charged to the seller' : '')}
             </div>
+            <ClaimPhotos claim={c} base="/api/admin/marketplace/claims/photos" canAdd onDone={() => window.location.reload()} />
             {c.notes.length > 0 && <ul style={{ fontSize: 13, paddingLeft: 18 }}>{c.notes.map((n, i) => <li key={i}>{day(n.at)} {n.author}{n.internal ? ' (internal)' : ''}{n.side === 'vendor' ? ' (seller)' : ''}: {n.note}</li>)}</ul>}
             {open && (
               <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
