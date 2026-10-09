@@ -26,10 +26,11 @@ export default function CartCapture() {
     let timer = null;
     let lastSent = '';
     const ident = { email: '', phone: '', name: '' };
+    let optIn = null;   // null = never ticked; true/false = the box as the shopper left it
 
     const send = () => {
       const skus = getCart();
-      const body = JSON.stringify({ token: tok, skus, ...ident });
+      const body = JSON.stringify({ token: tok, skus, ...ident, ...(optIn === null ? {} : { marketingOptIn: optIn }) });
       if (body === lastSent) return;
       lastSent = body;
       fetch('/api/cart-capture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
@@ -45,10 +46,21 @@ export default function CartCapture() {
       else return;
       soon();
     };
+    // The unticked marketing box beside the email field. Reported the moment it
+    // changes, so a shopper who ticks it and then leaves is still on record as
+    // having said yes. Unticking after ticking withdraws.
+    const onChange = (e) => {
+      if (e.target?.id !== 'co-marketing') return;
+      optIn = !!e.target.checked;
+      const el = document.getElementById('co-email');
+      if (el && el.value) ident.email = el.value.trim();
+      soon();
+    };
+    document.addEventListener('change', onChange);
     document.addEventListener('focusout', onBlur);
     const off = onCartChange(soon);
     soon();   // signed-in shoppers are identified server-side, so report once on load
-    return () => { document.removeEventListener('focusout', onBlur); off(); clearTimeout(timer); };
+    return () => { document.removeEventListener('focusout', onBlur); document.removeEventListener('change', onChange); off(); clearTimeout(timer); };
   }, []);
   return null;
 }

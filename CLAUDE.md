@@ -93,6 +93,14 @@ four fridges as four identical tiles — which read as the feature breaking ever
 time a lot of identical units arrived. A unit with no model number is never
 grouped: nothing says it is the same appliance.
 
+### `/refurbished` (added 2026-10-09)
+`app/refurbished/page.jsx` — same shape as `/clearance`, same source and filter as
+the Condition dropdown on `/shop` (`condition === 'Refurbished'`, marketplace units
+included), so the two cannot disagree. Linked from the header nav, the categories
+row, the footer and the home page (banner, only when there is stock), and in the
+sitemap. Green (`.refurb-*` in globals.css) so it reads as a different thing from
+the red Clearance.
+
 ### The product tile is square; the photo is not
 `.thumb` (app/globals.css) is `aspect-ratio: 1/1` **plus `min-height: 0`**, and
 its image is **absolutely positioned**. All three are load-bearing and the reason
@@ -115,6 +123,19 @@ So: **a non-square stock photo is fine.** Do not go hunting for square-only
 sources, and do not reach for an image pipeline to trim and pad them — the tile
 normalises presentation now. `normalizeImg` stays useful for AJ Madison because
 it also strips their baked-in white border.
+
+### Every stock photo fills its tile the same amount (added 2026-10-09)
+The tile is a fixed square and the photo is `object-fit: contain`, so tiles were
+always equal — but an appliance looked big or small by how much white margin its
+SOURCE FILE carried: LG's wide 3:2 renders put the product in ~58% of the frame
+and read as toys beside an AJ Madison photo. `node scripts/normalize-stock-photos.mjs`
+(report) / `--write` measures every non-AJ entry in `data/images.json`, and anything
+filling under 95% of its frame is trimmed, scaled to 98% of a 1000x1000 white
+square, saved to `public/model-photos/<KEY>.jpg` and re-pointed there. AJ Madison
+entries are skipped — `normalizeImg` already does the same trim-and-pad at request
+time. **Run it after adding photos to `data/images.json`**; it is idempotent. Hosts
+that 403 scripts (Whirlpool, Maytag, Beko) are reported, not fixed — measured by
+hand in a browser on 2026-10-09 they all sit at 93–100%, so they are fine.
 
 ### Adding to `data/images.json`
 The lookup is `modelImages[model]` — an **exact string match**, no trimming, no
@@ -4057,6 +4078,58 @@ Microsoft app must be "any org + personal accounts".
 - **One UNASSIGNED `customer_tasks` row per customer** (title starts "Abandoned cart"), raised by
   the nightly pass and by the first dashboard load; a cart is raised once (`tasked_at`).
 - Everything degrades open to "nothing"; the capture endpoint always answers 200.
+
+### Abandoned-cart notifications and reminders (added 2026-10-09)
+`lib/abandoned-cart-emails.js`, migration 0020 (`abandoned_cart_emails`,
+`cart_sessions.notified_at` / `generation`), `/api/cron/abandoned-carts` (hourly,
+its own `vercel.json` entry; `runAbandonedCartPass` in `lib/cron-jobs.js`).
+
+- **Staff digest — always on.** One email per pass listing every cart that has
+  gone quiet 4h with a unit still for sale, to `ABANDONED_CART_NOTIFY_TO` else
+  `SALES_EMAIL`, linking `/admin/dashboard`. Claimed with
+  `UPDATE ... WHERE notified_at IS NULL` before sending; put back if the send
+  fails. The My Day task is unchanged. It is an internal message, not CASL.
+- **Customer reminders at 4h / 24h / 72h after the cart's LAST ACTIVITY — a
+  commercial electronic message, so CASL applies, and the whole thing is OFF
+  until `ABANDONED_CART_EMAILS=on`.** Every recipient goes through
+  `filterAudience` (fails closed); each email carries the sender identity,
+  unsubscribe link and `List-Unsubscribe` / `-Post` headers. **A shopper who only
+  typed an email at checkout and never bought has NO consent and gets nothing.
+  This is the point, not a bug**: implied consent is a purchase within 24 months
+  or a quote within 6, and the existing checkout box (`MarketingOptIn`) records
+  consent only when the order is SUBMITTED — which an abandoner never does.
+  **OWNER DECISION (2026-10-09, final): option A — the unticked opt-in is asked
+  BOTH at account creation AND beside the email field on /checkout, because we
+  cannot know which order a shopper goes in.** Customer reminders reach only
+  people who ticked it somewhere (plus existing implied consent); the number is
+  small at first. Guest abandoners who never tick get no email; staff still get
+  the digest and My Day task to phone them.
+  - **Checkout**: `CartCapture` reports the `#co-marketing` checkbox the moment
+    it changes (`marketingOptIn` true/false); `/api/cart-capture` grants consent
+    with OUR wording (`lib/consent-text.js`, never the client's) as evidence, and
+    withdraws if they untick. Keep the `#co-marketing` id. Typed emails are
+    unverified, same as the existing submit-time box.
+  - **All three account doors ask**: password signup, and Sign in with
+    Google/Microsoft — the OAuth box sits above the buttons
+    (`components/OAuthButtons.jsx`, unticked), rides the redirect as `?optin=1`
+    in the httpOnly `bb_oauth` cookie, and `recordOAuthOptIn` (lib/oauth.js)
+    grants consent in the callback ONLY for a newly created account that ticked
+    it. Signing in again is never recorded as a yes.
+  - Existing accounts that never saw a box have no express consent; do not
+    assume it (a one-time prompt in /account is an unbuilt follow-up).
+- **Idempotent**: `abandoned_cart_emails` is keyed `(cart_id, generation, step)`;
+  a step is claimed by inserting its row. A failed send is recorded and NOT
+  retried (a timeout can mean it was accepted; at-most-once beats eventually).
+  A closed cart that refills bumps `generation`, i.e. a new sequence.
+- **Only the highest due step is sent**; overtaken ones are recorded `skipped`.
+  A cart older than 72h + 12h grace is over. Nothing goes 21:00–08:00 Toronto.
+  One email per address per pass. Stops on: bought (`BOUGHT`), cart emptied, no
+  unit still available, opt-out, no consent.
+- **Honest copy**: stock is one-of-a-kind, so "someone else may buy it". The cart
+  holds nothing (only checkout reserves) and the email says so. No countdowns.
+- **Non-production sends nothing real and uses up no step**: `sendEmail` redirects
+  or refuses (`lib/environment.js`), and the claim row / `notified_at` are handed
+  back so a staging run on a shared database cannot burn a customer's reminders.
 
 ## The sales team scorecard and quotas (added 2026-10-08)
 `repScorecard` in `lib/analytics.js`, `lib/rep-match.js` (no imports), `lib/quotas.js`,

@@ -3,7 +3,7 @@ import { SITE_URL } from '../lib/site';
 
 export default async function sitemap() {
   const now = new Date();
-  const staticPages = ['', '/shop', '/deals', '/giveaway', '/contact', '/track', '/policies/returns', '/policies/shipping', '/policies/privacy', '/policies/terms', '/policies/contact'].map((p) => ({
+  const staticPages = ['', '/shop', '/deals', '/clearance', '/refurbished', '/giveaway', '/contact', '/track', '/policies/returns', '/policies/shipping', '/policies/privacy', '/policies/terms', '/policies/contact'].map((p) => ({
     url: `${SITE_URL}${p}`,
     lastModified: now,
     changeFrequency: p === '' || p === '/shop' ? 'daily' : 'monthly',

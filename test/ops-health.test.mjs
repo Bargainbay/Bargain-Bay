@@ -60,5 +60,5 @@ test('records success, failure and ignores a 401', async () => {
   await mk(200)(); await mk(500, { error: 'boom' })(); await mk(401)();
   const { rows } = await client.query('SELECT * FROM cron_heartbeats WHERE name = $1', ['t']);
   equal(rows.length, 1); equal(Number(rows[0].runs), 2); equal(rows[0].last_status, 500); equal(rows[0].last_error, 'boom'); assert(rows[0].last_ok_at);
-  } finally { __useTestDatabase(null); }  // a leaked test database makes every later file think a DB is configured
+  } finally { __useTestDatabase(null); }   // a leaked test DB makes later suites think a database exists
 });
