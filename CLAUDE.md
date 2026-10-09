@@ -4016,6 +4016,42 @@ Microsoft app must be "any org + personal accounts".
   the nightly pass and by the first dashboard load; a cart is raised once (`tasked_at`).
 - Everything degrades open to "nothing"; the capture endpoint always answers 200.
 
+### Abandoned-cart notifications and reminders (added 2026-10-09)
+`lib/abandoned-cart-emails.js`, migration 0020 (`abandoned_cart_emails`,
+`cart_sessions.notified_at` / `generation`), `/api/cron/abandoned-carts` (hourly,
+its own `vercel.json` entry; `runAbandonedCartPass` in `lib/cron-jobs.js`).
+
+- **Staff digest — always on.** One email per pass listing every cart that has
+  gone quiet 4h with a unit still for sale, to `ABANDONED_CART_NOTIFY_TO` else
+  `SALES_EMAIL`, linking `/admin/dashboard`. Claimed with
+  `UPDATE ... WHERE notified_at IS NULL` before sending; put back if the send
+  fails. The My Day task is unchanged. It is an internal message, not CASL.
+- **Customer reminders at 4h / 24h / 72h after the cart's LAST ACTIVITY — a
+  commercial electronic message, so CASL applies, and the whole thing is OFF
+  until `ABANDONED_CART_EMAILS=on`.** Every recipient goes through
+  `filterAudience` (fails closed); each email carries the sender identity,
+  unsubscribe link and `List-Unsubscribe` / `-Post` headers. **A shopper who only
+  typed an email at checkout and never bought has NO consent and gets nothing.
+  This is the point, not a bug**: implied consent is a purchase within 24 months
+  or a quote within 6, and the existing checkout box (`MarketingOptIn`) records
+  consent only when the order is SUBMITTED — which an abandoner never does.
+  Reaching more people means collecting a real, unticked opt-in at capture time
+  (wording stored via `grantConsent` as evidence), not loosening the gate. The
+  owner chooses the option; do not decide it in code.
+- **Idempotent**: `abandoned_cart_emails` is keyed `(cart_id, generation, step)`;
+  a step is claimed by inserting its row. A failed send is recorded and NOT
+  retried (a timeout can mean it was accepted; at-most-once beats eventually).
+  A closed cart that refills bumps `generation`, i.e. a new sequence.
+- **Only the highest due step is sent**; overtaken ones are recorded `skipped`.
+  A cart older than 72h + 12h grace is over. Nothing goes 21:00–08:00 Toronto.
+  One email per address per pass. Stops on: bought (`BOUGHT`), cart emptied, no
+  unit still available, opt-out, no consent.
+- **Honest copy**: stock is one-of-a-kind, so "someone else may buy it". The cart
+  holds nothing (only checkout reserves) and the email says so. No countdowns.
+- **Non-production sends nothing real and uses up no step**: `sendEmail` redirects
+  or refuses (`lib/environment.js`), and the claim row / `notified_at` are handed
+  back so a staging run on a shared database cannot burn a customer's reminders.
+
 ## The sales team scorecard and quotas (added 2026-10-08)
 `repScorecard` in `lib/analytics.js`, `lib/rep-match.js` (no imports), `lib/quotas.js`,
 table `sales_quotas` (migration 0015), `components/RepScorecard.jsx`,
