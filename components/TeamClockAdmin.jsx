@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 const input = { padding: '7px 9px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--charcoal)' };
 const toLocal = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-CA', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'America/Toronto' }) : '');
 const day = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
+const CO = { bargain_bay: 'Bargain Bay', rs_solutions: 'RS Solutions' };
+const coName = (c) => CO[c] || 'Unassigned';
 const hm = (m) => (m == null ? 'open' : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`);
 
 // Admin: who may clock in (and at what rate), and the hours they've logged.
 export default function TeamClockAdmin({ employees, shifts, from, to }) {
   const router = useRouter();
-  const [emp, setEmp] = useState({ email: '', name: '', roleLabel: '', hourlyRate: '' });
+  const [emp, setEmp] = useState({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '' });
   const [fix, setFix] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -25,6 +27,11 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
 
+  const done = shifts.filter((x) => x.minutes != null);
+  const byCo = ['bargain_bay', 'rs_solutions', null].map((c) => {
+    const rows = shifts.filter((x) => (x.company || null) === c);
+    return { c, people: new Set(rows.map((x) => x.employeeId)).size, mins: rows.reduce((a, x) => a + (x.minutes || 0), 0), open: rows.filter((x) => x.minutes == null).length };
+  }).filter((r) => r.people || r.c);
   return (
     <div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Team clock</h1>
@@ -36,15 +43,15 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
       </p>
 
       <div className="table-wrap"><table className="admin">
-        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th style={{ textAlign: 'right' }}>$/hour</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Email</th><th>Company</th><th>Role</th><th style={{ textAlign: 'right' }}>$/hour</th><th></th></tr></thead>
         <tbody>
-          {employees.length === 0 && <tr><td colSpan={5} className="hint">No employees yet.</td></tr>}
+          {employees.length === 0 && <tr><td colSpan={6} className="hint">No employees yet.</td></tr>}
           {employees.map((e) => (
             <tr key={e.id}>
-              <td>{e.name || '—'}</td><td>{e.email}</td><td>{e.roleLabel || '—'}</td>
+              <td>{e.name || '—'}</td><td>{e.email}</td><td>{coName(e.company)}</td><td>{e.roleLabel || '—'}</td>
               <td style={{ textAlign: 'right' }}>{e.hourlyRate == null ? <b style={{ color: 'var(--danger)' }}>not set</b> : e.hourlyRate.toFixed(2)}</td>
               <td style={{ whiteSpace: 'nowrap' }}>
-                <button type="button" className="dash-filter" onClick={() => setEmp({ email: e.email, name: e.name || '', roleLabel: e.roleLabel || '', hourlyRate: e.hourlyRate ?? '' })}>Edit</button>{' '}
+                <button type="button" className="dash-filter" onClick={() => setEmp({ email: e.email, name: e.name || '', roleLabel: e.roleLabel || '', hourlyRate: e.hourlyRate ?? '', company: e.company || '' })}>Edit</button>{' '}
                 <button type="button" className="dash-filter" disabled={busy} onClick={() => { if (confirm(`Remove ${e.name || e.email}? Their past hours stay.`)) send({ action: 'end_employee', id: e.id }); }}>Remove</button>
               </td>
             </tr>
@@ -55,9 +62,12 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '12px 0 4px' }}>
         <input style={{ ...input, width: 210 }} placeholder="Email" value={emp.email} onChange={(e) => setEmp({ ...emp, email: e.target.value })} />
         <input style={{ ...input, width: 150 }} placeholder="Name" value={emp.name} onChange={(e) => setEmp({ ...emp, name: e.target.value })} />
+        <select style={{ ...input, width: 140 }} value={emp.company} onChange={(e) => setEmp({ ...emp, company: e.target.value })}>
+          <option value="">Company…</option><option value="bargain_bay">Bargain Bay</option><option value="rs_solutions">RS Solutions</option>
+        </select>
         <input style={{ ...input, width: 140 }} placeholder="Role (warehouse…)" value={emp.roleLabel} onChange={(e) => setEmp({ ...emp, roleLabel: e.target.value })} />
         <input style={{ ...input, width: 100 }} type="number" min="0" step="0.25" inputMode="decimal" placeholder="$/hour" value={emp.hourlyRate} onChange={(e) => setEmp({ ...emp, hourlyRate: e.target.value })} />
-        <button type="button" className="dash-filter active" disabled={busy} onClick={() => send({ action: 'save_employee', ...emp }, () => setEmp({ email: '', name: '', roleLabel: '', hourlyRate: '' }))}>Save employee</button>
+        <button type="button" className="dash-filter active" disabled={busy} onClick={() => send({ action: 'save_employee', ...emp }, () => setEmp({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '' }))}>Save employee</button>
       </div>
       <p className="hint">A rate change applies to shifts started from now on; past shifts keep the rate they had.</p>
       {err && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</p>}
@@ -69,12 +79,19 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
         <button className="dash-filter active" type="submit">Show</button>
       </form>
       <div className="table-wrap"><table className="admin">
-        <thead><tr><th>Day</th><th>Who</th><th>In</th><th>Out</th><th style={{ textAlign: 'right' }}>Time</th><th style={{ textAlign: 'right' }}>Rate</th><th></th></tr></thead>
+        <thead><tr><th>Company</th><th>People</th><th style={{ textAlign: 'right' }}>Hours</th><th>Still in</th></tr></thead>
         <tbody>
-          {shifts.length === 0 && <tr><td colSpan={7} className="hint">No shifts in this range.</td></tr>}
+          {byCo.map((r) => (<tr key={r.c || 'none'}><td>{coName(r.c)}</td><td>{r.people}</td><td style={{ textAlign: 'right' }}>{hm(r.mins)}</td><td>{r.open || '—'}</td></tr>))}
+          <tr><td><b>Both companies</b></td><td>{new Set(shifts.map((x) => x.employeeId)).size}</td><td style={{ textAlign: 'right' }}><b>{hm(done.reduce((a, x) => a + x.minutes, 0))}</b></td><td>{shifts.length - done.length || '—'}</td></tr>
+        </tbody>
+      </table></div>
+      <div className="table-wrap" style={{ marginTop: 12 }}><table className="admin">
+        <thead><tr><th>Day</th><th>Who</th><th>Company</th><th>In</th><th>Out</th><th style={{ textAlign: 'right' }}>Time</th><th style={{ textAlign: 'right' }}>Rate</th><th></th></tr></thead>
+        <tbody>
+          {shifts.length === 0 && <tr><td colSpan={8} className="hint">No shifts in this range.</td></tr>}
           {shifts.map((s) => (
             <tr key={s.id}>
-              <td>{day(s.startedAt)}</td><td>{s.name}</td>
+              <td>{day(s.startedAt)}</td><td>{s.name}</td><td>{coName(s.company)}</td>
               <td>{toLocal(s.startedAt)}</td>
               <td>{s.endedAt ? toLocal(s.endedAt) : <b style={{ color: 'var(--warn)' }}>still in</b>}</td>
               <td style={{ textAlign: 'right' }}>{hm(s.minutes)}</td>

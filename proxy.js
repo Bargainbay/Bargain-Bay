@@ -14,6 +14,8 @@ const RS_HOSTS = new Set(
 
 // What the RS host is allowed to serve. Everything else lands on the board.
 //   /admin, /driver  — the people using it
+//   /clock           — staff who aren't drivers clock in and out here; the RS
+//                      staff use this host, and without it they hit the board
 //   /d/<token>       — the link texted to a driver to sign their phone in.
 //                      It is sent on the RS host, so redirecting it here would
 //                      bounce every driver to a board they can't see.
@@ -31,6 +33,7 @@ const RS_HOSTS = new Set(
 const ALLOWED = [
   /^\/admin(\/|$)/,
   /^\/driver(\/|$)/,
+  /^\/clock$/,
   /^\/d\/[^/]+$/,
   /^\/api(\/|$)/,
   /^\/invoice(\/|$)/,
