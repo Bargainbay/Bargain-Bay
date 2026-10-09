@@ -30,7 +30,8 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Team clock</h1>
       <p className="hint">
         Add someone by email. They sign up at <b>/signup</b> with that address (or already have an account),
-        then open <b>/clock</b> on their phone and tap Clock in / Clock out. Save it to their home screen.
+        then open the clock page on their phone and tap Clock in / Clock out. Save it to their home screen.
+        <a href="/clock" style={{ marginLeft: 6 }}>Open the employee clock page →</a>
         Drivers keep using the driver app. Don&apos;t add a driver here too, or their hours count twice.
       </p>
 

@@ -48,6 +48,9 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // owner could open the reports describing his own business only by typing
     // the URL. A hub rather than four more tabs: this nav is already long, and
     // a report is something you go looking for rather than work in all day.
+    // Looked at every evening, so it gets its own tab rather than hiding in the hub.
+    // The cost list that feeds it is one click from that page.
+    { key: 'daily-pnl', label: 'Daily P&L', href: '/admin/daily-pnl' },
     { key: 'reports', label: 'Reports', href: '/admin/reports' },
     { key: 'operations', label: 'Operations', href: '/admin/operations' }
   ];
