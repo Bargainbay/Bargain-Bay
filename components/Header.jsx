@@ -36,7 +36,6 @@ export default function Header({ promo = null }) {
             <a href="/bundle">Bundle &amp; Save</a>
             <a href="/track">Track Order</a>
             <a href="/contact">Contact</a>
-            {user ? <a href="/account">My Account</a> : <a href="/login">Login</a>}
           </nav>
           <div className="header-actions">
             <a href={user ? '/account' : '/login'} className="btn" style={{ padding: '7px 12px' }}>
