@@ -21,7 +21,7 @@ export async function generateMetadata({ searchParams }) {
 
 export default async function ShopPage({ searchParams }) {
   const sParams = await searchParams;
-  const units = await decorate(await getAvailable(), await getSession());
+  const units = await decorate(await getAvailable({ marketplace: true }), await getSession());
   const enriched = units.map((u) => ({
     ...u,
     kw: unitKeywords(u, specs[u.id]),

@@ -4,6 +4,7 @@ import { decorateOne, decorate } from '../../../lib/pricing';
 import { getSession } from '../../../lib/auth';
 import { isUnavailable } from '../../../lib/reservations';
 import { conditionCopy, leadSentence, specRows, seoDescription } from '../../../lib/specs';
+import { marketplaceConditionCopy } from '../../../lib/marketplace-storefront';
 import { SITE_URL, jsonLd } from '../../../lib/site';
 import ProductBuyPanel from '../../../components/ProductBuyPanel';
 import PixelView from '../../../components/PixelView';
@@ -17,7 +18,7 @@ const CONDITION_SCHEMA = {
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
-  const u = await getById(decodeURIComponent(id));
+  const u = await getById(decodeURIComponent(id), { marketplace: true });
   if (!u) return { title: 'Not found' };
   return {
     title: `${u.make} ${u.model} ${u.category} (${u.condition})`,
@@ -33,15 +34,24 @@ export async function generateMetadata({ params }) {
 
 // Slim, serializable shape handed to the client buy panel — only the fields the
 // picker needs, so we don't ship the whole spec blob to the browser.
+const explain = (x) => (x.marketplace
+  ? marketplaceConditionCopy(x.condition, x.vendor?.name, x.refurbNotes)
+  : conditionCopy(x.condition));
+
 function forPanel(x, sold) {
   return {
+    // A vendor's unit carries who sells it and what they promise; ours carries none of this.
+    ...(x.marketplace ? {
+      marketplace: true, vendor: x.vendor, lane: x.lane, warrantyMonths: x.warrantyMonths,
+      orderable: !!x.orderable, vendorPhotos: x.vendorPhotos || []
+    } : {}),
     id: x.id,
     make: x.make,
     model: x.model,
     category: x.category,
     title: x.title || `${x.make} ${x.model}`,
     condition: x.condition,
-    explainer: conditionCopy(x.condition),
+    explainer: explain(x),
     price: x.price,
     compareAt: x.compareAt || 0,
     clientPrice: x.clientPrice,
@@ -59,12 +69,12 @@ function forPanel(x, sold) {
 
 export default async function Product({ params }) {
   const { id } = await params;
-  const base = await getById(decodeURIComponent(id));
+  const base = await getById(decodeURIComponent(id), { marketplace: true });
   if (!base) return notFound();
   const session = await getSession();
   const u = await decorateOne(base, session);
   const sold = await isUnavailable(u.id);
-  const siblings = await decorate(await getSiblings(u.make, u.model, u.id), session);
+  const siblings = await decorate(await getSiblings(u.make, u.model, u.id, 8, { marketplace: true }), session);
 
   // Every available unit of this model, cheapest first; the URL's unit is the
   // one preselected in the picker. Siblings come from getAvailable(), so they're
@@ -72,9 +82,10 @@ export default async function Product({ params }) {
   const units = [forPanel(u, sold), ...siblings.map((s) => forPanel(s, false))]
     .sort((a, b) => a.price - b.price);
 
-  const explainer = conditionCopy(u.condition);
+  const explainer = explain(u);
   const rows = specRows(u);
   const warrantyLabel = 'one-year warranty';
+  const vendorName = u.vendor?.name;
 
   const productSchema = {
     '@context': 'https://schema.org',
@@ -86,6 +97,7 @@ export default async function Product({ params }) {
     mpn: u.model,
     sku: u.id,
     offers: {
+      ...(u.vendor ? { seller: { '@type': 'Organization', name: u.vendor.name } } : {}),
       '@type': 'Offer',
       price: Number(u.price).toFixed(2),
       priceCurrency: 'CAD',
@@ -109,11 +121,22 @@ export default async function Product({ params }) {
             the spec table another screen down. */}
         <h2>About this unit</h2>
         <p>{leadSentence(u)}</p>
-        <p>
-          Like every appliance at Bargain Bay, it was put through a functional bench test by our
-          technicians before listing and is backed by a {warrantyLabel}. Free warehouse pickup,
-          flat-fee local delivery, and freight options serve Pickering, Scarborough and the GTA.
-        </p>
+        {u.marketplace ? (
+          <>
+            {u.sellerDescription && <p style={{ whiteSpace: 'pre-line' }}>{u.sellerDescription}</p>}
+            <p>
+              This unit is sold by {vendorName} on the Bargain Bay marketplace. {vendorName} tested and described it and
+              backs it with a {u.warrantyMonths || 12}-month warranty.
+              {u.lane === 'C' ? ' The seller ships it to you.' : ' Bargain Bay arranges delivery to Pickering, Scarborough and the GTA.'}
+            </p>
+          </>
+        ) : (
+          <p>
+            Like every appliance at Bargain Bay, it was put through a functional bench test by our
+            technicians before listing and is backed by a {warrantyLabel}. Free warehouse pickup,
+            flat-fee local delivery, and freight options serve Pickering, Scarborough and the GTA.
+          </p>
+        )}
 
         <h2>Condition: {u.condition}</h2>
         <p>{explainer}</p>

@@ -40,7 +40,7 @@ function tileImage(slug, units) {
 
 export default async function Home() {
   const session = await getSession();
-  const units = await decorate(await getAvailable(), session);
+  const units = await decorate(await getAvailable({ marketplace: true }), session);
   // Whatever is being promoted today. Any failure means the ordinary hero.
   const promo = heroFor(await dealsSnapshot().catch(() => null));
   // One card per model — four of the same fridge are one listing, not four tiles.

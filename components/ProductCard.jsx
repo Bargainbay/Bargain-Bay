@@ -24,6 +24,7 @@ export default function ProductCard({ unit, count = 1 }) {
         <ConditionPill condition={unit.condition} />
         <a href={href} className="card-title">{name}</a>
         <div className="card-model">{unit.make} · {unit.model}</div>
+        {unit.vendor && <div className="sold-by">Sold by <b>{unit.vendor.name}</b></div>}
         <div className="price-row">
           {grouped && <span className="from-label">from</span>}
           <span className={'price' + (unit.onClearance ? ' price-clearance' : '') + (unit.isMemberPrice ? ' price-member' : '')}>{money(unit.price)}</span>
@@ -33,7 +34,9 @@ export default function ProductCard({ unit, count = 1 }) {
         <div style={{ marginTop: 'auto', paddingTop: 8 }}>
           {grouped
             ? <a className="btn block" href={href}>View {count} units →</a>
-            : <AddToCartButton sku={unit.id} small price={unit.price} name={name} />}
+            : unit.vendor && !unit.orderable
+              ? <a className="btn block" href={href}>View details →</a>
+              : <AddToCartButton sku={unit.id} small price={unit.price} name={name} />}
         </div>
       </div>
     </div>

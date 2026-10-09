@@ -65,7 +65,9 @@ export default function ProductGallery({ images = [], alt = '', badge = null }) 
           ? 'Manufacturer photo — the same model, not this unit.'
           : cur.kind === 'rsops'
             ? `Photo of this exact unit — ${cur.label}, taken during inspection.`
-            : 'Photo of this exact unit, taken at our warehouse.'}
+            : cur.kind === 'vendor'
+              ? `Photo of this exact unit, provided by ${cur.by || 'the seller'}.`
+              : 'Photo of this exact unit, taken at our warehouse.'}
       </div>
 
       {n > 1 && (

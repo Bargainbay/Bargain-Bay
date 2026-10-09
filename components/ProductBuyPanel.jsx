@@ -29,6 +29,8 @@ export default function ProductBuyPanel({ units, initialId }) {
   // order rule the cards and the Meta feed follow.
   const slides = [
     { url: sel.image, kind: 'stock', label: 'stock photo' },
+    // A vendor's own photographs of this exact unit, captioned as the seller's.
+    ...(sel.vendorPhotos || []).map((p, n) => ({ url: p.url, kind: 'vendor', label: `photo ${n + 1}`, by: sel.vendor?.name })),
     ...(sel.photos || []).map((p, n) => ({ url: p.url, kind: 'own', label: `photo ${n + 1}` })),
     ...(sel.rsopsPhotos || []).map((p) => ({ url: p.url, kind: 'rsops', label: p.slot || 'inspection' }))
   ].filter((x, n, all) => x.url && all.findIndex((y) => y.url === x.url) === n);
@@ -46,6 +48,12 @@ export default function ProductBuyPanel({ units, initialId }) {
         {sel.sold && <span className="pill sold" style={{ marginLeft: 8 }}>Sold / on hold</span>}
         <h1 style={{ margin: '10px 0 4px' }}>{name}</h1>
         <div style={{ color: 'var(--muted)', fontSize: 14 }}>{sel.category} · {sel.make}</div>
+        {sel.vendor && (
+          <div className="sold-by sold-by-lg">
+            Sold by <a href={`/marketplace/v/${sel.vendor.slug}`}><b>{sel.vendor.name}</b></a>
+            {sel.lane === 'C' ? ' · shipped by the seller' : ' · delivery arranged by Bargain Bay'}
+          </div>
+        )}
 
         <div className="price-row" style={{ margin: '14px 0 4px' }}>
           <span className={'product-price' + (sel.onClearance ? ' price-clearance' : '')}>{money(sel.price)}</span>
@@ -60,7 +68,9 @@ export default function ProductBuyPanel({ units, initialId }) {
         <div className="meta-list">
           <div>Model #: <b style={{ color: 'var(--ink)' }}>{sel.model}</b></div>
           <div>SKU: {sel.id}</div>
-          {multi
+          {sel.vendor
+            ? <div>⚡ <b style={{ color: 'var(--ink)' }}>One-of-a-kind unit</b> from our marketplace. When it&apos;s gone, it&apos;s gone.</div>
+            : multi
             ? <div>⚡ <b style={{ color: 'var(--ink)' }}>{units.length} of this model available</b> — each a separate, individually-tested unit. Pick yours below.</div>
             : <div>⚡ <b style={{ color: 'var(--ink)' }}>One available</b> — every Bargain Bay unit is one-of-a-kind. When it&apos;s gone, it&apos;s gone.</div>}
         </div>
@@ -85,7 +95,7 @@ export default function ProductBuyPanel({ units, initialId }) {
                     <span className="unit-radio" aria-hidden="true" />
                     <span className="unit-option-main">
                       <ConditionPill condition={u.condition} />
-                      <span className="unit-option-sku">SKU {u.id}{u.sold ? ' · sold' : ''}</span>
+                      <span className="unit-option-sku">SKU {u.id}{u.sold ? ' · sold' : ''}{u.vendor ? ` · sold by ${u.vendor.name}` : ''}</span>
                     </span>
                     <span className="unit-option-price">
                       <span className="price">{money(u.price)}</span>
@@ -99,13 +109,27 @@ export default function ProductBuyPanel({ units, initialId }) {
         )}
 
         <div style={{ maxWidth: 360, marginTop: 14 }}>
-          <AddToCartButton sku={sel.id} available={!sel.sold} price={sel.price} name={name} />
+          {sel.marketplace && !sel.orderable
+            ? <button className="btn block" disabled>Ordering opens soon</button>
+            : <AddToCartButton sku={sel.id} available={!sel.sold} price={sel.price} name={name} />}
         </div>
 
         <div className="meta-list" style={{ marginTop: 18 }}>
-          <div>🚚 Free pickup at {PICKUP_ADDRESS} (by appointment), flat-fee local delivery, or freight — Pickering, Scarborough &amp; the GTA.</div>
-          <div>✔️ Bench-tested &amp; certified working before listing.</div>
-          <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; one-year warranty</a></div>
+          {sel.vendor ? (
+            <>
+              <div>{sel.lane === 'C'
+                ? '🚚 Shipped by the seller to your address.'
+                : '🚚 Delivered by Bargain Bay — flat-fee local delivery or freight to Pickering, Scarborough & the GTA.'}</div>
+              <div>✔️ Tested and described by {sel.vendor.name}, who backs it with a {sel.warrantyMonths || 12}-month warranty.</div>
+              <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; warranty</a></div>
+            </>
+          ) : (
+            <>
+              <div>🚚 Free pickup at {PICKUP_ADDRESS} (by appointment), flat-fee local delivery, or freight — Pickering, Scarborough &amp; the GTA.</div>
+              <div>✔️ Bench-tested &amp; certified working before listing.</div>
+              <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; one-year warranty</a></div>
+            </>
+          )}
         </div>
 
         <a className="btn" href="/shop" style={{ marginTop: 18 }}>← Back to catalogue</a>
