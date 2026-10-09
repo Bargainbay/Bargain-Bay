@@ -4396,7 +4396,6 @@ not shown anywhere until the storefront slice.
   - Admin > Marketplace > Vendors > a vendor has a "Take money off this seller" form (`/api/admin/marketplace/ledger`,
     admin only): fixed reasons, an adjustment needs a written reason, and the form's key makes a double click
     record once.
-=======
 - **Lane B collection is a dispatch job, booked automatically (`lib/vendor-pickup.js`, migration 0024).** The
   moment the vendor marks a Lane B order READY, `ensurePickupJob` creates ONE `type='pickup'` job: the vendor's
   dock (listing pickup address; vendor name/contact as the pickup company/person) to our warehouse
@@ -4424,7 +4423,6 @@ not shown anywhere until the storefront slice.
     rebook) from the Orders tab (`book_pickup`, staff). The delivery job made by the pull says "NOT YET
     COLLECTED FROM THE SELLER" while a collection is outstanding.
   - `npm test -- <word>` now runs only the test files whose name contains the word.
->>>>>>> d987400ea3df8ee041530ee96dc5e30b3a925008
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
