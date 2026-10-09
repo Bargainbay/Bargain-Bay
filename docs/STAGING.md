@@ -67,6 +67,11 @@ variables say. Check that setting first.
 
 ### 4. Migrate it
 
+A database built from the migrations alone is now complete (`0023_runtime_schema.sql`
+carries the tables that used to exist only because the app created them on first use,
+and `test/runtime-schema.test.mjs` keeps it that way), so a brand-new EMPTY database
+works as well as a branch of production.
+
 ```bash
 POSTGRES_URL='<the neon branch string>' npm run migrate -- --status
 POSTGRES_URL='<the neon branch string>' npm run migrate

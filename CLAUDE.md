@@ -262,11 +262,16 @@ code so they cannot disagree.
   which is the whole reason this beats re-running one big idempotent blob.
   Later migrations do not run: they may assume the failed one did.
 - `-- migrate:no-transaction` on the first line for `CREATE INDEX CONCURRENTLY`.
-- **`0001_baseline.sql` is NOT the whole database.** It is the old
-  `db/schema.sql` moved verbatim, and 27 `ensureXSchema()` functions in `lib/`
-  still create tables at runtime, plus at least one CHECK constraint
-  (`jobs_type_check`) that exists in production and in no file here. Folding
-  those in is the next step and wants a staging database in front of it.
+- **`0001_baseline.sql` is not the whole database on its own, and `0023_runtime_schema.sql`
+  is the rest.** (2026-10-09.) 30 files in `lib/` used to create their own tables at
+  runtime, so a database built from migrations alone was missing 22 of them. 0023
+  carries that DDL verbatim, every statement idempotent, so it is a no-op on
+  production. **The `ensureXSchema()` functions were deliberately LEFT IN PLACE** —
+  removing them is a separate, riskier change, and `jobs_type_check` is still
+  rewritten from `JOB_TYPES` on every boot. `test/runtime-schema.test.mjs` builds a
+  database from the migrations only and fails if the code reads or writes a table
+  that no migration creates, so **a new `ensureXSchema()` needs a migration too**
+  or that test names the table.
 - **`next.config.mjs` must keep tracing `./db/migrations/**/*.sql`.** It named
   `db/schema.sql` exactly; a directory would have deployed EMPTY and the button
   would report "no migrations found" on production while working in dev.
