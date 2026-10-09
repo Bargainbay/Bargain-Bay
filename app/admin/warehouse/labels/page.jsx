@@ -86,7 +86,18 @@ const partNumSize = (text, format) => {
 
 const beamSize = (code) => (code.length <= 5 ? '90pt' : code.length <= 8 ? '60pt' : code.length <= 12 ? '40pt' : '28pt');
 
+// Bin labels: a drawer or a shelf section, not a rack beam. Same QR as the
+// spot sign (it IS the spot's label, just small), with the code sized to fit
+// on one line. Roll sizes match the unit stickers so one printer does both.
+const BIN_TEXT = { bin: { in: 1.0, max: 40 }, 'bin-lg': { in: 2.0, max: 64 } };
+const binSize = (code, format) => {
+  const t = BIN_TEXT[format];
+  return `${Math.min(t.max, (t.in / Math.max(1, code.length) / 0.62) * 72).toFixed(1)}pt`;
+};
+
 const SPOT_FORMATS = {
+  bin: { label: 'Bin label — 2.25 × 1.25 in roll', page: '2.25in 1.25in', margin: '0' },
+  'bin-lg': { label: 'Bin label — 4 × 2 in', page: '4in 2in', margin: '0' },
   beam: { label: 'Rack beam — 3 per letter sheet', page: 'letter', margin: '0.25in' },
   '4x6': { label: '4 × 6 in label', page: '4in 6in', margin: '0' },
   letter: { label: 'Letter paper — one per page', page: 'letter', margin: '0.5in' }
@@ -134,6 +145,15 @@ const CSS = `
   .sbeam .lbl-spot .q { flex: none; width: 2.9in; height: 2.9in; order: -1; }
   .sbeam .lbl-spot .t { min-width: 0; flex: 1; }
   .sbeam .lbl-spot .sub { font-size: 16pt; margin-top: 8pt; }
+  .sbin .lbl-spot, .sbin-lg .lbl-spot { flex-direction: row; justify-content: flex-start; gap: .08in; text-align: left; }
+  .sbin .lbl-spot .q, .sbin-lg .lbl-spot .q { flex: none; order: -1; }
+  .sbin .lbl-spot .t, .sbin-lg .lbl-spot .t { min-width: 0; flex: 1; }
+  .sbin .lbl-spot .sub, .sbin-lg .lbl-spot .sub { font-size: 7pt; margin-top: 3pt; line-height: 1.15; }
+  .sbin .lbl-spot { width: 2.25in; height: 1.25in; padding: .08in; }
+  .sbin .lbl-spot .q { width: 1.05in; height: 1.05in; }
+  .sbin-lg .lbl-spot { width: 4in; height: 2in; padding: .12in .15in; gap: .15in; }
+  .sbin-lg .lbl-spot .q { width: 1.7in; height: 1.7in; }
+  .sbin-lg .lbl-spot .sub { font-size: 10pt; }
   .s4x6 .lbl-spot { width: 4in; height: 6in; padding: .3in; }
   .s4x6 .lbl-spot .q { width: 2.7in; height: 2.7in; }
   .sletter .lbl-spot { width: 7.5in; height: 9.9in; padding: .4in; }
@@ -284,6 +304,7 @@ export default async function LabelsPage({ searchParams }) {
     && (codes.length ? codes.includes(s.code) : (!areas.length || areas.includes(s.area))));
   // Racks go on cross beams ~4 in tall: three strips to a letter sheet.
   const format = SPOT_FORMATS[sp?.format] ? sp.format
+    : spots.length && spots.every((s) => s.area?.startsWith('parts-')) ? 'bin'
     : spots.length && spots.every((s) => s.kind === 'rack') ? 'beam' : '4x6';
   const allAreas = await listAreas();
   const areaLabel = (k) => allAreas.find((a) => a.key === k)?.label || '';
@@ -304,7 +325,16 @@ export default async function LabelsPage({ searchParams }) {
       <div className={`lbl-sheet s${format}`}>
         {spots.map((s) => (
           <div key={s.code} className="lbl-spot">
-            {format === 'beam' ? (
+            {format === 'bin' || format === 'bin-lg' ? (
+              <>
+                {/* eslint-disable-next-line react/no-danger */}
+                <div className="q" dangerouslySetInnerHTML={{ __html: qrSvg(spotScanUrl(SITE_URL, s.code)) }} />
+                <div className="t">
+                  <div className="code" style={{ fontSize: binSize(s.code, format) }}>{s.code}</div>
+                  <div className="sub">{s.note || areaLabel(s.area)}</div>
+                </div>
+              </>
+            ) : format === 'beam' ? (
               <>
                 {/* eslint-disable-next-line react/no-danger */}
                 <div className="q" dangerouslySetInnerHTML={{ __html: qrSvg(spotScanUrl(SITE_URL, s.code)) }} />

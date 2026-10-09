@@ -970,6 +970,8 @@ function LabelsTab() {
         ))}
         <div className="wh-row" style={{ marginTop: 10 }}>
           <select value={spotFormat} onChange={(e) => setSpotFormat(e.target.value)} style={{ width: 'auto' }}>
+            <option value="bin">Bin label — 2.25 × 1.25 in roll</option>
+            <option value="bin-lg">Bin label — 4 × 2 in</option>
             <option value="beam">Rack beam — 3 per letter sheet</option>
             <option value="4x6">4 × 6 in label</option>
             <option value="letter">Letter paper</option>
@@ -978,6 +980,10 @@ function LabelsTab() {
             aria-disabled={!areas.length}
             href={areas.length ? labelsHref({ type: 'spots', area: areas.join(','), format: spotFormat }) : undefined}>
             Open labels
+          </a>
+          <a className="btn" target="_blank" rel="noopener noreferrer"
+            href={labelsHref({ type: 'spots', area: 'parts-drawers,parts-shelves', format: 'bin' })}>
+            Parts bin labels (all 24)
           </a>
         </div>
       </div>
