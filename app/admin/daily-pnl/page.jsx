@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { dailyPnl } from '../../../lib/daily-pnl';
+import { daySales } from '../../../lib/day-sales';
 import { money, torontoToday } from '../../../lib/constants';
 import AdminNav from '../../../components/AdminNav';
 
@@ -25,7 +26,7 @@ export default async function DailyPnlPage({ searchParams }) {
   const today = torontoToday();
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp?.to || '') ? sp.to : today;
   const from = /^\d{4}-\d{2}-\d{2}$/.test(sp?.from || '') ? sp.from : shift(to, -13);
-  const r = await dailyPnl({ from, to });
+  const [r, ds] = await Promise.all([dailyPnl({ from, to }), daySales(to)]);
   const latest = r.rows[r.rows.length - 1];
 
   return (
@@ -47,6 +48,44 @@ export default async function DailyPnlPage({ searchParams }) {
           <a className="dash-filter" href={`?from=${shift(today, -6)}&to=${today}`}>7 days</a>
           <a className="dash-filter" href={`?from=${today.slice(0, 7)}-01&to=${today}`}>This month</a>
         </form>
+
+
+        <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 16, marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+            <b style={{ fontSize: 16 }}>Sales for {label(ds.day)}{ds.day === today ? ' (so far today)' : ''}</b>
+            <span className="hint">All amounts before HST unless marked. Cost is the products only.</span>
+          </div>
+          <div className="table-wrap"><table className="admin" style={{ marginTop: 8 }}>
+            <thead><tr><th></th><th style={{ textAlign: 'right' }}>Invoices created</th><th style={{ textAlign: 'right' }}>Invoices paid</th></tr></thead>
+            <tbody>
+              <tr><td>Invoices</td><td style={{ textAlign: 'right' }}>{ds.created.count}</td><td style={{ textAlign: 'right' }}>{ds.paid.count}</td></tr>
+              <tr><td>Total sales</td><td style={{ textAlign: 'right' }}>{money(ds.created.sales)}</td><td style={{ textAlign: 'right' }}>{money(ds.paid.sales)}</td></tr>
+              <tr><td className="hint">…with HST</td><td style={{ textAlign: 'right' }} className="hint">{money(ds.created.withTax)}</td><td style={{ textAlign: 'right' }} className="hint">{money(ds.paid.withTax)}</td></tr>
+              <tr><td>Cost of products</td><td style={{ textAlign: 'right' }}>{signed(-ds.created.cost)}</td><td style={{ textAlign: 'right' }}>{signed(-ds.paid.cost)}</td></tr>
+              <tr style={{ fontWeight: 800 }}><td>Net revenue</td>
+                <td style={{ textAlign: 'right', color: ds.created.net >= 0 ? 'var(--ok)' : 'var(--danger)' }}>{signed(ds.created.net)}</td>
+                <td style={{ textAlign: 'right', color: ds.paid.net >= 0 ? 'var(--ok)' : 'var(--danger)' }}>{signed(ds.paid.net)}</td></tr>
+            </tbody>
+          </table></div>
+          <p className="hint" style={{ marginBottom: 0 }}>
+            Cash actually received today (deposits and balances): <b>{money(ds.cashReceived)}</b> across {ds.cashPayments} payment{ds.cashPayments === 1 ? '' : 's'}.
+            {' '}Net revenue is before staff, delivery and overhead costs, which are in the daily P&amp;L below.
+            {(ds.created.missingCost + ds.paid.missingCost) > 0 && <b style={{ color: 'var(--warn)' }}> Some product lines have no cost on file and count as $0 cost, so those net figures are too high.</b>}
+          </p>
+          {[['Invoices created', ds.created.rows], ['Invoices paid', ds.paid.rows]].map(([title, rows]) => rows.length > 0 && (
+            <details key={title} style={{ marginTop: 10 }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{title}: {rows.length}</summary>
+              <div className="table-wrap"><table className="admin">
+                <thead><tr><th>Invoice</th><th>Customer</th><th style={{ textAlign: 'right' }}>Sales</th><th style={{ textAlign: 'right' }}>Cost</th><th style={{ textAlign: 'right' }}>Net</th><th>Status</th></tr></thead>
+                <tbody>{rows.map((x) => (
+                  <tr key={x.id}><td>{x.number}</td><td>{x.customer}</td><td style={{ textAlign: 'right' }}>{money(x.sales)}</td>
+                    <td style={{ textAlign: 'right' }}>{money(x.cost)}{x.missing ? ' ⚠' : ''}</td>
+                    <td style={{ textAlign: 'right' }}>{signed(x.net)}</td><td>{x.status}</td></tr>
+                ))}</tbody>
+              </table></div>
+            </details>
+          ))}
+        </div>
 
         {latest && (
           <div style={{ border: `2px solid ${latest.net >= 0 ? 'var(--ok)' : 'var(--danger)'}`, borderRadius: 14, padding: 16, marginBottom: 16 }}>
