@@ -93,6 +93,14 @@ four fridges as four identical tiles — which read as the feature breaking ever
 time a lot of identical units arrived. A unit with no model number is never
 grouped: nothing says it is the same appliance.
 
+### `/refurbished` (added 2026-10-09)
+`app/refurbished/page.jsx` — same shape as `/clearance`, same source and filter as
+the Condition dropdown on `/shop` (`condition === 'Refurbished'`, marketplace units
+included), so the two cannot disagree. Linked from the header nav, the categories
+row, the footer and the home page (banner, only when there is stock), and in the
+sitemap. Green (`.refurb-*` in globals.css) so it reads as a different thing from
+the red Clearance.
+
 ### The product tile is square; the photo is not
 `.thumb` (app/globals.css) is `aspect-ratio: 1/1` **plus `min-height: 0`**, and
 its image is **absolutely positioned**. All three are load-bearing and the reason
@@ -115,6 +123,19 @@ So: **a non-square stock photo is fine.** Do not go hunting for square-only
 sources, and do not reach for an image pipeline to trim and pad them — the tile
 normalises presentation now. `normalizeImg` stays useful for AJ Madison because
 it also strips their baked-in white border.
+
+### Every stock photo fills its tile the same amount (added 2026-10-09)
+The tile is a fixed square and the photo is `object-fit: contain`, so tiles were
+always equal — but an appliance looked big or small by how much white margin its
+SOURCE FILE carried: LG's wide 3:2 renders put the product in ~58% of the frame
+and read as toys beside an AJ Madison photo. `node scripts/normalize-stock-photos.mjs`
+(report) / `--write` measures every non-AJ entry in `data/images.json`, and anything
+filling under 95% of its frame is trimmed, scaled to 98% of a 1000x1000 white
+square, saved to `public/model-photos/<KEY>.jpg` and re-pointed there. AJ Madison
+entries are skipped — `normalizeImg` already does the same trim-and-pad at request
+time. **Run it after adding photos to `data/images.json`**; it is idempotent. Hosts
+that 403 scripts (Whirlpool, Maytag, Beko) are reported, not fixed — measured by
+hand in a browser on 2026-10-09 they all sit at 93–100%, so they are fine.
 
 ### Adding to `data/images.json`
 The lookup is `modelImages[model]` — an **exact string match**, no trimming, no
