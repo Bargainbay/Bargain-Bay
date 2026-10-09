@@ -117,6 +117,8 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
       {tab === 'orders' && (
         <OrdersTab orders={orders} rates={rates} isAdmin={isAdmin} busy={busy} now={new Date(serverNow || Date.now())}
           onVendor={goVendor}
+          bookPickup={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'book_pickup', id }), 'Collection booked on the dispatch board.')}
+          resolveMismatch={(id, action, note) => act(() => post('/api/admin/marketplace/orders', { action: 'resolve_mismatch', id, resolution: action, note }), 'Decision recorded.')}
           deliver={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'deliver', id }), 'Marked delivered — the sale is booked to the vendor.')}
           setRate={(sizeClass, dollars) => act(() => post('/api/admin/marketplace/orders', { action: 'set_rate', sizeClass, dollars }), 'Fee saved.')} />
       )}
@@ -421,7 +423,7 @@ function VendorLink({ id, onOpen, children }) {
   return <a href="#" onClick={(e) => { e.preventDefault(); onOpen(id); }}>{children}</a>;
 }
 
-function OrdersTab({ orders, rates, isAdmin, busy, now, onVendor, deliver, setRate }) {
+function OrdersTab({ orders, rates, isAdmin, busy, now, onVendor, deliver, setRate, bookPickup, resolveMismatch }) {
   const [dollars, setDollars] = useState({});
   const hrs = (d) => (new Date(d) - now) / 3600000;
   const clock = (o) => {
@@ -435,13 +437,28 @@ function OrdersTab({ orders, rates, isAdmin, busy, now, onVendor, deliver, setRa
       <div className="panel">
         <h2 style={{ marginTop: 0, fontSize: 17 }}>Vendor orders</h2>
         <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>Orders appear here once you have confirmed the customer&rsquo;s e-transfer — that is when the vendor&rsquo;s 24-hour and 72-hour clocks start. Overdue ones have already been struck. Lane A/B orders are booked to the vendor when you mark the customer&rsquo;s order Delivered; a seller who ships (Lane C) is booked here once the carrier confirms delivery.</p>
-        <div className="table-wrap"><table className="admin"><thead><tr><th>Order</th><th>Vendor</th><th>Lane</th><th>Amount</th><th>Status</th><th>Clock</th><th>Detail</th><th /></tr></thead><tbody>
-          {orders.length === 0 && <tr><td colSpan={8} style={{ color: 'var(--muted)' }}>No vendor orders yet.</td></tr>}
+        <div className="table-wrap"><table className="admin"><thead><tr><th>Order</th><th>Vendor</th><th>Lane</th><th>Amount</th><th>Status</th><th>Clock</th><th>Detail</th><th>Collection</th><th /></tr></thead><tbody>
+          {orders.length === 0 && <tr><td colSpan={9} style={{ color: 'var(--muted)' }}>No vendor orders yet.</td></tr>}
           {orders.map((o) => (
             <tr key={o.id}><td>{o.orderNumber}</td><td><VendorLink id={o.vendorId} onOpen={onVendor}>{o.vendor}</VendorLink></td><td>{o.lane}</td><td>{cents(o.itemCents)}</td>
               <td>{o.status.replace('_', ' ')}</td>
               <td style={{ color: clock(o).includes('OVERDUE') ? 'var(--danger)' : undefined }}>{clock(o)}</td>
               <td style={{ fontSize: 12 }}>{o.lane === 'C' && o.trackingNumber ? `${o.carrier} ${o.trackingNumber}` : o.insuranceChoice ? `insurance: ${o.insuranceChoice}` : ''}{o.status === 'cancelled' ? ` ${o.cancelCode}` : ''}</td>
+              <td style={{ fontSize: 12 }}>{o.lane !== 'B' ? '' : o.collectedAt ? `collected ${new Date(o.collectedAt).toISOString().slice(0, 10)}`
+                : o.pickupJob ? `${o.pickupJob.number} (${o.pickupJob.status.replace('_', ' ')})`
+                : o.status === 'ready' ? <button className="btn" disabled={busy} onClick={() => bookPickup(o.id)}>Book collection</button> : 'booked when ready'}
+                {o.mismatch && (
+                  <div style={{ color: 'var(--danger)', marginTop: 4 }}>
+                    <b>Crew: does not match the listing.</b> {o.mismatch.note}
+                    {o.mismatch.resolvedAt ? <div>Decided: {String(o.mismatch.resolution).replace('_', ' ')}</div>
+                      : isAdmin ? (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                          <button className="btn danger" disabled={busy} onClick={() => confirm('Strike the seller, cancel the order and refund the customer?') && resolveMismatch(o.id, 'strike_refund', '')}>Strike + refund</button>
+                          <button className="btn" disabled={busy} onClick={() => confirm('Strike the seller only?') && resolveMismatch(o.id, 'strike', '')}>Strike only</button>
+                          <button className="btn" disabled={busy} onClick={() => resolveMismatch(o.id, 'dismiss', '')}>Dismiss</button>
+                        </div>) : <div>An admin decides (strike / refund).</div>}
+                  </div>)}
+              </td>
               <td>{o.lane === 'C' && ['accepted', 'ready'].includes(o.status) && <button className="btn" disabled={busy} onClick={() => confirm('Mark delivered? Only after the carrier has confirmed delivery.') && deliver(o.id)}>Mark delivered</button>}</td></tr>
           ))}
         </tbody></table></div>
