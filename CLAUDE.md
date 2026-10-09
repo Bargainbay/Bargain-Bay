@@ -4052,19 +4052,25 @@ its own `vercel.json` entry; `runAbandonedCartPass` in `lib/cron-jobs.js`).
   This is the point, not a bug**: implied consent is a purchase within 24 months
   or a quote within 6, and the existing checkout box (`MarketingOptIn`) records
   consent only when the order is SUBMITTED — which an abandoner never does.
-  **OWNER DECISION (2026-10-09): the opt-in is asked at ACCOUNT CREATION, never
-  beside the email field at checkout.** Customer reminders therefore reach only
-  people who ticked it when creating an account (password signup, or Sign in
-  with Google/Microsoft), plus anyone with existing implied consent. Guest
-  checkouts get no customer email; staff still get the digest and My Day task to
-  phone them. The number reached is small at first. **All three doors must ask**:
-  the OAuth box sits above the buttons (`components/OAuthButtons.jsx`, unticked),
-  rides the redirect as `?optin=1` in the httpOnly `bb_oauth` cookie, and
-  `recordOAuthOptIn` (lib/oauth.js) grants consent in the callback ONLY for a
-  newly created account that ticked it. An existing account signing in again is
-  never recorded as a yes. Existing accounts that never saw the box have no
-  express consent; do not assume it (a one-time prompt in /account is a possible
-  follow-up, not built). Wording lives in `lib/consent-text.js`.
+  **OWNER DECISION (2026-10-09, final): option A — the unticked opt-in is asked
+  BOTH at account creation AND beside the email field on /checkout, because we
+  cannot know which order a shopper goes in.** Customer reminders reach only
+  people who ticked it somewhere (plus existing implied consent); the number is
+  small at first. Guest abandoners who never tick get no email; staff still get
+  the digest and My Day task to phone them.
+  - **Checkout**: `CartCapture` reports the `#co-marketing` checkbox the moment
+    it changes (`marketingOptIn` true/false); `/api/cart-capture` grants consent
+    with OUR wording (`lib/consent-text.js`, never the client's) as evidence, and
+    withdraws if they untick. Keep the `#co-marketing` id. Typed emails are
+    unverified, same as the existing submit-time box.
+  - **All three account doors ask**: password signup, and Sign in with
+    Google/Microsoft — the OAuth box sits above the buttons
+    (`components/OAuthButtons.jsx`, unticked), rides the redirect as `?optin=1`
+    in the httpOnly `bb_oauth` cookie, and `recordOAuthOptIn` (lib/oauth.js)
+    grants consent in the callback ONLY for a newly created account that ticked
+    it. Signing in again is never recorded as a yes.
+  - Existing accounts that never saw a box have no express consent; do not
+    assume it (a one-time prompt in /account is an unbuilt follow-up).
 - **Idempotent**: `abandoned_cart_emails` is keyed `(cart_id, generation, step)`;
   a step is claimed by inserting its row. A failed send is recorded and NOT
   retried (a timeout can mean it was accepted; at-most-once beats eventually).

@@ -242,3 +242,24 @@ test('consent is recorded only for a NEW account that ticked the box', async () 
     assert(ev.evidence.includes('Email me occasional deals') && ev.evidence.includes('microsoft'));
   } finally { done(); }
 });
+
+suite('Checkout capture-time opt-in');
+import { POST as capturePost } from '../app/api/cart-capture/route.js';
+const post = (body) => capturePost({ json: async () => body, headers: new Headers() });
+
+test('ticking the box at checkout records consent with OUR wording; unticking withdraws', async () => {
+  const { done } = await withTestDb();
+  try {
+    await unit('A1');
+    const base = { token: 'tok-opt-00001', skus: ['A1'], email: 'Shopper@X.ca' };
+    await post({ ...base, marketingOptIn: true, marketingOptInText: 'client-made-up wording' });
+    const st = async () => (await consentStatus(['shopper@x.ca'], 'email')).get('shopper@x.ca').basis;
+    equal(await st(), 'express');
+    const ev = (await query(`SELECT evidence, source FROM consent_events`)).rows[0];
+    assert(ev.evidence.includes('Email me occasional deals') && !ev.evidence.includes('made-up'));
+    await post({ ...base, marketingOptIn: false });
+    equal(await st(), 'withdrawn');
+    await post({ token: 'tok-opt-00002', skus: ['A1'], email: 'plain@x.ca' });   // box never touched
+    equal((await consentStatus(['plain@x.ca'], 'email')).get('plain@x.ca').basis, 'none');
+  } finally { done(); }
+});
