@@ -280,7 +280,7 @@ export async function POST(req) {
       // A seller's units: re-verify they are still on sale, then write each seller's part of the order.
       await createVendorOrdersTx(client, {
         orderId, orderNumber: numbered[0].order_number, units: items, deliveryMethod,
-        feeCents: Math.round(DELIVERY_FEE * 100)
+        feeCents: Math.round(DELIVERY_FEE * 100), hstCharged: hst > 0
       });
       return { id: orderId, orderNumber: numbered[0].order_number };
     });

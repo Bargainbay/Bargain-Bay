@@ -76,7 +76,8 @@ test('payout: commission, delivery service fee and insurance come off, then 2% i
   equal(p.commission, 10000);
   equal(p.netBeforeReserve, 100000 - 10000 - 5900 - 1500); // 82600
   equal(p.reserve, 1652);                                   // 2% of 82600
-  equal(p.payable, 82600 - 1652);
+  equal(p.hstOnFeesCents, 2067);                            // 13% of commission + delivery service (insurance is exempt)
+  equal(p.payable, 82600 - 1652 - 2067);
 });
 
 test('payout: Lane C adds the vendor\'s delivery share and charges no service fee', () => {
@@ -249,4 +250,17 @@ test('every decision leaves an event, and a revision without a reason cannot be 
     try { await client.query(`UPDATE vendor_strikes SET revised_at = now() WHERE id = $1`, [open.strikeId]); } catch (e) { err = e; }
     assert(err, 'database refuses a half-filled revision');
   } finally { done(); }
+});
+
+test('HST: the seller is handed the HST on their sale and charged HST on our fees; the pass-through is never reserved', () => {
+  const p = payoutBreakdown({ itemCents: 100000, hstOnSaleCents: 13000 });
+  equal(p.reserve, 1800);                                   // 2% of 90000 (item − commission), not of the HST
+  equal(p.hstOnFeesCents, 1300);                            // 13% of the 10000 commission
+  equal(p.payable, 100000 - 10000 - 1800 + 13000 - 1300);
+});
+
+test('the HST rate used for fees is the shop\'s HST rate', async () => {
+  const { HST_RATE } = await import('../lib/constants.js');
+  const { HST_BPS } = await import('../lib/marketplace-rules.js');
+  equal(HST_BPS, Math.round(HST_RATE * 10000));
 });

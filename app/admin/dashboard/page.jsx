@@ -107,6 +107,20 @@ export default async function SalesDashboardPage({ searchParams }) {
           the shop's. Owner-only — a sales associate sees selling performance. */}
       {!salesOnly && <TaxOwed data={tax} />}
 
+      {/* Marketplace money, kept apart from the revenue above on purpose: a seller's sale is the seller's.
+          What is ours is the commission and fees; the sellers' sales are shown only so nobody mistakes them
+          for revenue. Owner-only, and only once there is something to show. */}
+      {!salesOnly && data.marketplace && (data.marketplace.gmv > 0 || data.marketplace.revenue > 0) && (
+        <div className="panel" style={{ marginTop: 18 }}>
+          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Marketplace · {periodLabel(period)}</h2>
+          <div className="dash-kpis">
+            <Kpi label="Commission + fees earned" value={money(data.marketplace.revenue)} sub={`${money(data.marketplace.commission)} commission · ${money(data.marketplace.fees)} delivery service & insurance`} />
+            <Kpi label="Sellers' sales (not our revenue)" value={money(data.marketplace.gmv)} sub={`${data.marketplace.orders} settled order${data.marketplace.orders === 1 ? '' : 's'}`} />
+          </div>
+          <p className="hint" style={{ marginBottom: 0 }}>Counted when an order is delivered and settled. Our revenue above excludes sellers' items and the HST on them.</p>
+        </div>
+      )}
+
       {period === 'month' && (
         <div className="panel" style={{ marginTop: 18 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
