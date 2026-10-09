@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { audit } from '../../../../lib/audit';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
 import { ORDER_STATUSES, updateOrderStatus, orderCounts } from '../../../../lib/orders';
@@ -68,6 +69,7 @@ export async function PATCH(req) {
   try {
     const order = await updateOrderStatus(id, status);
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    await audit(session, { action: 'order.status', entity: 'order', entityId: order.order_number || id, summary: `Status set to ${status}${notify ? '' : ' (customer not emailed)'}` });
     const { rows: its } = await query('SELECT sku, title, price, kind FROM order_items WHERE order_id = $1', [id]);
 
     if (status === 'cancelled') {

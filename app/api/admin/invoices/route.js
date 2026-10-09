@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { audit } from '../../../../lib/audit';
 import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
 import { stockRuleProblem } from '../../../../lib/stock-reconcile';
@@ -124,6 +125,7 @@ export async function POST(req) {
       createdBy: { email: session?.email, name: session?.name },
       leadSource, leadBy
     });
+    await audit(session, { action: 'invoice.create', entity: 'invoice', entityId: invoice?.number, summary: `Invoice raised, total ${invoice?.total ?? '?'}`, detail: { total: invoice?.total ?? null, lines: items.length } });
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
     console.error('create invoice failed', e?.message || e);
@@ -225,6 +227,7 @@ export async function PATCH(req) {
         try { await resendInvoice(invoiceId); emailed = true; }
         catch (e) { emailError = e?.message || 'The invoice saved, but the email failed to send.'; }
       }
+      await audit(await getSession(), { action: 'invoice.edit', entity: 'invoice', entityId: updated?.number || invoiceId, summary: `Invoice edited${updated?.total != null ? `, total now ${updated.total}` : ''}`, detail: { total: updated?.total ?? null, lines: Array.isArray(body.items) ? body.items.length : null } });
       return NextResponse.json({ ok: true, invoice: updated, emailed, emailError });
     }
     // Re-send the invoice email as-is (customer lost it / wrong inbox found).
@@ -243,16 +246,19 @@ export async function PATCH(req) {
         amount: body.amount, method: String(body.method || '').trim(),
         paidDate: String(body.paidDate || '').trim(), note: body.note
       });
+      await audit(await getSession(), { action: 'invoice.payment', entity: 'invoice', entityId: r?.number || invoiceId, summary: `Payment of ${body.amount} by ${body.method || '?'} recorded`, detail: { amount: body.amount, method: body.method } });
       return NextResponse.json({ ok: true, invoice: r });
     }
     // Remove a payment recorded in error (only while the invoice isn't settled).
     if (body.action === 'void_payment') {
       const r = await voidInvoicePayment(invoiceId, body.paymentId);
+      await audit(await getSession(), { action: 'invoice.payment_void', entity: 'invoice', entityId: r?.number || invoiceId, summary: `Payment ${body.paymentId} removed` });
       return NextResponse.json({ ok: true, invoice: r });
     }
     if (body.action === 'void') {
       const voided = await voidInvoice(invoiceId);
       if (!voided) return NextResponse.json({ error: 'Only an open invoice can be voided.' }, { status: 409 });
+      await audit(await getSession(), { action: 'invoice.void', entity: 'invoice', entityId: voided.number, summary: 'Invoice voided' });
       return NextResponse.json({ ok: true, invoice: { id: voided.id, number: voided.number, status: 'void' } });
     }
     // Whoever is signed in owns the refund, same rule as invoice creation: taken
@@ -262,6 +268,7 @@ export async function PATCH(req) {
       const refunded = await refundInvoice(invoiceId, {
         restockingPct: body.restockingPct, reason: body.reason, by: actor
       });
+      await audit(await getSession(), { action: 'invoice.refund', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `Full refund${body.restockingPct ? ` with ${body.restockingPct}% restocking` : ''}${body.reason ? `: ${body.reason}` : ''}` });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     // Per-unit refund: refund only the selected line items (invoice_items.id).
@@ -271,6 +278,7 @@ export async function PATCH(req) {
       const refunded = await refundInvoiceItems(invoiceId, {
         itemIds, restockingPct: body.restockingPct, reason: body.reason, by: actor
       });
+      await audit(await getSession(), { action: 'invoice.refund_items', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${itemIds.length} line(s) refunded${body.reason ? `: ${body.reason}` : ''}`, detail: { itemIds } });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     // Money-only refund of an arbitrary amount (price adjustment / goodwill /
@@ -279,11 +287,13 @@ export async function PATCH(req) {
       const refunded = await refundInvoiceAmount(invoiceId, {
         amount: body.amount, reason: body.reason, by: actor
       });
+      await audit(await getSession(), { action: 'invoice.refund_amount', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${body.amount} refunded${body.reason ? `: ${body.reason}` : ''}`, detail: { amount: body.amount } });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     const method = String(body.method || '').trim();
     if (!PAYMENT_METHODS[method]) return NextResponse.json({ error: 'Pick a valid payment method.' }, { status: 400 });
     const invoice = await markInvoicePaid(invoiceId, method, String(body.paidDate || '').trim());
+    await audit(await getSession(), { action: 'invoice.paid', entity: 'invoice', entityId: invoice?.number || invoiceId, summary: `Marked paid by ${method}` });
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
     console.error('update invoice failed', e?.message || e);
@@ -302,6 +312,7 @@ export async function DELETE(req) {
   if (!invoiceId) return NextResponse.json({ error: 'invoiceId is required.' }, { status: 400 });
   try {
     const res = await deleteInvoice(invoiceId);
+    await audit(await getSession(), { action: 'invoice.delete', entity: 'invoice', entityId: res?.number || invoiceId, summary: 'Invoice deleted' });
     return NextResponse.json({ ok: true, invoice: res });
   } catch (e) {
     console.error('delete invoice failed', e?.message || e);

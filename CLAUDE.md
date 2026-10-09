@@ -3462,6 +3462,31 @@ performs a real dump and restore against a real Postgres (PGlite):
 - Off-site backup copies the tracker (daily) and new Blob files to a Drive folder;
   setup is in `docs/BACKUP.md`. It only adds, never deletes. Production only.
 
+## Who changed it, and who can get in (added 2026-10-09)
+`lib/audit.js`, table `audit_log` (migration 0022), **Change log** on the reports hub
+(`/admin/audit`, admin), `test/admin-access.test.mjs`.
+
+- **The log is APPEND-ONLY and BEST-EFFORT.** `audit(session, { action, entity,
+  entityId, summary, detail })` never throws into the action it describes (a refund
+  with the customer at the counter must not fail over a log write); a failed write goes
+  to `captureError`. The actor comes from the SESSION, never the request body, and no
+  session is logged as `unknown` rather than dropped.
+- **It covers** clearance markdowns, every invoice action (create, edit, payment,
+  payment removed, mark paid, void, three kinds of refund, delete), order edits/refunds/
+  status changes and coupons. **It does NOT yet cover** the tracker write-back, settings,
+  the member list or price changes made in the tracker sheet itself, and nothing before
+  2026-10-09 is in it. A new money-moving route should call `audit()`.
+- **`test/admin-access.test.mjs` calls EVERY handler of EVERY `/api/admin/*` route** as
+  nobody and as a signed-in customer on no staff list, and requires 401/403/redirect;
+  a third pass proves an admin is let through, so a harness that never authenticates
+  cannot pass for the wrong reason. A new admin route is covered automatically. The one
+  allowed exception is `/api/admin/migrate` (503 with no database; it is deliberately
+  open on a database with no `users` table). It checks "refused", not "refused the right
+  ROLE": staff-versus-admin on a given route is still reviewed by eye.
+- `test/stubs/next-headers.mjs` gained `__setTestCookies()` for this. With no jar set,
+  `cookies()` still throws exactly as before. A test that installs a test database must
+  reset it (`__useTestDatabase(null)`) or it leaks into every later file.
+
 ## Staff roles live in the database now (added 2026-09-25)
 `lib/staff.js`, table `staff_access` (migration 0002), **Staff access** on
 `/admin/operations`, `/api/admin/staff` (admin only).
