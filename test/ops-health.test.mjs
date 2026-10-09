@@ -55,8 +55,10 @@ test('records success, failure and ignores a 401', async () => {
   const client = { query: async (sql, p) => (p && p.length ? db.query(sql, p) : (async () => { const r = await db.exec(sql); return Array.isArray(r) ? r[r.length - 1] || { rows: [] } : r; })()) };
   const m = await migrate({ client }); assert(m.ok, m.error);
   __useTestDatabase(client);
+  try {
   const mk = (status, body) => withHeartbeat('t', async () => new Response(JSON.stringify(body || {}), { status }));
   await mk(200)(); await mk(500, { error: 'boom' })(); await mk(401)();
   const { rows } = await client.query('SELECT * FROM cron_heartbeats WHERE name = $1', ['t']);
   equal(rows.length, 1); equal(Number(rows[0].runs), 2); equal(rows[0].last_status, 500); equal(rows[0].last_error, 'boom'); assert(rows[0].last_ok_at);
+  } finally { __useTestDatabase(null); }  // a leaked test database makes every later file think a DB is configured
 });
