@@ -1,7 +1,7 @@
 // The real /api/checkout route, end to end against a real database, with a vendor unit in the cart.
 // Card payments are off, so this is the offline (e-transfer) path the shop actually runs.
 import { suite, test, assert, equal } from './_harness.mjs';
-import { withTestDb } from './db.mjs';
+import { sharedCheckoutDb } from './shared-checkout-db.mjs';
 import { query } from '../lib/db.js';
 import { createApplication, decideApplication } from '../lib/vendors.js';
 import { POST } from '../app/api/checkout/route.js';
@@ -16,16 +16,12 @@ async function withFlags(vars, fn) {
   Object.assign(process.env, vars);
   try { return await fn(); } finally { for (const k of KEYS) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } }
 }
-// ONE database for this whole file. The checkout route's runtime-DDL helpers (ensureAttributionColumns and
-// friends) memoise "done" in module scope, so a second FRESH database would never get their columns.
-// Real deployments have one database; the file shares one too, and each test seeds its own vendor.
-let shared = null;
-const db = () => (shared ||= withTestDb());
+const db = sharedCheckoutDb;
 let ip = 0;
 let seeded = 0;
 const call = (body) => POST(new Request('http://localhost/api/checkout', {
   method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': `10.0.0.${++ip}` },
-  body: JSON.stringify({ email: `buyer${ip}@gmail.com`, name: 'Buyer', phone: '4165550100', paymentMethod: 'etransfer', ...body })
+  body: JSON.stringify({ email: `buyer${ip}@gmail.com`, name: 'Buyer', phone: `41655${String(50000 + ip)}`, paymentMethod: 'etransfer', ...body })
 }));
 const json = async (res) => ({ status: res.status, ...(await res.json()) });
 
@@ -122,5 +118,4 @@ test('our promo codes never discount a seller\'s unit', async () => {
       equal(Number((await query('SELECT discount FROM orders WHERE order_number = $1', [mixed.orderNumber])).rows[0].discount), 60);
     });
   } finally { /* the shared database is released by the last test */ }
-  shared?.then((x) => x.done());
 });

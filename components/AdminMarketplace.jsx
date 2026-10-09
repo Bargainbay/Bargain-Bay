@@ -230,7 +230,8 @@ function VendorPanel({ d, isAdmin, busy, strikeReasons, onClose, run }) {
       <h2 style={{ fontSize: 17 }}>{v.tradeName || v.legalName} <span className={`pill ${STANDING[v.status] || ''}`}>{v.status}</span> <span className="pill">{TIERS[v.tier]}</span></h2>
       <p style={{ fontSize: 14 }}>{v.legalName} · {v.contactName} · {v.contactEmail} · {v.contactPhone || 'no phone'}<br />
         HST: {v.hstStatus || 'not recorded'}{v.hstNo ? ` (${v.hstNo})` : ''} · {v.address || 'no address'} {v.city || ''} {v.postal || ''} · stock: {v.sourceOfGoods || '—'}<br />
-        Listings: {Object.entries(d.listingCounts).map(([k, n]) => `${k.replace('_', ' ')} ${n}`).join(' · ') || 'none'}</p>
+        Listings: {Object.entries(d.listingCounts).map(([k, n]) => `${k.replace('_', ' ')} ${n}`).join(' · ') || 'none'}<br />
+        Policies: {!d.policies ? 'unknown' : d.policies.pending.length ? <span className="pill warn">not accepted: {d.policies.pending.join(', ')}</span> : <span className="pill ok">accepted {d.policies.acceptedAt ? `${day(d.policies.acceptedAt)} by ${d.policies.acceptedBy}` : ''}</span>}</p>
 
       {isAdmin && d.balance && (
         <p style={{ fontSize: 14 }}>

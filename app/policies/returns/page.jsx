@@ -52,6 +52,16 @@ export default function ReturnsPage() {
         not cosmetic wear, customer damage, or improper installation.
       </p>
 
+      <h2>Items sold by marketplace sellers</h2>
+      <p>
+        Some units are sold by approved sellers on our marketplace; the listing says <b>&quot;Sold by&quot;</b> and
+        names the seller. Everything on this page applies to them too: report a unit that doesn&apos;t work
+        on arrival within 48 hours, or that isn&apos;t as described within 7 days, and <b>we</b> will put it right —
+        you don&apos;t have to deal with the seller. Their <b>warranty</b> is the seller&apos;s promise (at least one
+        year), and claims go through us. Marketplace units are not eligible for promo codes or member pricing,
+        and a unit shipped by its seller can&apos;t be collected from our warehouse.
+      </p>
+
       <h2>Final-sale / non-returnable items</h2>
       <p>The following are <b>not eligible for change-of-mind returns</b> (DOA and warranty coverage still apply where noted):</p>
       <ul>

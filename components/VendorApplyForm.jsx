@@ -49,7 +49,7 @@ export default function VendorApplyForm() {
         <div className="field"><label>Postal code</label><input value={f.postal} onChange={set('postal')} /></div>
       </div>
       <div className="field"><label><input type="checkbox" checked={f.acceptsTerms} onChange={set('acceptsTerms')} required />{' '}
-        I understand every unit needs a one-year warranty from me, pre-owned units are sold as Refurbished, and accounts with three strikes are restricted.</label></div>
+        I have read the <a href="/marketplace/policies" target="_blank" rel="noreferrer">marketplace policies</a>. I understand every unit needs a one-year warranty from me, pre-owned units are sold as Refurbished, and accounts with three strikes are restricted.</label></div>
       <button className="btn primary" disabled={busy}>{busy ? 'Sending…' : 'Send application'}</button>
     </form>
   );

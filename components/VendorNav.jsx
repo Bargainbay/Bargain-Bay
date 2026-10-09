@@ -8,7 +8,8 @@ export default function VendorNav({ active, name }) {
     { key: 'orders', label: 'Orders', href: '/vendor/orders' },
     { key: 'listings', label: 'Listings', href: '/vendor/listings' },
     { key: 'payouts', label: 'Payouts', href: '/vendor/payouts' },
-    { key: 'performance', label: 'Performance', href: '/vendor/performance' }
+    { key: 'performance', label: 'Performance', href: '/vendor/performance' },
+    { key: 'policies', label: 'Policies', href: '/vendor/policies' }
   ];
   return (
     <div className="admin-nav">

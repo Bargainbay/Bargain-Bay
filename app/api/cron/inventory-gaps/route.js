@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { runStockReconcile } from '../../../../lib/stock-reconcile';
 import { cronAuthorized } from '../../../../lib/cron-auth';
+import { withHeartbeat } from '../../../../lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,5 +21,6 @@ async function run(req) {
   }
 }
 
-export async function GET(req) { return run(req); }
-export async function POST(req) { return run(req); }
+const beat = withHeartbeat('inventory-gaps', run);
+export const GET = beat;
+export const POST = beat;

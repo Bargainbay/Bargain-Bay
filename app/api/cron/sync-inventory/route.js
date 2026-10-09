@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { runNightlyOps } from '../../../../lib/cron-jobs';
 import { cronAuthorized } from '../../../../lib/cron-auth';
+import { withHeartbeat } from '../../../../lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -19,5 +20,6 @@ async function run(req) {
   }
 }
 
-export async function GET(req) { return run(req); }
-export async function POST(req) { return run(req); }
+const beat = withHeartbeat('sync-inventory', run);
+export const GET = beat;
+export const POST = beat;
