@@ -4368,6 +4368,33 @@ not shown anywhere until the storefront slice.
   module scope, so a second FRESH test database never gets their columns. Every test file that drives the real
   route uses `test/shared-checkout-db.mjs` (one database, re-installed on each call).
 - Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
+- **Lane B collection is a dispatch job, booked automatically (`lib/vendor-pickup.js`, migration 0024).** The
+  moment the vendor marks a Lane B order READY, `ensurePickupJob` creates ONE `type='pickup'` job: the vendor's
+  dock (listing pickup address; vendor name/contact as the pickup company/person) to our warehouse
+  (`PICKUP_ADDRESS`), dated today or tomorrow after 14:00 Toronto, landing in To assign. It is a **two-leg**
+  model on purpose (collect, then the ordinary customer delivery from the warehouse): it works with the delivery
+  job the pull already makes and lets the crew inspect before a day is promised. **Open owner question:**
+  collecting and delivering in one trip when the order is only that unit.
+  - **`jobs.vendor_order_id`, NEVER `jobs.order_id`.** order_id would make the board think the customer's order
+    is already on it, and completing the collection would run `markOrderDeliveredForJob` on the CUSTOMER'S
+    order. A partial unique index (one live job per vendor order) is the idempotency; `createJob` takes the
+    column in its INSERT so a lost race rolls back instead of leaving an orphan job.
+  - **The job carries model, serial, size class/staffing, handover notes and packing expectations in its notes
+    and item line, and nothing of the customer** (no name, phone, email, address). The serial is private: it
+    is on staff/driver surfaces only; the vendor's order shape and the vendor portal never include it.
+  - **Completing the stop sets `vendor_orders.collected_at` and nothing else.** `ready_by` / `ready_strike_id`
+    are judged on the vendor marking ready, never on our crew arriving; the vendor order stays `ready` until
+    the customer delivery settles it. Hooked from `setJobStatus`, `completeJob` and `setJobTimes` via
+    `pickupHook` (lazy import; a marketplace hiccup never fails a stop).
+  - **Not as described:** the driver's reasons for a collection include "Unit does not match the listing"
+    (fail reason `not_as_described`). That records `mismatch_*` on the vendor order and emails the office; it
+    does NOT strike. An ADMIN decides on Admin > Marketplace > Orders (`resolveMismatch`): strike only, strike
+    + cancel + refund, or dismiss (crew was wrong; reopen/rebook from the board). Decided once, strike once.
+  - **Cancelled paths:** vendor cancel/lapse (`afterCancel`) and a cancelled customer order
+    (`onOrderStatus`) cancel an uncollected pickup job. Lanes A and C never create one. Staff can book (or
+    rebook) from the Orders tab (`book_pickup`, staff). The delivery job made by the pull says "NOT YET
+    COLLECTED FROM THE SELLER" while a collection is outstanding.
+  - `npm test -- <word>` now runs only the test files whose name contains the word.
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.

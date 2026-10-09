@@ -2,6 +2,7 @@
 // the carrier confirms (the customer's sale). The delivery-service fees are the business's pricing: admin.
 import { NextResponse } from 'next/server';
 import { getSession, isStaff, isAdmin } from '../../../../../lib/auth';
+import { tryEnsurePickupJob, resolveMismatch } from '../../../../../lib/vendor-pickup';
 import { allVendorOrders, deliverVendorOrder, deliveryRates, setDeliveryRate } from '../../../../../lib/vendor-orders';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,15 @@ export async function POST(req) {
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }
   try {
     if (b?.action === 'deliver') return NextResponse.json(await deliverVendorOrder(Number(b.id), { by: s.email }));
+    // Booking the collection is selling-side (a rep would do it); deciding a strike is admin.
+    if (b?.action === 'book_pickup') {
+      const r = await tryEnsurePickupJob(Number(b.id), { by: s.email });
+      return NextResponse.json(r.ok ? r : { error: r.why }, { status: r.ok ? 200 : 400 });
+    }
+    if (b?.action === 'resolve_mismatch') {
+      if (!isAdmin(s)) return denied();
+      return NextResponse.json(await resolveMismatch(Number(b.id), { action: b.resolution, note: b.note, by: s.email }));
+    }
     if (b?.action === 'set_rate') {
       if (!isAdmin(s)) return denied();
       return NextResponse.json(await setDeliveryRate(b.sizeClass, Math.round(Number(b.dollars) * 100), { by: s.email }));
