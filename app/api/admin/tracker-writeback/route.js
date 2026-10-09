@@ -5,7 +5,7 @@
 // building block for the nightly Sold catch-up sweep.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, applyVendorUpliftToTracker, sheetsConfigured } from '../../../../lib/sheets';
+import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, applyVendorUpliftToTracker, typedPriceReport, sheetsConfigured } from '../../../../lib/sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -33,6 +33,9 @@ export async function POST(req) {
   // Put a vendor's price uplift into the sheet's Suggested Sale Price formula:
   // { vendorUplift: { dryRun?: true (default), revert?: false, vendor?: 'abi' } }.
   // A dry run changes nothing and reports what it would.
+  // { typedPrices: true }: READ-ONLY list of the hand-typed Suggested Sale Price
+  // cells, each checked against the pricing rules. Writes nothing.
+  const typedPrices = b.typedPrices === true;
   const vendorUplift = b.vendorUplift && typeof b.vendorUplift === 'object' ? b.vendorUplift : null;
   try {
     const soldRes = sold.length ? await writeSoldRows(sold) : { written: 0 };
@@ -44,12 +47,13 @@ export async function POST(req) {
     }
     const invoiceRes = invoices.length ? await setTrackerInvoice(invoices, { force: !!b.force }) : null;
     const correctionRes = corrections.length ? await correctTrackerUnit(corrections) : null;
+    const typedRes = typedPrices ? await typedPriceReport() : null;
     const upliftRes = vendorUplift
       ? await applyVendorUpliftToTracker({ dryRun: vendorUplift.dryRun !== false, revert: !!vendorUplift.revert, vendorKey: String(vendorUplift.vendor || 'abi').toLowerCase() })
       : null;
     return NextResponse.json({
       ok: true, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
-      unsoldMissing: unsoldRes.missing, costsUpdated: costRes, invoices: invoiceRes, corrections: correctionRes, vendorUplift: upliftRes
+      unsoldMissing: unsoldRes.missing, costsUpdated: costRes, invoices: invoiceRes, corrections: correctionRes, vendorUplift: upliftRes, typedPrices: typedRes
     });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Write-back failed.' }, { status: 500 });
