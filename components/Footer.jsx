@@ -24,6 +24,7 @@ export default function Footer() {
             <a href="/shop?collection=under-500">Deals under $500</a>
             <a href="/cart">Cart</a>
             <a href="/track">Track your order</a>
+            <a href="/marketplace">Marketplace</a>
             <a href="/marketplace/sell">Sell on Bargain Bay</a>
           </div>
           <div>

@@ -4093,7 +4093,7 @@ migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
-Built so far (Phase 1, slices 1–4): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
+Built so far (Phase 1, slices 1–5): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
 commission), `0017_marketplace_listings` (listings, photos, events) and `0018_marketplace_payouts` (bank
 accounts, ledger, payouts); `lib/marketplace-rules.js` (clocks, strikes, commission, payout maths, in
 INTEGER CENTS), `lib/listing-rules.js` (what a listing must contain; shared with the browser),
@@ -4156,6 +4156,20 @@ not shown anywhere until the storefront slice.
   and bank are admin. A vendor signs up at /signup with the email that was approved.
 - Order countdowns and the order scorecard are NOT on the dashboard yet — they need the checkout slice;
   the home page says so rather than showing invented zeros.
+- **Vendor units on the storefront (slice 5), behind two flags, both OFF.** `MARKETPLACE_STOREFRONT=1`
+  makes them visible; `MARKETPLACE_ORDERING=1` is reserved for the checkout slice (until then a visible
+  unit shows "Ordering opens soon" — the cart and checkout cannot buy one). They are read by
+  `lib/marketplace-storefront.js` and merged by `lib/inventory.js` **only when the caller passes
+  `{ marketplace: true }`** — the shop, home page and product page do; the Meta/Google feeds, sitemap,
+  Sarah, the voice agent, the invoice/quote/order pickers, analytics and checkout do NOT, on purpose:
+  a vendor unit appearing in any of those by accident would be advertised, quoted or sold as ours.
+  Never make it the default. Only `live` units from an `approved` vendor appear; a restricted vendor's
+  units come off the shelf. `decorate()` returns a vendor unit at the vendor's price — no clearance, no
+  member tier, no promo (a cost of 0 would otherwise read as "floors nothing" and sell it at 55% of
+  retail). Grouping is WITHIN a vendor (`modelKey` includes the vendor id). Copy is the seller's
+  (`marketplaceConditionCopy`): the shop's `conditionCopy` says "our technicians tested it", which is
+  false for a vendor's unit. Photos are served by `/api/mp-photo/<id>` — a public photo of a live
+  listing only, never the rating plate.
 - Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
 
 ## What is NOT in this repo

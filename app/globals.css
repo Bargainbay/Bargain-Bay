@@ -1742,3 +1742,9 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .poster-card figcaption { margin-top: 8px; font-size: 13.5px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; justify-content: space-between; }
 .poster-dl { display: inline-flex; gap: 12px; }
 .poster-dl a { text-decoration: underline; font-size: 13px; }
+
+/* ── Marketplace: who is selling this unit ─────────────────────────────── */
+.sold-by { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.sold-by b { color: var(--charcoal); font-weight: 600; }
+.sold-by-lg { font-size: 14px; margin: 6px 0 2px; }
+.sold-by-lg a { color: var(--charcoal); text-decoration: underline; }
