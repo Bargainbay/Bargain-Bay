@@ -9,7 +9,7 @@ import { updateOrderStatus } from '../lib/orders.js';
 import {
   acceptVendorOrder, markVendorOrderReady, cancelVendorOrder, setDeliveryRate
 } from '../lib/vendor-orders.js';
-import { vendorBalance } from '../lib/vendor-ledger.js';
+import { vendorBalance, deduct, adjust } from '../lib/vendor-ledger.js';
 import { submitBankAccount, verifyBankAccount } from '../lib/vendor-bank.js';
 import { proposeForVendor, approvePayout, markPayoutPaid, clearFirstPayout } from '../lib/payouts.js';
 import { dashboardData, hstRemittance, revenueDashboard } from '../lib/analytics.js';
@@ -188,6 +188,61 @@ test('A SELLER CANCELS: the refund draws down what we owe them, nothing is booke
     equal(dollars(acct(after, '4000') - acct(before, '4000')), 79);
     const stuck = dollars(acct(after, '2160') - acct(before, '2160'));
     assert(Math.abs(stuck) <= 0.03, `nothing should be left owed to a seller who cancelled (rounding aside), got ${stuck}`);
+  });
+});
+
+test('AFTER-SALE DEDUCTIONS: account 2160 keeps equalling what we owe the seller, and each kind books the right other side', async () => {
+  await sharedCheckoutDb();
+  const w = await world();
+  await open(async () => {
+    await setDeliveryRate('oversize', 8900, { by: 'admin' });
+    await setOpeningBalances({ asOf: '2020-01-01', accounts: {} });
+    const r = await checkout([w.sku]);
+    const o = await orderRow(r.orderNumber);
+    await updateOrderStatus(o.id, 'confirmed');
+    const id = (await vo(o.id)).id;
+    await acceptVendorOrder(w.v.id, id, { insurance: 'declined' }); await markVendorOrderReady(w.v.id, id, {});
+    await updateOrderStatus(o.id, 'delivered');
+    const ref = `${r.orderNumber}:${id}`;
+    const later = new Date(Date.now() + 30 * 86400000);
+    const owed = async () => { const b = await vendorBalance(w.v.id, later); return b.availableCents + b.pendingCents + b.reserveHeldCents; };
+    const snap = async () => ({ tb: await tbNow(), owed: await owed() });
+    const move = (a, b, code) => dollars(acct(a.tb, code) - acct(b.tb, code));
+
+    // 1. a guarantee claim we paid the customer: cash leaves, 2160 falls by the claim; the reserve is drawn first
+    let before = await snap();
+    const g = await deduct(w.v.id, { kind: 'guarantee_claim', amountCents: 20000, orderRef: ref, memo: 'claim', by: 'admin', idemKey: `g-${seq}`, drawReserve: true });
+    assert(g.drawnCents > 0, 'reserve drawn first');
+    let after = await snap();
+    equal(before.owed - after.owed, 20000);
+    equal(move(before, after, '2160'), 200); equal(move(before, after, '1000'), 200);
+    equal(after.tb.outOfBalance, 0);
+
+    // 2. a customer refund after delivery that we paid by hand: same shape
+    before = after;
+    await deduct(w.v.id, { kind: 'refund', amountCents: 5000, orderRef: ref, memo: 'refund', by: 'admin', idemKey: `r-${seq}` });
+    after = await snap();
+    equal(before.owed - after.owed, 5000); equal(move(before, after, '2160'), 50); equal(move(before, after, '1000'), 50);
+
+    // 3. ...but one already booked through the invoice refund path is NOT journalled again (that path debited 2160 itself)
+    before = after;
+    await deduct(w.v.id, { kind: 'refund', amountCents: 3000, orderRef: ref, memo: 'already on the invoice', by: 'admin', idemKey: `rb-${seq}`, bookedElsewhere: true });
+    after = await snap();
+    equal(before.owed - after.owed, 3000); equal(move(before, after, '2160'), 0); equal(move(before, after, '1000'), 0);
+
+    // 4. a charge-back is between us and the seller: no cash, income 4320
+    before = after;
+    await deduct(w.v.id, { kind: 'chargeback', amountCents: 4000, orderRef: ref, memo: 'repair we paid for', by: 'admin', idemKey: `c-${seq}` });
+    after = await snap();
+    equal(before.owed - after.owed, 4000); equal(move(before, after, '2160'), 40); equal(move(before, after, '1000'), 0);
+    equal(dollars(acct(after.tb, '4320') - acct(before.tb, '4320')), 40);           // recovered income
+
+    // 5. an adjustment in either direction, never cash
+    before = after;
+    await adjust(w.v.id, { amountCents: 1000, memo: 'we mis-charged a fee', by: 'admin', idemKey: `a-${seq}` });
+    after = await snap();
+    equal(after.owed - before.owed, 1000); equal(move(after, before, '2160'), 10); equal(move(before, after, '1000'), 0);
+    assert(after.tb.outOfBalance === 0, 'still balanced');
   });
 });
 
