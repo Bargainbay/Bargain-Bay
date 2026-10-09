@@ -13,6 +13,16 @@ export async function POST(req) {
   let b; try { b = await req.json(); } catch { b = {}; }
   try {
     if (b.action === 'save_employee') return NextResponse.json({ ok: true, employee: await saveEmployee(b, s.email) });
+    if (b.action === 'save_many') {
+      // One bad line must not lose the rest, and must say which line it was.
+      const list = Array.isArray(b.people) ? b.people.slice(0, 50) : [];
+      const saved = [], failed = [];
+      for (const p of list) {
+        try { saved.push(await saveEmployee(p, s.email)); }
+        catch (e) { failed.push({ email: p?.email || '', error: e?.message || 'Failed' }); }
+      }
+      return NextResponse.json({ ok: failed.length === 0, saved: saved.length, failed });
+    }
     if (b.action === 'end_employee') return NextResponse.json({ ok: true, done: await endEmployee(Number(b.id)) });
     if (b.action === 'fix_shift') return NextResponse.json({ ok: true, shift: await fixStaffShift(Number(b.id), b, s.email) });
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
