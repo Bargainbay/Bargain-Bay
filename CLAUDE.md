@@ -4064,6 +4064,33 @@ old "By salesperson" panel on `/admin/dashboard`.
     two periods, and a running-total line by day number. Each series is in a legend
     and the tooltip, so colour is never the only signal.
 
+## Daily P&L, the cost list, and everyone's clock (added 2026-10-08)
+`lib/daily-pnl.js`, `lib/daily-cost-math.js` (no imports), `lib/team-clock.js`,
+migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
+`/admin/daily-pnl`, `/admin/costs`, `/admin/team-clock` (ADMIN) and `/clock`
+(any employee). Linked from the Reports hub and the nav.
+
+- **Did we make or lose money today** = product profit (unit lines, price - cost,
+  less coupons and credit lines) + delivery income, less delivery costs, staff
+  wages and overhead. The delivery lines are `profitReport()`'s own buckets, so
+  this page agrees to the cent with the dispatch Profit tab.
+- **The `expenses` ledger (bank/QuickBooks) is DELIBERATELY NOT read.** It holds
+  the same rent and hydro the cost list does; using both counts every bill
+  twice. The cost list is the day-by-day view, the P&L report stays the accountant's.
+- **A bill is spread over the period it covers** (`dailyShare`): monthly / days in
+  that month, quarterly / days in that quarter, annual / 365 or 366, so a month's
+  days add back to exactly the bill. Amounts are PRE-TAX. Do not put wages, truck
+  day rates or fuel in the cost list - they are already counted from clock-ins and dispatch.
+- **Everyone who is not driving clocks in at `/clock`.** `employees` is a grant by
+  email (like `dispatch_access`): they sign up with that address, any order.
+  Drivers keep `driver_shifts`; adding a driver as an employee as well counts
+  their hours twice. `staff_shifts.rate` is SNAPSHOTTED at clock-in, so a raise
+  never rewrites last month. One open shift per person is a partial unique index.
+- **Unclosed, over-long (`MAX_SHIFT_HOURS`) and rate-less shifts are left out of
+  the money and NAMED in the page's warnings**, never estimated - same rule as
+  `profitReport`. An office "Fix times" on Team clock repairs a forgotten clock-out.
+- **Not built:** an xlsx/Sheet export of the daily table, service-line revenue
+  (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
 Built so far (Phase 1, slices 1–2): `db/migrations/0016` (vendors, strikes, commission) and `0017`
