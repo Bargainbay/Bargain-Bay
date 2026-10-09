@@ -3087,6 +3087,7 @@ screens need the labels and must not pull `./db` into the browser, same split as
     UNPRICED incoming pieces of a part in one go (`unpriced` on `describeParts`,
     admin-only like `valueAtCost`). It never touches a price already set, or a
     harvested piece — `finishPartOut` costs those from their unit.
+- **Parts storage spots (added 2026-10-09):** drawers `PD1`–`PD8` (area `parts-drawers`) and shelf sections `P1-1`–`P4-4` (area `parts-shelves`) are created by `ensurePartsStorage` in `lib/locations.js`, once, guarded by the area row so a retired spot is not revived. Plain spots, not racks (a rack shows "shelf N from the floor"). RS Ops lists them from `/api/ops/warehouse` and `/api/ops/parts?spots=1` - nothing to build there.
 - **Admin only, everywhere:** what a part COST (stripped server-side from every
   response, never hidden in the browser) and **answering a request** — the
   owner's instruction.
