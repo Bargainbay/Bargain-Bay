@@ -102,3 +102,48 @@ test('an RS Ops name matches one active RS Solutions employee, never two or the 
     equal(await tc.employeeByRsOpsName('Dinesh'), null);
   } finally { db.done(); }
 });
+
+suite('end-of-day sales (real SQL)');
+
+test('created vs paid, pre-tax sales, unit cost only, missing cost reported', async () => {
+  const db = await withTestDb();
+  try {
+    const q = (s, p) => db.client.query(s, p);
+    await q('ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS kind text');
+    await q('ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS cost numeric(10,2)');
+    await q('ALTER TABLE invoices ADD COLUMN IF NOT EXISTS channel text');
+    await q("INSERT INTO products (sku, make, model, title, price, cost, active) VALUES ('A1','LG','M1','Fridge',1000,600,true)");
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
+    const mk = async (num, status, sub, paidToday) => (await q(
+      `INSERT INTO invoices (number, email, name, status, subtotal, hst, total, created_at, paid_at)
+       VALUES ($1,'a@b.ca','Cust',$2,$3,$4,$5, now(), $6) RETURNING id`,
+      [num, status, sub, round(sub * 0.13), round(sub * 1.13), paidToday ? new Date().toISOString() : null])).rows[0].id;
+    const round = (v) => Math.round(v * 100) / 100;
+    // INV-1: $1000 unit (cost 600 from products) + $100 delivery, paid today
+    const a = await mk('INV-1', 'paid', 1100, true);
+    await q("INSERT INTO invoice_items (invoice_id, description, sku, amount, kind) VALUES ($1,'Fridge','A1',1000,'unit'),($1,'Delivery',NULL,100,'service')", [a]);
+    // INV-2: $500 typed unit with line cost 300, still open
+    const b = await mk('INV-2', 'open', 500, false);
+    await q("INSERT INTO invoice_items (invoice_id, description, amount, kind, cost) VALUES ($1,'Stove',500,'unit',300)", [b]);
+    // INV-3: void, must not count anywhere
+    const c = await mk('INV-3', 'void', 999, false);
+    await q("INSERT INTO invoice_items (invoice_id, description, amount, kind, cost) VALUES ($1,'x',999,'unit',1)", [c]);
+    // INV-4: unit with no cost anywhere
+    const d = await mk('INV-4', 'open', 200, false);
+    await q("INSERT INTO invoice_items (invoice_id, description, amount, kind) VALUES ($1,'Mystery',200,'unit')", [d]);
+    await q("INSERT INTO invoice_payments (invoice_id, amount, method) VALUES ($1,1243,'cash'),($2,100,'etransfer')", [a, b]);
+
+    const { daySales } = await import('../lib/day-sales.js');
+    const r = await daySales(today);
+    equal(r.created.count, 3);                    // void excluded
+    equal(r.created.sales, 1800);                 // 1100 + 500 + 200, pre-tax
+    equal(r.created.cost, 900);                   // 600 + 300 + 0 (no cost on file)
+    equal(r.created.net, 900);
+    equal(r.created.missingCost, 1);
+    equal(r.paid.count, 1);
+    equal(r.paid.sales, 1100);
+    equal(r.paid.cost, 600);                      // the delivery line has no cost of goods
+    equal(r.paid.net, 500);
+    equal(r.cashReceived, 1343);                  // deposits count as cash, separately
+  } finally { db.done(); }
+});
