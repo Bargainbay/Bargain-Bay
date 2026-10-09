@@ -11,7 +11,7 @@ import {
 import { vendorBalance, vendorStatement, deduct, adjust, releaseWarrantyReserves, reserveRemaining } from '../lib/vendor-ledger.js';
 import {
   openClaim, listClaims, listVendorClaims, vendorRespond, vendorResolve, staffResolve, staffNote, closeClaim, chargeClaim,
-  sweepWarrantyClaims, openClaimRefs, claimsForViewer, claimState
+  sweepWarrantyClaims, openClaimRefs, claimsForViewer, claimState, attachClaimPhoto, claimPhotoPath, MAX_CLAIM_PHOTOS
 } from '../lib/warranty-claims.js';
 import { CLAIM_RESPOND_HOURS, CLAIM_RESOLVE_DAYS } from '../lib/marketplace-rules.js';
 
@@ -249,6 +249,33 @@ test('deductions are idempotent per key; an adjustment needs a reason; the sign 
     await adjust(v.id, { amountCents: 700, memo: 'goodwill', by: 'admin', idemKey: 'adj1' });
     await adjust(v.id, { amountCents: 700, memo: 'goodwill', by: 'admin', idemKey: 'adj1' });
     equal(await total(v) - t0, 700);
+  } finally { done(); }
+});
+
+suite('warranty claims — photos');
+
+test('photos on a claim: staff add the fault, the seller adds the repair, each sees both, nobody sees another seller\'s', async () => {
+  const { done } = await withTestDb();
+  try {
+    const a = await vendor('Alpha'); const b = await vendor('Beta');
+    const oa = await deliveredOrder(a); const ob = await deliveredOrder(b);
+    const ca = await openClaim({ vendorOrderId: oa.voId, description: 'Compressor is making a loud noise', by: 'staff@x', now: plus(1) });
+    const cb = await openClaim({ vendorOrderId: ob.voId, description: 'Door will not seal properly', by: 'staff@x', now: plus(1) });
+    const s1 = await attachClaimPhoto(ca.id, { by: 'staff@x', blobPath: 'claims/1/a.jpg', caption: 'the fault' });
+    const v1 = await attachClaimPhoto(ca.id, { vendorId: a.id, by: 'alpha-user@example.com', blobPath: 'claims/1/b.jpg' });
+    const mine = (await listVendorClaims(a.id))[0];
+    equal(mine.photos.map((p) => p.side).join(), 'staff,vendor');
+    equal((await listClaims()).find((c) => c.id === ca.id).photos.length, 2);
+    assert(!/claims\/1/.test(JSON.stringify(mine)), 'the storage path is never sent to a browser');
+    equal(await claimPhotoPath(s1.id, { vendorId: a.id }), 'claims/1/a.jpg');
+    equal(await claimPhotoPath(s1.id, { vendorId: b.id }), null);                  // another seller's photo is just not there
+    equal(await claimPhotoPath(v1.id), 'claims/1/b.jpg');                          // staff see any
+    await rejects(() => attachClaimPhoto(ca.id, { vendorId: b.id, by: 'beta', blobPath: 'x.jpg' }), /not found/);
+    equal((await listVendorClaims(b.id))[0].photos.length, 0); void cb;
+    for (let i = 2; i < MAX_CLAIM_PHOTOS; i++) await attachClaimPhoto(ca.id, { by: 's', blobPath: `claims/1/${i}.jpg` });
+    await rejects(() => attachClaimPhoto(ca.id, { by: 's', blobPath: 'one-too-many.jpg' }), /at most/);
+    await closeClaim(ca.id, { reason: 'withdrawn', by: 's' });
+    await rejects(() => attachClaimPhoto(ca.id, { vendorId: a.id, by: 'alpha', blobPath: 'late.jpg' }), /closed|at most/);
   } finally { done(); }
 });
 
