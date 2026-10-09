@@ -46,6 +46,7 @@ export default async function Home() {
   // One card per model — four of the same fridge are one listing, not four tiles.
   const newest = newestModels(units, 12);
   const clearance = units.filter((u) => u.onClearance);
+  const refurb = units.filter((u) => u.condition === 'Refurbished');
   const tileImages = Object.fromEntries(COLLECTIONS.map((c) => [c.slug, tileImage(c.slug, units)]));
   const topClearanceOff = clearance.reduce(
     (m, u) => Math.max(m, u.compareAt > u.price ? Math.round((1 - u.price / u.compareAt) * 100) : 0), 0
@@ -108,6 +109,17 @@ export default async function Home() {
             <span className="clearance-banner-sub">Heavy markdowns on tested units · full one-year warranty</span>
           </div>
           <span className="clearance-banner-cta">Shop clearance →</span>
+        </a>
+      )}
+
+      {refurb.length > 0 && (
+        <a href="/refurbished" className="clearance-banner refurb-banner" aria-label="Shop refurbished">
+          <div className="clearance-banner-txt">
+            <span className="clearance-kicker">Refurbished</span>
+            <strong>{refurb.length} refurbished unit{refurb.length === 1 ? '' : 's'}, inspected and repaired</strong>
+            <span className="clearance-banner-sub">Bench-tested back to full working order · full one-year warranty</span>
+          </div>
+          <span className="clearance-banner-cta">Shop refurbished →</span>
         </a>
       )}
 

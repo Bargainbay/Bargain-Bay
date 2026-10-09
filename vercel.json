@@ -41,6 +41,10 @@
       "schedule": "*/30 * * * *"
     },
     {
+"path": "/api/cron/abandoned-carts",
+      "schedule": "40 * * * *"
+    },
+    {
       "path": "/api/cron/backup-offsite",
       "schedule": "10 * * * *"
     },

@@ -56,13 +56,9 @@ test('records success, failure and ignores a 401', async () => {
   const m = await migrate({ client }); assert(m.ok, m.error);
   __useTestDatabase(client);
   try {
-    const mk = (status, body) => withHeartbeat('t', async () => new Response(JSON.stringify(body || {}), { status }));
-    await mk(200)(); await mk(500, { error: 'boom' })(); await mk(401)();
-    const { rows } = await client.query('SELECT * FROM cron_heartbeats WHERE name = $1', ['t']);
-    equal(rows.length, 1); equal(Number(rows[0].runs), 2); equal(rows[0].last_status, 500); equal(rows[0].last_error, 'boom'); assert(rows[0].last_ok_at);
-  } finally {
-    // Release it. Left installed, this database leaks into every later test file — test/partial.test.mjs
-    // relies on there being NO database and failed three tests because of it.
-    __useTestDatabase(null);
-  }
+  const mk = (status, body) => withHeartbeat('t', async () => new Response(JSON.stringify(body || {}), { status }));
+  await mk(200)(); await mk(500, { error: 'boom' })(); await mk(401)();
+  const { rows } = await client.query('SELECT * FROM cron_heartbeats WHERE name = $1', ['t']);
+  equal(rows.length, 1); equal(Number(rows[0].runs), 2); equal(rows[0].last_status, 500); equal(rows[0].last_error, 'boom'); assert(rows[0].last_ok_at);
+  } finally { __useTestDatabase(null); }   // a leaked test DB makes later suites think a database exists
 });
