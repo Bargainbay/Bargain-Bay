@@ -970,6 +970,7 @@ function LabelsTab() {
         ))}
         <div className="wh-row" style={{ marginTop: 10 }}>
           <select value={spotFormat} onChange={(e) => setSpotFormat(e.target.value)} style={{ width: 'auto' }}>
+            <option value="contents">Drawer contents — 4 × 2 in</option>
             <option value="bin">Bin label — 2.25 × 1.25 in roll</option>
             <option value="bin-lg">Bin label — 4 × 2 in</option>
             <option value="beam">Rack beam — 3 per letter sheet</option>
@@ -984,6 +985,10 @@ function LabelsTab() {
           <a className="btn" target="_blank" rel="noopener noreferrer"
             href={labelsHref({ type: 'spots', area: 'parts-drawers,parts-shelves', format: 'bin' })}>
             Parts bin labels (all 24)
+          </a>
+          <a className="btn" target="_blank" rel="noopener noreferrer"
+            href={labelsHref({ type: 'spots', codes: 'PD1,PD2,PD3,PD4,PD5,PD6,PD7,PD8', format: 'contents' })}>
+            Drawer contents labels (PD1–PD8)
           </a>
         </div>
       </div>

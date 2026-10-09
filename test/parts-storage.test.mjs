@@ -22,6 +22,18 @@ test('8 drawers and 16 shelf sections exist, in their own areas', async () => {
     // Retired once, it stays retired: the seed is guarded by the area row.
     await updateSpot('PD8', { active: false }, { admin: true });
     equal((await listLocations()).find((x) => x.code === 'PD8').active, false);
+    const { bookInPart, usePart } = await import('../lib/parts.js');
+    const { partsInSpots } = await import('../lib/parts.js');
+    const a = await bookInPart({ part: { partNumber: 'W10295370A', name: 'Igniter' }, qty: 2, condition: 'new', location: 'PD1' });
+    const b = await bookInPart({ part: { name: 'Door gasket' }, qty: 1, condition: 'new', location: 'PD1' });
+    await bookInPart({ part: { partNumber: 'X1', name: 'Knob' }, qty: 1, condition: 'new', location: 'PD2' });
+    await usePart({ partId: b.part?.id ?? b.partId ?? b.id, qty: 1, location: 'PD1' });
+    const m = await partsInSpots(['pd1', 'PD2', 'PD3']);
+    equal(m.get('PD1').length, 1, 'the emptied gasket is gone');
+    equal(m.get('PD1')[0].partNumber, 'W10295370A');
+    equal(m.get('PD2').length, 1);
+    equal(m.get('PD3').length, 0, 'empty drawer');
+    void a;
   } finally { done(); }
 });
 

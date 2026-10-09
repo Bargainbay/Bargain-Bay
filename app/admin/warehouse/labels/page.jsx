@@ -4,7 +4,7 @@ import { getSession, isStaff } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { SITE_URL } from '../../../../lib/site';
 import { canonicalSkus, describeUnits, listAreas, listLocations } from '../../../../lib/locations';
-import { describeParts } from '../../../../lib/parts';
+import { describeParts, partsInSpots } from '../../../../lib/parts';
 import { normCode, partScanUrl, spotScanUrl, unitScanUrl } from '../../../../lib/location-codes';
 import PrintButton from '../../../../components/PrintButton';
 
@@ -96,6 +96,7 @@ const binSize = (code, format) => {
 };
 
 const SPOT_FORMATS = {
+  contents: { label: 'Drawer contents — 4 × 2 in', page: '4in 2in', margin: '0' },
   bin: { label: 'Bin label — 2.25 × 1.25 in roll', page: '2.25in 1.25in', margin: '0' },
   'bin-lg': { label: 'Bin label — 4 × 2 in', page: '4in 2in', margin: '0' },
   beam: { label: 'Rack beam — 3 per letter sheet', page: 'letter', margin: '0.25in' },
@@ -154,6 +155,15 @@ const CSS = `
   .sbin-lg .lbl-spot { width: 4in; height: 2in; padding: .12in .15in; gap: .15in; }
   .sbin-lg .lbl-spot .q { width: 1.7in; height: 1.7in; }
   .sbin-lg .lbl-spot .sub { font-size: 10pt; }
+  .scontents .lbl-spot { width: 4in; height: 2in; padding: .1in .14in; flex-direction: row; justify-content: flex-start; align-items: flex-start; gap: .12in; text-align: left; }
+  .scontents .lbl-spot .q { flex: none; width: .9in; height: .9in; }
+  .scontents .lbl-spot .t { min-width: 0; flex: 1; }
+  .scontents .lbl-spot .code { font-size: 30pt; }
+  .scontents .lbl-spot .asof { font-size: 6pt; color: #444; margin-top: 3pt; }
+  .scontents .lbl-spot ul { list-style: none; margin: 0; padding: 0; font-size: 8.5pt; line-height: 1.2; }
+  .scontents .lbl-spot li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scontents .lbl-spot li b { font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .scontents .lbl-spot .none { font-size: 9pt; font-style: italic; }
   .s4x6 .lbl-spot { width: 4in; height: 6in; padding: .3in; }
   .s4x6 .lbl-spot .q { width: 2.7in; height: 2.7in; }
   .sletter .lbl-spot { width: 7.5in; height: 9.9in; padding: .4in; }
@@ -307,6 +317,9 @@ export default async function LabelsPage({ searchParams }) {
     : spots.length && spots.every((s) => s.area?.startsWith('parts-')) ? 'bin'
     : spots.length && spots.every((s) => s.kind === 'rack') ? 'beam' : '4x6';
   const allAreas = await listAreas();
+  const contents = format === 'contents' ? await partsInSpots(spots.map((s) => s.code)).catch(() => new Map()) : null;
+  const printedOn = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
+  const MAX_LINES = 7;
   const areaLabel = (k) => allAreas.find((a) => a.key === k)?.label || '';
   return (
     <div style={{ padding: 16 }}>
@@ -325,7 +338,29 @@ export default async function LabelsPage({ searchParams }) {
       <div className={`lbl-sheet s${format}`}>
         {spots.map((s) => (
           <div key={s.code} className="lbl-spot">
-            {format === 'bin' || format === 'bin-lg' ? (
+            {format === 'contents' ? (() => {
+              const items = contents?.get(s.code) || [];
+              return (
+                <>
+                  <div className="t" style={{ flex: 'none', width: '1.0in' }}>
+                    <div className="code">{s.code}</div>
+                    {/* eslint-disable-next-line react/no-danger */}
+                    <div className="q" style={{ marginTop: 4 }} dangerouslySetInnerHTML={{ __html: qrSvg(spotScanUrl(SITE_URL, s.code)) }} />
+                    <div className="asof">Printed {printedOn}</div>
+                  </div>
+                  <div className="t">
+                    {items.length ? (
+                      <ul>
+                        {items.slice(0, MAX_LINES).map((it) => (
+                          <li key={it.id}>{it.partNumber ? <><b>{it.partNumber}</b> {it.name}</> : it.name}</li>
+                        ))}
+                        {items.length > MAX_LINES && <li><b>+ {items.length - MAX_LINES} more</b> — scan for the list</li>}
+                      </ul>
+                    ) : <div className="none">Empty when printed</div>}
+                  </div>
+                </>
+              );
+            })() : format === 'bin' || format === 'bin-lg' ? (
               <>
                 {/* eslint-disable-next-line react/no-danger */}
                 <div className="q" dangerouslySetInnerHTML={{ __html: qrSvg(spotScanUrl(SITE_URL, s.code)) }} />
