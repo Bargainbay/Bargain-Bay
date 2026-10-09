@@ -87,3 +87,18 @@ test('daily P&L: overhead and wages reduce net; empty day is overhead only', asy
     assert(Math.abs(row.net + 200) < 0.5, `net ${row.net}`);
   } finally { db.done(); }
 });
+
+suite('team clock: RS Ops name match');
+
+test('an RS Ops name matches one active RS Solutions employee, never two or the wrong company', async () => {
+  const db = await withTestDb();
+  try {
+    const tc = await import('../lib/team-clock.js');
+    const a = await tc.saveEmployee({ email: 'dinesh@x.ca', name: 'Dinesh', company: 'rs_solutions' }, 'o');
+    await tc.saveEmployee({ email: 'bish@x.ca', name: 'Bishakha', company: 'bargain_bay' }, 'o');
+    equal((await tc.employeeByRsOpsName(' dinesh ')).id, a.id);
+    equal(await tc.employeeByRsOpsName('Bishakha'), null);
+    await tc.saveEmployee({ email: 'dinesh2@x.ca', name: 'Dinesh', company: 'rs_solutions' }, 'o');
+    equal(await tc.employeeByRsOpsName('Dinesh'), null);
+  } finally { db.done(); }
+});
