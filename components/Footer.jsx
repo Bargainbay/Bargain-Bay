@@ -26,6 +26,7 @@ export default function Footer() {
             <a href="/track">Track your order</a>
             <a href="/marketplace">Marketplace</a>
             <a href="/marketplace/sell">Sell on Bargain Bay</a>
+            <a href="/marketplace/policies">Marketplace policies</a>
           </div>
           <div>
             <h4>Policies</h4>

@@ -11,6 +11,8 @@ import { processListingImage, sniffImage } from '../lib/image-checks.js';
 import {
   createApplication, decideApplication, issueStrike
 } from '../lib/vendors.js';
+import { acceptPolicies } from '../lib/policy-acceptance.js';
+import { requiredPolicies } from '../lib/marketplace-policies.js';
 import {
   createDraft, updateListing, attachPhoto, removePhoto, checkListing, submitListing, pauseListing,
   resumeListing, reopenForEdit, withdrawListing, listVendorListings, getVendorListing, reviewQueue,
@@ -167,6 +169,7 @@ suite('listings — lifecycle and isolation against a real database');
 async function vendor(name, { tier = 0 } = {}) {
   const v = await createApplication({ legalName: name, contactEmail: `${name.toLowerCase().replace(/\W/g, '')}@example.com` });
   await decideApplication(v.id, { approve: true, by: 'staff', hstStatus: 'registered' });
+  await acceptPolicies(v.id, { role: 'owner', by: 'owner@example.com', accepting: requiredPolicies().map((p) => ({ policy: p.slug, version: p.version })) });
   if (tier) await (await import('../lib/db.js')).query('UPDATE vendors SET tier = $2 WHERE id = $1', [v.id, tier]);
   return v;
 }
