@@ -609,6 +609,16 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .clearance-hero h1 { margin: 6px 0 8px; color: #fff; }
 .clearance-hero p { font-size: 14.5px; max-width: 640px; opacity: .95; }
 
+/* Refurbished — same shapes as clearance, in green so the two read as different things. */
+.nav-refurb, .cats-refurb { color: #1f6b43 !important; font-weight: 700; }
+.refurb-banner { background: linear-gradient(100deg, #1f6b43 0%, #154d30 100%); box-shadow: 0 8px 26px rgba(31,107,67,.26); }
+.refurb-hero {
+  margin: 8px 0 4px; padding: 26px 24px; border-radius: 14px;
+  background: linear-gradient(100deg, #1f6b43 0%, #154d30 100%); color: #fff;
+}
+.refurb-hero h1 { margin: 6px 0 8px; color: #fff; }
+.refurb-hero p { font-size: 14.5px; max-width: 640px; opacity: .95; }
+
 /* ============================================================
    Chat FAB (Bay) — Android positioning hardening (C)
    Guarantee a valid fixed position on every browser; layer the
