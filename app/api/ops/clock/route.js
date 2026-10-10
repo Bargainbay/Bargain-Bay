@@ -8,6 +8,7 @@
 // clock unless an admin added them to Team clock as an RS Solutions employee.
 import { NextResponse } from 'next/server';
 import { hasDb } from '../../../../lib/db';
+import { openQuestion, answerQuestion } from '../../../../lib/work-presence';
 import { employeeByRsOpsName, openStaffShift, recentStaffShifts, clockIn, clockOut } from '../../../../lib/team-clock';
 
 export const dynamic = 'force-dynamic';
@@ -22,11 +23,15 @@ function keyProblem(req) {
   return null;
 }
 
-const view = async (emp) => ({
+const view = async (emp) => {
+  const open = await openStaffShift(emp.id);
+  return {
   employee: true,
-  open: await openStaffShift(emp.id),
+  open,
+  question: open ? await openQuestion('staff', open.id) : null,
   recent: (await recentStaffShifts(emp.id, 5)).filter((s) => s.endedAt)
-});
+  };
+};
 
 export async function GET(req) {
   const problem = keyProblem(req);
@@ -49,11 +54,19 @@ export async function POST(req) {
   try {
     const emp = await employeeByRsOpsName(b.name);
     if (!emp) return NextResponse.json({ error: 'The office has not added you to the clock yet.' }, { status: 403 });
-    if (b.action === 'in') await clockIn(emp, { ref: b.ref });
+    if (b.action === 'answer') {
+      const open = await openStaffShift(emp.id);
+      if (open) {
+        await answerQuestion('staff', open.id, b.answer);
+        if (b.answer === 'no') await clockOut(emp, { note: 'Ended after the evening check' });
+      }
+    } else if (b.action === 'in') await clockIn(emp, { ref: b.ref });
     else if (b.action === 'out') await clockOut(emp, { note: b.note });
     else return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
     return NextResponse.json(await view(emp));
   } catch (e) {
+    // The refusals (still on the driver app) are sentences meant for the person.
+    if (/clocked in/i.test(e?.message || '')) return NextResponse.json({ error: e.message }, { status: 409 });
     console.error('ops clock failed', e);
     return NextResponse.json({ error: 'Could not save that.' }, { status: 500 });
   }

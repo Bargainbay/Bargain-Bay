@@ -4,6 +4,7 @@ import { hasDb } from '../../../../lib/db';
 import { isDriver } from '../../../../lib/drivers';
 import { startShift, endShift, openShift, listVehicles } from '../../../../lib/shifts';
 import { listDrivers } from '../../../../lib/drivers';
+import { openQuestion, answerQuestion } from '../../../../lib/work-presence';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -24,8 +25,10 @@ export async function GET() {
     const mates = (await listDrivers())
       .filter((d) => d.id !== s.userId)
       .map((d) => ({ id: d.id, name: d.name || d.email }));
+    const shift = await openShift(s.userId);
     return NextResponse.json({
-      shift: await openShift(s.userId), vehicles: await listVehicles(), mates
+      shift, vehicles: await listVehicles(), mates,
+      question: shift ? await openQuestion('driver', shift.id) : null
     });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not load that.' }, { status: 400 });
@@ -43,6 +46,13 @@ export async function PATCH(req) {
   try {
     if (body.action === 'start') {
       return NextResponse.json({ ok: true, shift: await startShift(s.userId, body) });
+    }
+    if (body.action === 'answer') {
+      // 'no' only records the answer: ending a shift needs the odometer, and
+      // the app moves them straight onto the End shift form.
+      const open = await openShift(s.userId);
+      if (open) await answerQuestion('driver', open.id, body.answer);
+      return NextResponse.json({ ok: true });
     }
     if (body.action === 'end') {
       return NextResponse.json({ ok: true, shift: await endShift(s.userId, body) });

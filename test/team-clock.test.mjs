@@ -147,3 +147,77 @@ test('created vs paid, pre-tax sales, unit cost only, missing cost reported', as
     equal(r.cashReceived, 1343);                  // deposits count as cash, separately
   } finally { db.done(); }
 });
+suite('one clock at a time + the evening question');
+
+test('cannot start a staff shift while a driver shift is open, nor the reverse', async () => {
+  const db = await withTestDb();
+  try {
+    const tc = await import('../lib/team-clock.js');
+    const sh = await import('../lib/shifts.js');
+    await sh.ensureShiftSchema();
+    const u = (await db.client.query(`INSERT INTO users (email, name, password_hash, is_driver) VALUES ('driver-4165550100@drivers.bargainbay.ca','Nick Junior','x',true) RETURNING id`)).rows[0];
+    const emp = await tc.saveEmployee({ email: 'nick@x.ca', name: 'Nick Junior', company: 'rs_solutions' }, 'o');
+    // on the driver app first
+    await sh.startShift(u.id, { driving: false });
+    let msg = '';
+    try { await tc.clockIn(emp); } catch (e) { msg = e.message; }
+    assert(/driver app/i.test(msg), `clock-in should be refused, got: ${msg}`);
+    await sh.endShift(u.id, {});
+    await tc.clockIn(emp);                       // fine once the other is closed
+    msg = '';
+    try { await sh.startShift(u.id, { driving: false }); } catch (e) { msg = e.message; }
+    assert(/staff clock/i.test(msg), `driver start should be refused, got: ${msg}`);
+  } finally { db.done(); }
+});
+
+test('decide(): first question at 8pm, hourly after a yes, owner ping after 2h of silence, once', async () => {
+  const { decide } = await import('../lib/work-presence.js');
+  const H = 3600000, eve = Date.parse('2026-10-09T20:00:00-04:00');
+  const base = { eveningStart: eve, inWindow: true, pending: null, lastAnsweredAt: null };
+  equal(decide({ ...base, now: eve - 1, startedAt: eve - 5 * H }), null);
+  equal(decide({ ...base, now: eve, startedAt: eve - 5 * H }), 'ask');
+  equal(decide({ ...base, now: eve + 10 * 60000, startedAt: eve + 5 * 60000 }), null);          // just clocked in
+  equal(decide({ ...base, now: eve + H + 5 * 60000, startedAt: eve + 5 * 60000 }), 'ask');       // an hour after
+  equal(decide({ ...base, now: eve + 30 * 60000, startedAt: eve - 5 * H, lastAnsweredAt: eve }), null);
+  equal(decide({ ...base, now: eve + H, startedAt: eve - 5 * H, lastAnsweredAt: eve }), 'ask');
+  const asked = eve;
+  equal(decide({ ...base, now: asked + 119 * 60000, startedAt: eve - 5 * H, pending: { askedAt: asked } }), null);
+  equal(decide({ ...base, now: asked + 120 * 60000, startedAt: eve - 5 * H, pending: { askedAt: asked } }), 'alert');
+  equal(decide({ ...base, now: asked + 300 * 60000, startedAt: eve - 5 * H, pending: { askedAt: asked, alertedAt: new Date() } }), null);
+  equal(decide({ ...base, inWindow: false, now: eve + 9 * H, startedAt: eve - 5 * H }), null);   // daytime: no new question
+  equal(decide({ ...base, inWindow: false, now: asked + 3 * H, startedAt: eve - 5 * H, pending: { askedAt: asked } }), 'alert'); // but silence is still judged
+});
+
+test('runPresenceCheck: asks once, answer yes defers an hour, silence alerts the owner once it can be delivered', async () => {
+  const db = await withTestDb();
+  const realFetch = globalThis.fetch;
+  try {
+    const tc = await import('../lib/team-clock.js');
+    const wp = await import('../lib/work-presence.js');
+    const emp = await tc.saveEmployee({ email: 'dinesh@x.ca', name: 'Dinesh', company: 'rs_solutions' }, 'o');
+    const { shift } = await tc.clockIn(emp);
+    let r = await wp.runPresenceCheck({ force: true });
+    equal(r.asked.length, 1);
+    r = await wp.runPresenceCheck({ force: true });
+    equal(r.asked.length, 0);                                    // still pending: not asked twice
+    assert(await wp.openQuestion('staff', shift.id), 'question is open');
+    await wp.answerQuestion('staff', shift.id, 'yes');
+    r = await wp.runPresenceCheck({ force: true });
+    equal(r.asked.length, 0);                                    // an hour has not passed
+    await db.client.query(`UPDATE shift_checkins SET answered_at = now() - interval '61 minutes'`);
+    r = await wp.runPresenceCheck({ force: true });
+    equal(r.asked.length, 1);                                    // hourly after a yes
+    await db.client.query(`UPDATE shift_checkins SET asked_at = now() - interval '130 minutes' WHERE answered_at IS NULL`);
+    delete process.env.RSOPS_INTAKE_KEY;
+    r = await wp.runPresenceCheck({ force: true });
+    equal(r.failed.length, 1);                                   // cannot deliver: not marked done, will retry
+    process.env.RSOPS_INTAKE_KEY = 'k';
+    let sent = null;
+    globalThis.fetch = async (url, init) => { sent = JSON.parse(init.body).text; return { ok: true, json: async () => ({ ok: true }) }; };
+    r = await wp.runPresenceCheck({ force: true });
+    equal(r.alerted.length, 1);
+    assert(/Dinesh/.test(sent) && /Call them/.test(sent), `alert text: ${sent}`);
+    r = await wp.runPresenceCheck({ force: true });
+    equal(r.alerted.length, 0);                                  // once
+  } finally { globalThis.fetch = realFetch; db.done(); }
+});

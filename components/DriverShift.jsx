@@ -21,6 +21,7 @@ export default function DriverShift({ onChanged }) {
   const [shift, setShift] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [mates, setMates] = useState([]);
+  const [question, setQuestion] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [form, setForm] = useState(null);      // 'start' | 'end' | 'fuel'
   const [err, setErr] = useState('');
@@ -34,11 +35,26 @@ export default function DriverShift({ onChanged }) {
         setShift(d.shift || null);
         setVehicles(d.vehicles || []);
         setMates(d.mates || []);
+        setQuestion(d.question || null);
       }
     } catch { /* offline: whatever is on screen stays */ }
     finally { setLoaded(true); }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // The evening "still working?" turns up on its own, without a refresh.
+    const t = setInterval(load, 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  async function answer(a) {
+    setQuestion(null);
+    try {
+      await fetch('/api/driver/shift', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'answer', answer: a }) });
+    } catch { /* the next load shows it again if it did not land */ }
+    // Saying no is the start of ending the shift, which needs the odometer.
+    if (a === 'no') setForm('end');
+  }
   // The running clock only moves in minutes.
   useEffect(() => {
     if (!shift) return undefined;
@@ -146,6 +162,15 @@ export default function DriverShift({ onChanged }) {
           )
       ) : (
         <>
+          {question && (
+            <div style={{ margin: '0 0 10px', padding: 12, border: '2px solid var(--warn)', borderRadius: 10 }}>
+              <b style={{ fontSize: 17 }}>Are you still working?</b>
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <button type="button" className="drv-btn go" style={{ flex: 1 }} onClick={() => answer('yes')}>Yes, still working</button>
+                <button type="button" className="drv-btn done" style={{ flex: 1 }} onClick={() => answer('no')}>No — end my shift</button>
+              </div>
+            </div>
+          )}
           <div className="drv-shift-on">
             <span>
               <b>On shift {asDuration(running)}</b>
