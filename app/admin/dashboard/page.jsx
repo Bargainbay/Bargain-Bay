@@ -8,6 +8,7 @@ import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
 import MyDay from '../../../components/MyDay';
 import AbandonedCarts from '../../../components/AbandonedCarts';
+import ApprovalRequests from '../../../components/ApprovalRequests';
 import GoalEditor from '../../../components/GoalEditor';
 import RepScorecard from '../../../components/RepScorecard';
 import MyQuota from '../../../components/MyQuota';
@@ -86,6 +87,7 @@ export default async function SalesDashboardPage({ searchParams }) {
 
       {/* Before the numbers. A dashboard tells you how the month went; this is
           the only thing on the page that is owed to somebody TODAY. */}
+      <ApprovalRequests />
       <MyDay />
       <AbandonedCarts />
 
