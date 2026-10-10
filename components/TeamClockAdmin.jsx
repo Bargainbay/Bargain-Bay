@@ -29,7 +29,7 @@ const hm = (m) => (m == null ? 'open' : `${Math.floor(m / 60)}h ${String(m % 60)
 // Admin: who may clock in (and at what rate), and the hours they've logged.
 export default function TeamClockAdmin({ employees, shifts, from, to }) {
   const router = useRouter();
-  const [emp, setEmp] = useState({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '' });
+  const [emp, setEmp] = useState({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '', phone: '' });
   const [fix, setFix] = useState(null);
   const [list, setList] = useState('');
   const [msg, setMsg] = useState('');
@@ -62,15 +62,15 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
       </p>
 
       <div className="table-wrap"><table className="admin">
-        <thead><tr><th>Name</th><th>Email</th><th>Company</th><th>Role</th><th style={{ textAlign: 'right' }}>$/hour</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>Email</th><th>Company</th><th>Role</th><th>WhatsApp</th><th style={{ textAlign: 'right' }}>$/hour</th><th></th></tr></thead>
         <tbody>
-          {employees.length === 0 && <tr><td colSpan={6} className="hint">No employees yet.</td></tr>}
+          {employees.length === 0 && <tr><td colSpan={7} className="hint">No employees yet.</td></tr>}
           {employees.map((e) => (
             <tr key={e.id}>
-              <td>{e.name || '—'}</td><td>{e.email}</td><td>{coName(e.company)}</td><td>{e.roleLabel || '—'}</td>
+              <td>{e.name || '—'}</td><td>{e.email}</td><td>{coName(e.company)}</td><td>{e.roleLabel || '—'}</td><td>{e.phone || <span className="hint">from their account</span>}</td>
               <td style={{ textAlign: 'right' }}>{e.hourlyRate == null ? <b style={{ color: 'var(--danger)' }}>not set</b> : e.hourlyRate.toFixed(2)}</td>
               <td style={{ whiteSpace: 'nowrap' }}>
-                <button type="button" className="dash-filter" onClick={() => setEmp({ email: e.email, name: e.name || '', roleLabel: e.roleLabel || '', hourlyRate: e.hourlyRate ?? '', company: e.company || '' })}>Edit</button>{' '}
+                <button type="button" className="dash-filter" onClick={() => setEmp({ email: e.email, name: e.name || '', roleLabel: e.roleLabel || '', hourlyRate: e.hourlyRate ?? '', company: e.company || '', phone: e.phone || '' })}>Edit</button>{' '}
                 <button type="button" className="dash-filter" disabled={busy} onClick={() => { if (confirm(`Remove ${e.name || e.email}? Their past hours stay.`)) send({ action: 'end_employee', id: e.id }); }}>Remove</button>
               </td>
             </tr>
@@ -85,8 +85,9 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
           <option value="">Company…</option><option value="bargain_bay">Bargain Bay</option><option value="rs_solutions">RS Solutions</option>
         </select>
         <input style={{ ...input, width: 140 }} placeholder="Role (warehouse…)" value={emp.roleLabel} onChange={(e) => setEmp({ ...emp, roleLabel: e.target.value })} />
+        <input style={{ ...input, width: 140 }} inputMode="tel" placeholder="WhatsApp (optional)" value={emp.phone} onChange={(e) => setEmp({ ...emp, phone: e.target.value })} />
         <input style={{ ...input, width: 100 }} type="number" min="0" step="0.25" inputMode="decimal" placeholder="$/hour" value={emp.hourlyRate} onChange={(e) => setEmp({ ...emp, hourlyRate: e.target.value })} />
-        <button type="button" className="dash-filter active" disabled={busy} onClick={() => send({ action: 'save_employee', ...emp }, () => setEmp({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '' }))}>Save employee</button>
+        <button type="button" className="dash-filter active" disabled={busy} onClick={() => send({ action: 'save_employee', ...emp }, () => setEmp({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '', phone: '' }))}>Save employee</button>
       </div>
       <details style={{ margin: '10px 0' }}>
         <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Add several people at once</summary>

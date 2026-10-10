@@ -221,3 +221,23 @@ test('runPresenceCheck: asks once, answer yes defers an hour, silence alerts the
     equal(r.alerted.length, 0);                                  // once
   } finally { globalThis.fetch = realFetch; db.done(); }
 });
+
+test('a question reaches the person on WhatsApp via RS Ops, using the number on their account when none is typed', async () => {
+  const db = await withTestDb();
+  const realFetch = globalThis.fetch;
+  try {
+    const tc = await import('../lib/team-clock.js');
+    const wp = await import('../lib/work-presence.js');
+    await db.client.query(`INSERT INTO users (email, name, phone, password_hash) VALUES ('bish@x.ca','Bishakha','(647) 555-0188','x')`);
+    const emp = await tc.saveEmployee({ email: 'bish@x.ca', name: 'Bishakha', company: 'bargain_bay' }, 'o');
+    await tc.clockIn(emp);
+    process.env.RSOPS_INTAKE_KEY = 'k';
+    const calls = [];
+    globalThis.fetch = async (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return { ok: true, json: async () => ({ ok: true }) }; };
+    const r = await wp.runPresenceCheck({ force: true });
+    equal(r.asked.length, 1);
+    equal(calls.length, 1);
+    equal(calls[0].body.to, '+16475550188');
+    assert(/bargainbay\.ca\/clock/.test(calls[0].body.text), calls[0].body.text);
+  } finally { globalThis.fetch = realFetch; db.done(); }
+});
