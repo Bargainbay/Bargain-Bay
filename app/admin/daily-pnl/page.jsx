@@ -3,6 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { dailyPnl } from '../../../lib/daily-pnl';
 import { daySales } from '../../../lib/day-sales';
+import { zeroCostLines } from '../../../lib/cost-audit';
 import { money, torontoToday } from '../../../lib/constants';
 import AdminNav from '../../../components/AdminNav';
 
@@ -26,7 +27,7 @@ export default async function DailyPnlPage({ searchParams }) {
   const today = torontoToday();
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp?.to || '') ? sp.to : today;
   const from = /^\d{4}-\d{2}-\d{2}$/.test(sp?.from || '') ? sp.from : shift(to, -13);
-  const [r, ds] = await Promise.all([dailyPnl({ from, to }), daySales(to)]);
+  const [r, ds, zc] = await Promise.all([dailyPnl({ from, to }), daySales(to), zeroCostLines().catch(() => null)]);
   const latest = r.rows[r.rows.length - 1];
 
   return (
@@ -97,6 +98,13 @@ export default async function DailyPnlPage({ searchParams }) {
               Earned {money(latest.income)} ({money(latest.productProfit)} product profit + {money(latest.deliveryIncome)} deliveries)
               · Costs {money(latest.cost)} ({money(latest.deliveryCost)} delivery + {money(latest.staffWages)} staff + {money(latest.overhead)} overhead)
             </div>
+          </div>
+        )}
+
+        {zc?.summary?.lines > 0 && (
+          <div style={{ background: 'var(--warnbg)', color: 'var(--warn)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 14 }}>
+            <b>{zc.summary.lines} sold units are costed at $0</b>, hiding {money(zc.summary.costLeftOut)} of real cost from profit figures.{' '}
+            <a href="/admin/cost-fix">Preview and fix →</a>
           </div>
         )}
 
