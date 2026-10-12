@@ -302,3 +302,43 @@ test('add a shift by hand: rate snapshotted, overnight rolls to next day, overla
     equal(rep.length, 2);
   } finally { db.done(); }
 });
+
+suite('$0-cost correction');
+
+test('apply resets only previewed, still-matching lines to NULL; true zeros and void untouched; idempotent', async () => {
+  const db = await withTestDb();
+  try {
+    const q = (s, p) => db.client.query(s, p);
+    await q('ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS kind text');
+    await q('ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS cost numeric(10,2)');
+    await q('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cost numeric(10,2)');
+    await q("INSERT INTO products (sku, make, model, title, price, cost, active) VALUES ('A1','LG','M','Fridge',1000,600,true),('H1','LG','M','Hauled',100,0,true)");
+    const inv = async (num, status) => (await q("INSERT INTO invoices (number, email, status, subtotal, total) VALUES ($1,'a@b.ca',$2,100,113) RETURNING id", [num, status])).rows[0].id;
+    const a = await inv('INV-1', 'paid'), v = await inv('INV-2', 'void'), h = await inv('INV-3', 'paid'), t = await inv('INV-4', 'paid');
+    const il = async (id, sku, cost) => (await q("INSERT INTO invoice_items (invoice_id, description, sku, amount, kind, cost) VALUES ($1,'x',$2,100,'unit',$3) RETURNING id", [id, sku, cost])).rows[0].id;
+    const fix = await il(a, 'A1', 0), voided = await il(v, 'A1', 0), haul = await il(h, 'H1', 0), typed = await il(t, 'A1', 550);
+    const o1 = (await q("INSERT INTO orders (order_number, email, status, total) VALUES ('BB-1','a@b.ca','confirmed',113) RETURNING id")).rows[0].id;
+    const oi = (await q("INSERT INTO order_items (order_id, sku, title, price, cost, kind) VALUES ($1,'A1','x',100,0,'unit') RETURNING id", [o1])).rows[0].id;
+
+    const { zeroCostLines, applyZeroCostFix } = await import('../lib/cost-audit.js');
+    const pre = await zeroCostLines();
+    equal(pre.invoiceLines.map((l) => l.id), [fix]);
+    equal(pre.orderLines.ids, [oi]);
+
+    // Even if handed ids it should not touch, apply only changes what matches the rule.
+    const r = await applyZeroCostFix({ invoiceLineIds: [fix, voided, haul, typed], orderLineIds: [oi] });
+    equal(r.invoiceLines, 1); equal(r.orderLines, 1); equal(r.skipped, 3);
+    const cost = async (id) => (await q('SELECT cost FROM invoice_items WHERE id = $1', [id])).rows[0].cost;
+    equal(await cost(fix), null);
+    equal(Number(await cost(voided)), 0);      // void: untouched
+    equal(Number(await cost(haul)), 0);        // product cost 0: a real zero, untouched
+    equal(Number(await cost(typed)), 550);     // a real typed cost: untouched
+    equal((await q('SELECT cost FROM order_items WHERE id = $1', [oi])).rows[0].cost, null);
+
+    // Second run finds nothing and says so.
+    const again = await zeroCostLines();
+    equal(again.summary.lines, 0);
+    let msg = ''; try { await applyZeroCostFix({ invoiceLineIds: [], orderLineIds: [] }); } catch (e) { msg = e.message; }
+    assert(/Nothing to correct/.test(msg));
+  } finally { db.done(); }
+});
