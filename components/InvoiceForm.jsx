@@ -39,6 +39,10 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
   const [belowFloor, setBelowFloor] = useState(false);
   const [belowFloorOk, setBelowFloorOk] = useState(false);
   const [done, setDone] = useState(null);
+  // A rep's ask for an admin to approve the refused sale.
+  const [asked, setAsked] = useState(null);
+  const [belowFloorRep, setBelowFloorRep] = useState(false);
+  const [repNote, setRepNote] = useState('');
   const acDone = useRef(false);
   const hasMaps = !!mapsKey();
 
@@ -150,6 +154,24 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
     return '';
   }
 
+  async function askAdmin() {
+    setBusy(true);
+    try {
+      const res = await fetch('/api/admin/invoice-approvals', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, items: toPayload(items), addHst, taxInclusive: taxMode === 'inclusive',
+          daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate, leadSource, leadBy, repNote })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not send the request.'); return; }
+      setErr(''); setBelowFloor(false); setBelowFloorRep(false); setAsked({ customer: name || email });
+      setName(''); setEmail(''); setItems([blankItem()]); setMemo(''); setInvoiceDate(todayToronto());
+      setDeliveryMethod('pickup'); setAddress(''); setCity(''); setPostal(''); setPhone('');
+      setLeadSource(''); setLeadBy(''); setRepNote('');
+    } catch { setErr('Network error — please try again.'); }
+    finally { setBusy(false); }
+  }
+
   async function submit(e) {
     e.preventDefault();
     const wrong = whatsWrong();
@@ -169,9 +191,10 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
         // Only an admin is offered the override, and only for the save that was
         // just refused — it is a decision on this sale, never a setting.
         setBelowFloor(!!d.belowFloor && !hideCost);
+        setBelowFloorRep(!!d.belowFloor && hideCost);
         return;
       }
-      setBelowFloor(false);
+      setBelowFloor(false); setBelowFloorRep(false);
       setDone(d.invoice);
       setName(''); setEmail(''); setItems([blankItem()]); setMemo(''); setInvoiceDate(todayToronto());
       setDeliveryMethod('pickup'); setAddress(''); setCity(''); setPostal(''); setPhone('');
@@ -183,6 +206,19 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
     } finally {
       setBusy(false);
     }
+  }
+
+  if (asked) {
+    return (
+      <div className="notice-box" style={{ lineHeight: 1.6 }}>
+        ✓ Sent to the admin for approval — <b>{asked.customer}</b>. The invoice is raised and emailed to the customer the
+        moment it is approved, under your name. You will get an email either way, and the answer shows on your dashboard.
+        <div style={{ marginTop: 8 }}>
+          <button type="button" className="btn" onClick={() => setAsked(null)}>Start another invoice</button>{' '}
+          <a href="/admin/dashboard#approvals" className="btn">See my requests</a>
+        </div>
+      </div>
+    );
   }
 
   if (done) {
@@ -320,6 +356,14 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
             </span>
           </span>
         </label>
+      )}
+
+      {belowFloorRep && (
+        <div style={{ marginTop: 8 }}>
+          <input value={repNote} onChange={(e) => setRepNote(e.target.value)} placeholder="Why this price? (optional, shown to the admin)" style={{ width: '100%', marginBottom: 6 }} />
+          <button type="button" className="btn" disabled={busy} onClick={askAdmin}>Ask an admin to approve this price</button>
+          <span className="hint" style={{ marginLeft: 8 }}>They get an email and a card on their dashboard; approving sends the invoice for you.</span>
+        </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
