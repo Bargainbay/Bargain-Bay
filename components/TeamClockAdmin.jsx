@@ -32,6 +32,8 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
   const [emp, setEmp] = useState({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '', phone: '' });
   const [fix, setFix] = useState(null);
   const [list, setList] = useState('');
+  const [add, setAdd] = useState({ employeeId: '', date: '', start: '', end: '', note: '' });
+  const [addMsg, setAddMsg] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -112,6 +114,25 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
         <label>To <input type="date" name="to" defaultValue={to} /></label>
         <button className="dash-filter active" type="submit">Show</button>
       </form>
+      <details style={{ margin: '0 0 12px' }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Add a missed shift</summary>
+        <p className="hint">For when somebody forgot to clock in and out. Times are Toronto time. It is saved at their current hourly rate and marked as added by the office.</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <select style={{ ...input, width: 170 }} value={add.employeeId} onChange={(e) => setAdd({ ...add, employeeId: e.target.value })}>
+            <option value="">Who worked…</option>
+            {employees.map((e) => <option key={e.id} value={e.id}>{e.name || e.email}</option>)}
+          </select>
+          <input style={input} type="date" max={to} value={add.date} onChange={(e) => setAdd({ ...add, date: e.target.value })} />
+          <label>In <input style={input} type="time" value={add.start} onChange={(e) => setAdd({ ...add, start: e.target.value })} /></label>
+          <label>Out <input style={input} type="time" value={add.end} onChange={(e) => setAdd({ ...add, end: e.target.value })} /></label>
+          <input style={{ ...input, width: 190 }} placeholder="Note (optional)" value={add.note} onChange={(e) => setAdd({ ...add, note: e.target.value })} />
+          <button type="button" className="dash-filter active" disabled={busy} onClick={() => {
+            setAddMsg('');
+            send({ action: 'add_shift', ...add }, () => { setAddMsg('Shift added.'); setAdd({ employeeId: add.employeeId, date: '', start: '', end: '', note: '' }); });
+          }}>Add shift</button>
+          {addMsg && <span className="hint">{addMsg}</span>}
+        </div>
+      </details>
       <div className="table-wrap"><table className="admin">
         <thead><tr><th>Company</th><th>People</th><th style={{ textAlign: 'right' }}>Hours</th><th>Still in</th></tr></thead>
         <tbody>

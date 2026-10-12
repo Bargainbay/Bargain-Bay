@@ -278,3 +278,27 @@ test('audit lists only $0-cost lines whose product has a real cost; ignores void
     equal(r.summary.lines, 1); equal(r.invoiceLines[0].invoice, 'INV-1'); equal(r.summary.costLeftOut, 600);
   } finally { db.done(); }
 });
+
+suite('team clock: adding a missed shift');
+
+test('add a shift by hand: rate snapshotted, overnight rolls to next day, overlaps / long / future refused', async () => {
+  const db = await withTestDb();
+  try {
+    const tc = await import('../lib/team-clock.js');
+    const emp = await tc.saveEmployee({ email: 'a@x.ca', name: 'Alvin', hourlyRate: '20', company: 'rs_solutions' }, 'o');
+    const s1 = await tc.addStaffShift(emp.id, { date: '2026-10-01', start: '11:00', end: '19:00' }, 'owner@x.ca');
+    equal(Number(s1.rate), 20);
+    equal(Math.round((new Date(s1.ended_at) - new Date(s1.started_at)) / 60000), 480);
+    equal(s1.edited_by, 'owner@x.ca');
+    const night = await tc.addStaffShift(emp.id, { date: '2026-10-02', start: '22:00', end: '02:00' }, 'o');
+    equal(Math.round((new Date(night.ended_at) - new Date(night.started_at)) / 60000), 240);   // past midnight
+    const fails = async (args, re) => { let m = ''; try { await tc.addStaffShift(emp.id, args, 'o'); } catch (e) { m = e.message; } assert(re.test(m), `expected ${re}, got "${m}"`); };
+    await fails({ date: '2026-10-01', start: '15:00', end: '17:00' }, /overlaps/i);
+    await fails({ date: '2026-10-03', start: '01:00', end: '23:00' }, /longer than/i);
+    await fails({ date: '2999-01-01', start: '09:00', end: '10:00' }, /future/i);
+    await fails({ date: '2026-10-04', start: '', end: '10:00' }, /both/i);
+    // and it shows up in the report that totals the hours
+    const rep = await tc.staffShiftReport('2026-10-01', '2026-10-02');
+    equal(rep.length, 2);
+  } finally { db.done(); }
+});

@@ -2,7 +2,7 @@
 // ADMIN only: an hourly rate is pay.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { saveEmployee, endEmployee, fixStaffShift } from '../../../../lib/team-clock';
+import { saveEmployee, endEmployee, fixStaffShift, addStaffShift } from '../../../../lib/team-clock';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -24,6 +24,7 @@ export async function POST(req) {
       return NextResponse.json({ ok: failed.length === 0, saved: saved.length, failed });
     }
     if (b.action === 'end_employee') return NextResponse.json({ ok: true, done: await endEmployee(Number(b.id)) });
+    if (b.action === 'add_shift') return NextResponse.json({ ok: true, shift: await addStaffShift(Number(b.employeeId), b, s.email) });
     if (b.action === 'fix_shift') return NextResponse.json({ ok: true, shift: await fixStaffShift(Number(b.id), b, s.email) });
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (e) {
