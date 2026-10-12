@@ -241,3 +241,40 @@ test('a question reaches the person on WhatsApp via RS Ops, using the number on 
     assert(/bargainbay\.ca\/clock/.test(calls[0].body.text), calls[0].body.text);
   } finally { globalThis.fetch = realFetch; db.done(); }
 });
+
+suite('empty cost box is blank, not zero');
+
+test('costOrNull: empty and missing are NULL, a typed zero stays zero', async () => {
+  const { costOrNull } = await import('../lib/constants.js');
+  equal(costOrNull(''), null); equal(costOrNull(null), null); equal(costOrNull(undefined), null);
+  equal(costOrNull('abc'), null); equal(costOrNull(-5), null);
+  equal(costOrNull(0), 0); equal(costOrNull('0'), 0); equal(costOrNull('131.255'), 131.26);
+});
+
+test('an invoice unit line with an empty cost saves NULL, so the tracker cost applies', async () => {
+  const { normalizeLines } = await import('../lib/invoices.js');
+  const lines = normalizeLines([
+    { description: 'Microwave', sku: 'A1', amount: 281.41, kind: 'unit', cost: '' },
+    { description: 'Typed', amount: 100, kind: 'unit', cost: '50' },
+    { description: 'Haul-away unit', amount: 100, kind: 'unit', cost: 0 },
+    { description: 'Delivery', amount: 50, kind: 'service', cost: '' }
+  ]);
+  equal(lines.map((l) => l.cost), [null, 50, 0, null]);
+});
+
+test('audit lists only $0-cost lines whose product has a real cost; ignores void and true zeros', async () => {
+  const db = await withTestDb();
+  try {
+    const q = (s, p) => db.client.query(s, p);
+    await q('ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS kind text');
+    await q('ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS cost numeric(10,2)');
+    await q('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cost numeric(10,2)');
+    await q("INSERT INTO products (sku, make, model, title, price, cost, active) VALUES ('A1','LG','M','Fridge',1000,600,true),('H1','LG','M','Hauled',100,0,true)");
+    const inv = async (num, status) => (await q("INSERT INTO invoices (number, email, status, subtotal, total) VALUES ($1,'a@b.ca',$2,100,113) RETURNING id", [num, status])).rows[0].id;
+    const a = await inv('INV-1', 'paid'), b = await inv('INV-2', 'void'), c = await inv('INV-3', 'paid');
+    await q("INSERT INTO invoice_items (invoice_id, description, sku, amount, kind, cost) VALUES ($1,'Fridge','A1',1000,'unit',0),($2,'Fridge','A1',1000,'unit',0),($3,'Hauled','H1',100,'unit',0)", [a, b, c]);
+    const { zeroCostLines } = await import('../lib/cost-audit.js');
+    const r = await zeroCostLines();
+    equal(r.summary.lines, 1); equal(r.invoiceLines[0].invoice, 'INV-1'); equal(r.summary.costLeftOut, 600);
+  } finally { db.done(); }
+});
