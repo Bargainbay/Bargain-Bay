@@ -110,7 +110,7 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
 
   // Signed amounts, exactly as the lines are stored (a credit line is negative).
   const signed = toPayload(items).map((it) => Number(it.amount) || 0);
-  const preview = previewTotals(signed, taxMode, toPayload(items).map((it) => it.kind));
+  const preview = previewTotals(signed, taxMode, toPayload(items).map((it) => it.kind), invoiceDate);
   const { subtotal, hst, total } = preview;
 
   // Switching only changes how the boxes are READ. The typed figures are left
@@ -296,7 +296,7 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
         taxInclusive={taxMode === 'inclusive'} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
-        <TaxMode mode={taxMode} onChange={changeTaxMode} />
+        <TaxMode mode={taxMode} onChange={changeTaxMode} onDate={invoiceDate} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
           title="Backdate for a sale you rang up late. Revenue counts on THIS date — the day the sale was made — not the day the money clears.">
           Invoice date

@@ -29,10 +29,15 @@ export const modeOf = (addHst, taxInclusive) => (!addHst ? NO_TAX : (taxInclusiv
 
 // What the invoice will come to, in the terms the boxes are currently in.
 // `amounts` are signed (a credit line is negative), exactly as the lines are.
-export function previewTotals(amounts, mode, kinds = []) {
+const SERVICES_BEFORE_TAX_FROM = '2026-10-14';   // keep in step with SERVICE_BILLING_FROM in lib/constants
+const todayToronto = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
+export const servicesBeforeTax = (onDate) => String(onDate || todayToronto()).slice(0, 10) >= SERVICES_BEFORE_TAX_FROM;
+
+export function previewTotals(amounts, mode, kinds = [], onDate = null) {
   const nums = (amounts || []).map((n) => Number(n) || 0);
   const sum = Math.round(nums.reduce((a, n) => a + n, 0) * 100) / 100;
   if (mode === NO_TAX) return { subtotal: sum, hst: 0, total: sum, quoted: sum };
+  if (mode === 'inclusive' && !servicesBeforeTax(onDate)) return splitTaxInclusive(nums);   // invoices dated before the change
   if (mode === 'inclusive') {
     // Same rule as the server (priceInvoice): services stay before tax, with HST
     // added on top; only products and credits have the tax backed out.
@@ -52,7 +57,7 @@ export function previewTotals(amounts, mode, kinds = []) {
   return { subtotal: sum, hst, total: Math.round((sum + hst) * 100) / 100, quoted: sum };
 }
 
-export default function TaxMode({ mode, onChange }) {
+export default function TaxMode({ mode, onChange, onDate = null }) {
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 14 }}>
       <label htmlFor="inv-taxmode">Tax</label>
@@ -67,7 +72,9 @@ export default function TaxMode({ mode, onChange }) {
           than recomputed off the subtotal. See lib/tax.js. */}
       {mode === 'inclusive' && (
         <span className="hint" style={{ margin: 0 }}>
-          Type what the customer pays for the appliances. Services (delivery, installation) stay before tax — HST is added on top of them.
+          {servicesBeforeTax(onDate)
+            ? 'Type what the customer pays for the appliances. Services (delivery, installation) stay before tax — HST is added on top of them.'
+            : 'Type what the customer pays. The invoice still shows the tax separately — it has to.'}
         </span>
       )}
     </div>

@@ -537,7 +537,7 @@ test('tax-included: products have the tax backed out, a $79 delivery stays $79 w
     { description: 'Fridge', amount: 1130, kind: 'unit' },
     { description: 'Delivery', amount: 79, kind: 'service' },
     { description: 'Installation', amount: 100, kind: 'service' }
-  ], { addHst: true, taxInclusive: true });
+  ], { addHst: true, taxInclusive: true, onDate: '2026-10-14' });
   const by = (d) => r.lineItems.find((l) => l.description === d);
   equal(by('Fridge').amount, 1000);            // 1130 out the door = 1000 + 130 HST
   equal(by('Delivery').amount, 79);            // NOT 69.91
@@ -545,6 +545,10 @@ test('tax-included: products have the tax backed out, a $79 delivery stays $79 w
   equal(r.subtotal, 1179);
   equal(r.hst, 130 + 10.27 + 13);              // 130 on the fridge, 13% of the 179 of services
   equal(r.total, 1332.27);
+  // an invoice dated BEFORE the change keeps the original rule: everything backed out
+  const old = priceInvoice([{ description: 'Fridge', amount: 1130, kind: 'unit' }, { description: 'Delivery', amount: 79, kind: 'service' }], { addHst: true, taxInclusive: true, onDate: '2026-10-13' });
+  equal(old.lineItems.find((l) => l.description === 'Delivery').amount, 69.91);
+  equal(old.total, 1209);
   // untouched mode behaves as before: everything typed is pre-tax
   const plain = priceInvoice([{ description: 'Fridge', amount: 1000, kind: 'unit' }, { description: 'Delivery', amount: 79, kind: 'service' }], { addHst: true, taxInclusive: false });
   equal(plain.subtotal, 1079);
@@ -564,13 +568,15 @@ test('a delivery scheduled from a sale bills what that sale charged for its serv
     const day = (await q(`SELECT (now() AT TIME ZONE 'America/Toronto')::date::text d`)).rows[0].d;
     // a stop on the board with no billing amount, finished today
     const j = (await q(`INSERT INTO jobs (job_number,type,status,order_id,job_date,source) VALUES ('RS-50','delivery','done',$1,$2::date,'bargain_bay') RETURNING id`, [o, day])).rows[0].id;
-    const preview = await jobs.fillDeliveryCharges({ dryRun: true });
+    const preview = await jobs.fillDeliveryCharges({ dryRun: true, from: '2000-01-01' });
     equal(preview.count, 1); equal(preview.jobs[0].billed, 179);
+    // by default old stops are never reached: the start date is later than any stop created before it
+    equal((await jobs.fillDeliveryCharges({ dryRun: true, from: '2999-01-01' })).count, 0);
     equal((await q('SELECT charge_amount FROM jobs WHERE id=$1', [j])).rows[0].charge_amount, null);   // preview changes nothing
-    const done = await jobs.fillDeliveryCharges({ dryRun: false, by: 'owner' });
+    const done = await jobs.fillDeliveryCharges({ dryRun: false, by: 'owner', from: '2000-01-01' });
     equal(done.count, 1);
     equal(Number((await q('SELECT charge_amount FROM jobs WHERE id=$1', [j])).rows[0].charge_amount), 179);
-    equal((await jobs.fillDeliveryCharges({ dryRun: false })).count, 0);                                // fills a blank only, once
+    equal((await jobs.fillDeliveryCharges({ dryRun: false, from: '2000-01-01' })).count, 0);                                // fills a blank only, once
     const { dailyPnl } = await import('../lib/daily-pnl.js');
     const r = await dailyPnl({ from: day, to: day });
     const row = r.rows[0];

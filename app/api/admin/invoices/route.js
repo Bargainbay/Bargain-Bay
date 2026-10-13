@@ -23,9 +23,9 @@ async function admin() {
 // tax-inclusive invoice are not pre-tax yet — so convert them exactly the way
 // the invoice itself will be stored (normalizeLines), rather than dividing by
 // 1.13 here and drifting from it.
-async function consignmentFloorCheck(items, { addHst, taxInclusive }) {
+async function consignmentFloorCheck(items, { addHst, taxInclusive, onDate = null }) {
   try {
-    const { lineItems } = priceInvoice(items, { addHst, taxInclusive: !!taxInclusive && !!addHst });
+    const { lineItems } = priceInvoice(items, { addHst, taxInclusive: !!taxInclusive && !!addHst, onDate });
     return await consignmentFloorProblem(lineItems);
   } catch (e) {
     console.error('consignment floor check failed', e?.message || e);
@@ -110,7 +110,7 @@ export async function POST(req) {
   // compared like for like against a tax-in cost we pay in full. An ADMIN can
   // override — a deal is sometimes worth doing — and the override is deliberate
   // and per-save, never a setting.
-  const floorWrong = await consignmentFloorCheck(items, { addHst, taxInclusive });
+  const floorWrong = await consignmentFloorCheck(items, { addHst, taxInclusive, onDate: invoiceDate || null });
   if (floorWrong && !(body.belowFloorOk && isAdmin(await getSession()))) {
     return NextResponse.json({ error: floorWrong, belowFloor: true }, { status: 400 });
   }
@@ -199,7 +199,7 @@ export async function PATCH(req) {
         ).catch(() => ({ rows: [] }));
         const stockWrong = await stockRuleProblem(body.items, { previous }).catch(() => null);
         if (stockWrong) return NextResponse.json({ error: stockWrong }, { status: 400 });
-        const floorWrong = await consignmentFloorCheck(body.items, { addHst: !!body.addHst, taxInclusive: !!body.taxInclusive });
+        const floorWrong = await consignmentFloorCheck(body.items, { addHst: !!body.addHst, taxInclusive: !!body.taxInclusive, onDate: String(body.invoiceDate || '').trim() || null });
         if (floorWrong && !(body.belowFloorOk && isAdmin(await getSession()))) {
           return NextResponse.json({ error: floorWrong, belowFloor: true }, { status: 400 });
         }

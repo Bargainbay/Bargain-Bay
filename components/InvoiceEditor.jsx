@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import InvoiceLines, { fromInvoice, toPayload, stockLineProblem } from './InvoiceLines';
-import TaxMode, { previewTotals, modeOf, NO_TAX } from './TaxMode';
+import TaxMode, { previewTotals, modeOf, NO_TAX, servicesBeforeTax } from './TaxMode';
 import { toInclusiveLines } from '../lib/tax';
 import { isCreditLine } from '../lib/invoice-lines';
 import LeadSource, { whatsWrongWithLead } from './LeadSource';
@@ -32,7 +32,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [], a
   // open a $1,000 sale and find $884.96 in the box.
   const [taxMode, setTaxMode] = useState(() => modeOf(Number(invoice.hst) > 0, invoice.taxInclusive));
   const [items, setItems] = useState(() => {
-    const rows = fromInvoice(invoice.items);
+    const rows = fromInvoice(invoice.items, { servicesAsStored: servicesBeforeTax(invoice.invoiceDate) });
     if (!invoice.taxInclusive || !(Number(invoice.hst) > 0)) return rows;
     // A tax-in invoice raised since we started keeping typed_amount comes back
     // exactly as it was keyed — nothing to reconstruct.
@@ -81,7 +81,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [], a
   }
 
   const signed = toPayload(items).map((it) => Number(it.amount) || 0);
-  const preview = previewTotals(signed, taxMode, toPayload(items).map((it) => it.kind));
+  const preview = previewTotals(signed, taxMode, toPayload(items).map((it) => it.kind), invoiceDate || invoice.invoiceDate);
   const { subtotal, hst, total } = preview;
 
   // Same as the new-invoice form: switching only re-reads what's in the boxes,
@@ -219,7 +219,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [], a
       <InvoiceLines items={items} setItems={setItems} services={INVOICE_SERVICES} stock={inventory} taxInclusive={taxMode === 'inclusive'} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
-        <TaxMode mode={taxMode} onChange={changeTaxMode} />
+        <TaxMode mode={taxMode} onChange={changeTaxMode} onDate={invoiceDate || invoice.invoiceDate} />
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}
           title="Backdate for a sale rung up late — the invoice shows this date. Revenue counts on the PAID date, set when you mark it paid.">
           Invoice date
