@@ -397,3 +397,18 @@ test('backfill: copies the tracker cost onto blank lines (and their order line);
     equal((await missingCostLines({ read: async () => tracker })).summary.lines, 0);   // idempotent
   } finally { db.done(); }
 });
+
+test('setShiftTimes: an explicit end date puts the end on a later day, and may restore a long recorded shift', async () => {
+  const db = await withTestDb();
+  try {
+    const sh = await import('../lib/shifts.js');
+    await sh.ensureShiftSchema();
+    const u = (await db.client.query(`INSERT INTO users (email, name, password_hash, is_driver) VALUES ('d@x.ca','Kowsi','x',true) RETURNING id`)).rows[0];
+    await db.client.query(`INSERT INTO driver_shifts (user_id, driving, started_at, ended_at) VALUES ($1,false,'2026-09-18 05:29-04','2026-09-18 20:00-04')`, [u.id]);
+    const id = (await db.client.query('SELECT id FROM driver_shifts')).rows[0].id;
+    const without = await sh.setShiftTimes(id, { endTime: '12:03' }, 'o');            // old behaviour: same day
+    equal(new Date(without.endedAt).toISOString().slice(0, 10), '2026-09-18');
+    const restored = await sh.setShiftTimes(id, { endTime: '12:03', endDate: '2026-09-19' }, 'o');
+    equal(Math.round((new Date(restored.endedAt) - new Date(restored.startedAt)) / 3600000), 31);   // 30.6h, not refused
+  } finally { db.done(); }
+});
