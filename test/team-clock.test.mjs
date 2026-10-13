@@ -664,3 +664,23 @@ test('a sold unit with no cost is filled from the tracker when it has one, and r
     assert(r.problems.some((p) => p.kind === 'noCost' && /NO COST/.test(p.text)), JSON.stringify(r.problems));
   } finally { db.done(); }
 });
+
+test('old sales that need a person are a backlog COUNT; new ones are alerts', async () => {
+  const db = await withTestDb();
+  try {
+    const { q } = await integritySetup(db, { cost: null });
+    await q(`UPDATE invoices SET created_at = '2025-03-01'`);                        // an old sale with no cost
+    const { checkSaleIntegrity } = await import('../lib/sale-integrity.js');
+    const t = fakeTracker([{ sku: 'U5', status: 'Sold', cost: '', totalCost: '' }]);
+    let r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    equal(r.problems.length, 0); equal(r.backlog.noCost, 1);                          // not an alarm
+    await q(`UPDATE invoices SET created_at = now()`);
+    r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    equal(r.problems.length, 1); equal(r.backlog.noCost, 0);                          // a new one IS
+    // but a mismatch that can be fixed is fixed whatever the age
+    await q(`UPDATE invoices SET created_at = '2025-03-01'`);
+    const old = fakeTracker([{ sku: 'U5', status: 'Untested', cost: '', totalCost: '300' }]);
+    r = await checkSaleIntegrity({ readRows: old.readRows, sell: old.sell, writeback: () => true, configured: () => true });
+    equal(r.fixed.length, 1);
+  } finally { db.done(); }
+});

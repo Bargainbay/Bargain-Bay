@@ -37,7 +37,14 @@ export default function SaleIntegrity() {
               <b>{r.problems.length} thing{r.problems.length === 1 ? '' : 's'} need a person:</b>
               <ul style={{ margin: '6px 0 0 18px' }}>{r.problems.map((p, i) => <li key={i}>{p.text}</li>)}</ul>
             </div>
-          ) : <p style={{ color: 'var(--ok)' }}><b>Everything agrees:</b> every unit with money paid is Sold on the tracker, and every sold unit has a cost.</p>}
+          ) : <p style={{ color: 'var(--ok)' }}><b>Everything agrees</b> for sales from {r.since} on: every unit with money paid is Sold on the tracker, and every sold unit has a cost.</p>}
+          {r.backlog && (r.backlog.noUnit + r.backlog.notOnTracker + r.backlog.noCost) > 0 && (
+            <p className="hint">
+              Older sales (before {r.since}) that still need a person: {r.backlog.noUnit} lines never tied to a unit (Stock gaps),
+              {' '}{r.backlog.notOnTracker} units not on the tracker, {r.backlog.noCost} lines with no cost (type them in below). These are history, so they
+              are counted here instead of sounding the alarm every day.
+            </p>
+          )}
         </div>
       )}
     </div>
