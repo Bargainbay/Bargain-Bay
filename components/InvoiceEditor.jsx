@@ -81,7 +81,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [], a
   }
 
   const signed = toPayload(items).map((it) => Number(it.amount) || 0);
-  const preview = previewTotals(signed, taxMode);
+  const preview = previewTotals(signed, taxMode, toPayload(items).map((it) => it.kind));
   const { subtotal, hst, total } = preview;
 
   // Same as the new-invoice form: switching only re-reads what's in the boxes,

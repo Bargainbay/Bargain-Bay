@@ -29,11 +29,25 @@ export const modeOf = (addHst, taxInclusive) => (!addHst ? NO_TAX : (taxInclusiv
 
 // What the invoice will come to, in the terms the boxes are currently in.
 // `amounts` are signed (a credit line is negative), exactly as the lines are.
-export function previewTotals(amounts, mode) {
+export function previewTotals(amounts, mode, kinds = []) {
   const nums = (amounts || []).map((n) => Number(n) || 0);
   const sum = Math.round(nums.reduce((a, n) => a + n, 0) * 100) / 100;
   if (mode === NO_TAX) return { subtotal: sum, hst: 0, total: sum, quoted: sum };
-  if (mode === 'inclusive') return splitTaxInclusive(nums);
+  if (mode === 'inclusive') {
+    // Same rule as the server (priceInvoice): services stay before tax, with HST
+    // added on top; only products and credits have the tax backed out.
+    const svc = nums.filter((n, i) => kinds[i] === 'service');
+    const rest = nums.filter((n, i) => kinds[i] !== 'service');
+    const split = splitTaxInclusive(rest);
+    const svcSub = Math.round(svc.reduce((a, n) => a + n, 0) * 100) / 100;
+    const svcHst = Math.round(svcSub * 13) / 100;
+    return {
+      subtotal: Math.round((split.subtotal + svcSub) * 100) / 100,
+      hst: Math.round((split.hst + svcHst) * 100) / 100,
+      total: Math.round((split.total + svcSub + svcHst) * 100) / 100,
+      quoted: split.total
+    };
+  }
   const hst = Math.round(sum * 13) / 100;
   return { subtotal: sum, hst, total: Math.round((sum + hst) * 100) / 100, quoted: sum };
 }
@@ -53,7 +67,7 @@ export default function TaxMode({ mode, onChange }) {
           than recomputed off the subtotal. See lib/tax.js. */}
       {mode === 'inclusive' && (
         <span className="hint" style={{ margin: 0 }}>
-          Type what the customer pays. The invoice still shows the tax separately — it has to.
+          Type what the customer pays for the appliances. Services (delivery, installation) stay before tax — HST is added on top of them.
         </span>
       )}
     </div>

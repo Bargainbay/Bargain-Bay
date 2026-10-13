@@ -470,6 +470,17 @@ export async function POST(req) {
         return NextResponse.json({ error: e?.message || 'Could not add that shift.' }, { status: 400 });
       }
     }
+    // Give deliveries already on the board the amount their sale billed for the
+    // services on them. Preview first (the default); `apply: true` writes. Admin.
+    if (body.action === 'fill_charges') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can set what a delivery bills.' }, { status: 403 });
+      try {
+        const { fillDeliveryCharges } = await import('../../../../lib/jobs');
+        return NextResponse.json({ ok: true, ...(await fillDeliveryCharges({ dryRun: body.apply !== true, by: s?.name || s?.email || null })) });
+      } catch (e) {
+        return NextResponse.json({ error: e?.message || 'Could not do that.' }, { status: 400 });
+      }
+    }
     // Correcting a shift the driver's taps got wrong.
     if (body.action === 'shift_times') {
       if (!s.full) {

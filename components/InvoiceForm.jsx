@@ -110,7 +110,7 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
 
   // Signed amounts, exactly as the lines are stored (a credit line is negative).
   const signed = toPayload(items).map((it) => Number(it.amount) || 0);
-  const preview = previewTotals(signed, taxMode);
+  const preview = previewTotals(signed, taxMode, toPayload(items).map((it) => it.kind));
   const { subtotal, hst, total } = preview;
 
   // Switching only changes how the boxes are READ. The typed figures are left

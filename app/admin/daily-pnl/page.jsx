@@ -107,6 +107,26 @@ export default async function DailyPnlPage({ searchParams }) {
           </div>
         )}
 
+        {r.totals?.deliveryIncome > 0 && (
+          <div style={{ border: '1px solid var(--line)', borderRadius: 14, padding: 16, marginBottom: 16 }}>
+            <b style={{ fontSize: 16 }}>What the deliveries billed, and what they cost</b>
+            <span className="hint" style={{ marginLeft: 8 }}>
+              {r.from === r.to ? label(r.from) : `${label(r.from)} – ${label(r.to)}`} · completed stops · before HST · already counted in “Deliveries in” above, shown apart, not added again
+            </span>
+            <div className="table-wrap"><table className="admin" style={{ marginTop: 8 }}>
+              <tbody>
+                {[['Delivery', 'delivery'], ['Installation', 'install'], ['Haul-away', 'haul'], ['Door removal', 'door'], ['Other (typed on the stop, or a web checkout’s delivery fee)', 'other']]
+                  .filter(([, k]) => r.totals.serviceIncome[k] > 0 || k === 'delivery')
+                  .map(([name, k]) => (<tr key={k}><td>{name}</td><td style={{ textAlign: 'right' }}>{money(r.totals.serviceIncome[k])}</td></tr>))}
+                <tr style={{ fontWeight: 800 }}><td>Billed for deliveries and services</td><td style={{ textAlign: 'right' }}>{money(r.totals.deliveryIncome)}</td></tr>
+                <tr><td>Cost to get them out (drivers, truck, fuel)</td><td style={{ textAlign: 'right' }}>{signed(-r.totals.deliveryCost)}</td></tr>
+                <tr style={{ fontWeight: 800 }}><td>Delivery margin</td>
+                  <td style={{ textAlign: 'right', color: r.totals.deliveryIncome - r.totals.deliveryCost >= 0 ? 'var(--ok)' : 'var(--danger)' }}>{signed(r.totals.deliveryIncome - r.totals.deliveryCost)}</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+        )}
+
         {(zc?.summary?.lines > 0 || blank > 0) && (
           <div style={{ background: 'var(--warnbg)', color: 'var(--warn)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 14 }}>
             <b>Some sold units have no cost counted.</b>{' '}

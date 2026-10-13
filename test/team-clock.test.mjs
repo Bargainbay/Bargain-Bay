@@ -528,3 +528,54 @@ test('removing ONE of two deposits leaves it sold; the nightly pass sells units 
     assert((await prod(q)).active === false, 'the sweep sold it');
   } finally { db.done(); }
 });
+
+suite('services stay before tax; deliveries bill what the sale billed for services');
+
+test('tax-included: products have the tax backed out, a $79 delivery stays $79 with HST on top', async () => {
+  const { priceInvoice } = await import('../lib/invoices.js');
+  const r = priceInvoice([
+    { description: 'Fridge', amount: 1130, kind: 'unit' },
+    { description: 'Delivery', amount: 79, kind: 'service' },
+    { description: 'Installation', amount: 100, kind: 'service' }
+  ], { addHst: true, taxInclusive: true });
+  const by = (d) => r.lineItems.find((l) => l.description === d);
+  equal(by('Fridge').amount, 1000);            // 1130 out the door = 1000 + 130 HST
+  equal(by('Delivery').amount, 79);            // NOT 69.91
+  equal(by('Installation').amount, 100);
+  equal(r.subtotal, 1179);
+  equal(r.hst, 130 + 10.27 + 13);              // 130 on the fridge, 13% of the 179 of services
+  equal(r.total, 1332.27);
+  // untouched mode behaves as before: everything typed is pre-tax
+  const plain = priceInvoice([{ description: 'Fridge', amount: 1000, kind: 'unit' }, { description: 'Delivery', amount: 79, kind: 'service' }], { addHst: true, taxInclusive: false });
+  equal(plain.subtotal, 1079);
+});
+
+test('a delivery scheduled from a sale bills what that sale charged for its services, and the P&L splits it', async () => {
+  const db = await withTestDb();
+  try {
+    const q = (s, p) => db.client.query(s, p);
+    const jobs = await import('../lib/jobs.js');
+    equal(jobs.serviceBilling([{ kind: 'service', price: 79 }, { kind: 'service', price: 100 }, { kind: 'unit', price: 900 }, { kind: 'discount', price: -20 }]), 179);
+    await jobs.ensureJobSchema?.();
+    const o = (await q(`INSERT INTO orders (order_number,email,status,subtotal,total,delivery_method,address) VALUES ('BB-50','a@b.ca','confirmed',1179,1332.27,'delivery','1 Main St') RETURNING id`)).rows[0].id;
+    for (const [t, k, pr] of [['Fridge', 'unit', 1000], ['Delivery', 'service', 79], ['Installation', 'service', 100]]) {
+      await q(`INSERT INTO order_items (order_id,sku,title,price,kind) VALUES ($1,$2,$3,$4,$5)`, [o, k === 'unit' ? 'F1' : null, t, pr, k]);
+    }
+    const day = (await q(`SELECT (now() AT TIME ZONE 'America/Toronto')::date::text d`)).rows[0].d;
+    // a stop on the board with no billing amount, finished today
+    const j = (await q(`INSERT INTO jobs (job_number,type,status,order_id,job_date,source) VALUES ('RS-50','delivery','done',$1,$2::date,'bargain_bay') RETURNING id`, [o, day])).rows[0].id;
+    const preview = await jobs.fillDeliveryCharges({ dryRun: true });
+    equal(preview.count, 1); equal(preview.jobs[0].billed, 179);
+    equal((await q('SELECT charge_amount FROM jobs WHERE id=$1', [j])).rows[0].charge_amount, null);   // preview changes nothing
+    const done = await jobs.fillDeliveryCharges({ dryRun: false, by: 'owner' });
+    equal(done.count, 1);
+    equal(Number((await q('SELECT charge_amount FROM jobs WHERE id=$1', [j])).rows[0].charge_amount), 179);
+    equal((await jobs.fillDeliveryCharges({ dryRun: false })).count, 0);                                // fills a blank only, once
+    const { dailyPnl } = await import('../lib/daily-pnl.js');
+    const r = await dailyPnl({ from: day, to: day });
+    const row = r.rows[0];
+    equal(row.deliveryIncome, 179);
+    equal(row.serviceIncome.delivery, 79); equal(row.serviceIncome.install, 100);
+    equal(row.serviceIncome.other, 0);                                                                  // the parts add to the whole
+  } finally { db.done(); }
+});
