@@ -65,25 +65,29 @@ export default async function DailyPnlPage({ searchParams }) {
               <tr><td>Total sales</td><td style={{ textAlign: 'right' }}>{money(ds.created.sales)}</td><td style={{ textAlign: 'right' }}>{money(ds.paid.sales)}</td></tr>
               <tr><td className="hint">…with HST</td><td style={{ textAlign: 'right' }} className="hint">{money(ds.created.withTax)}</td><td style={{ textAlign: 'right' }} className="hint">{money(ds.paid.withTax)}</td></tr>
               <tr><td>Cost of products</td><td style={{ textAlign: 'right' }}>{signed(-ds.created.cost)}</td><td style={{ textAlign: 'right' }}>{signed(-ds.paid.cost)}</td></tr>
-              <tr style={{ fontWeight: 800 }}><td>Net revenue</td>
-                <td style={{ textAlign: 'right', color: ds.created.net >= 0 ? 'var(--ok)' : 'var(--danger)' }}>{signed(ds.created.net)}</td>
-                <td style={{ textAlign: 'right', color: ds.paid.net >= 0 ? 'var(--ok)' : 'var(--danger)' }}>{signed(ds.paid.net)}</td></tr>
+              <tr><td className="hint">Services in the total (delivery, install…)</td><td style={{ textAlign: 'right' }} className="hint">{money(ds.created.serviceSales)}</td><td style={{ textAlign: 'right' }} className="hint">{money(ds.paid.serviceSales)}</td></tr>
+              <tr><td className="hint" style={{ color: (ds.created.unknownSales + ds.paid.unknownSales) > 0 ? 'var(--warn)' : undefined }}>Sold, cost unknown (not in the profit below)</td>
+                <td style={{ textAlign: 'right', color: ds.created.unknownSales > 0 ? 'var(--warn)' : undefined }} className="hint">{money(ds.created.unknownSales)}</td>
+                <td style={{ textAlign: 'right', color: ds.paid.unknownSales > 0 ? 'var(--warn)' : undefined }} className="hint">{money(ds.paid.unknownSales)}</td></tr>
+              <tr style={{ fontWeight: 800 }}><td>Product profit <span className="hint" style={{ fontWeight: 400 }}>(units with a known cost)</span></td>
+                <td style={{ textAlign: 'right', color: ds.created.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}>{signed(ds.created.profit)}</td>
+                <td style={{ textAlign: 'right', color: ds.paid.profit >= 0 ? 'var(--ok)' : 'var(--danger)' }}>{signed(ds.paid.profit)}</td></tr>
             </tbody>
           </table></div>
           <p className="hint" style={{ marginBottom: 0 }}>
             Cash actually received today (deposits and balances): <b>{money(ds.cashReceived)}</b> across {ds.cashPayments} payment{ds.cashPayments === 1 ? '' : 's'}.
-            {' '}Net revenue is before staff, delivery and overhead costs, which are in the daily P&amp;L below.
-            {(ds.created.missingCost + ds.paid.missingCost) > 0 && <b style={{ color: 'var(--warn)' }}> Some product lines have no cost on file and count as $0 cost, so those net figures are too high.</b>}
+            {' '}Product profit is before staff, delivery and overhead costs, which are in the daily P&amp;L below, and uses the same rule as it.
+            {(ds.created.missingCost + ds.paid.missingCost) > 0 && <b style={{ color: 'var(--warn)' }}> Some units have no cost on file: they are left out of the profit (shown as &quot;cost unknown&quot;), not counted as pure profit. <a href="/admin/cost-fix">Enter the costs →</a></b>}
           </p>
           {[['Invoices created', ds.created.rows], ['Invoices paid', ds.paid.rows]].map(([title, rows]) => rows.length > 0 && (
             <details key={title} style={{ marginTop: 10 }}>
               <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{title}: {rows.length}</summary>
               <div className="table-wrap"><table className="admin">
-                <thead><tr><th>Invoice</th><th>Customer</th><th style={{ textAlign: 'right' }}>Sales</th><th style={{ textAlign: 'right' }}>Cost</th><th style={{ textAlign: 'right' }}>Net</th><th>Status</th></tr></thead>
+                <thead><tr><th>Invoice</th><th>Customer</th><th style={{ textAlign: 'right' }}>Sales</th><th style={{ textAlign: 'right' }}>Cost</th><th style={{ textAlign: 'right' }}>Product profit</th><th>Status</th></tr></thead>
                 <tbody>{rows.map((x) => (
                   <tr key={x.id}><td>{x.number}</td><td>{x.customer}</td><td style={{ textAlign: 'right' }}>{money(x.sales)}</td>
                     <td style={{ textAlign: 'right' }}>{money(x.cost)}{x.missing ? ' ⚠' : ''}</td>
-                    <td style={{ textAlign: 'right' }}>{signed(x.net)}</td><td>{x.status}</td></tr>
+                    <td style={{ textAlign: 'right' }}>{x.missing ? <span className="hint">cost unknown</span> : signed(x.profit)}</td><td>{x.status}</td></tr>
                 ))}</tbody>
               </table></div>
             </details>

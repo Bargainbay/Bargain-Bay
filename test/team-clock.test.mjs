@@ -420,3 +420,50 @@ test('costFromRow: Total Cost (product + parts + labour) wins; falls back to Cos
   equal(costFromRow({ cost: '', totalCost: '' }), null);               // nothing stated: unknown, not zero
   equal(costFromRow({ cost: '$50', totalCost: '0' }), 0);              // a stated zero is a real zero
 });
+
+suite('daily P&L: one rule for profit, and typing in a missing cost');
+
+test('day sales: unknown-cost units and service lines are shown apart, profit matches the daily P&L rule', async () => {
+  const db = await withTestDb();
+  try {
+    const q = (s, p) => db.client.query(s, p);
+    const today = (await q(`SELECT (now() AT TIME ZONE 'America/Toronto')::date::text AS d`)).rows[0].d;
+    const inv = async (num, sub) => (await q(`INSERT INTO invoices (number,email,status,subtotal,total) VALUES ($1,'a@b.ca','paid',$2,$2) RETURNING id`, [num, sub])).rows[0].id;
+    const add = (id, d, sku, amt, kind, cost) => q(`INSERT INTO invoice_items (invoice_id,description,sku,amount,kind,cost) VALUES ($1,$2,$3,$4,$5,$6)`, [id, d, sku, amt, kind, cost]);
+    const a = await inv('INV-A', 1769.91);                          // two costed units + a delivery line, like INV-1304
+    await add(a, 'Washer', 'S1', 900, 'unit', 600); await add(a, 'Dryer', 'S2', 840, 'unit', 850); await add(a, 'Delivery', null, 29.91, 'service', null);
+    const b = await inv('INV-B', 575.22);                           // a unit nobody has a cost for
+    await add(b, 'Fridge', 'S3', 575.22, 'unit', null);
+    const { daySales } = await import('../lib/day-sales.js');
+    const r = await daySales(today);
+    equal(r.created.sales, 2345.13);
+    equal(r.created.cost, 1450);
+    equal(r.created.unknownSales, 575.22);
+    equal(r.created.serviceSales, 29.91);
+    equal(r.created.profit, 290);                                    // (900+840) - 1450; NOT counting the service or the unknown unit
+  } finally { db.done(); }
+});
+
+test('typing a missing cost fills a blank line and its order line once, never overwrites, refuses nonsense', async () => {
+  const db = await withTestDb();
+  try {
+    const q = (s, p) => db.client.query(s, p);
+    const ca = await import('../lib/cost-audit.js');
+    const o = (await q(`INSERT INTO orders (order_number,email,status,subtotal,total) VALUES ('BB-9','a@b.ca','confirmed',500,500) RETURNING id`)).rows[0].id;
+    await q(`INSERT INTO order_items (order_id,sku,title,price,kind) VALUES ($1,'S9','Fridge',500,'unit')`, [o]);
+    const i = (await q(`INSERT INTO invoices (number,email,status,subtotal,total,order_id) VALUES ('INV-9','a@b.ca','paid',500,500,$1) RETURNING id`, [o])).rows[0].id;
+    const line = (await q(`INSERT INTO invoice_items (invoice_id,description,sku,amount,kind) VALUES ($1,'Fridge','S9',500,'unit') RETURNING id`, [i])).rows[0].id;
+    const listed = await ca.needsPersonLines({ read: async () => new Map() });
+    equal(listed.lines.length, 1);
+    const withTracker = await ca.needsPersonLines({ read: async () => new Map([['S9', 200]]) });
+    equal(withTracker.lines.length, 0);                              // the tracker can fill it: not offered here
+    let m = ''; try { await ca.setLineCostByHand({ lineId: line, cost: '' }); } catch (e) { m = e.message; }
+    assert(/number/i.test(m), m);
+    const r = await ca.setLineCostByHand({ lineId: line, cost: '248.75' });
+    equal(r.cost, 248.75); equal(r.orderLines, 1);
+    equal(Number((await q('SELECT cost FROM invoice_items WHERE id=$1', [line])).rows[0].cost), 248.75);
+    equal(Number((await q('SELECT cost FROM order_items WHERE order_id=$1', [o])).rows[0].cost), 248.75);
+    m = ''; try { await ca.setLineCostByHand({ lineId: line, cost: '1' }); } catch (e) { m = e.message; }
+    assert(/already has a cost/i.test(m), m);                        // never overwrites
+  } finally { db.done(); }
+});
