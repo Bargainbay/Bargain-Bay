@@ -467,3 +467,64 @@ test('typing a missing cost fills a blank line and its order line once, never ov
     assert(/already has a cost/i.test(m), m);                        // never overwrites
   } finally { db.done(); }
 });
+
+suite('a unit is sold from the first payment');
+
+async function partPaidSetup(db) {
+  const q = (s, p) => db.client.query(s, p);
+  const inv = await import('../lib/invoices.js');
+  await inv.ensureInvoiceSchema?.();
+  await q(`INSERT INTO products (sku, make, model, title, price, cost, active) VALUES ('U1','LG','M1','Fridge',600,300,true)`);
+  const o = (await q(`INSERT INTO orders (order_number,email,status,subtotal,total) VALUES ('BB-77','a@b.ca','pending_payment',600,600) RETURNING id`)).rows[0].id;
+  const i = (await q(`INSERT INTO invoices (number,email,status,subtotal,total,order_id) VALUES ('INV-77','a@b.ca','open',600,600,$1) RETURNING id`, [o])).rows[0].id;
+  await q(`INSERT INTO invoice_items (invoice_id,description,sku,amount,kind) VALUES ($1,'Fridge','U1',600,'unit')`, [i]);
+  return { q, inv, o, i };
+}
+const prod = async (q) => (await q(`SELECT active, sold_at, sold_price FROM products WHERE sku='U1'`)).rows[0];
+
+test('a deposit sells the unit and takes it off the website; the balance does not undo or re-date that', async () => {
+  const db = await withTestDb();
+  try {
+    const { q, inv, i } = await partPaidSetup(db);
+    assert((await prod(q)).active === true, 'starts on the website');
+    await inv.recordInvoicePayment(i, { amount: 200, method: 'cash' });
+    let p = await prod(q);
+    assert(p.active === false && p.sold_at, `deposit should mark it sold: ${JSON.stringify(p)}`);
+    const firstSoldAt = new Date(p.sold_at).getTime();
+    await inv.recordInvoicePayment(i, { amount: 400, method: 'cash' });          // the balance
+    p = await prod(q);
+    assert(p.active === false, 'still sold after the final payment');
+    equal(new Date(p.sold_at).getTime(), firstSoldAt);                            // first sale date stays
+  } finally { db.done(); }
+});
+
+test('removing the only deposit puts the unit back on HOLD, not back on sale', async () => {
+  const db = await withTestDb();
+  try {
+    const { q, inv, i, o } = await partPaidSetup(db);
+    await inv.recordInvoicePayment(i, { amount: 200, method: 'cash' });
+    const pay = (await q('SELECT id FROM invoice_payments WHERE invoice_id=$1', [i])).rows[0].id;
+    await inv.voidInvoicePayment(i, pay);
+    const p = await prod(q);
+    assert(p.active === true && !p.sold_at, `unsold again: ${JSON.stringify(p)}`);
+    const held = await q(`SELECT 1 FROM reservations WHERE order_id=$1 AND sku='U1'`, [o]);
+    assert(held.rows.length === 1, 'and held for the customer who is still buying');
+  } finally { db.done(); }
+});
+
+test('removing ONE of two deposits leaves it sold; the nightly pass sells units on older deposits', async () => {
+  const db = await withTestDb();
+  try {
+    const { q, inv, i } = await partPaidSetup(db);
+    await inv.recordInvoicePayment(i, { amount: 100, method: 'cash' });
+    await inv.recordInvoicePayment(i, { amount: 100, method: 'cash' });
+    const first = (await q('SELECT id FROM invoice_payments WHERE invoice_id=$1 ORDER BY id', [i])).rows[0].id;
+    await inv.voidInvoicePayment(i, first);
+    assert((await prod(q)).active === false, 'still money in: still sold');
+    // an invoice that took its deposit BEFORE this rule: the unit is still active
+    await q(`UPDATE products SET active=true, sold_at=null WHERE sku='U1'`);
+    const r = await inv.sellPartlyPaidUnits();
+    equal(r.invoices, 1);
+    assert((await prod(q)).active === false, 'the sweep sold it');
+  } finally { db.done(); }
+});
