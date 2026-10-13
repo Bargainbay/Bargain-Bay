@@ -1,12 +1,13 @@
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
-import { zeroCostLines } from '../../../lib/cost-audit';
+import { zeroCostLines, missingCostLines } from '../../../lib/cost-audit';
 import AdminNav from '../../../components/AdminNav';
 import CostFix from '../../../components/CostFix';
+import CostFillFromTracker from '../../../components/CostFillFromTracker';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Fix $0 costs — Bargain Bay' };
+export const metadata = { title: 'Fix costs — Bargain Bay' };
 
 export default async function CostFixPage() {
   const session = await getSession();
@@ -17,5 +18,7 @@ export default async function CostFixPage() {
   }
   if (!hasDb()) return (<div><AdminNav active="daily-pnl" /><div className="panel">Database not configured.</div></div>);
   const a = await zeroCostLines();
-  return (<div><AdminNav active="daily-pnl" /><CostFix initial={{ summary: a.summary, orderCount: a.orderLines.count }} /></div>);
+  // Reads the tracker, so it can fail on its own without taking the page down.
+  const m = await missingCostLines().then((x) => x.summary).catch(() => ({ error: true }));
+  return (<div><AdminNav active="daily-pnl" /><CostFix initial={{ summary: a.summary, orderCount: a.orderLines.count }} /><CostFillFromTracker initial={m} /></div>);
 }
