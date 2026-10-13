@@ -12,6 +12,6 @@ export const maxDuration = 60;
 export async function POST() {
   const s = await getSession();
   if (!(s && isAdmin(s))) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
-  try { return NextResponse.json({ ok: true, ...(await runSaleIntegrity()) }); }
+  try { return NextResponse.json({ ok: true, ...(await runSaleIntegrity({ force: true })) }); }
   catch (e) { return NextResponse.json({ error: e?.message || 'The check failed.' }, { status: 500 }); }
 }

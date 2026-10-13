@@ -468,6 +468,17 @@ test('typing a missing cost fills a blank line and its order line once, never ov
   } finally { db.done(); }
 });
 
+// Run a test as if it were `iso` (JS side only; SQL now() stays real). The sale
+// rules start on a fixed day, and a test must not depend on the day it runs.
+async function onDay(iso, fn) {
+  const Real = Date, fixed = new Real(iso + 'T15:00:00Z').getTime();
+  globalThis.Date = class extends Real {
+    constructor(...a) { if (a.length) super(...a); else super(fixed); }
+    static now() { return fixed; }
+  };
+  try { return await fn(); } finally { globalThis.Date = Real; }
+}
+
 suite('a unit is sold from the first payment');
 
 async function partPaidSetup(db) {
@@ -482,7 +493,7 @@ async function partPaidSetup(db) {
 }
 const prod = async (q) => (await q(`SELECT active, sold_at, sold_price FROM products WHERE sku='U1'`)).rows[0];
 
-test('a deposit sells the unit and takes it off the website; the balance does not undo or re-date that', async () => {
+test('a deposit sells the unit and takes it off the website; the balance does not undo or re-date that', async () => onDay('2026-10-20', async () => {
   const db = await withTestDb();
   try {
     const { q, inv, i } = await partPaidSetup(db);
@@ -496,9 +507,9 @@ test('a deposit sells the unit and takes it off the website; the balance does no
     assert(p.active === false, 'still sold after the final payment');
     equal(new Date(p.sold_at).getTime(), firstSoldAt);                            // first sale date stays
   } finally { db.done(); }
-});
+}));
 
-test('removing the only deposit puts the unit back on HOLD, not back on sale', async () => {
+test('removing the only deposit puts the unit back on HOLD, not back on sale', async () => onDay('2026-10-20', async () => {
   const db = await withTestDb();
   try {
     const { q, inv, i, o } = await partPaidSetup(db);
@@ -510,9 +521,9 @@ test('removing the only deposit puts the unit back on HOLD, not back on sale', a
     const held = await q(`SELECT 1 FROM reservations WHERE order_id=$1 AND sku='U1'`, [o]);
     assert(held.rows.length === 1, 'and held for the customer who is still buying');
   } finally { db.done(); }
-});
+}));
 
-test('removing ONE of two deposits leaves it sold; the nightly pass sells units on older deposits', async () => {
+test('removing ONE of two deposits leaves it sold; the nightly pass sells units on older deposits', async () => onDay('2026-10-20', async () => {
   const db = await withTestDb();
   try {
     const { q, inv, i } = await partPaidSetup(db);
@@ -523,11 +534,12 @@ test('removing ONE of two deposits leaves it sold; the nightly pass sells units 
     assert((await prod(q)).active === false, 'still money in: still sold');
     // an invoice that took its deposit BEFORE this rule: the unit is still active
     await q(`UPDATE products SET active=true, sold_at=null WHERE sku='U1'`);
+    await q("UPDATE invoice_payments SET paid_at = '2026-10-20 12:00-04'");
     const r = await inv.sellPartlyPaidUnits();
     equal(r.invoices, 1);
     assert((await prod(q)).active === false, 'the sweep sold it');
   } finally { db.done(); }
-});
+}));
 
 suite('services stay before tax; deliveries bill what the sale billed for services');
 
@@ -614,11 +626,11 @@ test('a unit with a deposit that the tracker still calls Untested is marked Sold
     const { checkSaleIntegrity } = await import('../lib/sale-integrity.js');
     const rows = [{ sku: 'U5', status: 'Untested', cost: '300', totalCost: '300' }];
     const t = fakeTracker(rows);
-    const r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    const r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true, since: '2026-01-01' });
     equal(r.problems.length, 0);
     equal(r.fixed.length, 1); equal(r.fixed[0].was, 'Untested');
     equal(rows[0].status, 'Sold');
-    const again = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    const again = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true, since: '2026-01-01' });
     equal(again.fixed.length, 0); equal(t.sold.length, 1);          // quiet when everything agrees
   } finally { db.done(); }
 });
@@ -629,10 +641,10 @@ test('it says so when it cannot fix it: write-back off, or a write that does not
     await integritySetup(db, { cost: 300 });
     const { checkSaleIntegrity } = await import('../lib/sale-integrity.js');
     let t = fakeTracker([{ sku: 'U5', status: 'Waiting on parts', totalCost: '300' }]);
-    let r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => false, configured: () => true });
+    let r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => false, configured: () => true, since: '2026-01-01' });
     assert(r.problems.some((p) => p.kind === 'writebackOff' && /Waiting on parts/.test(p.text)), JSON.stringify(r.problems));
     t = fakeTracker([{ sku: 'U5', status: 'Untested', totalCost: '300' }], { works: false });
-    r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true, since: '2026-01-01' });
     assert(r.problems.some((p) => p.kind === 'stillNotSold'), JSON.stringify(r.problems));
   } finally { db.done(); }
 });
@@ -643,13 +655,13 @@ test('an invoice with no money on it is left alone, and a unit missing from the 
     await integritySetup(db, { paid: 0, cost: 300 });
     const { checkSaleIntegrity } = await import('../lib/sale-integrity.js');
     const t = fakeTracker([{ sku: 'U5', status: 'Untested', totalCost: '300' }]);
-    const r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    const r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true, since: '2026-01-01' });
     equal(r.problems.length, 0); equal(t.sold.length, 0);           // held, not sold: no money yet
     const db2 = await withTestDb();
     try {
       await integritySetup(db2, { cost: 300 });
       const none = fakeTracker([]);
-      const r2 = await checkSaleIntegrity({ readRows: none.readRows, sell: none.sell, writeback: () => true, configured: () => true });
+      const r2 = await checkSaleIntegrity({ readRows: none.readRows, sell: none.sell, writeback: () => true, configured: () => true, since: '2026-01-01' });
       assert(r2.problems.some((p) => p.kind === 'notOnTracker'), JSON.stringify(r2.problems));
     } finally { db2.done(); }
   } finally { db.done(); }
@@ -661,12 +673,12 @@ test('a sold unit with no cost is filled from the tracker when it has one, and r
     const { q } = await integritySetup(db, { cost: null });
     const { checkSaleIntegrity } = await import('../lib/sale-integrity.js');
     let t = fakeTracker([{ sku: 'U5', status: 'Sold', cost: '', totalCost: '248.75' }]);
-    let r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    let r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true, since: '2026-01-01' });
     equal(r.costsFilled, 1); equal(r.problems.length, 0);
     equal(Number((await q(`SELECT cost FROM invoice_items WHERE sku='U5'`)).rows[0].cost), 248.75);
     await q(`UPDATE invoice_items SET cost = NULL`);
     t = fakeTracker([{ sku: 'U5', status: 'Sold', cost: '', totalCost: '' }]);
-    r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true, since: '2026-01-01' });
     assert(r.problems.some((p) => p.kind === 'noCost' && /NO COST/.test(p.text)), JSON.stringify(r.problems));
   } finally { db.done(); }
 });
@@ -678,15 +690,29 @@ test('old sales that need a person are a backlog COUNT; new ones are alerts', as
     await q(`UPDATE invoices SET created_at = '2025-03-01'`);                        // an old sale with no cost
     const { checkSaleIntegrity } = await import('../lib/sale-integrity.js');
     const t = fakeTracker([{ sku: 'U5', status: 'Sold', cost: '', totalCost: '' }]);
-    let r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    let r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true, since: '2026-01-01' });
     equal(r.problems.length, 0); equal(r.backlog.noCost, 1);                          // not an alarm
     await q(`UPDATE invoices SET created_at = now()`);
-    r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true, since: '2026-01-01' });
     equal(r.problems.length, 1); equal(r.backlog.noCost, 0);                          // a new one IS
     // but a mismatch that can be fixed is fixed whatever the age
     await q(`UPDATE invoices SET created_at = '2025-03-01'`);
     const old = fakeTracker([{ sku: 'U5', status: 'Untested', cost: '', totalCost: '300' }]);
-    r = await checkSaleIntegrity({ readRows: old.readRows, sell: old.sell, writeback: () => true, configured: () => true });
+    r = await checkSaleIntegrity({ readRows: old.readRows, sell: old.sell, writeback: () => true, configured: () => true, since: '2026-01-01' });
     equal(r.fixed.length, 1);
   } finally { db.done(); }
 });
+
+test('before 2026-10-14 a deposit holds the unit but does not sell it, and the schedule does not run', async () => onDay('2026-10-13', async () => {
+  const db = await withTestDb();
+  try {
+    const { q, inv, i } = await partPaidSetup(db);
+    await inv.recordInvoicePayment(i, { amount: 200, method: 'cash' });
+    const p = await prod(q);
+    assert(p.active === true && !p.sold_at, `the old behaviour until the start date: ${JSON.stringify(p)}`);
+    equal((await inv.sellPartlyPaidUnits()).invoices, 0);
+    const { runSaleIntegrity } = await import('../lib/sale-integrity.js');
+    const r = await runSaleIntegrity();
+    assert(/starts 2026-10-14/.test(r.skipped), JSON.stringify(r));
+  } finally { db.done(); }
+}));
