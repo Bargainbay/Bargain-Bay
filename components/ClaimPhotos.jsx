@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import DownloadPhoto from './DownloadPhoto';
 
 // The photos on one warranty claim, with an upload when the viewer may add. Both sides see every photo of a
 // claim (the seller has to see the fault). `base` is the route that serves and accepts them.
@@ -28,9 +29,12 @@ export default function ClaimPhotos({ claim, base, canAdd, onDone }) {
       {photos.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {photos.map((p) => (
-            <a key={p.id} href={`${base}?id=${p.id}`} target="_blank" rel="noreferrer" title={`${p.side === 'vendor' ? 'Seller' : 'Bargain Bay'}${p.caption ? ` — ${p.caption}` : ''}`}>
-              <img src={`${base}?id=${p.id}`} alt={p.caption || 'Claim photo'} width={84} height={84} style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border, #ddd)' }} />
-            </a>
+            <div key={p.id} style={{ textAlign: 'center' }}>
+              <a href={`${base}?id=${p.id}`} target="_blank" rel="noreferrer" title={`${p.side === 'vendor' ? 'Seller' : 'Bargain Bay'}${p.caption ? ` — ${p.caption}` : ''}`}>
+                <img src={`${base}?id=${p.id}`} alt={p.caption || 'Claim photo'} width={84} height={84} style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border, #ddd)' }} />
+              </a>
+              <div><DownloadPhoto url={`${base}?id=${p.id}`} name={`claim-photo-${p.id}`} className="" style={{ fontSize: 12 }}>⤓ Save</DownloadPhoto></div>
+            </div>
           ))}
         </div>)}
       {canAdd && (

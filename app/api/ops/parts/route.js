@@ -15,6 +15,7 @@
 import { NextResponse } from 'next/server';
 import { hasDb } from '../../../../lib/db';
 import { listAreas, listLocations } from '../../../../lib/locations';
+import { addPartPhotos, listPartPhotos } from '../../../../lib/part-photos';
 import { bookInPart, describeParts, getPart, receiveParts, searchParts, usePart } from '../../../../lib/parts';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +53,7 @@ export async function GET(req) {
   if (problem) return problem;
   const sp = new URL(req.url).searchParams;
   try {
-    if (sp.get('id')) return NextResponse.json({ part: floorPart(await getPart(Number(sp.get('id')))) });
+    if (sp.get('id')) return NextResponse.json({ part: floorPart(await getPart(Number(sp.get('id')))), photos: await listPartPhotos(Number(sp.get('id'))) });
     // Several parts at once, for RS Ops' label sheet. One call, not one per
     // sticker: a roll is printed a shelf at a time.
     if (sp.get('ids')) {
@@ -79,6 +80,15 @@ const OUT_REASONS = { repair: 'use_unit', correction: 'adjust' };
 export async function POST(req) {
   const problem = keyProblem(req);
   if (problem) return problem;
+  // Photos arrive as multipart (partId + photos); everything else is JSON.
+  if ((req.headers.get('content-type') || '').includes('multipart/form-data')) {
+    try {
+      const form = await req.formData();
+      const name = String(form.get('by') || '').trim().slice(0, 80);
+      const out = await addPartPhotos(form.get('partId'), form.getAll('photos'), { createdBy: name ? `${name} (RS Ops)` : 'RS Ops' });
+      return NextResponse.json({ ok: true, ...out, all: await listPartPhotos(form.get('partId')) });
+    } catch (e) { return fail(e); }
+  }
   let body;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }); }
   const name = String(body.by || '').trim().slice(0, 80);

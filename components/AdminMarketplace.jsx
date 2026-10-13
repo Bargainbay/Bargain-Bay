@@ -193,7 +193,7 @@ function ListingReview({ data, busy, rejectReasons, onClose, onDecide }) {
           <figure key={p.id} style={{ margin: 0, fontSize: 12 }}>
             <a href={`/api/admin/marketplace/photo?id=${p.id}`} target="_blank" rel="noreferrer">
               <img src={`/api/admin/marketplace/photo?id=${p.id}`} alt={p.role} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'contain', background: 'var(--tint)', borderRadius: 6 }} /></a>
-            <figcaption>{p.role}{p.kind === 'evidence' ? ' (private)' : ''}</figcaption>
+            <figcaption>{p.role}{p.kind === 'evidence' ? ' (private)' : ''} · <a href={`/api/admin/marketplace/photo?id=${p.id}&download=1`} download>save</a></figcaption>
           </figure>
         ))}
       </div>

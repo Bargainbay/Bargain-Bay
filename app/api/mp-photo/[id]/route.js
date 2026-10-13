@@ -5,11 +5,12 @@
 import { NextResponse } from 'next/server';
 import { get } from '@vercel/blob';
 import { publicPhotoPath } from '../../../../lib/marketplace-storefront';
+import { downloadHeaders } from '../../../../lib/image-download';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-export async function GET(_req, { params }) {
+export async function GET(req, { params }) {
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id <= 0) return new NextResponse('Not found', { status: 404 });
   try {
@@ -18,7 +19,7 @@ export async function GET(_req, { params }) {
     const res = await get(path, { access: 'private' });
     if (!res || res.statusCode !== 200 || !res.stream) return new NextResponse('Not found', { status: 404 });
     return new Response(res.stream, {
-      headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400' }
+      headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400', ...downloadHeaders(req, `listing-photo-${id}`) }
     });
   } catch {
     return new NextResponse('Not found', { status: 404 });

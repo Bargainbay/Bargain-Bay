@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { get } from '@vercel/blob';
+import { downloadHeaders } from '../../../../lib/image-download';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,6 +21,7 @@ export async function GET(req, { params }) {
       headers: {
         'Content-Type': res.blob?.contentType || 'image/jpeg',
         'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
+        ...downloadHeaders(req, sku, res.blob?.contentType),
       },
     });
   } catch (e) {

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import DownloadPhoto from './DownloadPhoto';
 
 // The product photo viewer: one big image, a thumbnail strip, arrows, swipe.
 //
@@ -68,6 +69,10 @@ export default function ProductGallery({ images = [], alt = '', badge = null }) 
             : cur.kind === 'vendor'
               ? `Photo of this exact unit, provided by ${cur.by || 'the seller'}.`
               : 'Photo of this exact unit, taken at our warehouse.'}
+      </div>
+
+      <div style={{ margin: '4px 0 8px' }}>
+        <DownloadPhoto url={cur.url} name={`${alt || 'photo'}-${safe + 1}`} style={{ padding: '3px 12px', fontSize: 13 }}>⤓ Download this photo</DownloadPhoto>
       </div>
 
       {n > 1 && (
