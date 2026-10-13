@@ -65,7 +65,11 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
        { key: 'pnl', label: 'Profit & loss', href: '/admin/reports/pnl' },
        { key: 'ledger', label: 'Trial balance', href: '/admin/reports/ledger' },
        { key: 'financial', label: 'Expenses', href: '/admin/financial' }]
-    : (salesOnly ? all.filter((i) => i.sales) : all);
+    : (salesOnly
+        // A rep clocks in here too, and the page is only reachable by typing its
+        // address otherwise. The owner is not an employee, so only this nav has it.
+        ? [...all.filter((i) => i.sales), { key: 'clock', label: 'Clock in / out', href: '/clock' }]
+        : all);
   return (
     <nav className="admin-nav">
       <span className="admin-nav-title">{dispatchOnly ? 'Dispatch Portal' : booksOnly ? 'Books' : salesOnly ? 'Sales Portal' : 'Owner Portal'}</span>
