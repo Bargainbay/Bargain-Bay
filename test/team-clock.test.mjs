@@ -342,3 +342,58 @@ test('apply resets only previewed, still-matching lines to NULL; true zeros and 
     assert(/Nothing to correct/.test(msg));
   } finally { db.done(); }
 });
+
+suite('tracker cost on invoices');
+
+test('fillCostsFromTracker: fills blanks the site cannot cost; typed and site-known costs win; empty cell fills nothing', async () => {
+  const { fillCostsFromTracker, parseCostCell } = await import('../lib/tracker-cost.js');
+  equal(parseCostCell('$273.75'), 273.75); equal(parseCostCell('0'), 0); equal(parseCostCell(''), null); equal(parseCostCell('n/a'), null);
+  const tracker = new Map([['A1', 273.75], ['B1', 100], ['C1', 0]]);
+  const lines = [
+    { sku: 'A1', cost: null, kind: 'unit' },            // site has no cost -> filled
+    { sku: 'B1', cost: null, kind: 'unit' },            // site knows 500 -> left NULL (fallback works)
+    { sku: 'A1', cost: 40, kind: 'unit' },              // typed -> never overwritten
+    { sku: 'D1', cost: null, kind: 'unit' },            // not on the tracker -> blank
+    { sku: 'C1', cost: null, kind: 'unit' },            // tracker says a real 0 -> 0
+    { sku: null, cost: null, kind: 'service' }
+  ];
+  const n = await fillCostsFromTracker(lines, { read: async () => tracker, siteCosts: new Map([['B1', 500]]) });
+  equal(lines.map((l) => l.cost), [273.75, null, 40, null, 0, null]); equal(n, 2);
+});
+
+test('fillCostsFromTracker degrades open: a failing tracker read leaves the line blank, never throws', async () => {
+  const { fillCostsFromTracker } = await import('../lib/tracker-cost.js');
+  const lines = [{ sku: 'A1', cost: null, kind: 'unit' }];
+  const n = await fillCostsFromTracker(lines, { read: async () => { throw new Error('google down'); }, siteCosts: new Map() });
+  equal(n, 0); equal(lines[0].cost, null);
+});
+
+test('backfill: copies the tracker cost onto blank lines (and their order line); never a typed, void, or tracker-empty line', async () => {
+  const db = await withTestDb();
+  try {
+    const q = (s, p) => db.client.query(s, p);
+    await q('ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS kind text');
+    await q('ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS cost numeric(10,2)');
+    await q('ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cost numeric(10,2)');
+    await q("INSERT INTO products (sku, make, model, title, price, cost, active) VALUES ('KNOWN','LG','M','Fridge',1000,600,true)");
+    const o = (await q("INSERT INTO orders (order_number, email, status, total) VALUES ('BB-1','a@b.ca','confirmed',113) RETURNING id")).rows[0].id;
+    const inv = async (num, status, orderId) => (await q("INSERT INTO invoices (number, email, status, subtotal, total, order_id) VALUES ($1,'a@b.ca',$2,100,113,$3) RETURNING id", [num, status, orderId || null])).rows[0].id;
+    const a = await inv('INV-1', 'paid', o), v = await inv('INV-2', 'void'), t = await inv('INV-3', 'paid');
+    const il = async (id, sku, cost) => (await q("INSERT INTO invoice_items (invoice_id, description, sku, amount, kind, cost) VALUES ($1,'x',$2,100,'unit',$3) RETURNING id", [id, sku, cost])).rows[0].id;
+    const fill = await il(a, 'UNTESTED1', null), voided = await il(v, 'UNTESTED1', null), typed = await il(t, 'UNTESTED1', 55),
+      empty = await il(t, 'NOCOST', null), known = await il(t, 'KNOWN', null);
+    await q("INSERT INTO order_items (order_id, sku, title, price, kind) VALUES ($1,'UNTESTED1','x',100,'unit')", [o]);
+    const tracker = new Map([['UNTESTED1', 273.75], ['KNOWN', 600]]);
+    const { missingCostLines, applyMissingCostFill } = await import('../lib/cost-audit.js');
+    const pre = await missingCostLines({ read: async () => tracker });
+    equal(pre.lines.map((l) => l.id), [fill]);                 // void, typed, site-known excluded
+    equal(pre.summary.noTrackerCost, 1);                       // NOCOST: blank both places, needs a person
+    const r = await applyMissingCostFill({ lineIds: [fill, voided, typed, empty, known], read: async () => tracker });
+    equal(r.invoiceLines, 1); equal(r.orderLines, 1);
+    const c = async (id) => (await q('SELECT cost FROM invoice_items WHERE id = $1', [id])).rows[0].cost;
+    equal(Number(await c(fill)), 273.75); equal(await c(voided), null); equal(Number(await c(typed)), 55);
+    equal(await c(empty), null); equal(await c(known), null);
+    equal(Number((await q("SELECT cost FROM order_items WHERE order_id = $1", [o])).rows[0].cost), 273.75);
+    equal((await missingCostLines({ read: async () => tracker })).summary.lines, 0);   // idempotent
+  } finally { db.done(); }
+});

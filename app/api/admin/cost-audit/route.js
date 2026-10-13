@@ -3,17 +3,18 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { audit } from '../../../../lib/audit';
-import { zeroCostLines, applyZeroCostFix } from '../../../../lib/cost-audit';
+import { zeroCostLines, applyZeroCostFix, missingCostLines, applyMissingCostFill } from '../../../../lib/cost-audit';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const deny = () => NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 
-export async function GET() {
+export async function GET(req) {
   const s = await getSession();
   if (!(s && isAdmin(s))) return deny();
-  try { return NextResponse.json(await zeroCostLines()); }
+  const kind = new URL(req.url).searchParams.get('kind');
+  try { return NextResponse.json(kind === 'missing' ? await missingCostLines() : await zeroCostLines()); }
   catch (e) { return NextResponse.json({ error: e?.message || 'Could not read.' }, { status: 500 }); }
 }
 
@@ -24,6 +25,13 @@ export async function POST(req) {
   // Must say so explicitly: a stray POST can never rewrite anything.
   if (b.confirm !== true) return NextResponse.json({ error: 'Confirmation required.' }, { status: 400 });
   try {
+    if (b.kind === 'missing') {
+      const m = await applyMissingCostFill({ lineIds: b.lineIds });
+      await audit(s, { action: 'cost.tracker_fill', entity: 'invoice_items', entityId: null,
+        summary: `Filled ${m.invoiceLines} invoice lines and ${m.orderLines} order lines with the tracker cost`,
+        detail: { invoiceLineIds: m.invoiceLineIds, orderLineIds: m.orderLineIds, skipped: m.skipped } }).catch(() => {});
+      return NextResponse.json({ ok: true, ...m });
+    }
     const r = await applyZeroCostFix({ invoiceLineIds: b.invoiceLineIds, orderLineIds: b.orderLineIds });
     // The ids are in the audit trail: it is the record of exactly what was changed.
     await audit(s, { action: 'cost.zero_fix', entity: 'invoice_items', entityId: null,
