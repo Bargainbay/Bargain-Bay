@@ -579,3 +579,88 @@ test('a delivery scheduled from a sale bills what that sale charged for its serv
     equal(row.serviceIncome.other, 0);                                                                  // the parts add to the whole
   } finally { db.done(); }
 });
+
+suite('sale integrity: money in means Sold, and every sold unit has a cost');
+
+async function integritySetup(db, { paid = 200, cost = null } = {}) {
+  const q = (s, p) => db.client.query(s, p);
+  const inv = await import('../lib/invoices.js');
+  await inv.getInvoiceByNumber('none');            // creates the invoice tables the way the app does
+  const i = (await q(`INSERT INTO invoices (number,email,status,subtotal,total) VALUES ('INV-5','a@b.ca',$1,600,600) RETURNING id`, [paid > 0 ? 'partial' : 'open'])).rows[0].id;
+  await q(`INSERT INTO invoice_items (invoice_id,description,sku,amount,kind,cost) VALUES ($1,'Fridge','U5',600,'unit',$2)`, [i, cost]);
+  if (paid > 0) await q(`INSERT INTO invoice_payments (invoice_id,amount,method) VALUES ($1,$2,'Cash')`, [i, paid]);
+  return { q };
+}
+// a fake tracker: statuses by sku, and a "sell" that either works or doesn't
+const fakeTracker = (rows, { works = true } = {}) => {
+  const sold = [];
+  return {
+    readRows: async () => rows.map((r) => ({ ...r })),
+    sell: async (skus) => { sold.push(...skus); if (works) for (const r of rows) if (skus.includes(r.sku)) r.status = 'Sold'; return { sold: skus.length }; },
+    sold
+  };
+};
+
+test('a unit with a deposit that the tracker still calls Untested is marked Sold, and proved', async () => {
+  const db = await withTestDb();
+  try {
+    await integritySetup(db, { cost: 300 });
+    const { checkSaleIntegrity } = await import('../lib/sale-integrity.js');
+    const rows = [{ sku: 'U5', status: 'Untested', cost: '300', totalCost: '300' }];
+    const t = fakeTracker(rows);
+    const r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    equal(r.problems.length, 0);
+    equal(r.fixed.length, 1); equal(r.fixed[0].was, 'Untested');
+    equal(rows[0].status, 'Sold');
+    const again = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    equal(again.fixed.length, 0); equal(t.sold.length, 1);          // quiet when everything agrees
+  } finally { db.done(); }
+});
+
+test('it says so when it cannot fix it: write-back off, or a write that does not stick', async () => {
+  const db = await withTestDb();
+  try {
+    await integritySetup(db, { cost: 300 });
+    const { checkSaleIntegrity } = await import('../lib/sale-integrity.js');
+    let t = fakeTracker([{ sku: 'U5', status: 'Waiting on parts', totalCost: '300' }]);
+    let r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => false, configured: () => true });
+    assert(r.problems.some((p) => p.kind === 'writebackOff' && /Waiting on parts/.test(p.text)), JSON.stringify(r.problems));
+    t = fakeTracker([{ sku: 'U5', status: 'Untested', totalCost: '300' }], { works: false });
+    r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    assert(r.problems.some((p) => p.kind === 'stillNotSold'), JSON.stringify(r.problems));
+  } finally { db.done(); }
+});
+
+test('an invoice with no money on it is left alone, and a unit missing from the tracker is reported', async () => {
+  const db = await withTestDb();
+  try {
+    await integritySetup(db, { paid: 0, cost: 300 });
+    const { checkSaleIntegrity } = await import('../lib/sale-integrity.js');
+    const t = fakeTracker([{ sku: 'U5', status: 'Untested', totalCost: '300' }]);
+    const r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    equal(r.problems.length, 0); equal(t.sold.length, 0);           // held, not sold: no money yet
+    const db2 = await withTestDb();
+    try {
+      await integritySetup(db2, { cost: 300 });
+      const none = fakeTracker([]);
+      const r2 = await checkSaleIntegrity({ readRows: none.readRows, sell: none.sell, writeback: () => true, configured: () => true });
+      assert(r2.problems.some((p) => p.kind === 'notOnTracker'), JSON.stringify(r2.problems));
+    } finally { db2.done(); }
+  } finally { db.done(); }
+});
+
+test('a sold unit with no cost is filled from the tracker when it has one, and reported when nobody does', async () => {
+  const db = await withTestDb();
+  try {
+    const { q } = await integritySetup(db, { cost: null });
+    const { checkSaleIntegrity } = await import('../lib/sale-integrity.js');
+    let t = fakeTracker([{ sku: 'U5', status: 'Sold', cost: '', totalCost: '248.75' }]);
+    let r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    equal(r.costsFilled, 1); equal(r.problems.length, 0);
+    equal(Number((await q(`SELECT cost FROM invoice_items WHERE sku='U5'`)).rows[0].cost), 248.75);
+    await q(`UPDATE invoice_items SET cost = NULL`);
+    t = fakeTracker([{ sku: 'U5', status: 'Sold', cost: '', totalCost: '' }]);
+    r = await checkSaleIntegrity({ readRows: t.readRows, sell: t.sell, writeback: () => true, configured: () => true });
+    assert(r.problems.some((p) => p.kind === 'noCost' && /NO COST/.test(p.text)), JSON.stringify(r.problems));
+  } finally { db.done(); }
+});
