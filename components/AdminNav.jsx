@@ -1,3 +1,4 @@
+import ClockPill from './ClockPill';
 import NavSignOut from './NavSignOut';
 
 // Owner-portal top nav. `active` = 'dashboard' | 'operations' | …
@@ -65,11 +66,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
        { key: 'pnl', label: 'Profit & loss', href: '/admin/reports/pnl' },
        { key: 'ledger', label: 'Trial balance', href: '/admin/reports/ledger' },
        { key: 'financial', label: 'Expenses', href: '/admin/financial' }]
-    : (salesOnly
-        // A rep clocks in here too, and the page is only reachable by typing its
-        // address otherwise. The owner is not an employee, so only this nav has it.
-        ? [...all.filter((i) => i.sales), { key: 'clock', label: 'Clock in / out', href: '/clock' }]
-        : all);
+    : (salesOnly ? all.filter((i) => i.sales) : all);
   return (
     <nav className="admin-nav">
       <span className="admin-nav-title">{dispatchOnly ? 'Dispatch Portal' : booksOnly ? 'Books' : salesOnly ? 'Sales Portal' : 'Owner Portal'}</span>
@@ -90,6 +87,8 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
           <input name="q" placeholder="Search customer / BB- / INV- / Q-…" aria-label="Search everything"
             style={{ width: 220, padding: '5px 10px', fontSize: 13 }} />
         </form>}
+        {/* The clock, for anyone on the team list; hides itself for everyone else. */}
+        {!booksOnly && <ClockPill alone={dispatchOnly} />}
       </div>
     </nav>
   );
