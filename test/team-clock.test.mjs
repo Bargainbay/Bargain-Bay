@@ -412,3 +412,11 @@ test('setShiftTimes: an explicit end date puts the end on a later day, and may r
     equal(Math.round((new Date(restored.endedAt) - new Date(restored.startedAt)) / 3600000), 31);   // 30.6h, not refused
   } finally { db.done(); }
 });
+
+test('costFromRow: Total Cost (product + parts + labour) wins; falls back to Cost of Product when the formula is empty', async () => {
+  const { costFromRow } = await import('../lib/tracker-cost.js');
+  equal(costFromRow({ cost: '$139.50', partsCost: '$80', totalCost: '$344.50' }), 344.5);
+  equal(costFromRow({ cost: '$139.50', totalCost: '' }), 139.5);       // API-appended row, formula not filled yet
+  equal(costFromRow({ cost: '', totalCost: '' }), null);               // nothing stated: unknown, not zero
+  equal(costFromRow({ cost: '$50', totalCost: '0' }), 0);              // a stated zero is a real zero
+});
