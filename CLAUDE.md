@@ -4426,5 +4426,34 @@ not shown anywhere until the storefront slice.
     COLLECTED FROM THE SELLER" while a collection is outstanding.
   - `npm test -- <word>` now runs only the test files whose name contains the word.
 
+## Parts bought for a unit, and what a unit COSTS (added 2026-10-13)
+`lib/part-costs.js`, `lib/tracker-cost.js`, migration 0030 (`unit_part_costs`),
+`/admin/part-costs` (ADMIN; linked from the Reports hub and the Parts page),
+`/api/admin/part-costs`.
+
+- **A unit's cost is the tracker's TOTAL COST = Cost of Product + Parts Cost +
+  Labour Cost**, which is also what `products.cost` holds after a sync. Anything
+  that reads "the cost of a unit" from the tracker must read Total Cost
+  (`costFromRow`), never Cost of Product alone. It falls back to Cost of Product
+  only when the Total Cost formula is empty (an API-appended row can be born
+  without it).
+- **Why the parts record exists:** the tracker's Parts Cost cell had been typed
+  for 1 unit of 935, so repaired units were costed at nothing. An admin records
+  each part actually BOUGHT against a SKU; the unit's lines are SUMMED and written
+  to the Parts Cost cell, and the sheet's own formula raises Total Cost.
+- **The tracker write is inside the database transaction**, so a refused write
+  (staging, no credentials, a Google error) saves nothing. The cell is written as
+  an ABSOLUTE sum, never an increment.
+- **A Parts Cost typed by hand on the tracker is never overwritten silently.** If
+  the cell disagrees with what is recorded, the save is refused and the admin is
+  asked to keep it: it is adopted as its own `tracker` line.
+- **Rows are voided, never deleted.** Amounts are PRE-TAX.
+- After the cell changes, `products.cost` follows, and so do invoice / order
+  lines carrying the OLD total as a snapshot (an exact match). A cost typed on a
+  line that differs is left alone.
+- **Not built (Phase 2):** RS Ops marking a part "ordered" with a price and
+  posting it here (`source = 'rsops'`, idempotent on `source_ref`). That is a
+  change to the separate RS Ops app. Only 6 of 216 RS Ops units have a parts list.
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.

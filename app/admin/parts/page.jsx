@@ -26,6 +26,7 @@ export default async function PartsPage({ searchParams }) {
   return (
     <div>
       <AdminNav active="parts" />
+      <p className="hint" style={{ margin: '0 0 10px' }}>Bought a part for a specific unit? <a href="/admin/part-costs">Record its cost →</a></p>
       {hasDb()
         ? <Parts admin initialPart={Number(sp?.part) > 0 ? Number(sp.part) : null} />
         : <div className="panel">Database not configured — set <code>POSTGRES_URL</code>.</div>}
