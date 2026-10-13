@@ -6,6 +6,7 @@ import AdminNav from '../../../components/AdminNav';
 import CostFix from '../../../components/CostFix';
 import CostFillFromTracker from '../../../components/CostFillFromTracker';
 import CostByHand from '../../../components/CostByHand';
+import SaleIntegrity from '../../../components/SaleIntegrity';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Fix costs — Bargain Bay' };
@@ -21,5 +22,5 @@ export default async function CostFixPage() {
   const a = await zeroCostLines();
   // Reads the tracker, so it can fail on its own without taking the page down.
   const m = await missingCostLines().then((x) => x.summary).catch(() => ({ error: true }));
-  return (<div><AdminNav active="daily-pnl" /><CostFix initial={{ summary: a.summary, orderCount: a.orderLines.count }} /><CostFillFromTracker initial={m} /><CostByHand /></div>);
+  return (<div><AdminNav active="daily-pnl" /><CostFix initial={{ summary: a.summary, orderCount: a.orderLines.count }} /><SaleIntegrity /><CostFillFromTracker initial={m} /><CostByHand /></div>);
 }
