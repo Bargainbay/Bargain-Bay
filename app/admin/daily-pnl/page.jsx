@@ -3,7 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { dailyPnl } from '../../../lib/daily-pnl';
 import { daySales } from '../../../lib/day-sales';
-import { zeroCostLines } from '../../../lib/cost-audit';
+import { zeroCostLines, blankCostCount } from '../../../lib/cost-audit';
 import { money, torontoToday } from '../../../lib/constants';
 import AdminNav from '../../../components/AdminNav';
 
@@ -28,6 +28,7 @@ export default async function DailyPnlPage({ searchParams }) {
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp?.to || '') ? sp.to : today;
   const from = /^\d{4}-\d{2}-\d{2}$/.test(sp?.from || '') ? sp.from : shift(to, -13);
   const [r, ds, zc] = await Promise.all([dailyPnl({ from, to }), daySales(to), zeroCostLines().catch(() => null)]);
+  const blank = await blankCostCount().catch(() => 0);
   const latest = r.rows[r.rows.length - 1];
 
   return (
@@ -38,7 +39,8 @@ export default async function DailyPnlPage({ searchParams }) {
         <p className="hint">
           Product profit + delivery income, less delivery costs, staff wages and overhead. Everything is
           pre-tax. A day is a Toronto day. <a href="/admin/costs">Edit the cost list →</a>{' '}
-          <a href="/admin/team-clock">Team hours →</a>
+          <a href="/admin/team-clock">Team hours →</a>{' '}
+          <a href="/admin/cost-fix">Fix missing costs →</a>
         </p>
         <form style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '8px 0 16px' }}>
           <label>From <input type="date" name="from" defaultValue={r.from} /></label>
@@ -101,9 +103,11 @@ export default async function DailyPnlPage({ searchParams }) {
           </div>
         )}
 
-        {zc?.summary?.lines > 0 && (
+        {(zc?.summary?.lines > 0 || blank > 0) && (
           <div style={{ background: 'var(--warnbg)', color: 'var(--warn)', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 14 }}>
-            <b>{zc.summary.lines} sold units are costed at $0</b>, hiding {money(zc.summary.costLeftOut)} of real cost from profit figures.{' '}
+            <b>Some sold units have no cost counted.</b>{' '}
+            {zc?.summary?.lines > 0 && <>{zc.summary.lines} are saved at $0, hiding {money(zc.summary.costLeftOut)} of real cost. </>}
+            {blank > 0 && <>{blank} sold line{blank === 1 ? ' has' : 's have'} no cost at all (the tracker may have it). </>}
             <a href="/admin/cost-fix">Preview and fix →</a>
           </div>
         )}
