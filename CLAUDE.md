@@ -4451,9 +4451,19 @@ not shown anywhere until the storefront slice.
 - After the cell changes, `products.cost` follows, and so do invoice / order
   lines carrying the OLD total as a snapshot (an exact match). A cost typed on a
   line that differs is left alone.
-- **Not built (Phase 2):** RS Ops marking a part "ordered" with a price and
-  posting it here (`source = 'rsops'`, idempotent on `source_ref`). That is a
-  change to the separate RS Ops app. Only 6 of 216 RS Ops units have a parts list.
+- **RS Ops posts a part when it is marked ORDERED with a price**
+  (`POST /api/ops/part-costs`, shared `RSOPS_INTAKE_KEY`, `upsertRsopsPartCost` /
+  `voidRsopsPartCost`). One row per part (`source = 'rsops'`, `source_ref =
+  <unit id>:<part id>`): posting twice is one row, a changed price UPDATES it,
+  un-ordering VOIDS it. It goes through the same guard, transaction and tracker
+  write as a part typed here. **It never adopts a hand-typed Parts Cost**: that is
+  a 409 with the reason, shown next to the part in RS Ops, for a person to resolve.
+  **The response never carries cost**: only whether it was recorded.
+- **Only OUR units post** (RS Ops checks the lot is its own stock). A client's
+  parts are quoted to the client and never reach our tracker.
+- Parts typed on `/admin/part-costs` are for parts that are not in RS Ops (any SKU,
+  any time). If a part is in RS Ops, RS Ops is where its price lives, or it would
+  be counted twice.
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.

@@ -111,3 +111,50 @@ test('validation: needs a unit on the tracker, a part name, a positive amount, a
     equal((await sumRows(db)).c, 0);
   } finally { db.done(); }
 });
+
+suite('part costs posted by RS Ops');
+
+test('upsert is idempotent per part; a new price UPDATES; void removes it from the tracker sum', async () => {
+  const db = await withTestDb();
+  try {
+    const { upsertRsopsPartCost, voidRsopsPartCost, addPartCost } = await import('../lib/part-costs.js');
+    const tr = fakeTracker([{ sku: 'R1', cost: '100', partsCost: '', totalCost: '' }]);
+    const post = (amount, extra = {}) => upsertRsopsPartCost({ unitId: 'R1', partKey: 'p1', partName: 'Ice maker', amount, by: 'Tech (RS Ops)', ...extra }, tr.deps);
+    let writes = 0; const write = tr.deps.write; tr.deps.write = async (c) => { writes += 1; return write(c); };
+    const a = await post(45); equal(a.amount, 45); equal(tr.rows[0].partsCost, '45'); equal(writes, 1);
+    const again = await post(45); equal(again.unchanged, true); equal(writes, 1);          // no second write
+    equal((await sumRows(db)).c, 1);
+    const up = await post(60); equal(up.updated, true); equal(tr.rows[0].partsCost, '60'); // price changed
+    equal((await sumRows(db)).c, 1);
+    await addPartCost({ sku: 'R1', partName: 'Door seal', amount: 15 }, 'owner', tr.deps);   // typed here as well
+    equal(tr.rows[0].partsCost, '75');
+    const v = await voidRsopsPartCost({ unitId: 'R1', partKey: 'p1', by: 'Tech (RS Ops)' }, tr.deps);
+    equal(v.voided, true); equal(tr.rows[0].partsCost, '15');
+    equal((await voidRsopsPartCost({ unitId: 'R1', partKey: 'p1' }, tr.deps)).unchanged, true);
+    const again2 = await post(60); equal(again2.updated, false); equal(tr.rows[0].partsCost, '75');   // re-ordered: a new row
+  } finally { db.done(); }
+});
+
+test('RS Ops never adopts a hand-typed Parts Cost: it is refused with the reason, nothing saved', async () => {
+  const db = await withTestDb();
+  try {
+    const { upsertRsopsPartCost } = await import('../lib/part-costs.js');
+    const tr = fakeTracker([{ sku: 'R2', cost: '100', partsCost: '$80.00', totalCost: '180' }]);
+    let err = null; try { await upsertRsopsPartCost({ unitId: 'R2', partKey: 'p1', partName: 'x', amount: 20 }, tr.deps); } catch (e) { err = e; }
+    assert(err && /already shows \$80\.00/.test(err.message)); equal((await sumRows(db)).c, 0); equal(tr.rows[0].partsCost, '$80.00');
+  } finally { db.done(); }
+});
+
+test('RS Ops posts are validated: a unit and part key, a name, a positive price', async () => {
+  const db = await withTestDb();
+  try {
+    const { upsertRsopsPartCost } = await import('../lib/part-costs.js');
+    const tr = fakeTracker([{ sku: 'R3', cost: '100', partsCost: '', totalCost: '' }]);
+    const bad = async (b) => { try { await upsertRsopsPartCost({ unitId: 'R3', partKey: 'p', partName: 'x', amount: 5, ...b }, tr.deps); return ''; } catch (e) { return e.message; } };
+    assert(/Which unit/.test(await bad({ partKey: '' })));
+    assert(/no name/.test(await bad({ partName: '' })));
+    assert(/above zero/.test(await bad({ amount: 0 })));
+    assert(/not on the tracker/.test(await bad({ unitId: 'NOPE' })));
+    equal((await sumRows(db)).c, 0);
+  } finally { db.done(); }
+});
