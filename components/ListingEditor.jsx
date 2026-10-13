@@ -201,7 +201,7 @@ export default function ListingEditor({ initial, canSelfShip, canSell, tier }) {
             <figure key={p.id} style={{ margin: 0, fontSize: 12 }}>
               {/* contain, never cover: a cropped thumbnail hides the blemish a buyer is checking */}
               <img src={`/api/vendor/photo?id=${p.id}`} alt={p.role} style={{ width: '100%', aspectRatio: '1/1', objectFit: 'contain', background: 'var(--tint)', borderRadius: 6 }} />
-              <figcaption>{ROLE_LABEL[p.role] || p.role}{editable && <> · <a href="#" onClick={(e) => { e.preventDefault(); remove(p.id); }}>remove</a></>}</figcaption>
+              <figcaption>{ROLE_LABEL[p.role] || p.role} · <a href={`/api/vendor/photo?id=${p.id}&download=1`} download>save</a>{editable && <> · <a href="#" onClick={(e) => { e.preventDefault(); remove(p.id); }}>remove</a></>}</figcaption>
             </figure>
           ))}
         </div>

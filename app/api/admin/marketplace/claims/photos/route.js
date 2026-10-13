@@ -6,6 +6,7 @@ import { put, del, get } from '@vercel/blob';
 import { getSession, isStaff } from '../../../../../../lib/auth';
 import { processListingImage } from '../../../../../../lib/image-checks';
 import { attachClaimPhoto, claimPhotoPath } from '../../../../../../lib/warranty-claims';
+import { downloadHeaders } from '../../../../../../lib/image-download';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -21,7 +22,7 @@ export async function GET(req) {
   try {
     const res = await get(path, { access: 'private' });
     if (!res || res.statusCode !== 200 || !res.stream) return new NextResponse('Not found', { status: 404 });
-    return new Response(res.stream, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=300' } });
+    return new Response(res.stream, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=300', ...downloadHeaders(req, `claim-photo-${new URL(req.url).searchParams.get('id')}`) } });
   } catch { return new NextResponse('Not found', { status: 404 }); }
 }
 

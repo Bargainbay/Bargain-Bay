@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import DownloadPhoto from './DownloadPhoto';
 
 // The pictures the storefront shows, in one place.
 //
@@ -64,7 +65,7 @@ function ModelRow({ m, onChanged }) {
   const trimmed = link.trim();
   return (
     <tr>
-      <td><Thumb src={m.image} /></td>
+      <td><Thumb src={m.image} />{m.image && <div style={{ marginTop: 4 }}><DownloadPhoto url={m.image} name={m.model} style={{ padding: '1px 8px', fontSize: 11 }}>⤓ Save</DownloadPhoto></div>}</td>
       <td>
         <div style={{ fontWeight: 600 }}>{m.model}</div>
         <div className="hint" style={{ margin: 0 }}>{[m.make, m.category].filter(Boolean).join(' · ')} · {m.units} unit{m.units === 1 ? '' : 's'}</div>
@@ -198,7 +199,10 @@ function UnitPhotos() {
             {photos.map((p) => (
               <div key={p.id} style={{ textAlign: 'center' }}>
                 <Thumb src={p.url} size={130} />
-                <button className="btn" style={{ padding: '2px 10px', fontSize: 12, marginTop: 4 }} disabled={busy} onClick={() => del(p.id)}>Delete</button>
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
+                  <DownloadPhoto url={p.url} name={`${loaded}-${p.position + 1}`} style={{ padding: '2px 10px', fontSize: 12 }}>⤓ Save</DownloadPhoto>
+                  <button className="btn" style={{ padding: '2px 10px', fontSize: 12 }} disabled={busy} onClick={() => del(p.id)}>Delete</button>
+                </div>
               </div>
             ))}
             {!photos.length && <p className="hint">No photos of {loaded} yet.</p>}

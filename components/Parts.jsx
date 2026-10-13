@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Reorder from './Reorder';
+import PartPhotos from './PartPhotos';
 import { money } from '../lib/constants';
 import { PART_CONDITIONS } from '../lib/parts-labels';
 
@@ -256,6 +257,9 @@ function PartCard({ id, admin, onClose, onChanged }) {
           </div>
         </div>
       )}
+
+      <h3>Photos</h3>
+      <PartPhotos partId={part.id} label={partTitle(part) || 'part'} />
 
       <h3>Take one off the shelf</h3>
       <p className="hint" style={{ marginTop: 0 }}>
@@ -586,6 +590,8 @@ function Receive({ admin, onChanged, onOpen }) {
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [shots, setShots] = useState([]);
+  const [shotKey, setShotKey] = useState(0);
   const set = (k) => (e) => setF({ ...f, [k]: k === 'location' ? e.target.value.toUpperCase() : e.target.value });
 
   async function book() {
@@ -598,7 +604,18 @@ function Receive({ admin, onChanged, onOpen }) {
         action: 'receive', partId: part.id, qty: Number(f.qty), condition: f.condition,
         location: f.location || undefined, cost: admin && f.cost ? Number(f.cost) : undefined, note: f.note
       });
-      setMsg(`Booked in ${f.qty} × ${part.name}${part.existed ? ' (added to the ones we already had)' : ''}.`);
+      let photoNote = '';
+      if (shots.length) {
+        const fd = new FormData(); fd.set('partId', String(part.id));
+        shots.forEach((b, i) => fd.append('photos', b, `part-${i}.jpg`));
+        try {
+          const r = await fetch('/api/admin/part-photos', { method: 'POST', body: fd });
+          const d = await r.json().catch(() => ({}));
+          photoNote = r.ok && !d.failed ? ` ${d.photos.length} photo${d.photos.length === 1 ? '' : 's'} saved.` : ` The part is booked in, but the photo didn't save (${d.error || 'too big or not a picture'}) - add it from the part's card.`;
+        } catch { photoNote = " The part is booked in, but the photo didn't save - add it from the part's card."; }
+      }
+      setShots([]); setShotKey((k) => k + 1);
+      setMsg(`Booked in ${f.qty} × ${part.name}${part.existed ? ' (added to the ones we already had)' : ''}.${photoNote}`);
       setF({ ...f, partNumber: '', name: '', qty: '1', cost: '', note: '' });
       onChanged?.();
       onOpen(part.id);
@@ -632,6 +649,10 @@ function Receive({ admin, onChanged, onOpen }) {
           {admin && <input value={f.cost} onChange={set('cost')} placeholder="Cost each $" style={{ width: 120 }} inputMode="decimal" aria-label="Cost each" />}
           <input value={f.note} onChange={set('note')} placeholder="Note (optional)" style={{ width: 180 }} aria-label="Note" />
           <button type="button" className="btn primary" disabled={busy} onClick={book}>Book it in</button>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <div className="hint" style={{ margin: '0 0 6px' }}>Photo of the part (optional) - saved with it when you press Book it in.</div>
+          <PartPhotos key={shotKey} onPending={setShots} label={f.partNumber || f.name || 'part'} />
         </div>
       </div>
     </div>
