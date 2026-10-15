@@ -16,7 +16,7 @@ export const maxDuration = 60;
 const denied = () => NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 
 export async function GET(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('claims.view');
   if (!ctx) return denied();
   const path = await claimPhotoPath(Number(new URL(req.url).searchParams.get('id')), { vendorId: ctx.vendor.id });
   if (!path) return new NextResponse('Not found', { status: 404 });
@@ -28,7 +28,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('claims.respond');
   if (!ctx) return denied();
   if (!process.env.BLOB_READ_WRITE_TOKEN) return NextResponse.json({ error: 'Photo storage is not configured.' }, { status: 503 });
   let form;

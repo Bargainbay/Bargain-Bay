@@ -8,8 +8,8 @@ import {
   createVendorOrdersTx, confirmVendorOrders, acceptVendorOrder, markVendorOrderReady, cancelVendorOrder,
   onOrderStatus, listVendorOrders, allVendorOrders
 } from '../lib/vendor-orders.js';
-import { ensurePickupJob, resolveMismatch, pickupDate, warehouseDrop, onPickupJobStatus } from '../lib/vendor-pickup.js';
-import { completeJob, setJobStatus, dispatchBoard } from '../lib/jobs.js';
+import { ensurePickupJob, combineTrip, resolveMismatch, pickupDate, warehouseDrop, onPickupJobStatus } from '../lib/vendor-pickup.js';
+import { completeJob, setJobStatus, dispatchBoard, createJob } from '../lib/jobs.js';
 import { PICKUP_ADDRESS } from '../lib/constants.js';
 
 const T0 = new Date('2026-10-20T14:00:00Z');
@@ -211,5 +211,28 @@ test('staff can rebook after a cancelled job, and assigning a driver works like 
     const again = await ensurePickupJob(id); assert(again.ok && !again.already && again.jobId !== first.id, 'a fresh job');
     equal((await liveJobs(id)).length, 1);
     await onPickupJobStatus(424242, 'done');                                       // a job with no vendor order: nothing happens
+  } finally { done(); }
+});
+
+test('ONE TRIP: the customer delivery stop absorbs the collection; the separate job comes off; finishing it marks the unit collected', async () => {
+  const { done } = await withTestDb();
+  try {
+    const v = await vendor('Alpha'); const l = await listing(v.id, 'B'); const { o, id } = await readyB(v, l);
+    await rejects(async () => { const r = await combineTrip(id); if (!r.ok) throw new Error(r.why); }, /not ready/);
+    await markVendorOrderReady(v.id, id, { now: new Date(T0.getTime() + 5 * 3600e3) });
+    const sep = (await liveJobs(id))[0];
+    const noDel = await combineTrip(id);
+    assert(!noDel.ok && /not on the board/.test(noDel.why), 'needs the delivery on the board first');
+    const del = await createJob({ type: 'delivery', source: 'bargain_bay', orderId: o.id, customerName: 'Cust Private', address: '9 Customer St', city: 'Toronto', postal: 'M1M 1M1',
+      jobDate: '2026-10-22', items: [{ description: 'A fridge', sku: l.sku }], createdBy: { email: 'x', name: 'x' } });
+    const r = await combineTrip(id, { by: 'staff@x' });
+    assert(r.ok && r.jobId === del.id, `combined onto the delivery: ${JSON.stringify(r)}`);
+    equal((await query('SELECT status FROM jobs WHERE id = $1', [sep.id])).rows[0].status, 'cancelled');
+    const live = await liveJobs(id); equal(live.length, 1); equal(live[0].id, del.id);
+    const j = live[0];
+    equal(j.pickup_address, '12 Dock Rd'); equal(j.pickup_company, 'Alpha'); assert(/ONE TRIP/.test(j.notes) && /SN-SECRET/.test(j.notes), 'crew has the checks');
+    assert(!(await combineTrip(id)).ok, 'cannot combine twice');
+    await completeJob(del.id, { signedBy: 'Customer' }, { email: 'd@x', name: 'Driver' });
+    assert((await vo(o.id, 'B')).collected_at, 'finishing the one trip marks the unit collected');
   } finally { done(); }
 });

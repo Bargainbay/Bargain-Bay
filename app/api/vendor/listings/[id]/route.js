@@ -14,14 +14,14 @@ const denied = () => NextResponse.json({ error: 'Not authorized' }, { status: 40
 const idOf = async (params) => Number((await params).id);
 
 export async function GET(_req, { params }) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('listings.view');
   if (!ctx) return denied();
   const l = await getVendorListing(ctx.vendor.id, await idOf(params));
   return l ? NextResponse.json({ listing: l }) : NextResponse.json({ error: 'Not found' }, { status: 404 });
 }
 
 export async function PATCH(req, { params }) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('listings.edit');
   if (!ctx) return denied();
   const id = await idOf(params);
   let body;
