@@ -4372,6 +4372,28 @@ not shown anywhere until the storefront slice.
   books the stop). **Test gotcha:** a test that installs a database with `__useTestDatabase` MUST release it
   (`done()` / `__useTestDatabase(null)`) — `test/partial.test.mjs` depends on there being none, and a leak makes it
   fail three tests in a different file.
+- **Bulk upload of listings (`lib/listing-bulk.js`, no migration).** "Bulk upload" on `/vendor/listings` ->
+  `/vendor/listings/bulk`; `GET .../bulk/template` (CSV, every column + a worked example row), `POST .../bulk/preview`
+  (CSV / .xlsx file or pasted text; WRITES NOTHING), `POST .../bulk/confirm`. Cap `BULK_MAX_ROWS` = 100 per upload.
+  - **No second rulebook.** Every row goes through `normalizeFields` / `validateForSubmit` / `tierProblem` — the single
+    path's own functions — minus the `photos` problems (photos cannot ride a spreadsheet; a draft with none still cannot be
+    submitted). Add a field to a listing -> add it to `BULK_COLUMNS` too, or the sheet cannot set it.
+  - **Confirm creates DRAFTS only, per row, not all-or-nothing**, and reports created / already-created / failed-with-reasons.
+    A row with any problem is skipped, not half-imported. The server re-parses and re-checks everything at confirm; the
+    browser sends the TEXT back (an .xlsx is turned into tab text at preview), never parsed rows.
+  - **Token = sha256(vendor id + every row's normalised input).** A confirm whose file differs from the previewed one, or
+    belongs to another vendor, is refused. **Replay safety is a `bulk_row` event** (`{batch,row}` in `listing_events`) checked
+    inside `createDraft`'s SKU lock (`{ bulk }` option) — no new table. Rows an earlier confirm made are reported as
+    "already created" and are NOT re-checked, or their own serials would read as clashes with themselves.
+  - **Serials:** duplicates inside the file name the other row; against another vendor only an in-review/for-sale listing
+    counts (their drafts do not) and the message never says who; against the vendor's OWN non-closed listings the message
+    names their own SKU. A re-upload after fixing a failed row therefore does not duplicate the good ones.
+  - **Parser:** `parseGrid` is a whole-text state machine (quoted line breaks work) with the stop importer's quote-only-
+    at-field-start rule (`36"`), delimiter sniffing and Excel error blanking (`sniffDelimiter` / `cell` are now exported
+    from `lib/stop-import.js`). Leading `= + @` on text cells is stripped with a warning (CSV injection). The template's
+    example row carries `EXAMPLE_SERIAL` and is blocked until deleted, so uploading the blank template creates nothing.
+  - Not verified: two simultaneous confirms of one batch — PGlite is one connection, so the advisory lock is untestable;
+    the per-row marker plus the SKU unique index mean the worst case is a failed row, never a duplicate.
 - **Test gotcha:** the checkout route's runtime-DDL helpers (`ensureAttributionColumns` etc.) memoise "done" in
   module scope, so a second FRESH test database never gets their columns. Every test file that drives the real
   route uses `test/shared-checkout-db.mjs` (one database, re-installed on each call).
