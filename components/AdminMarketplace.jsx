@@ -14,7 +14,7 @@ async function api(url, method, body) {
   return d;
 }
 
-export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, payouts, orders = [], claims = [], rates = null, serverNow, rejectReasons, strikeReasons }) {
+export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, payouts, orders = [], claims = [], rates = null, zoneRates = null, serverNow, rejectReasons, strikeReasons }) {
   const apps = vendors.filter((v) => v.status === 'applied');
   const tabs = [
     ['apps', `Applications${apps.length ? ` (${apps.length})` : ''}`],
@@ -115,11 +115,12 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
       )}
 
       {tab === 'orders' && (
-        <OrdersTab orders={orders} rates={rates} isAdmin={isAdmin} busy={busy} now={new Date(serverNow || Date.now())}
+        <OrdersTab orders={orders} rates={rates} zoneRates={zoneRates} isAdmin={isAdmin} busy={busy} now={new Date(serverNow || Date.now())}
           onVendor={goVendor}
           bookPickup={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'book_pickup', id }), 'Collection booked on the dispatch board.')}
           resolveMismatch={(id, action, note) => act(() => post('/api/admin/marketplace/orders', { action: 'resolve_mismatch', id, resolution: action, note }), 'Decision recorded.')}
           deliver={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'deliver', id }), 'Marked delivered — the sale is booked to the vendor.')}
+          setZoneRate={(zone, sizeClass, dollars) => act(() => post('/api/admin/marketplace/orders', { action: 'set_zone_rate', zone, sizeClass, dollars }), 'Fee saved.')}
           setRate={(sizeClass, dollars) => act(() => post('/api/admin/marketplace/orders', { action: 'set_rate', sizeClass, dollars }), 'Fee saved.')} />
       )}
       {tab === 'claims' && (
@@ -183,6 +184,7 @@ function ListingReview({ data, busy, rejectReasons, onClose, onDecide }) {
   const [note, setNote] = useState('');
   const [reason, setReason] = useState('');
   const [cond, setCond] = useState('');
+  const [km, setKm] = useState('');
   const row = (k, v) => <tr key={k}><td style={{ width: 180, color: 'var(--muted)' }}>{k}</td><td>{v ?? '—'}</td></tr>;
   return (
     <div className="panel">
@@ -205,13 +207,19 @@ function ListingReview({ data, busy, rejectReasons, onClose, onDecide }) {
         {row('Tested', `${l.testedWorking ? 'yes' : 'NO'} — ${l.testNotes || ''}`)}{row('Refurb notes', l.refurbNotes)}
         {row('Description', l.description)}{row('Delivery notes', l.deliveryNotes)}
         {l.lane === 'B' && row('Pickup', `${l.pickupAddress || ''} ${l.pickupCity || ''} ${l.pickupPostal || ''}`)}
+        {l.lane === 'B' && row('Driving distance', l.pickupKm != null ? `${l.pickupKm} km (${l.pickupKmSource === 'google' ? 'looked up' : 'entered by staff'})` : 'not known yet — enter it below')}
       </tbody></table>
       <p style={{ fontSize: 13, color: 'var(--muted)' }}>Check: are the photos of one real unit, does the plate match the model, is the grade honest, is the retail price real.</p>
       <div style={{ display: 'grid', gap: 10, maxWidth: 520 }}>
         <div><label style={{ fontSize: 13 }}>Re-grade condition on approval (optional)</label>
           <select value={cond} onChange={(e) => setCond(e.target.value)}><option value="">Keep “{l.condition}”</option>
             {['New in Box', 'New Open Box', 'New Scratch & Dent', 'Refurbished'].map((c) => <option key={c}>{c}</option>)}</select></div>
-        <button className="btn primary" disabled={busy} onClick={() => onDecide({ decision: 'approve', condition: cond || undefined })}>
+        {l.lane === 'B' && (
+          <div><label style={{ fontSize: 13 }}>Driving distance from our warehouse, km {l.pickupKm != null ? '(leave blank to keep)' : '(required for Lane B)'}</label>
+            <input inputMode="decimal" value={km} onChange={(e) => setKm(e.target.value)} placeholder={l.pickupKm != null ? String(l.pickupKm) : 'e.g. 38.5'} />
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sets the collection fee zone. Over 150 km we do not collect.</div></div>
+        )}
+        <button className="btn primary" disabled={busy} onClick={() => onDecide({ decision: 'approve', condition: cond || undefined, pickupKm: km === '' ? undefined : km })}>
           Approve {l.lane === 'A' ? '(then waits for check-in at our warehouse)' : '(goes live)'}</button>
         <textarea rows={2} placeholder="What should the vendor change?" value={note} onChange={(e) => setNote(e.target.value)} />
         <button className="btn" disabled={busy || !note.trim()} onClick={() => onDecide({ decision: 'changes', note })}>Send back for changes</button>
@@ -423,7 +431,7 @@ function VendorLink({ id, onOpen, children }) {
   return <a href="#" onClick={(e) => { e.preventDefault(); onOpen(id); }}>{children}</a>;
 }
 
-function OrdersTab({ orders, rates, isAdmin, busy, now, onVendor, deliver, setRate, bookPickup, resolveMismatch }) {
+function OrdersTab({ orders, rates, zoneRates, setZoneRate, isAdmin, busy, now, onVendor, deliver, setRate, bookPickup, resolveMismatch }) {
   const [dollars, setDollars] = useState({});
   const hrs = (d) => (new Date(d) - now) / 3600000;
   const clock = (o) => {
@@ -463,9 +471,29 @@ function OrdersTab({ orders, rates, isAdmin, busy, now, onVendor, deliver, setRa
           ))}
         </tbody></table></div>
       </div>
+      {isAdmin && zoneRates && (
+        <div className="panel">
+          <h2 style={{ marginTop: 0, fontSize: 17 }}>Collection fee — Lane B (we pick the unit up from the vendor)</h2>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>By driving distance from the warehouse and the unit&rsquo;s size. Same distance bands as the customer delivery policy. The fee is copied onto each order when the vendor accepts it. Cells marked <b>starter</b> are a suggested schedule (the customer zone fee scaled by size), not a measured cost — check them against the dispatch Profit tab and save each one to confirm it. Beyond 150 km we do not collect.</p>
+          <div className="table-wrap"><table className="admin" style={{ minWidth: 0 }}>
+            <thead><tr><th>Zone</th>{SIZES.map(([k, label]) => <th key={k}>{label}</th>)}</tr></thead>
+            <tbody>{[[1, '0–50 km'], [2, '51–100 km'], [3, '101–150 km']].map(([z, label]) => (
+              <tr key={z}><td><b>{label}</b></td>
+                {SIZES.map(([k]) => {
+                  const key = `${z}-${k}`; const cur = zoneRates.rates[z][k]; const starter = zoneRates.isStarter[z][k];
+                  return (<td key={k}>
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <span>$</span><input style={{ width: 70 }} inputMode="decimal" placeholder={(cur / 100).toFixed(0)} value={dollars[key] ?? ''} onChange={(e) => setDollars({ ...dollars, [key]: e.target.value })} />
+                      <button className="btn" disabled={busy} onClick={() => setZoneRate(z, k, dollars[key] === undefined || dollars[key] === '' ? cur / 100 : dollars[key])}>{dollars[key] ? 'Save' : starter ? 'Confirm' : 'Re-save'}</button>
+                    </div>
+                    <div style={{ fontSize: 11, color: starter ? 'var(--accent, #b45309)' : 'var(--muted)' }}>{starter ? `starter $${(cur / 100).toFixed(0)}` : `saved $${(cur / 100).toFixed(0)}`}</div>
+                  </td>);
+                })}</tr>))}</tbody></table></div>
+        </div>
+      )}
       {isAdmin && rates && (
         <div className="panel">
-          <h2 style={{ marginTop: 0, fontSize: 17 }}>Delivery service fee (billed to the vendor)</h2>
+          <h2 style={{ marginTop: 0, fontSize: 17 }}>Handling fee — Lane A (the vendor brings it to us)</h2>
           <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>What we charge a vendor to collect and deliver one unit, by size. It is copied onto each order when the vendor accepts it, so changing it never alters a past statement. Set these from what a pickup actually costs us (the dispatch Profit tab shows it). Lane C (the vendor ships) is not charged.</p>
           {rates.unset.length > 0 && <div className="error-box">Not set yet: {rates.unset.join(', ')}. Until set, vendors are charged $0 for those sizes.</div>}
           {SIZES.map(([k, label, hint]) => (
