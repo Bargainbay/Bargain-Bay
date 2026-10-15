@@ -82,17 +82,18 @@ export default function WorkshopPage() {
 
       <section className="ws-sec">
         <h2>Questions</h2>
-        <details><summary>Do I need experience or my own tools?</summary><p>No experience is needed; we start from the basics. Tools are provided for use in class.</p></details>
+        <details><summary>Do I need experience or my own tools?</summary><p>No experience is needed; we start from the basics. Everything you need for the hands-on sessions is provided.</p></details>
         <details><summary>Is it safe?</summary><p>Safety is week one. Instructors supervise every live-power, gas and refrigeration task.</p></details>
         <details><summary>Will I get a job?</summary><p>We can&apos;t promise one. Successful candidates may be offered our apprenticeship program, and then employment with RS Solutions, as described above.</p></details>
-        <details><summary>How do I pay?</summary><p>Tuition is {W.priceLabel} for the six-week term. Apply below, and we&apos;ll contact you to confirm your seat and arrange payment. Nothing is charged when you apply.</p></details>
+        <details><summary>Will I get a certificate?</summary><p>Yes. Everyone who completes the workshop receives a certificate of completion.</p></details>
+        <details><summary>How do I pay?</summary><p>Tuition is {W.priceFull} for the six-week term. Apply below, and we&apos;ll contact you to confirm your seat and arrange payment. Nothing is charged when you apply.</p></details>
         <details><summary>Where is it?</summary><p>{PICKUP_ADDRESS}.</p></details>
       </section>
 
       <section className="ws-sec ws-alt" id="apply">
         <h2>Apply for a seat</h2>
         <p className="ws-muted">Classes run {dayLabel(W.start, false)} to {dayLabel(W.end, false)}. Seats are limited, and we confirm them in the order applications arrive.</p>
-        <ApplyForm experience={W.experience} heardFrom={W.heardFrom} priceLabel={W.priceLabel} />
+        <ApplyForm experience={W.experience} heardFrom={W.heardFrom} priceLabel={W.priceFull} />
       </section>
 
       <footer className="ws-foot">
