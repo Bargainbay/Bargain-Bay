@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('listings.bulk');
   if (!ctx) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   return new NextResponse(bulkTemplateCsv(), {
     headers: {

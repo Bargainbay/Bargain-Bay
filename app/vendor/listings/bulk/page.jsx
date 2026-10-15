@@ -9,12 +9,12 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Bulk upload — Bargain Bay Marketplace' };
 
 export default async function BulkPage() {
-  const gate = await vendorGate('/vendor/listings/bulk');
+  const gate = await vendorGate('/vendor/listings/bulk', 'listings.bulk');
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
   return (
     <div>
-      <VendorNav active="listings" name={vendor.trade_name || vendor.legal_name} />
+      <VendorNav active="listings" name={vendor.trade_name || vendor.legal_name} role={vendor.role} mfa={gate.ctx.mfa} />
       <VendorBulkUpload max={BULK_MAX_ROWS} help={bulkColumnHelp()} canList={canSell(vendor.status)} />
     </div>
   );

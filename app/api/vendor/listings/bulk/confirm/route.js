@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function POST(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('listings.bulk');
   if (!ctx) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   let body;
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }

@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 const MAX_BYTES = 2 * 1024 * 1024;
 
 export async function POST(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('listings.bulk');
   if (!ctx) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   let text = '';
   try {

@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 const denied = () => NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 
 export async function GET(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('messages.view');
   if (!ctx) return denied();
   const id = new URL(req.url).searchParams.get('id');
   if (id) {

@@ -37,7 +37,7 @@ export default async function VendorHome() {
     can(vendor.role, 'listings.view') ? listVendorListings(vendor.id) : [],
     can(vendor.role, 'orders.view') ? listVendorOrders(vendor.id).catch(() => []) : []
   ]);
-  const unreadMessages = await vendorUnreadCount(vendor.id).catch(() => 0);
+  const unreadMessages = can(vendor.role, 'messages.view') ? await vendorUnreadCount(vendor.id).catch(() => 0) : 0;
   const policiesPending = await pendingPolicies(vendor.id).catch(() => []);
   // The checklist runs through the bank account and payouts, which only the owner sees.
   const onboarding = can(vendor.role, 'bank.view') ? await onboardingProgress(vendor.id).catch(() => null) : null;

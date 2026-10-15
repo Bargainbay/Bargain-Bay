@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Messages — Bargain Bay Marketplace' };
 
 export default async function MessagesPage({ searchParams }) {
-  const gate = await vendorGate('/vendor/messages');
+  const gate = await vendorGate('/vendor/messages', 'messages.view');
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
   const sp = await searchParams;
@@ -17,7 +17,7 @@ export default async function MessagesPage({ searchParams }) {
   ]);
   return (
     <div>
-      <VendorNav active="messages" name={vendor.trade_name || vendor.legal_name} unread={unread} />
+      <VendorNav active="messages" name={vendor.trade_name || vendor.legal_name} role={vendor.role} mfa={gate.ctx.mfa} unread={unread} />
       <VendorMessages initial={JSON.parse(JSON.stringify(threads))} ties={ties} openId={Number(sp?.t) || null} limits={{ body: MAX_BODY, subject: MAX_SUBJECT }} />
     </div>
   );
