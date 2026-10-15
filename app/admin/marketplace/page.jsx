@@ -10,6 +10,7 @@ import { pendingBankAccounts } from '../../../lib/vendor-bank';
 import { listPayouts } from '../../../lib/payouts';
 import { allVendorOrders, deliveryRates, deliveryZoneRates } from '../../../lib/vendor-orders';
 import { listClaims, claimsForViewer } from '../../../lib/warranty-claims';
+import { listStaffThreads } from '../../../lib/vendor-messages';
 import { REJECT_REASONS } from '../../../lib/listing-rules';
 import { STRIKE_REASONS } from '../../../lib/marketplace-rules';
 
@@ -29,7 +30,7 @@ export default async function MarketplacePage() {
   if (!hasDb()) return <div><AdminNav active="marketplace" /><div className="panel">Database not configured — set POSTGRES_URL.</div></div>;
   const admin = isAdmin(session);
   const soft = (p, fallback) => p.catch((e) => { console.error('marketplace page', e?.message || e); return fallback; });
-  const [vendors, queue, due, banks, payouts, orders, rates, claims, zoneRates] = await Promise.all([
+  const [vendors, queue, due, banks, payouts, orders, rates, claims, messages, zoneRates] = await Promise.all([
     soft(listVendors(), []),
     soft(reviewQueue(), []),
     admin ? soft(strikesAwaitingReview(), []) : [],
@@ -38,6 +39,7 @@ export default async function MarketplacePage() {
     soft(allVendorOrders(), []),
     admin ? soft(deliveryRates(), null) : null,
     soft(listClaims(), []),
+    soft(listStaffThreads({ filter: 'open' }), []),
     admin ? soft(deliveryZoneRates(), null) : null
   ]);
   return (
@@ -54,6 +56,8 @@ export default async function MarketplacePage() {
         rates={rates}
         zoneRates={zoneRates}
         claims={JSON.parse(JSON.stringify(claimsForViewer(claims, admin)))}
+        messages={JSON.parse(JSON.stringify(messages))}
+        meEmail={String(session.email || '').toLowerCase()}
         serverNow={new Date().toISOString()}
         rejectReasons={REJECT_REASONS}
         strikeReasons={STRIKE_REASONS}

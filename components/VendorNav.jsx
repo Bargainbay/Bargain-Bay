@@ -2,10 +2,11 @@ import NavSignOut from './NavSignOut';
 
 // The vendor portal's nav. A vendor is on no staff list, so there is no link here to anything
 // of ours — and no search box, which would reach customers and orders.
-export default function VendorNav({ active, name }) {
+export default function VendorNav({ active, name, unread = 0 }) {
   const items = [
     { key: 'home', label: 'Home', href: '/vendor' },
     { key: 'orders', label: 'Orders', href: '/vendor/orders' },
+    { key: 'messages', label: unread ? `Messages (${unread})` : 'Messages', href: '/vendor/messages' },
     { key: 'claims', label: 'Claims', href: '/vendor/claims' },
     { key: 'listings', label: 'Listings', href: '/vendor/listings' },
     { key: 'payouts', label: 'Payouts', href: '/vendor/payouts' },

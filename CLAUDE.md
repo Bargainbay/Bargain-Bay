@@ -4456,6 +4456,28 @@ not shown anywhere until the storefront slice.
     COLLECTED FROM THE SELLER" while a collection is outstanding.
   - `npm test -- <word>` now runs only the test files whose name contains the word.
 
+- **Seller messaging (`lib/vendor-messages.js`, `lib/contact-guard.js`, migration 0033).** Threads belong to ONE vendor
+  and may be tied to one of THAT vendor's orders, listings or warranty claims (each id is validated against the
+  thread's vendor). Seller: `/vendor/messages` (inbox, thread, new message; nav item + unread on the home page),
+  `/api/vendor/messages`, vendor id from `requireVendor()` only, another seller's thread is a 404. Staff: the
+  **Messages** tab on `/admin/marketplace`, `/api/admin/marketplace/messages`, **STAFF-level** (dealing with a seller,
+  not the books).
+  - **Append-only**: a trigger refuses UPDATE/DELETE on `vendor_messages`; a correction is a new message. Author is the
+    session's email, name snapshotted, never from the body.
+  - **Internal staff notes** are rows with `internal = true` (CHECK: staff side only). Every seller-side query filters them
+    out IN SQL, they never move unread state or "who spoke last", and they email nobody. A staff member's email address
+    is not shown to the seller either. Do not add a seller query without `NOT internal`.
+  - **No customer contact to a seller**: a tie-in shows only order number / listing sku / claim, nothing about the
+    customer. A seller-VISIBLE staff message matching an email/phone pattern is refused (409 `needsConfirm`) until the
+    sender confirms (`confirmContact`); the composer warns first using the same `contactDetailsIn`. Internal notes are exempt.
+  - **Read state is a per-side marker on the thread** (`vendor_read_at` / `staff_read_at`, one per side not per user);
+    writing a message counts as having read. Awaiting-us / awaiting-seller come from `last_public_side`.
+  - **Email**: best-effort, awaited, one per side per thread per 15 minutes (conditional UPDATE claims the slot; a failed
+    send hands it back). `sendEmail` RETURNS failure, so the result is checked. The email never carries the message text.
+  - **Limits** counted from rows under a per-vendor advisory lock: 20 messages/hour, 10 new threads/day, 4000 characters.
+    A reply from either side reopens a closed thread. **Text only: no attachments in this slice.**
+  - Thread open/close/reopen go to `vendor_events` via `logVendorEvent`.
+
 ## Parts bought for a unit, and what a unit COSTS (added 2026-10-13)
 `lib/part-costs.js`, `lib/tracker-cost.js`, migration 0030 (`unit_part_costs`),
 `/admin/part-costs` (ADMIN; linked from the Reports hub and the Parts page),
