@@ -547,6 +547,11 @@ function StopCard({ stop, n, done, preview, me, onStart, onArrive, onFinish, onF
         <div className="drv-svc">{stop.services.map((k) => SERVICE_LABEL[k] || k).join(' · ')}</div>
       )}
       {stop.notes && <div className="drv-note">{stop.notes}</div>}
+      {stop.invoiceNumber && (
+        <a href={`/admin/packing-slip/${stop.invoiceNumber}`} target="_blank" rel="noopener noreferrer" className="drv-svc">
+          📄 Packing slip — installation / haul-away
+        </a>
+      )}
       <div className="drv-ref">
         {stop.ticketNumber || stop.jobNumber}
         {stop.orderNumber ? ` · ${stop.orderNumber}` : ''}
