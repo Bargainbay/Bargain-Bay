@@ -9,6 +9,8 @@ import {
   markStrikeReviewed, reinstateVendor, strikesAwaitingReview
 } from '../../../../../lib/vendors';
 import { STRIKE_REASONS } from '../../../../../lib/marketplace-rules';
+import { VENDOR_ROLES, VENDOR_ROLE_LABELS } from '../../../../../lib/vendor-permissions';
+import { resetMemberMfa } from '../../../../../lib/vendor-team';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -45,7 +47,7 @@ export async function POST(req) {
       case 'approve': return NextResponse.json(await decideApplication(vendorId, { approve: true, by, hstStatus: b.hstStatus }));
       case 'reject': return NextResponse.json(await decideApplication(vendorId, { approve: false, by, reason: b.reason }));
       case 'grant_user': {
-        const role = b.role === 'owner' ? 'owner' : 'staff';
+        const role = VENDOR_ROLES.includes(b.role) ? b.role : 'viewer';
         if (role === 'owner' && !admin) return NextResponse.json({ error: 'Only an admin can give someone the owner login (it controls the bank account).' }, { status: 403 });
         return NextResponse.json(await grantVendorUser(vendorId, { email: b.email, name: b.name, role, by }));
       }
@@ -54,6 +56,8 @@ export async function POST(req) {
     }
     if (!admin) return denied();
     switch (b?.action) {
+      // A locked-out team member (lost phone AND recovery codes). ADMIN only, with a reason; audited.
+      case 'reset_mfa': return NextResponse.json(await resetMemberMfa(vendorId, b.email, { session: s, reason: b.reason }));
       case 'set_tier': return NextResponse.json(await setTier(vendorId, b.tier, { by, reason: b.reason }));
       case 'set_commission': return NextResponse.json(await setCommission({ vendorId: vendorId || null, rateBps: b.rateBps, effectiveFrom: b.effectiveFrom, by }));
       case 'strike': return NextResponse.json(await issueStrike(vendorId, { reason: b.reason, orderRef: b.orderRef, note: b.note, by }));

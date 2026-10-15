@@ -12,6 +12,7 @@ import { onboardingProgress } from '../../lib/onboarding';
 import { vendorScorecard } from '../../lib/vendor-scorecard';
 import VendorCountdowns from '../../components/VendorCountdowns';
 import VendorScorecard from '../../components/VendorScorecard';
+import { can } from '../../lib/vendor-permissions';
 import { ACCEPT_HOURS, READY_HOURS, STRIKE_REASONS, TIERS } from '../../lib/marketplace-rules';
 
 export const dynamic = 'force-dynamic';
@@ -25,24 +26,29 @@ const BANNER = {
 };
 
 export default async function VendorHome() {
-  const gate = await vendorGate('/vendor');
+  const gate = await vendorGate('/vendor', 'portal.view');
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
+  // Money and orders are loaded only for roles that may see them (lib/vendor-permissions.js).
   const [meter, bal, bank, listings, orders] = await Promise.all([
-    strikeMeter(vendor.id), vendorBalance(vendor.id), bankSummary(vendor.id), listVendorListings(vendor.id),
-    listVendorOrders(vendor.id).catch(() => [])
+    strikeMeter(vendor.id),
+    can(vendor.role, 'money.view') ? vendorBalance(vendor.id) : null,
+    can(vendor.role, 'bank.view') ? bankSummary(vendor.id) : null,
+    can(vendor.role, 'listings.view') ? listVendorListings(vendor.id) : [],
+    can(vendor.role, 'orders.view') ? listVendorOrders(vendor.id).catch(() => []) : []
   ]);
   const unreadMessages = await vendorUnreadCount(vendor.id).catch(() => 0);
   const policiesPending = await pendingPolicies(vendor.id).catch(() => []);
-  const onboarding = await onboardingProgress(vendor.id).catch(() => null);
-  const card = await vendorScorecard(vendor.id).catch(() => null);
+  // The checklist runs through the bank account and payouts, which only the owner sees.
+  const onboarding = can(vendor.role, 'bank.view') ? await onboardingProgress(vendor.id).catch(() => null) : null;
+  const card = can(vendor.role, 'performance.view') ? await vendorScorecard(vendor.id).catch(() => null) : null;
   const waiting = orders.filter((o) => o.status === 'awaiting_accept').length;
   const toReady = orders.filter((o) => o.status === 'accepted').length;
   const by = (s) => listings.filter((l) => l.status === s).length;
   const [tone, label] = BANNER[meter.standing] || ['ok', meter.standing];
   const todo = [];
   if (policiesPending.length) todo.push({ text: `Read and accept our marketplace policies (${policiesPending.length}) — you can't list until the account owner has.`, href: '/vendor/policies' });
-  if (!bank.payable && !bank.waiting.length) todo.push({ text: 'Add your banking details so we can pay you.', href: '/vendor/payouts' });
+  if (bank && !bank.payable && !bank.waiting.length) todo.push({ text: 'Add your banking details so we can pay you.', href: '/vendor/payouts' });
   if (unreadMessages) todo.push({ text: `You have ${unreadMessages} unread conversation(s) from Bargain Bay.`, href: '/vendor/messages' });
   if (waiting) todo.push({ text: `${waiting} order(s) are waiting for you to accept — the 24-hour clock is running.`, href: '/vendor/orders' });
   if (toReady) todo.push({ text: `${toReady} accepted order(s) still need to be made ready (72-hour clock).`, href: '/vendor/orders' });
@@ -52,7 +58,7 @@ export default async function VendorHome() {
 
   return (
     <div>
-      <VendorNav active="home" name={vendor.trade_name || vendor.legal_name} unread={unreadMessages} />
+      <VendorNav active="home" name={vendor.trade_name || vendor.legal_name} role={vendor.role} mfa={gate.ctx.mfa} unread={unreadMessages} />
       <div className="panel" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <span className={`pill ${tone}`}>{label}</span>
         <span style={{ fontSize: 14 }}>Tier: <strong>{TIERS[vendor.tier]}</strong></span>
@@ -81,9 +87,9 @@ export default async function VendorHome() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 12, marginBottom: 16 }}>
-        <div className="kpi-card"><div className="kpi-value">{cents(bal.availableCents)}</div><div style={{ fontSize: 13 }}>Available to be paid</div></div>
-        <div className="kpi-card"><div className="kpi-value">{cents(bal.pendingCents)}</div><div style={{ fontSize: 13 }}>Pending (held after delivery)</div></div>
-        <div className="kpi-card"><div className="kpi-value">{cents(bal.reserveHeldCents)}</div><div style={{ fontSize: 13 }}>Warranty reserve (2%, 12 months)</div></div>
+        {bal && <div className="kpi-card"><div className="kpi-value">{cents(bal.availableCents)}</div><div style={{ fontSize: 13 }}>Available to be paid</div></div>}
+        {bal && <div className="kpi-card"><div className="kpi-value">{cents(bal.pendingCents)}</div><div style={{ fontSize: 13 }}>Pending (held after delivery)</div></div>}
+        {bal && <div className="kpi-card"><div className="kpi-value">{cents(bal.reserveHeldCents)}</div><div style={{ fontSize: 13 }}>Warranty reserve (2%, 12 months)</div></div>}
         <div className="kpi-card"><div className="kpi-value">{by('live')}</div><div style={{ fontSize: 13 }}>Units for sale · {by('in_review')} in review</div></div>
       </div>
 

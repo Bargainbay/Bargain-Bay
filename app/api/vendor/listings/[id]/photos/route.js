@@ -16,7 +16,7 @@ export const maxDuration = 60;
 const denied = () => NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 
 export async function POST(req, { params }) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('listings.edit');
   if (!ctx) return denied();
   if (!process.env.BLOB_READ_WRITE_TOKEN) return NextResponse.json({ error: 'Photo storage is not configured.' }, { status: 503 });
   const id = Number((await params).id);
@@ -53,7 +53,7 @@ export async function POST(req, { params }) {
 }
 
 export async function DELETE(req, { params }) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('listings.edit');
   if (!ctx) return denied();
   const id = Number((await params).id);
   const photoId = Number(new URL(req.url).searchParams.get('photoId'));

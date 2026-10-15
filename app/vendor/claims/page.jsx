@@ -9,13 +9,13 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Warranty claims — Bargain Bay Marketplace' };
 
 export default async function ClaimsPage() {
-  const gate = await vendorGate('/vendor/claims');
+  const gate = await vendorGate('/vendor/claims', 'claims.view');
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
   const claims = await listVendorClaims(vendor.id);
   return (
     <div>
-      <VendorNav active="claims" name={vendor.trade_name || vendor.legal_name} />
+      <VendorNav active="claims" name={vendor.trade_name || vendor.legal_name} role={vendor.role} mfa={gate.ctx.mfa} />
       <VendorClaims initial={JSON.parse(JSON.stringify(claims))} serverNow={new Date().toISOString()}
         rules={{ respondHours: CLAIM_RESPOND_HOURS, resolveDays: CLAIM_RESOLVE_DAYS, resolutions: CLAIM_RESOLUTIONS }} />
     </div>

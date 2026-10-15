@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Performance — Bargain Bay Marketplace' };
 
 export default async function Performance() {
-  const gate = await vendorGate('/vendor/performance');
+  const gate = await vendorGate('/vendor/performance', 'performance.view');
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
   const meter = await strikeMeter(vendor.id);
@@ -21,7 +21,7 @@ export default async function Performance() {
   const lim = TIER_LIMITS[vendor.tier];
   return (
     <div>
-      <VendorNav active="performance" name={vendor.trade_name || vendor.legal_name} />
+      <VendorNav active="performance" name={vendor.trade_name || vendor.legal_name} role={vendor.role} mfa={gate.ctx.mfa} />
       {card && (
         <div className="panel">
           <h2 style={{ marginTop: 0, fontSize: 17 }}>Your order scorecard</h2>
