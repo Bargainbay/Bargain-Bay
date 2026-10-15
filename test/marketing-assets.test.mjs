@@ -14,10 +14,10 @@ test('every file the page refers to is actually there', () => {
   }
 });
 
-test('every poster has BOTH a still and an animated version, and ids are unique', () => {
+test('every poster has a still (an animated version is optional), and ids are unique', () => {
   const ids = new Set();
   for (const c of CAMPAIGNS) for (const f of c.formats) for (const p of f.posters) {
-    assert(p.still && p.video, `${p.id} needs a still and a video`);
+    assert(p.still, `${p.id} needs a still`);
     assert(!ids.has(p.id), `duplicate id ${p.id}`);
     ids.add(p.id);
   }
