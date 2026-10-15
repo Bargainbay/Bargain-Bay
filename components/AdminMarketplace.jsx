@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { TIERS, DEDUCTION_REASONS, CLAIM_RESPOND_HOURS, CLAIM_RESOLVE_DAYS, CLAIM_RESOLUTIONS } from '../lib/marketplace-rules';
 import MarketplaceClaims from './MarketplaceClaims';
+import StaffMessages from './StaffMessages';
 
 const cents = (n) => `${n < 0 ? '−' : ''}$${(Math.abs(Number(n || 0)) / 100).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const day = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '—');
@@ -14,13 +15,14 @@ async function api(url, method, body) {
   return d;
 }
 
-export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, payouts, orders = [], claims = [], rates = null, serverNow, rejectReasons, strikeReasons }) {
+export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, payouts, orders = [], claims = [], messages = [], meEmail = '', rates = null, serverNow, rejectReasons, strikeReasons }) {
   const apps = vendors.filter((v) => v.status === 'applied');
   const tabs = [
     ['apps', `Applications${apps.length ? ` (${apps.length})` : ''}`],
     ['review', `Listings to review${queue.length ? ` (${queue.length})` : ''}`],
     ['orders', `Orders${orders.filter((o) => ['awaiting_accept', 'accepted'].includes(o.status)).length ? ` (${orders.filter((o) => ['awaiting_accept', 'accepted'].includes(o.status)).length} open)` : ''}`],
     ['claims', `Claims${claims.filter((c) => ['open', 'responded', 'awaiting_refund'].includes(c.status)).length ? ` (${claims.filter((c) => ['open', 'responded', 'awaiting_refund'].includes(c.status)).length} open)` : ''}`],
+    ['messages', `Messages${messages.filter((m) => m.unread).length ? ` (${messages.filter((m) => m.unread).length} new)` : ''}`],
     ['vendors', 'Vendors'],
     ...(isAdmin ? [
       ['bank', `Bank accounts${banks.length ? ` (${banks.length})` : ''}`],
@@ -122,6 +124,7 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
           deliver={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'deliver', id }), 'Marked delivered — the sale is booked to the vendor.')}
           setRate={(sizeClass, dollars) => act(() => post('/api/admin/marketplace/orders', { action: 'set_rate', sizeClass, dollars }), 'Fee saved.')} />
       )}
+      {tab === 'messages' && <StaffMessages vendors={vendors.filter((v) => ['approved', 'restricted', 'suspended'].includes(v.status))} initial={messages} me={meEmail} />}
       {tab === 'claims' && (
         <MarketplaceClaims claims={claims} orders={orders} isAdmin={isAdmin} busy={busy} now={new Date(serverNow || Date.now())}
           rules={{ respondHours: CLAIM_RESPOND_HOURS, resolveDays: CLAIM_RESOLVE_DAYS, resolutions: CLAIM_RESOLUTIONS }} post={post} act={act} />

@@ -6,6 +6,7 @@ import { vendorBalance } from '../../lib/vendor-ledger';
 import { bankSummary } from '../../lib/vendor-bank';
 import { listVendorListings } from '../../lib/marketplace-listings';
 import { listVendorOrders } from '../../lib/vendor-orders';
+import { vendorUnreadCount } from '../../lib/vendor-messages';
 import { pendingPolicies } from '../../lib/policy-acceptance';
 import { onboardingProgress } from '../../lib/onboarding';
 import { ACCEPT_HOURS, READY_HOURS, STRIKE_REASONS, TIERS } from '../../lib/marketplace-rules';
@@ -28,6 +29,7 @@ export default async function VendorHome() {
     strikeMeter(vendor.id), vendorBalance(vendor.id), bankSummary(vendor.id), listVendorListings(vendor.id),
     listVendorOrders(vendor.id).catch(() => [])
   ]);
+  const unreadMessages = await vendorUnreadCount(vendor.id).catch(() => 0);
   const policiesPending = await pendingPolicies(vendor.id).catch(() => []);
   const onboarding = await onboardingProgress(vendor.id).catch(() => null);
   const waiting = orders.filter((o) => o.status === 'awaiting_accept').length;
@@ -37,6 +39,7 @@ export default async function VendorHome() {
   const todo = [];
   if (policiesPending.length) todo.push({ text: `Read and accept our marketplace policies (${policiesPending.length}) — you can't list until the account owner has.`, href: '/vendor/policies' });
   if (!bank.payable && !bank.waiting.length) todo.push({ text: 'Add your banking details so we can pay you.', href: '/vendor/payouts' });
+  if (unreadMessages) todo.push({ text: `You have ${unreadMessages} unread conversation(s) from Bargain Bay.`, href: '/vendor/messages' });
   if (waiting) todo.push({ text: `${waiting} order(s) are waiting for you to accept — the 24-hour clock is running.`, href: '/vendor/orders' });
   if (toReady) todo.push({ text: `${toReady} accepted order(s) still need to be made ready (72-hour clock).`, href: '/vendor/orders' });
   if (by('changes_requested')) todo.push({ text: `${by('changes_requested')} listing(s) need changes before they can go live.`, href: '/vendor/listings?status=changes_requested' });
@@ -45,7 +48,7 @@ export default async function VendorHome() {
 
   return (
     <div>
-      <VendorNav active="home" name={vendor.trade_name || vendor.legal_name} />
+      <VendorNav active="home" name={vendor.trade_name || vendor.legal_name} unread={unreadMessages} />
       <div className="panel" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <span className={`pill ${tone}`}>{label}</span>
         <span style={{ fontSize: 14 }}>Tier: <strong>{TIERS[vendor.tier]}</strong></span>
