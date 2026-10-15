@@ -4508,6 +4508,34 @@ not shown anywhere until the storefront slice.
     A reply from either side reopens a closed thread. **Text only: no attachments in this slice.**
   - Thread open/close/reopen go to `vendor_events` via `logVendorEvent`.
 
+- **Lane B collection fee is zone x size (`lib/pickup-zones.js`, migration 0032).** Zones are the customer shipping
+  policy's bands from Pickering (0-50 / 51-100 / 101-150 km; beyond that we do not collect, so no Lane B). The distance
+  is on the LISTING (`pickup_km`), looked up by `lib/pickup-distance.js` (Google Routes, needs a SERVER key
+  `GOOGLE_MAPS_SERVER_KEY`, NOT the browser one) when staff open the listing, or typed by staff; **approving a Lane B
+  listing needs a distance in range**, and editing the pickup address clears it. The fee is copied onto the vendor order
+  at accept with an itemised `delivery_service_detail`. Cells with no saved row use a STARTER schedule (the customer zone
+  fee x 0.75 / 1 / 1.5) that the admin screen labels as a guess until each cell is confirmed. Lane A keeps the flat
+  per-size handling rate. A pre-existing listing with no distance is charged zone 1 and flagged, never struck.
+- **Dashboard countdowns and the order scorecard** (`components/VendorCountdowns.jsx`, `lib/vendor-scorecard.js`):
+  rolling 90 days, judged on server timestamps; a rate is null (shown as a dash) with nothing to measure.
+- **A refund of a seller's unit must be booked the seller's way** (`lib/seller-refund-guard.js`, called from
+  `refundInvoice` / `refundInvoiceItems` / `refundInvoiceAmount`). The ledger credits Sales/HST only with OUR part of such
+  an invoice, so an ordinary refund would debit Sales for money never credited and leave 2160 owing the seller. Seller lines
+  refund under the reason `Seller could not fulfil` and only seller lines together; whole-invoice and money-only refunds are
+  refused while a live seller order is on the invoice. The seller's share is then taken off them with the 'Take money off
+  this seller' form. Invoice EDITS (`updateInvoice`) on an invoice carrying a seller's unit are NOT guarded yet.
+- **Collect AND deliver in one trip is the dispatcher's choice** (`combineTrip`, Orders tab "One trip"): the customer's
+  delivery stop becomes a transfer from the seller's dock and carries `vendor_order_id`, so finishing it marks the unit
+  collected. The separate collection job is cancelled. Two legs stays the default.
+- **Payments in** (`lib/deposit-match.js`, `bank_deposits` migration 0036, `/admin/payments-in`, staff): incoming e-transfers
+  from the Plaid feed are kept and RANKED against unpaid e-transfer orders / manual invoices. It proposes; a person
+  confirms (confirming starts a seller's clocks). 'Sure' needs an exact amount AND the reference or the whole name AND no
+  close rival. An order is only confirmed at its exact total.
+- **Monthly seller statements** (`monthlyStatement`, `/api/vendor/statement`, owner only): Toronto-time months, closing =
+  opening + the month's entries, CSV cells neutralised against formulas.
+- Migration numbers 0033 exist twice on disk (vendor messages here; `workshop_applications` from another session). The
+  runner keys on the filename so both apply; pick the next free number.
+
 ## Parts bought for a unit, and what a unit COSTS (added 2026-10-13)
 `lib/part-costs.js`, `lib/tracker-cost.js`, migration 0030 (`unit_part_costs`),
 `/admin/part-costs` (ADMIN; linked from the Reports hub and the Parts page),
