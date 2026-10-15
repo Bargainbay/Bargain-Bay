@@ -377,3 +377,25 @@ test('cancelling a proposal frees the vendor for the next run', async () => {
     equal((await proposePayouts()).proposed.length, 1);
   } finally { done(); }
 });
+
+test('MONTHLY STATEMENT: opening + the month\'s entries = closing, Toronto-time months, CSV cannot carry a formula', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { monthlyStatement, statementCsv } = await import('../lib/vendor-ledger.js');
+    const v = await createApplication({ legalName: 'Stmt', contactEmail: 'stmt@example.com' });
+    await decideApplication(v.id, { approve: true, by: 's', hstStatus: 'registered' });
+    const ins = (kind, cents, at, memo = null) => query(
+      `INSERT INTO vendor_ledger (vendor_id, kind, amount_cents, order_ref, memo, at, available_at) VALUES ($1,$2,$3,'BB-1',$4,$5,$5)`, [v.id, kind, cents, memo, at]);
+    await ins('sale', 100000, '2026-09-30T12:00:00Z');                                  // before October: the opening balance
+    await ins('commission', -10000, '2026-10-02T15:00:00Z', '=HYPERLINK("x")');          // a memo that would be a formula
+    await ins('sale', 50000, '2026-11-01T03:30:00Z');                                    // 23:30 on Oct 31 in Toronto: still October
+    await ins('sale', 70000, '2026-11-05T12:00:00Z');                                    // November: not in this statement
+    const st = await monthlyStatement(v.id, '2026-10');
+    equal(st.openingCents, 100000); equal(st.entries.length, 2); equal(st.closingCents, 140000);
+    equal(st.closingCents, st.openingCents + st.entries.reduce((a, e) => a + e.amountCents, 0));
+    const csv = statementCsv(st);
+    assert(/'=HYPERLINK/.test(csv) && !/,=HYPERLINK/.test(csv), 'formula neutralised');
+    assert(/Closing balance,,,,1400\.00/.test(csv.replace(/\r/g, '')) || /1400\.00/.test(csv), 'closing in the file');
+    await rejects(() => monthlyStatement(v.id, 'October'), /month like/);
+  } finally { done(); }
+});

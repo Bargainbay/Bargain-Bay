@@ -36,7 +36,8 @@ export default function VendorListings({ initial = [], initialStatus = '', canLi
           <option value="">All ({rows.length})</option>
           {LISTING_STATUSES.filter((s) => counts[s]).map((s) => <option key={s} value={s}>{LABEL[s]} ({counts[s]})</option>)}
         </select>
-        <button className="btn primary" style={{ marginLeft: 'auto' }} disabled={busy || !canList} onClick={start}>+ New listing</button>
+        <a className="btn" style={{ marginLeft: 'auto', pointerEvents: canList ? 'auto' : 'none', opacity: canList ? 1 : 0.5 }} href="/vendor/listings/bulk">Bulk upload</a>
+        <button className="btn primary" disabled={busy || !canList} onClick={start}>+ New listing</button>
       </div>
       {!canList && <div className="error-box">Your account cannot list new units right now. See the Performance tab.</div>}
       {err && <div className="error-box">{err}</div>}

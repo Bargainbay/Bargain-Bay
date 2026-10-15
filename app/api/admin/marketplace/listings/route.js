@@ -3,7 +3,7 @@
 // on the phone (the customer's sale, not the business's books).
 import { NextResponse } from 'next/server';
 import { getSession, isStaff } from '../../../../../lib/auth';
-import { reviewQueue, getListingForReview, reviewListing, checkInListing } from '../../../../../lib/marketplace-listings';
+import { reviewQueue, getListingForReview, reviewListing, checkInListing, ensurePickupDistance } from '../../../../../lib/marketplace-listings';
 import { REJECT_REASONS } from '../../../../../lib/listing-rules';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +16,7 @@ export async function GET(req) {
   if (!(await staff())) return denied();
   const id = Number(new URL(req.url).searchParams.get('id'));
   if (id) {
+    await ensurePickupDistance(id).catch(() => null);
     const l = await getListingForReview(id);
     return l ? NextResponse.json({ listing: l, rejectReasons: REJECT_REASONS }) : NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
@@ -31,7 +32,7 @@ export async function POST(req) {
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
   try {
     if (b.action === 'checkin') return NextResponse.json(await checkInListing(id, { by: s.email, accepted: !!b.accepted, note: b.note }));
-    return NextResponse.json(await reviewListing(id, { decision: b.decision, by: s.email, note: b.note, reason: b.reason, condition: b.condition }));
+    return NextResponse.json(await reviewListing(id, { decision: b.decision, by: s.email, note: b.note, reason: b.reason, condition: b.condition, pickupKm: b.pickupKm }));
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not record that.' }, { status: 400 });
   }

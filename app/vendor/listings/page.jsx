@@ -9,14 +9,14 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Listings — Bargain Bay Marketplace' };
 
 export default async function ListingsPage({ searchParams }) {
-  const gate = await vendorGate('/vendor/listings');
+  const gate = await vendorGate('/vendor/listings', 'listings.view');
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
   const sp = await searchParams;
   const listings = await listVendorListings(vendor.id);
   return (
     <div>
-      <VendorNav active="listings" name={vendor.trade_name || vendor.legal_name} />
+      <VendorNav active="listings" name={vendor.trade_name || vendor.legal_name} role={vendor.role} mfa={gate.ctx.mfa} />
       <VendorListings initial={listings} initialStatus={sp?.status || ''} canList={canSell(vendor.status)} />
     </div>
   );

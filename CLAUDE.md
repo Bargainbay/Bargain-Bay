@@ -4372,6 +4372,28 @@ not shown anywhere until the storefront slice.
   books the stop). **Test gotcha:** a test that installs a database with `__useTestDatabase` MUST release it
   (`done()` / `__useTestDatabase(null)`) — `test/partial.test.mjs` depends on there being none, and a leak makes it
   fail three tests in a different file.
+- **Bulk upload of listings (`lib/listing-bulk.js`, no migration).** "Bulk upload" on `/vendor/listings` ->
+  `/vendor/listings/bulk`; `GET .../bulk/template` (CSV, every column + a worked example row), `POST .../bulk/preview`
+  (CSV / .xlsx file or pasted text; WRITES NOTHING), `POST .../bulk/confirm`. Cap `BULK_MAX_ROWS` = 100 per upload.
+  - **No second rulebook.** Every row goes through `normalizeFields` / `validateForSubmit` / `tierProblem` — the single
+    path's own functions — minus the `photos` problems (photos cannot ride a spreadsheet; a draft with none still cannot be
+    submitted). Add a field to a listing -> add it to `BULK_COLUMNS` too, or the sheet cannot set it.
+  - **Confirm creates DRAFTS only, per row, not all-or-nothing**, and reports created / already-created / failed-with-reasons.
+    A row with any problem is skipped, not half-imported. The server re-parses and re-checks everything at confirm; the
+    browser sends the TEXT back (an .xlsx is turned into tab text at preview), never parsed rows.
+  - **Token = sha256(vendor id + every row's normalised input).** A confirm whose file differs from the previewed one, or
+    belongs to another vendor, is refused. **Replay safety is a `bulk_row` event** (`{batch,row}` in `listing_events`) checked
+    inside `createDraft`'s SKU lock (`{ bulk }` option) — no new table. Rows an earlier confirm made are reported as
+    "already created" and are NOT re-checked, or their own serials would read as clashes with themselves.
+  - **Serials:** duplicates inside the file name the other row; against another vendor only an in-review/for-sale listing
+    counts (their drafts do not) and the message never says who; against the vendor's OWN non-closed listings the message
+    names their own SKU. A re-upload after fixing a failed row therefore does not duplicate the good ones.
+  - **Parser:** `parseGrid` is a whole-text state machine (quoted line breaks work) with the stop importer's quote-only-
+    at-field-start rule (`36"`), delimiter sniffing and Excel error blanking (`sniffDelimiter` / `cell` are now exported
+    from `lib/stop-import.js`). Leading `= + @` on text cells is stripped with a warning (CSV injection). The template's
+    example row carries `EXAMPLE_SERIAL` and is blocked until deleted, so uploading the blank template creates nothing.
+  - Not verified: two simultaneous confirms of one batch — PGlite is one connection, so the advisory lock is untestable;
+    the per-row marker plus the SKU unique index mean the worst case is a failed row, never a duplicate.
 - **Test gotcha:** the checkout route's runtime-DDL helpers (`ensureAttributionColumns` etc.) memoise "done" in
   module scope, so a second FRESH test database never gets their columns. Every test file that drives the real
   route uses `test/shared-checkout-db.mjs` (one database, re-installed on each call).
@@ -4433,6 +4455,86 @@ not shown anywhere until the storefront slice.
     rebook) from the Orders tab (`book_pickup`, staff). The delivery job made by the pull says "NOT YET
     COLLECTED FROM THE SELLER" while a collection is outstanding.
   - `npm test -- <word>` now runs only the test files whose name contains the word.
+- **Vendor team roles and two-factor sign-in (migration 0034, `lib/vendor-permissions.js`, `lib/vendor-session.js`,
+  `lib/vendor-mfa.js`, `lib/vendor-mfa-marker.js`, `lib/totp.js`, `lib/vendor-team.js`; pages `/vendor/team`,
+  `/vendor/security`, `/vendor/mfa`).**
+  - **ONE permission table, ONE gate.** Roles: owner, manager, listings, fulfilment, viewer (the old `staff` is
+    `manager`; the word is still accepted). `can(role, action)` in `lib/vendor-permissions.js` (no imports) is the
+    only table; `requireVendor('<action>')` / `checkVendor` in `lib/vendor-session.js` is the only door, and pages use
+    `vendorGate(next, '<action>')`. **An action is required: calling the gate with none REFUSES**, and an action
+    nobody lists is allowed to nobody. `test/vendor-mfa-team.test.mjs` scans every `app/api/vendor/**/route.js`
+    handler and every `app/vendor/**/page.jsx`, fails on one that names no valid action, and calls every handler
+    as every role. **A new vendor route or page must name its action (add it to ACTIONS first).** Only owners see
+    money, bank, team and accept policies; hidden nav is a courtesy, never the permission.
+  - **Team = `vendor_users`, by email, owner-managed** (revoke keeps the row; partial unique index; the LAST owner
+    cannot be removed or demoted, checked under a lock on the vendor row). Team members are never on a staff list.
+    Inviting, changing a role and removing need **step-up** (below), so a stolen owner session cannot seat itself.
+  - **TOTP (RFC 6238) in `node:crypto`**, vectors in the test. Secret encrypted with `secret-box` and the user id as
+    AAD (no `BANK_ENCRYPTION_KEY` = nobody can enrol, and then the "must enrol" rule is NOT enforced, because it
+    cannot be met). A code works once (`vendor_mfa.last_step`, one conditional UPDATE), window +-1 step. Recovery
+    codes: 10, single use, salted SHA-256, shown once. Attempts are counted in Postgres: 5 wrong in a row locks for
+    1 minute, doubling to an hour; attempts made while locked are refused and NOT recorded. Enrolment is
+    confirmed by a first code; an enrolled user cannot re-enrol (admin reset is the way back).
+  - **The second factor guards the vendor portal only.** After the normal session, vendor surfaces need a signed
+    httpOnly `bb_vmfa` cookie bound to the user and their `token_version` (key derived from AUTH_SECRET, 12 h).
+    Customers, staff and drivers sign in as before. An ENROLLED user (any role) needs the cookie; an OWNER who is not
+    enrolled has 14 days from the grant (`mfa_grace_until`), then is sent to `/vendor/security` until enrolled.
+    **Step-up:** `bank.edit` and `team.manage` need enrolment outright and a code typed within 10 minutes.
+    The marker fails CLOSED on any database error (unlike `bb_session`'s own token_version check).
+  - **Admin reset** (Admin > Marketplace > Vendors > a vendor > Reset 2FA; ADMIN only, reason required): wipes the
+    factor, bumps `token_version`, writes `vendor_events` and `audit_log`. Staff cannot.
+  - Not covered: an invitation email (the owner tells them), enforcement of MFA for non-owner roles (optional for
+    them), and the CSRF posture is just `SameSite=Lax` on a JSON-only API.
+
+- **Seller messaging (`lib/vendor-messages.js`, `lib/contact-guard.js`, migration 0033).** Threads belong to ONE vendor
+  and may be tied to one of THAT vendor's orders, listings or warranty claims (each id is validated against the
+  thread's vendor). Seller: `/vendor/messages` (inbox, thread, new message; nav item + unread on the home page),
+  `/api/vendor/messages`, vendor id from `requireVendor()` only, another seller's thread is a 404. Staff: the
+  **Messages** tab on `/admin/marketplace`, `/api/admin/marketplace/messages`, **STAFF-level** (dealing with a seller,
+  not the books).
+  - **Append-only**: a trigger refuses UPDATE/DELETE on `vendor_messages`; a correction is a new message. Author is the
+    session's email, name snapshotted, never from the body.
+  - **Internal staff notes** are rows with `internal = true` (CHECK: staff side only). Every seller-side query filters them
+    out IN SQL, they never move unread state or "who spoke last", and they email nobody. A staff member's email address
+    is not shown to the seller either. Do not add a seller query without `NOT internal`.
+  - **No customer contact to a seller**: a tie-in shows only order number / listing sku / claim, nothing about the
+    customer. A seller-VISIBLE staff message matching an email/phone pattern is refused (409 `needsConfirm`) until the
+    sender confirms (`confirmContact`); the composer warns first using the same `contactDetailsIn`. Internal notes are exempt.
+  - **Read state is a per-side marker on the thread** (`vendor_read_at` / `staff_read_at`, one per side not per user);
+    writing a message counts as having read. Awaiting-us / awaiting-seller come from `last_public_side`.
+  - **Email**: best-effort, awaited, one per side per thread per 15 minutes (conditional UPDATE claims the slot; a failed
+    send hands it back). `sendEmail` RETURNS failure, so the result is checked. The email never carries the message text.
+  - **Limits** counted from rows under a per-vendor advisory lock: 20 messages/hour, 10 new threads/day, 4000 characters.
+    A reply from either side reopens a closed thread. **Text only: no attachments in this slice.**
+  - Thread open/close/reopen go to `vendor_events` via `logVendorEvent`.
+
+- **Lane B collection fee is zone x size (`lib/pickup-zones.js`, migration 0032).** Zones are the customer shipping
+  policy's bands from Pickering (0-50 / 51-100 / 101-150 km; beyond that we do not collect, so no Lane B). The distance
+  is on the LISTING (`pickup_km`), looked up by `lib/pickup-distance.js` (Google Routes, needs a SERVER key
+  `GOOGLE_MAPS_SERVER_KEY`, NOT the browser one) when staff open the listing, or typed by staff; **approving a Lane B
+  listing needs a distance in range**, and editing the pickup address clears it. The fee is copied onto the vendor order
+  at accept with an itemised `delivery_service_detail`. Cells with no saved row use a STARTER schedule (the customer zone
+  fee x 0.75 / 1 / 1.5) that the admin screen labels as a guess until each cell is confirmed. Lane A keeps the flat
+  per-size handling rate. A pre-existing listing with no distance is charged zone 1 and flagged, never struck.
+- **Dashboard countdowns and the order scorecard** (`components/VendorCountdowns.jsx`, `lib/vendor-scorecard.js`):
+  rolling 90 days, judged on server timestamps; a rate is null (shown as a dash) with nothing to measure.
+- **A refund of a seller's unit must be booked the seller's way** (`lib/seller-refund-guard.js`, called from
+  `refundInvoice` / `refundInvoiceItems` / `refundInvoiceAmount`). The ledger credits Sales/HST only with OUR part of such
+  an invoice, so an ordinary refund would debit Sales for money never credited and leave 2160 owing the seller. Seller lines
+  refund under the reason `Seller could not fulfil` and only seller lines together; whole-invoice and money-only refunds are
+  refused while a live seller order is on the invoice. The seller's share is then taken off them with the 'Take money off
+  this seller' form. Invoice EDITS (`updateInvoice`) on an invoice carrying a seller's unit are NOT guarded yet.
+- **Collect AND deliver in one trip is the dispatcher's choice** (`combineTrip`, Orders tab "One trip"): the customer's
+  delivery stop becomes a transfer from the seller's dock and carries `vendor_order_id`, so finishing it marks the unit
+  collected. The separate collection job is cancelled. Two legs stays the default.
+- **Payments in** (`lib/deposit-match.js`, `bank_deposits` migration 0036, `/admin/payments-in`, staff): incoming e-transfers
+  from the Plaid feed are kept and RANKED against unpaid e-transfer orders / manual invoices. It proposes; a person
+  confirms (confirming starts a seller's clocks). 'Sure' needs an exact amount AND the reference or the whole name AND no
+  close rival. An order is only confirmed at its exact total.
+- **Monthly seller statements** (`monthlyStatement`, `/api/vendor/statement`, owner only): Toronto-time months, closing =
+  opening + the month's entries, CSV cells neutralised against formulas.
+- Migration numbers 0033 exist twice on disk (vendor messages here; `workshop_applications` from another session). The
+  runner keys on the filename so both apply; pick the next free number.
 
 ## Parts bought for a unit, and what a unit COSTS (added 2026-10-13)
 `lib/part-costs.js`, `lib/tracker-cost.js`, migration 0030 (`unit_part_costs`),

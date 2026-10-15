@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { TIERS, DEDUCTION_REASONS, CLAIM_RESPOND_HOURS, CLAIM_RESOLVE_DAYS, CLAIM_RESOLUTIONS } from '../lib/marketplace-rules';
 import MarketplaceClaims from './MarketplaceClaims';
+import StaffMessages from './StaffMessages';
 
 const cents = (n) => `${n < 0 ? '−' : ''}$${(Math.abs(Number(n || 0)) / 100).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const day = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '—');
@@ -14,13 +15,14 @@ async function api(url, method, body) {
   return d;
 }
 
-export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, payouts, orders = [], claims = [], rates = null, serverNow, rejectReasons, strikeReasons }) {
+export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, payouts, orders = [], claims = [], messages = [], meEmail = '', rates = null, zoneRates = null, serverNow, rejectReasons, strikeReasons }) {
   const apps = vendors.filter((v) => v.status === 'applied');
   const tabs = [
     ['apps', `Applications${apps.length ? ` (${apps.length})` : ''}`],
     ['review', `Listings to review${queue.length ? ` (${queue.length})` : ''}`],
     ['orders', `Orders${orders.filter((o) => ['awaiting_accept', 'accepted'].includes(o.status)).length ? ` (${orders.filter((o) => ['awaiting_accept', 'accepted'].includes(o.status)).length} open)` : ''}`],
     ['claims', `Claims${claims.filter((c) => ['open', 'responded', 'awaiting_refund'].includes(c.status)).length ? ` (${claims.filter((c) => ['open', 'responded', 'awaiting_refund'].includes(c.status)).length} open)` : ''}`],
+    ['messages', `Messages${messages.filter((m) => m.unread).length ? ` (${messages.filter((m) => m.unread).length} new)` : ''}`],
     ['vendors', 'Vendors'],
     ...(isAdmin ? [
       ['bank', `Bank accounts${banks.length ? ` (${banks.length})` : ''}`],
@@ -115,13 +117,16 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
       )}
 
       {tab === 'orders' && (
-        <OrdersTab orders={orders} rates={rates} isAdmin={isAdmin} busy={busy} now={new Date(serverNow || Date.now())}
+        <OrdersTab orders={orders} rates={rates} zoneRates={zoneRates} isAdmin={isAdmin} busy={busy} now={new Date(serverNow || Date.now())}
           onVendor={goVendor}
+          combineTrip={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'combine_trip', id }), 'Added to the customer delivery as one trip.')}
           bookPickup={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'book_pickup', id }), 'Collection booked on the dispatch board.')}
           resolveMismatch={(id, action, note) => act(() => post('/api/admin/marketplace/orders', { action: 'resolve_mismatch', id, resolution: action, note }), 'Decision recorded.')}
           deliver={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'deliver', id }), 'Marked delivered — the sale is booked to the vendor.')}
+          setZoneRate={(zone, sizeClass, dollars) => act(() => post('/api/admin/marketplace/orders', { action: 'set_zone_rate', zone, sizeClass, dollars }), 'Fee saved.')}
           setRate={(sizeClass, dollars) => act(() => post('/api/admin/marketplace/orders', { action: 'set_rate', sizeClass, dollars }), 'Fee saved.')} />
       )}
+      {tab === 'messages' && <StaffMessages vendors={vendors.filter((v) => ['approved', 'restricted', 'suspended'].includes(v.status))} initial={messages} me={meEmail} />}
       {tab === 'claims' && (
         <MarketplaceClaims claims={claims} orders={orders} isAdmin={isAdmin} busy={busy} now={new Date(serverNow || Date.now())}
           rules={{ respondHours: CLAIM_RESPOND_HOURS, resolveDays: CLAIM_RESOLVE_DAYS, resolutions: CLAIM_RESOLUTIONS }} post={post} act={act} />
@@ -183,6 +188,7 @@ function ListingReview({ data, busy, rejectReasons, onClose, onDecide }) {
   const [note, setNote] = useState('');
   const [reason, setReason] = useState('');
   const [cond, setCond] = useState('');
+  const [km, setKm] = useState('');
   const row = (k, v) => <tr key={k}><td style={{ width: 180, color: 'var(--muted)' }}>{k}</td><td>{v ?? '—'}</td></tr>;
   return (
     <div className="panel">
@@ -205,13 +211,19 @@ function ListingReview({ data, busy, rejectReasons, onClose, onDecide }) {
         {row('Tested', `${l.testedWorking ? 'yes' : 'NO'} — ${l.testNotes || ''}`)}{row('Refurb notes', l.refurbNotes)}
         {row('Description', l.description)}{row('Delivery notes', l.deliveryNotes)}
         {l.lane === 'B' && row('Pickup', `${l.pickupAddress || ''} ${l.pickupCity || ''} ${l.pickupPostal || ''}`)}
+        {l.lane === 'B' && row('Driving distance', l.pickupKm != null ? `${l.pickupKm} km (${l.pickupKmSource === 'google' ? 'looked up' : 'entered by staff'})` : 'not known yet — enter it below')}
       </tbody></table>
       <p style={{ fontSize: 13, color: 'var(--muted)' }}>Check: are the photos of one real unit, does the plate match the model, is the grade honest, is the retail price real.</p>
       <div style={{ display: 'grid', gap: 10, maxWidth: 520 }}>
         <div><label style={{ fontSize: 13 }}>Re-grade condition on approval (optional)</label>
           <select value={cond} onChange={(e) => setCond(e.target.value)}><option value="">Keep “{l.condition}”</option>
             {['New in Box', 'New Open Box', 'New Scratch & Dent', 'Refurbished'].map((c) => <option key={c}>{c}</option>)}</select></div>
-        <button className="btn primary" disabled={busy} onClick={() => onDecide({ decision: 'approve', condition: cond || undefined })}>
+        {l.lane === 'B' && (
+          <div><label style={{ fontSize: 13 }}>Driving distance from our warehouse, km {l.pickupKm != null ? '(leave blank to keep)' : '(required for Lane B)'}</label>
+            <input inputMode="decimal" value={km} onChange={(e) => setKm(e.target.value)} placeholder={l.pickupKm != null ? String(l.pickupKm) : 'e.g. 38.5'} />
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Sets the collection fee zone. Over 150 km we do not collect.</div></div>
+        )}
+        <button className="btn primary" disabled={busy} onClick={() => onDecide({ decision: 'approve', condition: cond || undefined, pickupKm: km === '' ? undefined : km })}>
           Approve {l.lane === 'A' ? '(then waits for check-in at our warehouse)' : '(goes live)'}</button>
         <textarea rows={2} placeholder="What should the vendor change?" value={note} onChange={(e) => setNote(e.target.value)} />
         <button className="btn" disabled={busy || !note.trim()} onClick={() => onDecide({ decision: 'changes', note })}>Send back for changes</button>
@@ -270,7 +282,8 @@ function DeductionForm({ vendorId, refs }) {
 function VendorPanel({ d, isAdmin, busy, strikeReasons, onClose, run }) {
   const v = d.vendor;
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('staff');
+  const [role, setRole] = useState('manager');
+  const roles = d.roles || [{ key: 'manager', label: 'Manager' }, { key: 'owner', label: 'Owner' }];
   const [strike, setStrike] = useState({ reason: '', orderRef: '', note: '' });
   const [reason, setReason] = useState('');
   const [rate, setRate] = useState('');
@@ -297,12 +310,18 @@ function VendorPanel({ d, isAdmin, busy, strikeReasons, onClose, run }) {
 
       <h3 style={{ fontSize: 15 }}>People who can act for this vendor</h3>
       <table className="admin" style={{ minWidth: 0 }}><tbody>
-        {d.users.map((u) => <tr key={u.email}><td>{u.email}</td><td>{u.role}</td><td>{u.revoked_at ? `revoked ${day(u.revoked_at)}` : 'active'}</td>
-          <td>{!u.revoked_at && <button className="btn" disabled={busy} onClick={() => run({ action: 'revoke_user', email: u.email }, 'Access removed.')}>Remove</button>}</td></tr>)}
+        {d.users.map((u) => <tr key={u.email + (u.revoked_at || '')}><td>{u.email}</td><td>{u.role}</td><td>{u.revoked_at ? `revoked ${day(u.revoked_at)}` : 'active'}</td>
+          <td>{u.revoked_at ? '' : u.mfa_enrolled ? <span className="pill ok">2FA on</span> : <span className="pill warn">2FA off{u.role === 'owner' ? ` (grace to ${day(u.mfa_grace_until)})` : ''}</span>}</td>
+          <td>{!u.revoked_at && <button className="btn" disabled={busy} onClick={() => run({ action: 'revoke_user', email: u.email }, 'Access removed.')}>Remove</button>}
+            {isAdmin && u.has_account && u.mfa_enrolled && (
+              <button className="btn danger" disabled={busy} style={{ marginLeft: 6 }} onClick={() => {
+                const why = window.prompt(`Reset two-factor sign-in for ${u.email}? They are signed out and must enrol again.\n\nWhy (required — check who you are talking to first):`);
+                if (why && why.trim()) run({ action: 'reset_mfa', email: u.email, reason: why.trim() }, 'Two-factor reset. They must set it up again.');
+              }}>Reset 2FA</button>)}</td></tr>)}
       </tbody></table>
       <div style={{ display: 'flex', gap: 8, margin: '8px 0 16px', flexWrap: 'wrap' }}>
         <input placeholder="Email (they sign up at /signup with it)" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: 280 }} />
-        <select value={role} onChange={(e) => setRole(e.target.value)} style={{ width: 'auto' }}><option value="staff">Staff</option>{isAdmin && <option value="owner">Owner (controls the bank account)</option>}</select>
+        <select value={role} onChange={(e) => setRole(e.target.value)} style={{ width: 'auto' }}>{roles.filter((r) => isAdmin || r.key !== 'owner').map((r) => <option key={r.key} value={r.key}>{r.label}{r.key === 'owner' ? ' (controls the bank account)' : ''}</option>)}</select>
         <button className="btn" disabled={busy || !email} onClick={() => run({ action: 'grant_user', email, role }, 'Access granted.')}>Give access</button>
       </div>
 
@@ -423,7 +442,7 @@ function VendorLink({ id, onOpen, children }) {
   return <a href="#" onClick={(e) => { e.preventDefault(); onOpen(id); }}>{children}</a>;
 }
 
-function OrdersTab({ orders, rates, isAdmin, busy, now, onVendor, deliver, setRate, bookPickup, resolveMismatch }) {
+function OrdersTab({ orders, rates, zoneRates, setZoneRate, isAdmin, busy, now, onVendor, deliver, setRate, bookPickup, combineTrip, resolveMismatch }) {
   const [dollars, setDollars] = useState({});
   const hrs = (d) => (new Date(d) - now) / 3600000;
   const clock = (o) => {
@@ -445,8 +464,12 @@ function OrdersTab({ orders, rates, isAdmin, busy, now, onVendor, deliver, setRa
               <td style={{ color: clock(o).includes('OVERDUE') ? 'var(--danger)' : undefined }}>{clock(o)}</td>
               <td style={{ fontSize: 12 }}>{o.lane === 'C' && o.trackingNumber ? `${o.carrier} ${o.trackingNumber}` : o.insuranceChoice ? `insurance: ${o.insuranceChoice}` : ''}{o.status === 'cancelled' ? ` ${o.cancelCode}` : ''}</td>
               <td style={{ fontSize: 12 }}>{o.lane !== 'B' ? '' : o.collectedAt ? `collected ${new Date(o.collectedAt).toISOString().slice(0, 10)}`
-                : o.pickupJob ? `${o.pickupJob.number} (${o.pickupJob.status.replace('_', ' ')})`
-                : o.status === 'ready' ? <button className="btn" disabled={busy} onClick={() => bookPickup(o.id)}>Book collection</button> : 'booked when ready'}
+                : o.pickupJob ? <span>{o.pickupJob.number} ({o.pickupJob.status.replace('_', ' ')}{o.pickupJob.type !== 'pickup' ? ', one trip' : ''}){o.status === 'ready' && !['done', 'failed', 'cancelled', 'arrived', 'en_route'].includes(o.pickupJob.status) && o.pickupJob.type === 'pickup' && (
+                    <> <button className="btn" disabled={busy} title="Fold this collection into the customer's delivery stop" onClick={() => confirm('Replace this separate collection with ONE trip (collect from the seller and deliver to the customer on the same stop)?') && combineTrip(o.id)}>Make it one trip</button></>)}</span>
+                : o.status === 'ready' ? <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button className="btn" disabled={busy} onClick={() => bookPickup(o.id)}>Book collection (two legs)</button>
+                    <button className="btn" disabled={busy} title="Collect and deliver in one trip, using the customer's delivery stop" onClick={() => confirm('Collect from the seller and deliver to the customer in ONE trip? This replaces the separate collection. Better when the seller is on the way and nothing needs inspecting at the warehouse.') && combineTrip(o.id)}>One trip</button>
+                  </span> : 'booked when ready'}
                 {o.mismatch && (
                   <div style={{ color: 'var(--danger)', marginTop: 4 }}>
                     <b>Crew: does not match the listing.</b> {o.mismatch.note}
@@ -463,9 +486,29 @@ function OrdersTab({ orders, rates, isAdmin, busy, now, onVendor, deliver, setRa
           ))}
         </tbody></table></div>
       </div>
+      {isAdmin && zoneRates && (
+        <div className="panel">
+          <h2 style={{ marginTop: 0, fontSize: 17 }}>Collection fee — Lane B (we pick the unit up from the vendor)</h2>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>By driving distance from the warehouse and the unit&rsquo;s size. Same distance bands as the customer delivery policy. The fee is copied onto each order when the vendor accepts it. Cells marked <b>starter</b> are a suggested schedule (the customer zone fee scaled by size), not a measured cost — check them against the dispatch Profit tab and save each one to confirm it. Beyond 150 km we do not collect.</p>
+          <div className="table-wrap"><table className="admin" style={{ minWidth: 0 }}>
+            <thead><tr><th>Zone</th>{SIZES.map(([k, label]) => <th key={k}>{label}</th>)}</tr></thead>
+            <tbody>{[[1, '0–50 km'], [2, '51–100 km'], [3, '101–150 km']].map(([z, label]) => (
+              <tr key={z}><td><b>{label}</b></td>
+                {SIZES.map(([k]) => {
+                  const key = `${z}-${k}`; const cur = zoneRates.rates[z][k]; const starter = zoneRates.isStarter[z][k];
+                  return (<td key={k}>
+                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <span>$</span><input style={{ width: 70 }} inputMode="decimal" placeholder={(cur / 100).toFixed(0)} value={dollars[key] ?? ''} onChange={(e) => setDollars({ ...dollars, [key]: e.target.value })} />
+                      <button className="btn" disabled={busy} onClick={() => setZoneRate(z, k, dollars[key] === undefined || dollars[key] === '' ? cur / 100 : dollars[key])}>{dollars[key] ? 'Save' : starter ? 'Confirm' : 'Re-save'}</button>
+                    </div>
+                    <div style={{ fontSize: 11, color: starter ? 'var(--accent, #b45309)' : 'var(--muted)' }}>{starter ? `starter $${(cur / 100).toFixed(0)}` : `saved $${(cur / 100).toFixed(0)}`}</div>
+                  </td>);
+                })}</tr>))}</tbody></table></div>
+        </div>
+      )}
       {isAdmin && rates && (
         <div className="panel">
-          <h2 style={{ marginTop: 0, fontSize: 17 }}>Delivery service fee (billed to the vendor)</h2>
+          <h2 style={{ marginTop: 0, fontSize: 17 }}>Handling fee — Lane A (the vendor brings it to us)</h2>
           <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>What we charge a vendor to collect and deliver one unit, by size. It is copied onto each order when the vendor accepts it, so changing it never alters a past statement. Set these from what a pickup actually costs us (the dispatch Profit tab shows it). Lane C (the vendor ships) is not charged.</p>
           {rates.unset.length > 0 && <div className="error-box">Not set yet: {rates.unset.join(', ')}. Until set, vendors are charged $0 for those sizes.</div>}
           {SIZES.map(([k, label, hint]) => (

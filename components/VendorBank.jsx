@@ -8,16 +8,17 @@ export default function VendorBank({ initial, isOwner, configured }) {
   const [f, setF] = useState({ holderName: '', institution: '', transit: '', account: '', method: 'direct_deposit' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [mfa, setMfa] = useState('');
   const [note, setNote] = useState('');
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
 
   async function submit(e) {
     e.preventDefault();
-    setBusy(true); setErr(''); setNote('');
+    setBusy(true); setErr(''); setNote(''); setMfa('');
     try {
       const res = await fetch('/api/vendor/bank', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(f) });
       const d = await res.json();
-      if (!res.ok) { setErr(d.error || 'Could not save those details.'); return; }
+      if (!res.ok) { setErr(d.error || 'Could not save those details.'); setMfa(d.mfa || ''); return; }
       setNote(`Submitted (account ending ${d.last4}). We will verify it before it is used for a payout.`);
       setOpen(false);
       setF({ holderName: '', institution: '', transit: '', account: '', method: 'direct_deposit' });
@@ -29,7 +30,14 @@ export default function VendorBank({ initial, isOwner, configured }) {
   return (
     <div className="panel">
       <h2 style={{ marginTop: 0, fontSize: 17 }}>Banking details</h2>
-      {err && <div className="error-box">{err}</div>}
+      {err && (
+        <div className="error-box">
+          {err}{' '}
+          {mfa === 'stepup' && <a href="/vendor/mfa?next=/vendor/payouts&fresh=1">Enter a fresh code →</a>}
+          {mfa === 'enrol' && <a href="/vendor/security?next=/vendor/payouts">Set up two-factor sign-in →</a>}
+          {mfa === 'verify' && <a href="/vendor/mfa?next=/vendor/payouts">Enter your code →</a>}
+        </div>
+      )}
       {note && <p style={{ color: 'var(--ok)' }}>{note}</p>}
       {sum.payable ? <p style={{ fontSize: 14 }}><span className="pill ok">Paying to</span> {line(sum.payable)}</p>
         : <p style={{ fontSize: 14 }}><span className="pill warn">No verified account</span> We cannot pay you until one is verified.</p>}

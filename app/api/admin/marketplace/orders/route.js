@@ -2,8 +2,8 @@
 // the carrier confirms (the customer's sale). The delivery-service fees are the business's pricing: admin.
 import { NextResponse } from 'next/server';
 import { getSession, isStaff, isAdmin } from '../../../../../lib/auth';
-import { tryEnsurePickupJob, resolveMismatch } from '../../../../../lib/vendor-pickup';
-import { allVendorOrders, deliverVendorOrder, deliveryRates, setDeliveryRate } from '../../../../../lib/vendor-orders';
+import { tryEnsurePickupJob, resolveMismatch, combineTrip } from '../../../../../lib/vendor-pickup';
+import { allVendorOrders, deliverVendorOrder, deliveryRates, setDeliveryRate, deliveryZoneRates, setZoneRate } from '../../../../../lib/vendor-orders';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,7 +14,7 @@ export async function GET(req) {
   const s = await getSession();
   if (!s || !isStaff(s)) return denied();
   const out = { orders: await allVendorOrders({ status: new URL(req.url).searchParams.get('status') || undefined }), now: new Date().toISOString() };
-  if (isAdmin(s)) out.rates = await deliveryRates();
+  if (isAdmin(s)) { out.rates = await deliveryRates(); out.zoneRates = await deliveryZoneRates(); }
   return NextResponse.json(out);
 }
 
@@ -30,6 +30,10 @@ export async function POST(req) {
       const r = await tryEnsurePickupJob(Number(b.id), { by: s.email });
       return NextResponse.json(r.ok ? r : { error: r.why }, { status: r.ok ? 200 : 400 });
     }
+    if (b?.action === 'combine_trip') {
+      const r = await combineTrip(Number(b.id), { by: s.email });
+      return NextResponse.json(r.ok ? r : { error: r.why }, { status: r.ok ? 200 : 400 });
+    }
     if (b?.action === 'resolve_mismatch') {
       if (!isAdmin(s)) return denied();
       return NextResponse.json(await resolveMismatch(Number(b.id), { action: b.resolution, note: b.note, by: s.email }));
@@ -37,6 +41,10 @@ export async function POST(req) {
     if (b?.action === 'set_rate') {
       if (!isAdmin(s)) return denied();
       return NextResponse.json(await setDeliveryRate(b.sizeClass, Math.round(Number(b.dollars) * 100), { by: s.email }));
+    }
+    if (b?.action === 'set_zone_rate') {
+      if (!isAdmin(s)) return denied();
+      return NextResponse.json(await setZoneRate(Number(b.zone), b.sizeClass, Math.round(Number(b.dollars) * 100), { by: s.email }));
     }
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (e) {

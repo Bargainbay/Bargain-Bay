@@ -252,7 +252,7 @@ test('review can send it back with a note, reject with a listed reason, or re-gr
     equal((await reviewListing(two.id, { decision: 'reject', by: 's', reason: 'condition_overstated' })).status, 'rejected');
     const three = await ready(a.id, { serial: 'SN-THREE', lane: 'B', pickupAddress: '1 Dock St', pickupPostal: 'L1W 3T9' });
     await submitListing(a.id, three.id);
-    equal((await reviewListing(three.id, { decision: 'approve', by: 's', condition: 'New Open Box' })).status, 'live');
+    equal((await reviewListing(three.id, { decision: 'approve', by: 's', condition: 'New Open Box', pickupKm: 20 })).status, 'live');
     await rejects(() => reviewListing(three.id, { decision: 'approve', by: 's' }), /not in review/);
   } finally { done(); }
 });
@@ -301,7 +301,7 @@ test('a live listing can only have its price LOWERED; any other change means reo
   try {
     const a = await vendor('Alpha', { tier: 1 });
     const { id } = await ready(a.id, { lane: 'B', pickupAddress: '1 Dock St', pickupPostal: 'L1W 3T9' });
-    await submitListing(a.id, id); await reviewListing(id, { decision: 'approve', by: 's' });
+    await submitListing(a.id, id); await reviewListing(id, { decision: 'approve', by: 's', pickupKm: 20 });
     equal((await getVendorListing(a.id, id)).status, 'live');
     await rejects(() => updateListing(a.id, id, { price: 1500 }), /lowered/);
     await rejects(() => updateListing(a.id, id, { title: 'A completely different title for this fridge' }), /lowered/);
@@ -319,7 +319,7 @@ test('the third strike pauses what is on sale, and a restricted vendor cannot pu
   try {
     const a = await vendor('Alpha', { tier: 1 });
     const { id } = await ready(a.id, { lane: 'B', pickupAddress: '1 Dock St', pickupPostal: 'L1W 3T9' });
-    await submitListing(a.id, id); await reviewListing(id, { decision: 'approve', by: 's' });
+    await submitListing(a.id, id); await reviewListing(id, { decision: 'approve', by: 's', pickupKm: 20 });
     for (const reason of ['missed_accept', 'missed_ready', 'cancelled_order']) await issueStrike(a.id, { reason, by: 'system' });
     equal((await getVendorListing(a.id, id)).status, 'paused');
     await rejects(() => resumeListing(a.id, id), /cannot put listings on sale/);
