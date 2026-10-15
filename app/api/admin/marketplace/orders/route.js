@@ -2,7 +2,7 @@
 // the carrier confirms (the customer's sale). The delivery-service fees are the business's pricing: admin.
 import { NextResponse } from 'next/server';
 import { getSession, isStaff, isAdmin } from '../../../../../lib/auth';
-import { tryEnsurePickupJob, resolveMismatch } from '../../../../../lib/vendor-pickup';
+import { tryEnsurePickupJob, resolveMismatch, combineTrip } from '../../../../../lib/vendor-pickup';
 import { allVendorOrders, deliverVendorOrder, deliveryRates, setDeliveryRate, deliveryZoneRates, setZoneRate } from '../../../../../lib/vendor-orders';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +28,10 @@ export async function POST(req) {
     // Booking the collection is selling-side (a rep would do it); deciding a strike is admin.
     if (b?.action === 'book_pickup') {
       const r = await tryEnsurePickupJob(Number(b.id), { by: s.email });
+      return NextResponse.json(r.ok ? r : { error: r.why }, { status: r.ok ? 200 : 400 });
+    }
+    if (b?.action === 'combine_trip') {
+      const r = await combineTrip(Number(b.id), { by: s.email });
       return NextResponse.json(r.ok ? r : { error: r.why }, { status: r.ok ? 200 : 400 });
     }
     if (b?.action === 'resolve_mismatch') {

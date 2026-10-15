@@ -117,6 +117,7 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
       {tab === 'orders' && (
         <OrdersTab orders={orders} rates={rates} zoneRates={zoneRates} isAdmin={isAdmin} busy={busy} now={new Date(serverNow || Date.now())}
           onVendor={goVendor}
+          combineTrip={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'combine_trip', id }), 'Added to the customer delivery as one trip.')}
           bookPickup={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'book_pickup', id }), 'Collection booked on the dispatch board.')}
           resolveMismatch={(id, action, note) => act(() => post('/api/admin/marketplace/orders', { action: 'resolve_mismatch', id, resolution: action, note }), 'Decision recorded.')}
           deliver={(id) => act(() => post('/api/admin/marketplace/orders', { action: 'deliver', id }), 'Marked delivered — the sale is booked to the vendor.')}
@@ -431,7 +432,7 @@ function VendorLink({ id, onOpen, children }) {
   return <a href="#" onClick={(e) => { e.preventDefault(); onOpen(id); }}>{children}</a>;
 }
 
-function OrdersTab({ orders, rates, zoneRates, setZoneRate, isAdmin, busy, now, onVendor, deliver, setRate, bookPickup, resolveMismatch }) {
+function OrdersTab({ orders, rates, zoneRates, setZoneRate, isAdmin, busy, now, onVendor, deliver, setRate, bookPickup, combineTrip, resolveMismatch }) {
   const [dollars, setDollars] = useState({});
   const hrs = (d) => (new Date(d) - now) / 3600000;
   const clock = (o) => {
@@ -453,8 +454,12 @@ function OrdersTab({ orders, rates, zoneRates, setZoneRate, isAdmin, busy, now, 
               <td style={{ color: clock(o).includes('OVERDUE') ? 'var(--danger)' : undefined }}>{clock(o)}</td>
               <td style={{ fontSize: 12 }}>{o.lane === 'C' && o.trackingNumber ? `${o.carrier} ${o.trackingNumber}` : o.insuranceChoice ? `insurance: ${o.insuranceChoice}` : ''}{o.status === 'cancelled' ? ` ${o.cancelCode}` : ''}</td>
               <td style={{ fontSize: 12 }}>{o.lane !== 'B' ? '' : o.collectedAt ? `collected ${new Date(o.collectedAt).toISOString().slice(0, 10)}`
-                : o.pickupJob ? `${o.pickupJob.number} (${o.pickupJob.status.replace('_', ' ')})`
-                : o.status === 'ready' ? <button className="btn" disabled={busy} onClick={() => bookPickup(o.id)}>Book collection</button> : 'booked when ready'}
+                : o.pickupJob ? <span>{o.pickupJob.number} ({o.pickupJob.status.replace('_', ' ')}{o.pickupJob.type !== 'pickup' ? ', one trip' : ''}){o.status === 'ready' && !['done', 'failed', 'cancelled', 'arrived', 'en_route'].includes(o.pickupJob.status) && o.pickupJob.type === 'pickup' && (
+                    <> <button className="btn" disabled={busy} title="Fold this collection into the customer's delivery stop" onClick={() => confirm('Replace this separate collection with ONE trip (collect from the seller and deliver to the customer on the same stop)?') && combineTrip(o.id)}>Make it one trip</button></>)}</span>
+                : o.status === 'ready' ? <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button className="btn" disabled={busy} onClick={() => bookPickup(o.id)}>Book collection (two legs)</button>
+                    <button className="btn" disabled={busy} title="Collect and deliver in one trip, using the customer's delivery stop" onClick={() => confirm('Collect from the seller and deliver to the customer in ONE trip? This replaces the separate collection. Better when the seller is on the way and nothing needs inspecting at the warehouse.') && combineTrip(o.id)}>One trip</button>
+                  </span> : 'booked when ready'}
                 {o.mismatch && (
                   <div style={{ color: 'var(--danger)', marginTop: 4 }}>
                     <b>Crew: does not match the listing.</b> {o.mismatch.note}

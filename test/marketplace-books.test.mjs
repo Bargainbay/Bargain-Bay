@@ -275,3 +275,30 @@ test('HST: the seller\'s HST is never ours; the HST on our own fees is', async (
     assert(dash.marketplace.commission >= 100 && dash.marketplace.gmv >= 1000, 'the dashboard reports the marketplace on its own line');
   });
 });
+
+test('A RETURN AFTER DELIVERY: an ordinary refund of a seller\'s unit is refused (it would be booked against Sales); the seller-reason refund draws down 2160', async () => {
+  await sharedCheckoutDb();
+  const w = await world();
+  await open(async () => {
+    await setOpeningBalances({ asOf: '2020-01-01', accounts: {} });
+    const r = await checkout([w.sku]);
+    const o = await orderRow(r.orderNumber);
+    await updateOrderStatus(o.id, 'confirmed');
+    const id = (await vo(o.id)).id;
+    await acceptVendorOrder(w.v.id, id, { insurance: 'declined' }); await markVendorOrderReady(w.v.id, id, {});
+    await updateOrderStatus(o.id, 'delivered');
+    const { orderInvoiceLink } = await import('../lib/orders.js');
+    const { refundInvoice, refundInvoiceItems, refundInvoiceAmount } = await import('../lib/invoices.js');
+    const inv = await orderInvoiceLink(o.id);
+    const refuses = async (fn, re) => { let e; try { await fn(); } catch (x) { e = x; } assert(e && re.test(e.message), `expected refusal, got ${e && e.message}`); };
+    await refuses(() => refundInvoiceItems(inv.id, { skus: [w.sku], reason: 'Customer changed their mind' }), /Seller could not fulfil/);
+    await refuses(() => refundInvoice(inv.id, { reason: 'return' }), /one at a time/);
+    await refuses(() => refundInvoiceAmount(inv.id, { amount: 50, reason: 'goodwill' }), /one at a time/);
+    const before = await tbNow();
+    await refundInvoiceItems(inv.id, { skus: [w.sku], reason: 'Seller could not fulfil', by: 'staff' });
+    const after = await tbNow();
+    equal(after.outOfBalance, 0);
+    equal(dollars(acct(after, '4000') - acct(before, '4000')), 0);       // Sales untouched
+    assert(acct(after, '2160') !== acct(before, '2160'), '2160 moved: the refund drew down what we owe the seller');
+  });
+});
