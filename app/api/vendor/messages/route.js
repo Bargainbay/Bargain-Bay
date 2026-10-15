@@ -24,7 +24,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('messages.send');
   if (!ctx) return denied();
   let b;
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }
