@@ -1,10 +1,12 @@
 import { notFound, redirect } from 'next/navigation';
-import { getSession, isAdmin } from '../../../../lib/auth';
-import { hasDb } from '../../../../lib/db';
+import { getSession, isAdmin, isStaff } from '../../../../lib/auth';
+import { hasDb, query } from '../../../../lib/db';
+import { dispatchAccess } from '../../../../lib/dispatch-access';
+import { isDriver } from '../../../../lib/drivers';
 import { getPackingSlip } from '../../../../lib/invoices';
 import { currentLocations } from '../../../../lib/locations';
 import {
-  BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, PICKUP_ADDRESS, DISPATCH_EMAIL, isUnitLine } from '../../../../lib/constants';
+  BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, PICKUP_ADDRESS, DISPATCH_EMAIL, isUnitLine, isHaulAwayLine, isInstallLine, isDoorRemovalLine } from '../../../../lib/constants';
 import PackingSlipActions from '../../../../components/PackingSlipActions';
 
 export const dynamic = 'force-dynamic';
@@ -16,10 +18,23 @@ export default async function PackingSlipPage({ params }) {
   const { number } = await params;
   const session = await getSession();
   if (!session) redirect(`/login?next=/admin/packing-slip/${number}`);
-  if (!isAdmin(session)) {
+  // Whoever has to carry the order out: staff, the dispatch coordinator, and a
+  // driver for a stop that is theirs. The slip shows no prices or costs.
+  let driverOnly = false;
+  let allowed = isAdmin(session) || isStaff(session);
+  if (!allowed) allowed = !!(await dispatchAccess().catch(() => null))?.allowed;
+  if (!allowed && hasDb() && (await isDriver(session).catch(() => false))) {
+    const { rows } = await query(
+      `SELECT 1 FROM jobs j JOIN invoices i ON i.order_id = j.order_id
+        WHERE i.number = $1 AND (j.driver_id = $2 OR j.driver2_id = $2) LIMIT 1`,
+      [number, session.userId]).catch(() => ({ rows: [] }));
+    allowed = rows.length > 0;
+    driverOnly = allowed;
+  }
+  if (!allowed) {
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not authorized</h1>
-      <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the admin list.</p>
+      <p style={{ fontSize: 14 }}>Your account ({session.email}) can&apos;t open this packing slip.</p>
     </div></div>);
   }
   if (!hasDb()) return <div className="narrow"><div className="panel">Database not configured.</div></div>;
@@ -35,6 +50,13 @@ export default async function PackingSlipPage({ params }) {
   // What we're taking away, not bringing. The slip travels with the delivery, so
   // it is the last piece of paper anyone reads before the van leaves.
   const tradeIns = (slip.items || []).filter((it) => it.kind === 'trade_in');
+  // Paid-for extras the crew must do at the door. Without this the slip only
+  // showed appliances, so an installation on the bill was invisible to them.
+  const extras = [
+    ...(slip.items || []).filter((it) => isInstallLine(it.kind, it.description)).map((it) => ['Installation', it.description]),
+    ...(slip.items || []).filter((it) => isHaulAwayLine(it.kind, it.description)).map((it) => ['Haul away old appliance', it.description]),
+    ...(slip.items || []).filter((it) => isDoorRemovalLine(it.kind, it.description)).map((it) => ['Door removal', it.description])
+  ];
   // Where to pick each one from. A slip that can't reach the warehouse records
   // still prints — the serials are what the pick is checked against.
   const where = await currentLocations(units.map((it) => it.sku)).catch(() => new Map());
@@ -53,7 +75,7 @@ export default async function PackingSlipPage({ params }) {
         .ps-row td { padding: 9px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
       `}</style>
 
-      <PackingSlipActions number={slip.number} dispatchEmail={DISPATCH_EMAIL} />
+      {!driverOnly && <PackingSlipActions number={slip.number} dispatchEmail={DISPATCH_EMAIL} />}
 
       <div className="ps-sheet">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #2e2d2b', paddingBottom: 10 }}>
@@ -114,6 +136,19 @@ export default async function PackingSlipPage({ params }) {
             )}
           </tbody>
         </table>
+
+        {extras.length > 0 && (
+          <div style={{ marginTop: 16, border: '2px solid #2e2d2b', borderRadius: 6, padding: '10px 12px', background: '#fff8e1' }}>
+            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 700 }}>
+              Paid for on this invoice — do at the door
+            </div>
+            {extras.map(([label, text], i) => (
+              <div key={i} style={{ fontSize: 14, marginTop: 4 }}>
+                <b>{label}</b>{text && text.toLowerCase() !== label.toLowerCase() ? <> &nbsp;·&nbsp; {text}</> : null} &nbsp;·&nbsp; Done ☐
+              </div>
+            ))}
+          </div>
+        )}
 
         {tradeIns.length > 0 && (
           <div style={{ marginTop: 16, border: '2px solid #2e2d2b', borderRadius: 6, padding: '10px 12px' }}>

@@ -1106,6 +1106,14 @@ when raising the sale and not when correcting it.
   for it and there should not be: a kind is what decides SKUs, warranties, cost
   and stock movement, and a haul-away behaves like every other service on all
   four. The match covers what the rep typed as well as the preset.
+- **Installation, haul-away and door removal reach the job from the invoice, and stay in step** (2026-10-14).
+  `serviceInfoFromItems` / `syncJobServicesFromOrder` (lib/jobs.js): the job is cut once from the order, so an
+  install added to the invoice later used to reach nobody. `updateInvoice` and the "Pull Bargain Bay orders"
+  pass now re-sync open jobs (only the `trade_in` / `haul_away` / `install` tags are managed; hand-added tags
+  survive; closed stops untouched). The packing slip (`/admin/packing-slip/<INV>`) lists them in a "do at the
+  door" box and is open to staff, the dispatch coordinator and a driver for their OWN stop (link on the driver's
+  stop card); it shows no prices. Staged imports (CDA etc.) tag `install` / `haul_away` from the service, notes
+  and item text, or an Install / Haul away column.
 - **Not to be confused with `jobs.collect_cash`** — that is a haul-away the
   customer pays the DRIVER for at the door, which no invoice knows about. An
   invoice line is money billed on the sale. The line editor says so, because
