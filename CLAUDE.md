@@ -4433,6 +4433,36 @@ not shown anywhere until the storefront slice.
     rebook) from the Orders tab (`book_pickup`, staff). The delivery job made by the pull says "NOT YET
     COLLECTED FROM THE SELLER" while a collection is outstanding.
   - `npm test -- <word>` now runs only the test files whose name contains the word.
+- **Vendor team roles and two-factor sign-in (migration 0034, `lib/vendor-permissions.js`, `lib/vendor-session.js`,
+  `lib/vendor-mfa.js`, `lib/vendor-mfa-marker.js`, `lib/totp.js`, `lib/vendor-team.js`; pages `/vendor/team`,
+  `/vendor/security`, `/vendor/mfa`).**
+  - **ONE permission table, ONE gate.** Roles: owner, manager, listings, fulfilment, viewer (the old `staff` is
+    `manager`; the word is still accepted). `can(role, action)` in `lib/vendor-permissions.js` (no imports) is the
+    only table; `requireVendor('<action>')` / `checkVendor` in `lib/vendor-session.js` is the only door, and pages use
+    `vendorGate(next, '<action>')`. **An action is required: calling the gate with none REFUSES**, and an action
+    nobody lists is allowed to nobody. `test/vendor-mfa-team.test.mjs` scans every `app/api/vendor/**/route.js`
+    handler and every `app/vendor/**/page.jsx`, fails on one that names no valid action, and calls every handler
+    as every role. **A new vendor route or page must name its action (add it to ACTIONS first).** Only owners see
+    money, bank, team and accept policies; hidden nav is a courtesy, never the permission.
+  - **Team = `vendor_users`, by email, owner-managed** (revoke keeps the row; partial unique index; the LAST owner
+    cannot be removed or demoted, checked under a lock on the vendor row). Team members are never on a staff list.
+    Inviting, changing a role and removing need **step-up** (below), so a stolen owner session cannot seat itself.
+  - **TOTP (RFC 6238) in `node:crypto`**, vectors in the test. Secret encrypted with `secret-box` and the user id as
+    AAD (no `BANK_ENCRYPTION_KEY` = nobody can enrol, and then the "must enrol" rule is NOT enforced, because it
+    cannot be met). A code works once (`vendor_mfa.last_step`, one conditional UPDATE), window +-1 step. Recovery
+    codes: 10, single use, salted SHA-256, shown once. Attempts are counted in Postgres: 5 wrong in a row locks for
+    1 minute, doubling to an hour; attempts made while locked are refused and NOT recorded. Enrolment is
+    confirmed by a first code; an enrolled user cannot re-enrol (admin reset is the way back).
+  - **The second factor guards the vendor portal only.** After the normal session, vendor surfaces need a signed
+    httpOnly `bb_vmfa` cookie bound to the user and their `token_version` (key derived from AUTH_SECRET, 12 h).
+    Customers, staff and drivers sign in as before. An ENROLLED user (any role) needs the cookie; an OWNER who is not
+    enrolled has 14 days from the grant (`mfa_grace_until`), then is sent to `/vendor/security` until enrolled.
+    **Step-up:** `bank.edit` and `team.manage` need enrolment outright and a code typed within 10 minutes.
+    The marker fails CLOSED on any database error (unlike `bb_session`'s own token_version check).
+  - **Admin reset** (Admin > Marketplace > Vendors > a vendor > Reset 2FA; ADMIN only, reason required): wipes the
+    factor, bumps `token_version`, writes `vendor_events` and `audit_log`. Staff cannot.
+  - Not covered: an invitation email (the owner tells them), enforcement of MFA for non-owner roles (optional for
+    them), and the CSRF posture is just `SameSite=Lax` on a JSON-only API.
 
 ## Parts bought for a unit, and what a unit COSTS (added 2026-10-13)
 `lib/part-costs.js`, `lib/tracker-cost.js`, migration 0030 (`unit_part_costs`),
