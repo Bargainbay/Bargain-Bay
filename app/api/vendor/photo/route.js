@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('listings.view');
   if (!ctx) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   const id = Number(new URL(req.url).searchParams.get('id'));
   if (!id) return new NextResponse('Not found', { status: 404 });

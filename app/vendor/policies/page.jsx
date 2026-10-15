@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Policies — Bargain Bay Marketplace' };
 
 export default async function PoliciesPage() {
-  const gate = await vendorGate('/vendor/policies');
+  const gate = await vendorGate('/vendor/policies', 'policies.view');
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
   const status = await acceptanceStatus(vendor.id);
@@ -17,7 +17,7 @@ export default async function PoliciesPage() {
     .map((p) => ({ slug: p.slug, title: p.title, summary: p.summary, version: p.version, status: p.status, required: p.acceptRequired }));
   return (
     <div>
-      <VendorNav active="policies" name={vendor.trade_name || vendor.legal_name} />
+      <VendorNav active="policies" name={vendor.trade_name || vendor.legal_name} role={vendor.role} mfa={gate.ctx.mfa} />
       <VendorPolicies
         docs={docs} isOwner={vendor.role === 'owner'}
         accepted={JSON.parse(JSON.stringify(status.accepted))}

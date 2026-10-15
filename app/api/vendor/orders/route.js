@@ -10,14 +10,14 @@ export const runtime = 'nodejs';
 const denied = () => NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 
 export async function GET(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('orders.view');
   if (!ctx) return denied();
   const status = new URL(req.url).searchParams.get('status') || undefined;
   return NextResponse.json({ orders: await listVendorOrders(ctx.vendor.id, { status }), now: new Date().toISOString() });
 }
 
 export async function POST(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('orders.fulfil');
   if (!ctx) return denied();
   let b;
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }

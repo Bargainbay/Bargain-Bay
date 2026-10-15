@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('money.view');
   if (!ctx) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   const sp = new URL(req.url).searchParams;
   const [balance, statement, payouts] = await Promise.all([

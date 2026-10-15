@@ -11,14 +11,14 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Performance — Bargain Bay Marketplace' };
 
 export default async function Performance() {
-  const gate = await vendorGate('/vendor/performance');
+  const gate = await vendorGate('/vendor/performance', 'performance.view');
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
   const meter = await strikeMeter(vendor.id);
   const lim = TIER_LIMITS[vendor.tier];
   return (
     <div>
-      <VendorNav active="performance" name={vendor.trade_name || vendor.legal_name} />
+      <VendorNav active="performance" name={vendor.trade_name || vendor.legal_name} role={vendor.role} mfa={gate.ctx.mfa} />
       <div className="panel">
         <h2 style={{ marginTop: 0, fontSize: 17 }}>The standards</h2>
         <div className="table-wrap"><table className="admin"><thead><tr><th>Rule</th><th>Standard</th><th>If missed</th></tr></thead><tbody>

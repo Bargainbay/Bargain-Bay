@@ -8,14 +8,14 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET() {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('policies.view');
   if (!ctx) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   const s = await acceptanceStatus(ctx.vendor.id);
   return NextResponse.json({ accepted: s.accepted, pending: s.pending.map((p) => ({ slug: p.slug, title: p.title, version: p.version })) });
 }
 
 export async function POST(req) {
-  const ctx = await requireVendor();
+  const ctx = await requireVendor('policies.accept');
   if (!ctx) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   let b;
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }

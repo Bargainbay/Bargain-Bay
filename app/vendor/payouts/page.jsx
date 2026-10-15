@@ -19,7 +19,7 @@ const KIND = {
 };
 
 export default async function Payouts() {
-  const gate = await vendorGate('/vendor/payouts');
+  const gate = await vendorGate('/vendor/payouts', 'money.view');
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
   const [bal, statement, payouts, bank] = await Promise.all([
@@ -28,7 +28,7 @@ export default async function Payouts() {
   const hold = holdDaysFor(vendor.tier);
   return (
     <div>
-      <VendorNav active="payouts" name={vendor.trade_name || vendor.legal_name} />
+      <VendorNav active="payouts" name={vendor.trade_name || vendor.legal_name} role={vendor.role} mfa={gate.ctx.mfa} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 12, marginBottom: 16 }}>
         <div className="kpi-card"><div className="kpi-value">{cents(bal.availableCents)}</div><div style={{ fontSize: 13 }}>Available</div></div>
         <div className="kpi-card"><div className="kpi-value">{cents(bal.pendingCents)}</div><div style={{ fontSize: 13 }}>Pending ({hold} days after delivery)</div></div>

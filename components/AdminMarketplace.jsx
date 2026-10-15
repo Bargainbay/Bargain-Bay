@@ -270,7 +270,8 @@ function DeductionForm({ vendorId, refs }) {
 function VendorPanel({ d, isAdmin, busy, strikeReasons, onClose, run }) {
   const v = d.vendor;
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('staff');
+  const [role, setRole] = useState('manager');
+  const roles = d.roles || [{ key: 'manager', label: 'Manager' }, { key: 'owner', label: 'Owner' }];
   const [strike, setStrike] = useState({ reason: '', orderRef: '', note: '' });
   const [reason, setReason] = useState('');
   const [rate, setRate] = useState('');
@@ -297,12 +298,18 @@ function VendorPanel({ d, isAdmin, busy, strikeReasons, onClose, run }) {
 
       <h3 style={{ fontSize: 15 }}>People who can act for this vendor</h3>
       <table className="admin" style={{ minWidth: 0 }}><tbody>
-        {d.users.map((u) => <tr key={u.email}><td>{u.email}</td><td>{u.role}</td><td>{u.revoked_at ? `revoked ${day(u.revoked_at)}` : 'active'}</td>
-          <td>{!u.revoked_at && <button className="btn" disabled={busy} onClick={() => run({ action: 'revoke_user', email: u.email }, 'Access removed.')}>Remove</button>}</td></tr>)}
+        {d.users.map((u) => <tr key={u.email + (u.revoked_at || '')}><td>{u.email}</td><td>{u.role}</td><td>{u.revoked_at ? `revoked ${day(u.revoked_at)}` : 'active'}</td>
+          <td>{u.revoked_at ? '' : u.mfa_enrolled ? <span className="pill ok">2FA on</span> : <span className="pill warn">2FA off{u.role === 'owner' ? ` (grace to ${day(u.mfa_grace_until)})` : ''}</span>}</td>
+          <td>{!u.revoked_at && <button className="btn" disabled={busy} onClick={() => run({ action: 'revoke_user', email: u.email }, 'Access removed.')}>Remove</button>}
+            {isAdmin && u.has_account && u.mfa_enrolled && (
+              <button className="btn danger" disabled={busy} style={{ marginLeft: 6 }} onClick={() => {
+                const why = window.prompt(`Reset two-factor sign-in for ${u.email}? They are signed out and must enrol again.\n\nWhy (required — check who you are talking to first):`);
+                if (why && why.trim()) run({ action: 'reset_mfa', email: u.email, reason: why.trim() }, 'Two-factor reset. They must set it up again.');
+              }}>Reset 2FA</button>)}</td></tr>)}
       </tbody></table>
       <div style={{ display: 'flex', gap: 8, margin: '8px 0 16px', flexWrap: 'wrap' }}>
         <input placeholder="Email (they sign up at /signup with it)" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: 280 }} />
-        <select value={role} onChange={(e) => setRole(e.target.value)} style={{ width: 'auto' }}><option value="staff">Staff</option>{isAdmin && <option value="owner">Owner (controls the bank account)</option>}</select>
+        <select value={role} onChange={(e) => setRole(e.target.value)} style={{ width: 'auto' }}>{roles.filter((r) => isAdmin || r.key !== 'owner').map((r) => <option key={r.key} value={r.key}>{r.label}{r.key === 'owner' ? ' (controls the bank account)' : ''}</option>)}</select>
         <button className="btn" disabled={busy || !email} onClick={() => run({ action: 'grant_user', email, role }, 'Access granted.')}>Give access</button>
       </div>
 
