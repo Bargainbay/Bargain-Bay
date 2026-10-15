@@ -26,6 +26,10 @@ export default async function Payouts() {
     vendorBalance(vendor.id), vendorStatement(vendor.id, { limit: 100 }), vendorPayouts(vendor.id), bankSummary(vendor.id)
   ]);
   const hold = holdDaysFor(vendor.tier);
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i);
+    return d.toISOString().slice(0, 7);
+  });
   return (
     <div>
       <VendorNav active="payouts" name={vendor.trade_name || vendor.legal_name} />
@@ -52,6 +56,8 @@ export default async function Payouts() {
 
       <div className="panel">
         <h2 style={{ marginTop: 0, fontSize: 17 }}>Statement</h2>
+        <p style={{ fontSize: 13, marginTop: 0 }}>Monthly statements for your records (opening balance, every entry, closing balance):{' '}
+          {months.map((m) => <a key={m} href={`/api/vendor/statement?month=${m}&format=csv`} style={{ marginRight: 10 }}>{m} (CSV)</a>)}</p>
         <div className="table-wrap"><table className="admin"><thead><tr><th>Date</th><th>Entry</th><th>Order</th><th>Amount</th><th>Payable from</th></tr></thead><tbody>
           {statement.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--muted)' }}>No activity yet.</td></tr>}
           {statement.map((s) => (
