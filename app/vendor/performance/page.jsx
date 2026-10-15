@@ -5,6 +5,8 @@ import { strikeMeter } from '../../../lib/vendors';
 import {
   ACCEPT_HOURS, READY_HOURS, CLAIM_RESPOND_HOURS, CLAIM_RESOLVE_DAYS, STRIKE_LIMIT, STRIKE_REASONS, WARRANTY_MONTHS, TIERS, HOLD_DAYS_BY_TIER
 } from '../../../lib/marketplace-rules';
+import { vendorScorecard } from '../../../lib/vendor-scorecard';
+import VendorScorecard from '../../../components/VendorScorecard';
 import { TIER_LIMITS } from '../../../lib/listing-rules';
 
 export const dynamic = 'force-dynamic';
@@ -15,10 +17,17 @@ export default async function Performance() {
   if (!gate.ctx) return <VendorGateView {...gate} />;
   const { vendor } = gate.ctx;
   const meter = await strikeMeter(vendor.id);
+  const card = await vendorScorecard(vendor.id).catch(() => null);
   const lim = TIER_LIMITS[vendor.tier];
   return (
     <div>
       <VendorNav active="performance" name={vendor.trade_name || vendor.legal_name} />
+      {card && (
+        <div className="panel">
+          <h2 style={{ marginTop: 0, fontSize: 17 }}>Your order scorecard</h2>
+          <VendorScorecard card={card} acceptHours={ACCEPT_HOURS} readyHours={READY_HOURS} />
+        </div>
+      )}
       <div className="panel">
         <h2 style={{ marginTop: 0, fontSize: 17 }}>The standards</h2>
         <div className="table-wrap"><table className="admin"><thead><tr><th>Rule</th><th>Standard</th><th>If missed</th></tr></thead><tbody>

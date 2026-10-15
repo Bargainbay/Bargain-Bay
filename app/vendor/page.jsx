@@ -8,6 +8,9 @@ import { listVendorListings } from '../../lib/marketplace-listings';
 import { listVendorOrders } from '../../lib/vendor-orders';
 import { pendingPolicies } from '../../lib/policy-acceptance';
 import { onboardingProgress } from '../../lib/onboarding';
+import { vendorScorecard } from '../../lib/vendor-scorecard';
+import VendorCountdowns from '../../components/VendorCountdowns';
+import VendorScorecard from '../../components/VendorScorecard';
 import { ACCEPT_HOURS, READY_HOURS, STRIKE_REASONS, TIERS } from '../../lib/marketplace-rules';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +33,7 @@ export default async function VendorHome() {
   ]);
   const policiesPending = await pendingPolicies(vendor.id).catch(() => []);
   const onboarding = await onboardingProgress(vendor.id).catch(() => null);
+  const card = await vendorScorecard(vendor.id).catch(() => null);
   const waiting = orders.filter((o) => o.status === 'awaiting_accept').length;
   const toReady = orders.filter((o) => o.status === 'accepted').length;
   const by = (s) => listings.filter((l) => l.status === s).length;
@@ -93,12 +97,16 @@ export default async function VendorHome() {
           <strong> accept within {ACCEPT_HOURS} hours</strong> and <strong>have it ready (or tracking submitted) within {READY_HOURS} hours</strong>.
           Missing either, or cancelling a paid order, is a strike. Three strikes restrict the account.
         </p>
-        <p style={{ marginBottom: 0, fontSize: 14 }}>
-          {waiting + toReady > 0
-            ? <><b>{waiting}</b> to accept · <b>{toReady}</b> to make ready — <a href="/vendor/orders">open your orders and see the countdowns →</a></>
-            : <span style={{ color: 'var(--muted)' }}>No open orders. Each one shows a live countdown — green, amber under six hours, red when overdue. <a href="/vendor/orders">Orders →</a></span>}
-        </p>
+        <VendorCountdowns orders={JSON.parse(JSON.stringify(orders))} serverNow={new Date().toISOString()} />
+        <p style={{ marginBottom: 0, fontSize: 13 }}><a href="/vendor/orders">All your orders →</a> · Green is plenty of time, amber is under six hours, red is overdue.</p>
       </div>
+
+      {card && (
+        <div className="panel">
+          <h2 style={{ marginTop: 0, fontSize: 17 }}>Your order scorecard</h2>
+          <VendorScorecard card={card} acceptHours={ACCEPT_HOURS} readyHours={READY_HOURS} />
+        </div>
+      )}
 
       {meter.strikes.length > 0 && (
         <div className="panel">
