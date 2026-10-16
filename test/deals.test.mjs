@@ -5,7 +5,7 @@
 // ticket however it is spelled.
 import { suite, test, assert, equal } from './_harness.mjs';
 import {
-  DEALS, DROPS, GIVEAWAY, isRunning, isUpcoming, dropFor, giveawayOpen,
+  DEALS, DROPS, GIVEAWAY, GIVEAWAYS, isRunning, isUpcoming, dropFor, giveawayOpen,
   describeCoupon, bannerFor, heroFor, torontoParts, ticketsOf, BONUS, MAX_TICKETS, GIVEAWAY_EMAIL_TEXT
 } from '../lib/deals-config.js';
 import {
@@ -49,11 +49,19 @@ test('there is never a gap or a double booking in the weekly drops', () => {
 });
 
 test('the giveaway window and its draw date agree', () => {
-  assert(giveawayOpen(at('2026-10-05T14:00:00Z')), 'opened Oct 5');
-  assert(!giveawayOpen(at('2026-10-04T14:00:00Z')), 'closed the day before');
-  assert(giveawayOpen(at('2026-10-13T01:00:00Z')), '9pm Oct 12 Toronto is still open');
-  assert(!giveawayOpen(at('2026-10-13T05:00:00Z')));
+  assert(giveawayOpen(at('2026-10-20T14:00:00Z')), 'opened Oct 20');
+  assert(!giveawayOpen(at('2026-10-19T14:00:00Z')), 'closed the day before');
+  assert(giveawayOpen(at('2026-11-01T01:00:00Z')), '9pm Oct 31 Toronto is still open');
+  assert(!giveawayOpen(at('2026-11-01T05:00:00Z')));
   assert(GIVEAWAY.drawDate > GIVEAWAY.to);
+  assert(GIVEAWAY.costumeJudgeDate > GIVEAWAY.to && GIVEAWAY.costumeJudgeDate <= GIVEAWAY.drawDate, 'the costume is judged after entries close and before the draw');
+});
+
+test('the earlier giveaway is kept, closed, and cannot overlap the live one', () => {
+  const t = GIVEAWAYS['thanksgiving-2026'];
+  assert(t && t.to < GIVEAWAY.from);
+  assert(!giveawayOpen(at('2026-10-21T14:00:00Z'), t));
+  assert(giveawayOpen(at('2026-10-06T14:00:00Z'), t));
 });
 
 test('torontoParts reports the Toronto clock', () => {
@@ -202,16 +210,19 @@ test('only a current winner can be resolved', async () => {
 
 suite('giveaway: bonus entries are derived, never stored');
 
-test('only Instagram and an approved video earn bonus entries', () => {
+test('only Instagram and the best costume earn bonus entries', () => {
   equal(ticketsOf({}), 1);
   // An account and the email subscription are REQUIRED to enter, so they are not bonuses.
   equal(ticketsOf({ has_account: true, newsletter: true }), 1);
   equal(ticketsOf({ instagram_handle: 'x' }), 2);
-  equal(ticketsOf({ video_status: 'pending' }), 1, 'a video nobody has watched is not a ticket');
-  equal(ticketsOf({ video_status: 'rejected' }), 1);
-  equal(ticketsOf({ instagram_handle: 'x', video_status: 'approved' }), MAX_TICKETS);
-  equal(MAX_TICKETS, 1 + BONUS.instagram + BONUS.video);
-  equal(MAX_TICKETS, 5);
+  equal(ticketsOf({ costume_status: 'pending' }), 1, 'a costume photo by itself is not a ticket');
+  equal(ticketsOf({ costume_status: 'approved' }), 1, 'approved is not best');
+  equal(ticketsOf({ costume_best: true }), 1 + BONUS.costume);
+  equal(ticketsOf({ instagram_handle: 'x', costume_best: true }), MAX_TICKETS);
+  equal(MAX_TICKETS, 1 + BONUS.instagram + BONUS.costume);
+  equal(MAX_TICKETS, 7);
+  // The earlier giveaway's video bonus still counts for the entries that earned it.
+  equal(ticketsOf({ video_status: 'approved' }), 1 + BONUS.video);
 });
 
 test('entry input is checked before anything is created', () => {
@@ -292,6 +303,69 @@ test('a video must carry this entry\'s prefix and the release', async () => {
     try { await registerVideo(G, a, `${videoPrefix(G, a)}x.mp4`, false); } catch (e) { m2 = e.message; }
     assert(m1.includes('does not belong'), 'cannot attach somebody else\'s upload');
     assert(m2.includes('share your video'), 'the release must be ticked');
+  } finally { done(); }
+});
+
+suite('giveaway: the costume contest');
+
+import { registerCostume, reviewCostume, setBestCostume, clearBestCostume, costumePrefix } from '../lib/giveaway.js';
+
+test('a costume photo must carry this entry\'s prefix and the release', async () => {
+  const { done } = await withTestDb();
+  try {
+    const a = (await enterGiveaway(G, person(1))).id;
+    const b = (await enterGiveaway(G, person(2))).id;
+    let m1 = '', m2 = '';
+    try { await registerCostume(G, a, `${costumePrefix(G, b)}x.jpg`, true); } catch (e) { m1 = e.message; }
+    try { await registerCostume(G, a, `${costumePrefix(G, a)}x.jpg`, false); } catch (e) { m2 = e.message; }
+    assert(m1.includes('does not belong'), 'cannot attach somebody else\'s upload');
+    assert(m2.includes('share your photo'), 'the release must be ticked');
+  } finally { done(); }
+});
+
+test('only the ONE best costume earns +5, and naming a new one takes it off the old', async () => {
+  const { done } = await withTestDb();
+  try {
+    const a = (await enterGiveaway(G, person(1))).id;
+    const b = (await enterGiveaway(G, person(2))).id;
+    const c = (await enterGiveaway(G, person(3))).id;
+    await registerCostume(G, a, `${costumePrefix(G, a)}1.jpg`, true);
+    await registerCostume(G, b, `${costumePrefix(G, b)}1.jpg`, true);
+    equal((await entryStatus(a)).tickets, 1, 'a pending photo is not a ticket');
+
+    let m = '';
+    try { await setBestCostume(G, a, 'admin'); } catch (e) { m = e.message; }
+    assert(m.includes('approved'), 'cannot name a photo nobody has approved');
+    try { await setBestCostume(G, c, 'admin'); m = ''; } catch (e) { m = e.message; }
+    assert(m, 'cannot name an entry with no photo');
+
+    await reviewCostume(G, a, 'approved', 'admin');
+    await reviewCostume(G, b, 'approved', 'admin');
+    equal((await entryStatus(a)).tickets, 1, 'approved is not best');
+    await setBestCostume(G, a, 'admin');
+    equal((await entryStatus(a)).tickets, 1 + BONUS.costume);
+    await setBestCostume(G, b, 'admin');
+    equal((await entryStatus(a)).tickets, 1, 'the old best loses it');
+    equal((await entryStatus(b)).tickets, 1 + BONUS.costume);
+
+    // Rejecting the best costume takes the title away with it.
+    await reviewCostume(G, b, 'rejected', 'admin');
+    equal((await entryStatus(b)).tickets, 1);
+    await setBestCostume(G, a, 'admin');
+    await clearBestCostume(G);
+    equal((await entryStatus(a)).tickets, 1);
+  } finally { done(); }
+});
+
+test('the database itself refuses two best costumes in one giveaway', async () => {
+  const { done } = await withTestDb();
+  try {
+    const a = (await enterGiveaway(G, person(1))).id;
+    const b = (await enterGiveaway(G, person(2))).id;
+    await query('UPDATE giveaway_entries SET costume_best = true WHERE id = $1', [a]);
+    let refused = false;
+    try { await query('UPDATE giveaway_entries SET costume_best = true WHERE id = $1', [b]); } catch { refused = true; }
+    assert(refused);
   } finally { done(); }
 });
 

@@ -1,21 +1,21 @@
 'use client';
 import { useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
-import { BONUS, MAX_TICKETS } from '../../lib/deals-config';
+import { BONUS, MAX_TICKETS, GIVEAWAY } from '../../lib/deals-config';
 
 // Shown to someone who already has an entry (the signed link carries which). The
 // account and the deals-and-flyers email were REQUIRED to get here, so they are
-// not steps. What is left is optional: two ways to earn bonus entries.
+// not steps. What is left is optional: two ways to earn bonus entries: following us, and the costume contest.
 const post = (body) => fetch('/api/giveaway/bonus', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 }).then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) }));
 
-function Step({ done, title, bonus, children }) {
+function Step({ done, title, bonus, bonusText, children }) {
   return (
     <div className="check-step" data-done={done ? '1' : '0'}>
       <div className="check-mark" aria-hidden="true">{done ? '✓' : ''}</div>
       <div style={{ flex: 1 }}>
-        <div className="check-title">{title} <span className="check-bonus">+{bonus} {bonus === 1 ? 'entry' : 'entries'}</span></div>
+        <div className="check-title">{title} <span className="check-bonus">{bonusText || `+${bonus} ${bonus === 1 ? 'entry' : 'entries'}`}</span></div>
         {children}
       </div>
     </div>
@@ -40,27 +40,30 @@ export default function GiveawayChecklist({ e, initial, instagramUrl, closesLabe
     } catch { setErr('Network error. Please try again.'); return false; } finally { setBusy(''); }
   }
 
-  async function sendVideo() {
+  async function sendPhoto() {
     const f = file.current?.files?.[0];
-    if (!f) { setErr('Choose a video first.'); return; }
-    if (!release) { setErr('Please tick the box that lets us share your video.'); return; }
-    if (f.size > 150 * 1024 * 1024) { setErr('That video is over 150 MB. Please send a shorter one.'); return; }
-    setBusy('video'); setErr(''); setProgress(0);
+    if (!f) { setErr('Choose a photo first.'); return; }
+    if (!release) { setErr('Please tick the box that lets us share your photo.'); return; }
+    if (f.size > 20 * 1024 * 1024) { setErr('That photo is over 20 MB. Please send a smaller one.'); return; }
+    setBusy('costume'); setErr(''); setProgress(0);
     try {
       const id = String(e).split('.')[0];
-      const ext = (f.name.split('.').pop() || 'mp4').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'mp4';
-      const blob = await upload(`giveaway/thanksgiving-2026/${id}-${Date.now()}.${ext}`, f, {
-        access: 'private', handleUploadUrl: '/api/giveaway/video', clientPayload: e, multipart: true,
+      const ext = (f.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
+      const blob = await upload(`giveaway/${GIVEAWAY.id}/costume-${id}-${Date.now()}.${ext}`, f, {
+        access: 'private', handleUploadUrl: '/api/giveaway/costume', clientPayload: e,
         onUploadProgress: (p) => setProgress(Math.round(p.percentage))
       });
-      await act('video', { action: 'video', pathname: blob.pathname, release });
+      await act('costume', { action: 'costume', pathname: blob.pathname, release });
     } catch (x) {
       setErr(x?.message || 'The upload did not finish. Please try again.');
       setBusy('');
     }
   }
 
-  const videoLabel = s.video_status === 'approved' ? 'Approved' : s.video_status === 'pending' ? 'Received, being reviewed' : s.video_status === 'rejected' ? 'We couldn’t use that one, send another' : '';
+  const costumeLabel = s.costume_best ? 'Judged the best costume: +5 entries added!'
+    : s.costume_status === 'approved' ? 'Received and approved. We pick the best costume after entries close.'
+    : s.costume_status === 'pending' ? 'Received, being reviewed'
+    : s.costume_status === 'rejected' ? 'We couldn’t use that one, send another' : '';
 
   return (
     <div className="panel" style={{ maxWidth: 640 }}>
@@ -84,20 +87,19 @@ export default function GiveawayChecklist({ e, initial, instagramUrl, closesLabe
         <div className="hint">We check that the winner follows us before the prize goes out.</div>
       </Step>
 
-      <Step done={s.video_status === 'approved'} title="Send a video: what are you thankful for?" bonus={BONUS.video}>
-        <div className="hint">Up to 30 seconds, filmed on your phone. Please: no children’s faces, no one else’s face without their OK, no copyrighted music.</div>
-        {videoLabel && <div style={{ fontSize: 13.5, margin: '6px 0', fontWeight: 600 }}>{videoLabel}</div>}
-        {s.video_status !== 'approved' && (
+      <Step done={!!s.costume_best} title="Halloween costume contest" bonusText={`best costume: +${BONUS.costume} entries`}>
+        <div className="hint">Send one photo of your Halloween costume. We pick the single best costume after entries close, and it earns +{BONUS.costume} entries. Sending a photo is optional and doesn’t change your base entry. Please: no children’s faces, and no one else’s face without their OK.</div>
+        {costumeLabel && <div style={{ fontSize: 13.5, margin: '6px 0', fontWeight: 600 }}>{costumeLabel}</div>}
+        {!s.costume_best && s.costume_status !== 'approved' && (
           <>
-            <input ref={file} type="file" accept="video/*" style={{ margin: '8px 0' }} />
+            <input ref={file} type="file" accept="image/*" style={{ margin: '8px 0' }} />
             <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 13.5, lineHeight: 1.45, cursor: 'pointer', fontWeight: 400 }}>
               <input type="checkbox" checked={release} onChange={(ev) => setRelease(ev.target.checked)} style={{ marginTop: 2, width: 'auto' }} />
-              <span>I made this video, everyone in it agrees, and Bargain Bay may share it on its website and social media.</span>
+              <span>I took this photo, everyone in it agrees, and Bargain Bay may share it on its website and social media.</span>
             </label>
-            <button className="btn primary" style={{ marginTop: 8 }} disabled={busy === 'video'} onClick={sendVideo}>
-              {busy === 'video' ? `Uploading… ${progress}%` : 'Upload video'}
+            <button className="btn primary" style={{ marginTop: 8 }} disabled={busy === 'costume'} onClick={sendPhoto}>
+              {busy === 'costume' ? `Uploading… ${progress}%` : 'Upload photo'}
             </button>
-            <div className="hint">Your video counts once we’ve watched it and approved it.</div>
           </>
         )}
       </Step>

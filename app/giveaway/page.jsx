@@ -7,8 +7,8 @@ import GiveawayChecklist from './GiveawayChecklist';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Win a 7 cu. ft. Freezer: Thanksgiving Giveaway',
-  description: 'Enter to win a Frigidaire 7 cu. ft. upright freezer from Bargain Bay. No purchase necessary. Ontario residents 18+.',
+  title: 'Win a SMEG Countertop Oven: Halloween Giveaway',
+  description: 'Enter to win a SMEG countertop oven from Bargain Bay, and show us your best Halloween costume for bonus entries. No purchase necessary. Ontario residents 18+.',
   alternates: { canonical: '/giveaway' }
 };
 
@@ -18,7 +18,9 @@ export default async function GiveawayPage({ searchParams }) {
   // Somebody following their link back sees their checklist, not the form.
   const eParam = typeof sp.e === 'string' ? sp.e : '';
   const entryId = open ? entryIdFromParam(eParam) : null;
-  const entry = entryId ? await entryStatus(entryId).catch(() => null) : null;
+  const found = entryId ? await entryStatus(entryId).catch(() => null) : null;
+  // A link from an earlier giveaway shows this one's form, not somebody's old checklist.
+  const entry = found && found.giveaway === GIVEAWAY.id ? found : null;
   const { date } = torontoParts();
   const notYet = date < GIVEAWAY.from;
 
@@ -29,19 +31,17 @@ export default async function GiveawayPage({ searchParams }) {
           <span className="clearance-kicker">Giveaway · no purchase necessary</span>
           <h1>Win a {GIVEAWAY.prizeShort}</h1>
           <p>
-            Thanksgiving means a full fridge and a fuller freezer. We&apos;re giving one away, free.
-            Approximate retail value ${GIVEAWAY.retailValue}.
+            Halloween is on us. We&apos;re giving away a SMEG countertop oven, free, and the best
+            Halloween costume earns {BONUS.costume} bonus entries.
+            Approximate retail value ${GIVEAWAY.retailValue.toLocaleString('en-CA')}.
             {open ? ` Entries close ${dayLabel(GIVEAWAY.to)} at 11:59 pm.` : ''}
           </p>
         </div>
       </section>
 
-      <section className="giveaway-ad" aria-label="Thanksgiving advertisement">
-        <video controls preload="none" playsInline poster="/giveaway/thanksgiving-ad-v2-poster.jpg">
-          <source src="/giveaway/thanksgiving-ad-v2.mp4" type="video/mp4" />
-          Your browser can’t play this video.
-        </video>
-        <p className="hint" style={{ margin: '6px 0 0' }}>Advertisement made with AI. The freezer shown is the prize.</p>
+      <section className="giveaway-prize" aria-label="The prize" style={{ marginTop: 14 }}>
+        <img src={GIVEAWAY.hero.image} alt={GIVEAWAY.hero.imageAlt} style={{ maxWidth: 320, width: '100%', height: 'auto' }} />
+        <p className="hint" style={{ margin: '6px 0 0' }}>The SMEG oven shown is the prize.</p>
       </section>
 
       <div style={{ marginTop: 18 }}>
@@ -92,14 +92,14 @@ export default async function GiveawayPage({ searchParams }) {
         </p>
         <ul>
           <li><b>+{BONUS.instagram}</b> Follow Bargain Bay on Instagram (@bargainbayinc) and give us your username. We will confirm the winner follows us before the prize is awarded.</li>
-          <li><b>+{BONUS.video}</b> Send us a video of up to 30 seconds of what you are thankful for. It counts once we have reviewed and approved it. Videos are not judged and the best video does not win: it only earns bonus entries.</li>
+          <li><b>+{BONUS.costume}</b> Halloween costume contest. Send us one photo of your Halloween costume. Bargain Bay will choose the one (1) costume it judges best, on creativity, effort and fun, on or about {dayLabel(GIVEAWAY.costumeJudgeDate)}, after entries close, and that entry earns {BONUS.costume} extra entries before the draw. Sending a photo does not earn extra entries by itself, and only one costume is chosen. Our choice is final.</li>
         </ul>
         <p>
-          <b>Video terms.</b> By sending a video you confirm you made it, that everyone appearing in it has agreed,
-          that it contains no copyrighted music or third-party material, and that it shows no one under 18. You give
-          {' '}{BUSINESS_LEGAL} a non-exclusive, royalty-free licence to show it on our website and social media, and in
-          our marketing, for as long as we choose to. We may decline any video that is unsuitable. Your video is kept
-          private until we choose to use it.
+          <b>Costume photo terms.</b> By sending a photo you confirm you took it, that everyone appearing in it has
+          agreed, that it shows no one under 18, and that it contains no third-party material you do not have the right
+          to use. You give {BUSINESS_LEGAL} a non-exclusive, royalty-free licence to show it on our website and social
+          media, and in our marketing, for as long as we choose to. We may decline any photo that is unsuitable. Your
+          photo is kept private until we choose to use it.
         </p>
 
         <h2>5. Prize</h2>

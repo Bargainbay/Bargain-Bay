@@ -106,7 +106,7 @@ export async function POST(req) {
         subject: `You're entered: ${GIVEAWAY.title}`,
         html: `<p>Hi ${esc(r.name.split(' ')[0])},</p>
           <p>You're entered to win ${esc(GIVEAWAY.prize)}. We draw on ${esc(dayLabel(GIVEAWAY.drawDate))} and contact the winner by email or phone.</p>
-          <p><b>Want more chances?</b> Follow us on Instagram, or send a short video of what you're thankful for. Both are optional and earn extra entries until ${esc(dayLabel(GIVEAWAY.to))}:</p>
+          <p><b>Want more chances?</b> Follow us on Instagram (+1 entry), and send us a photo of your Halloween costume: the costume we judge best earns +5 entries. Both are optional and open until ${esc(dayLabel(GIVEAWAY.to))}:</p>
           <p><a href="${link}">${link}</a></p>
           <p>You're also on our deals and flyers email list (about once a week); there is an unsubscribe link in every one, and your entry stays valid if you unsubscribe.</p>
           <p>Full contest rules: <a href="${SITE_URL}/giveaway#rules">${SITE_URL}/giveaway#rules</a></p>

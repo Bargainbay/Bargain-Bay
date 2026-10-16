@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { hasDb } from '../../../../lib/db';
 import { GIVEAWAY, giveawayOpen } from '../../../../lib/deals-config';
-import { entryIdFromParam, entryStatus, setInstagram, registerVideo } from '../../../../lib/giveaway';
+import { entryIdFromParam, entryStatus, setInstagram, registerCostume } from '../../../../lib/giveaway';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,12 +17,13 @@ export async function POST(req) {
 
   try {
     const cur = await entryStatus(id);
-    if (!cur) return NextResponse.json({ error: 'Entry not found.' }, { status: 404 });
+    // An entry from an earlier giveaway cannot be used to earn bonuses in this one.
+    if (!cur || cur.giveaway !== GIVEAWAY.id) return NextResponse.json({ error: 'Entry not found.' }, { status: 404 });
 
     if (body.action === 'instagram') {
       await setInstagram(id, body.handle);
-    } else if (body.action === 'video') {
-      await registerVideo(GIVEAWAY.id, id, body.pathname, body.release === true);
+    } else if (body.action === 'costume') {
+      await registerCostume(GIVEAWAY.id, id, body.pathname, body.release === true);
     } else {
       return NextResponse.json({ error: 'Unknown step.' }, { status: 400 });
     }
