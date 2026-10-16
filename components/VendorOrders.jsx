@@ -81,6 +81,17 @@ export default function VendorOrders({ initial, serverNow, cancelReasons, carrie
             </div>
           )}
 
+          {o.lane === 'C' && o.shipTo && ['accepted', 'ready'].includes(o.status) && (
+            <div className="panel" style={{ marginTop: 12, background: 'var(--tint)' }}>
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Ship to and contact</div>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>{o.shipTo.name}</div>
+              <div style={{ fontSize: 15 }}>{o.shipTo.address}{o.shipTo.city ? `, ${o.shipTo.city}` : ''}{o.shipTo.postal ? ` ${o.shipTo.postal}` : ''}</div>
+              {o.shipTo.phone && <div style={{ fontSize: 15 }}>Phone: <a href={`tel:${o.shipTo.phone}`}>{o.shipTo.phone}</a></div>}
+              {o.shipTo.email && <div style={{ fontSize: 15 }}>Email: <a href={`mailto:${o.shipTo.email}`}>{o.shipTo.email}</a></div>}
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Use these details only to ship and deliver this order and to talk to the customer about it. Do not market to the customer or keep the details longer than you need them.</div>
+            </div>
+          )}
+
           {o.status === 'accepted' && (
             <div style={{ marginTop: 12 }}>
               {o.lane === 'C' ? (

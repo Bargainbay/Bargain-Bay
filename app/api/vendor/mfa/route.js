@@ -7,7 +7,7 @@
 // on the SESSION's own user; there is no user id in the request.
 import { NextResponse } from 'next/server';
 import { requireVendorIdentity, mfaContext, checkVendor } from '../../../../lib/vendor-session';
-import { beginEnrolment, confirmEnrolment, verifyCode, regenerateRecoveryCodes } from '../../../../lib/vendor-mfa';
+import { beginEnrolment, confirmEnrolment, verifyCode, regenerateRecoveryCodes, attestTwoStep } from '../../../../lib/vendor-mfa';
 import { signMarker, markerCookieOptions, MARKER_COOKIE } from '../../../../lib/vendor-mfa-marker';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +18,8 @@ const noStore = { 'Cache-Control': 'no-store' };
 
 const publicState = (m) => ({
   enrolled: m.enrolled, pendingEnrolment: m.pendingEnrolment, recoveryLeft: m.recoveryLeft, required: m.required,
-  available: m.available, verified: m.verified, mustEnrol: m.mustEnrol, graceUntil: m.graceUntil, daysLeft: m.daysLeft
+  available: m.available, verified: m.verified, mustEnrol: m.mustEnrol, graceUntil: m.graceUntil, daysLeft: m.daysLeft,
+  twoStepAttested: m.twoStepAttested, twoStepPrompt: m.twoStepPrompt
 });
 
 export async function GET() {
@@ -44,6 +45,11 @@ export async function POST(req) {
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }
   try {
     switch (b?.action) {
+      case 'attest_two_step': {
+        // "2-step verification is on for the account I sign in with" — their own statement, dated and kept.
+        await attestTwoStep(id.vendor.id, id.session.email, b.method, { by: id.session.email });
+        return NextResponse.json({ ok: true }, { headers: noStore });
+      }
       case 'begin': {
         const r = await beginEnrolment(userId, id.session.email);
         return NextResponse.json({ ok: true, secret: r.secret, display: r.display, otpauthUrl: r.otpauthUrl }, { headers: noStore });
