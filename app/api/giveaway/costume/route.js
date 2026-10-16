@@ -1,21 +1,19 @@
 import { NextResponse } from 'next/server';
 import { handleUpload } from '@vercel/blob/client';
 import { GIVEAWAY, giveawayOpen } from '../../../../lib/deals-config';
-import { entryIdFromParam, videoPrefix } from '../../../../lib/giveaway';
+import { entryIdFromParam, costumePrefix } from '../../../../lib/giveaway';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Hands the browser a short-lived token to upload a video STRAIGHT to the
-// private Blob store. A phone video is tens of megabytes, far past what a
-// serverless function accepts in a request body, so it cannot come through us.
-//
-// What this route enforces is where the file may land: only under THIS entry's
-// prefix, only video types, only up to the size cap, and with a random suffix so
-// it cannot be guessed or overwritten. Registering the finished upload against
-// the entry happens afterwards, in /api/giveaway/bonus, which re-checks the prefix.
-const MAX_VIDEO_BYTES = 150 * 1024 * 1024;
-const VIDEO_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v'];
+// Hands the browser a short-lived token to upload a COSTUME PHOTO straight to the
+// private Blob store, the same way the old video upload did. What this route
+// enforces is where the file may land: only under THIS entry's prefix, only
+// image types, only up to the size cap, with a random suffix so it cannot be
+// guessed or overwritten. Registering the finished upload against the entry
+// happens afterwards in /api/giveaway/bonus, which re-checks the prefix.
+const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
 export async function POST(req) {
   let body;
@@ -28,10 +26,10 @@ export async function POST(req) {
         const id = entryIdFromParam(clientPayload);
         if (!id) throw new Error('That link is not valid.');
         if (!giveawayOpen()) throw new Error('This giveaway is no longer taking entries.');
-        if (!pathname.startsWith(videoPrefix(GIVEAWAY.id, id))) throw new Error('Unexpected upload location.');
+        if (!pathname.startsWith(costumePrefix(GIVEAWAY.id, id))) throw new Error('Unexpected upload location.');
         return {
-          allowedContentTypes: VIDEO_TYPES,
-          maximumSizeInBytes: MAX_VIDEO_BYTES,
+          allowedContentTypes: PHOTO_TYPES,
+          maximumSizeInBytes: MAX_PHOTO_BYTES,
           addRandomSuffix: true,
           tokenPayload: String(id)
         };
