@@ -37,10 +37,10 @@ export default function GiveawayAdmin({ initial, giveawayId, title, drawDate, co
           <div style={{ fontSize: 14, margin: '6px 0' }}>
             Instagram: {w.instagram_handle ? <a href={`https://instagram.com/${w.instagram_handle}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>@{w.instagram_handle}</a> : 'not given'}. Check they follow us before you award the prize.
           </div>
-          <p className="hint">Contact them, have them answer the skill-testing question unaided, then record the result. They have 72 hours.</p>
+          <p className="hint">Contact them and confirm they are eligible, then record the result. They have 72 hours.</p>
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" style={{ marginBottom: 8 }} />
           <div className="btn-row">
-            <button className="btn primary" disabled={busy} onClick={() => call({ action: 'resolve', id: w.id, outcome: 'claimed', note })}>Answered correctly: prize claimed</button>
+            <button className="btn primary" disabled={busy} onClick={() => call({ action: 'resolve', id: w.id, outcome: 'claimed', note })}>Prize claimed</button>
             <button className="btn" disabled={busy} onClick={() => call({ action: 'resolve', id: w.id, outcome: 'forfeited', note })}>Forfeited / unreachable</button>
           </div>
         </div>
