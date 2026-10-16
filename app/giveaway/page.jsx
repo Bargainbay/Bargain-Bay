@@ -119,9 +119,8 @@ export default async function GiveawayPage({ searchParams }) {
           the entry and must respond within 72 hours.
         </p>
         <p>
-          To be declared the winner, the selected entrant must first correctly answer, without assistance, a
-          mathematical skill-testing question. If they cannot be reached within 72 hours, answer incorrectly, or are
-          found to be ineligible, they forfeit the prize and another eligible entry will be drawn.
+          If the selected entrant cannot be reached within 72 hours, or is found to be ineligible, they forfeit the
+          prize and another eligible entry will be drawn.
         </p>
 
         <h2>7. Your information</h2>
