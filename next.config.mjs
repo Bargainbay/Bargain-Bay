@@ -22,6 +22,12 @@ const nextConfig = {
   // "no migrations found" on production while working perfectly in dev.
   outputFileTracingIncludes: {
     '/api/admin/migrate': ['./db/migrations/**/*.sql']
+  },
+  // The Appliance Repair Workshop is an RS Solutions product and lives on
+  // rssolutions.ca. It was briefly built here by mistake; anything that was
+  // shared with this address still lands in the right place.
+  async redirects() {
+    return [{ source: '/workshop', destination: 'https://rssolutions.ca/workshop', permanent: false }];
   }
 };
 export default nextConfig;
