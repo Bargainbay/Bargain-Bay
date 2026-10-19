@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { IMPORT_FIELDS, parseTable, QUEBEC_DROP } from '../lib/stop-import';
+import { ROUTE_BASES } from '../lib/constants';
 
 // A client's spreadsheet, onto the board.
 //
@@ -28,6 +29,7 @@ export default function StopImport({ clients = [], date, onDone }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [result, setResult] = useState(null);
+  const [routeBase, setRouteBase] = useState('cda');   // '' = leave the order alone
   const [showMap, setShowMap] = useState(false);
   const [fixing, setFixing] = useState(null);         // row index being corrected
   const [checking, setChecking] = useState(false);    // pulling Freightcom mail
@@ -169,7 +171,7 @@ export default function StopImport({ clients = [], date, onDone }) {
   async function approve() {
     setBusy(true); setErr(''); setResult(null);
     try {
-      const d = await post({ action: 'import_approve', batchId: batch.id });
+      const d = await post({ action: 'import_approve', batchId: batch.id, routeBase: routeBase || null });
       setResult(d);
       setBatch(null); setQuestions([]); setText(''); setSheetInfo(null);
       loadDrafts();
@@ -263,6 +265,14 @@ export default function StopImport({ clients = [], date, onDone }) {
       {result && (
         <div className="imp-done">
           Added <b>{result.added}</b> stop{result.added === 1 ? '' : 's'} to the board from {result.batchNumber}.
+          {result.route && !result.route.error && result.route.order?.length > 0 && (
+            <div>
+              In driving order from {result.route.base.name}: {result.route.totalKm} km, about {result.route.totalMin} min on the road
+              {result.route.source === 'approx' ? ' (approximate — city to city, no Google key on the server)' : ''}.
+              {result.route.unplaced?.length > 0 && ` ${result.route.unplaced.length} stop(s) in towns I could not place went last.`}
+            </div>
+          )}
+          {result.route?.error && <div>Added, but could not order them: {result.route.error}</div>}
           {result.failed?.length > 0 && (
             <ul className="imp-problems">
               {result.failed.map((f, i) => <li key={i}>Row {f.row} — {f.customerName || f.address || 'a row'} — {f.error}</li>)}
@@ -445,6 +455,14 @@ export default function StopImport({ clients = [], date, onDone }) {
                 {call.to ? '📞 Call me about this' : '📞 Call me (no number set)'}
               </button>
             )}
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}
+              title="After adding, number the stops in driving order starting from this place">
+              Order by route from
+              <select value={routeBase} onChange={(e) => setRouteBase(e.target.value)}>
+                <option value="">— don’t order —</option>
+                {ROUTE_BASES.map((b) => <option key={b.key} value={b.key}>{b.name}</option>)}
+              </select>
+            </label>
             <button type="button" className="btn" disabled={busy} onClick={discard}>Throw away</button>
             <button type="button" className="btn accent" disabled={busy || batch.summary.ready === 0}
               onClick={approve}>
