@@ -262,7 +262,8 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'vehicle', id: v.id, name: v.name, plate: v.plate, active: v.active,
-          fuelPaidBy: editVan.fuelPaidBy, carrierName: editVan.carrierName, dayRate: editVan.dayRate
+          fuelPaidBy: editVan.fuelPaidBy, carrierName: editVan.carrierName, dayRate: editVan.dayRate,
+          kmIncluded: editVan.kmIncluded, kmRate: editVan.kmRate
         })
       });
       const d = await res.json();
@@ -650,14 +651,17 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                     ? ` · fuel billed by ${v.carrierName || 'the carrier'}`
                     : ' · we pay the fuel'}
                   {v.dayRate ? ` · $${v.dayRate.toFixed(2)}/day` : ' · no day rate'}
+                  {v.kmRate != null ? ` · $${v.kmRate}/km after ${v.kmIncluded || 0} km` : ''}
                   {v.trackerDeviceId ? ` · tracker ${v.trackerDeviceId}` : ''}
                 </span>
                 {!v.active && <span className="hint" style={{ margin: 0 }}> · retired</span>}
                 <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
                   onClick={() => setEditVan(editVan?.id === v.id ? null
                     : { id: v.id, fuelPaidBy: v.fuelPaidBy || 'us', carrierName: v.carrierName || '',
-                        dayRate: v.dayRate == null ? '' : String(v.dayRate) })}>
-                  fuel &amp; day rate
+                        dayRate: v.dayRate == null ? '' : String(v.dayRate),
+                        kmIncluded: v.kmIncluded == null ? '' : String(v.kmIncluded),
+                        kmRate: v.kmRate == null ? '' : String(v.kmRate) })}>
+                  fuel, day rate &amp; km
                 </button>
                 <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
                   onClick={() => setEditTracker(editTracker?.id === v.id ? null
@@ -699,6 +703,12 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                     <input value={editVan.dayRate} inputMode="decimal" style={{ width: 150 }}
                       placeholder="Day rate, e.g. 60"
                       onChange={(e) => setEditVan({ ...editVan, dayRate: e.target.value })} />
+                    <input value={editVan.kmIncluded} inputMode="numeric" style={{ width: 150 }}
+                      placeholder="Free km a day, e.g. 100"
+                      onChange={(e) => setEditVan({ ...editVan, kmIncluded: e.target.value })} />
+                    <input value={editVan.kmRate} inputMode="decimal" style={{ width: 150 }}
+                      placeholder="$ per km after, e.g. 0.35"
+                      onChange={(e) => setEditVan({ ...editVan, kmRate: e.target.value })} />
                     <button type="button" className="btn accent" disabled={busy === `van${v.id}`}
                       onClick={() => saveVanFuel(v)}>
                       {busy === `van${v.id}` ? 'Saving…' : 'Save'}

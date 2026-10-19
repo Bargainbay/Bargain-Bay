@@ -74,6 +74,37 @@ export default function Mileage({ from, to }) {
           ))}
         </tbody>
       </table></div>
+      {data.drivers?.length > 0 && (
+        <>
+          <h4 style={{ marginBottom: 4 }}>By driver</h4>
+          <div className="table-wrap"><table className="admin">
+            <thead><tr>
+              <th>Day</th><th>Driver</th><th>Van</th>
+              <th style={{ textAlign: 'right' }}>Km driven</th>
+              <th style={{ textAlign: 'right' }}>Km billed</th>
+              <th style={{ textAlign: 'right' }}>Km charge</th>
+            </tr></thead>
+            <tbody>
+              {data.drivers.map((d, i) => (
+                <tr key={i}>
+                  <td>{d.day}</td>
+                  <td style={{ fontWeight: 600 }}>{d.driver}</td>
+                  <td>{d.van}</td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {d.km ? d.km.toLocaleString('en-CA') : '—'}
+                    {d.shiftsMissingKm > 0 && <div style={{ fontSize: 11, color: 'var(--danger, #c0392b)' }}>{d.shiftsMissingKm} shift(s) missing a reading</div>}
+                  </td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                    {d.kmRate != null ? d.billableKm : '—'}
+                    {d.kmRate != null && <div style={{ fontSize: 11, color: 'var(--muted)' }}>after {d.kmIncluded || 0} free</div>}
+                  </td>
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{d.kmRate != null ? money(d.kmCharge) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        </>
+      )}
       <p className="hint">
         Distance comes from the odometer at the start and end of a shift; fuel from the gas entries.
         A <b>carrier</b> truck still shows its litres and its L/100km — that is how far it went on how much,

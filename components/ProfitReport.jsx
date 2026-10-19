@@ -228,6 +228,11 @@ export default function ProfitReport({ drivers = [], date }) {
                           {b.truckDays} truck-day{b.truckDays === 1 ? '' : 's'}
                         </div>
                       )}
+                      {b.kmCharge > 0 && (
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                          incl. {money(b.kmCharge)} km charge · {b.km} km, {b.billableKm} billed
+                        </div>
+                      )}
                     </td>
                     <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{money(b.gas)}</td>
                     {/* Shown, and NOT added in. It is already inside the
