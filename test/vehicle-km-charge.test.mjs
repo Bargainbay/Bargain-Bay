@@ -29,3 +29,21 @@ test('379 km on a day with 100 free at $0.35 is $97.65, and it reaches the profi
     equal(again.kmIncluded, 100);
   } finally { await done(); }
 });
+
+test('a bridged Bargain Bay order prices the stop from its Delivery line; no delivery line stays unpriced', async () => {
+  const { done } = await withTestDb();
+  try {
+    const mk = async (num, subtotal, items) => {
+      const { rows: o } = await query(`INSERT INTO orders (order_number, email, status, subtotal, hst, total, delivery_method)
+        VALUES ($1,'c@x.ca','delivered',$2,$3,$4,'delivery') RETURNING id`, [num, subtotal, +(subtotal * 0.13).toFixed(2), +(subtotal * 1.13).toFixed(2)]);
+      for (const [kind, title, price] of items) await query(`INSERT INTO order_items (order_id, title, price, kind) VALUES ($1,$2,$3,$4)`, [o[0].id, title, price, kind]);
+      const { rows: j } = await query(`INSERT INTO jobs (type, status, order_id, address, job_date) VALUES ('delivery','done',$1,'1 Main St','2026-10-16') RETURNING id`, [o[0].id]);
+      return j[0].id;
+    };
+    await mk('BB-T1', 600, [['unit', 'Fridge', 500], ['service', 'Delivery', 50], ['service', 'Installation', 50]]);
+    await mk('BB-T2', 486.73, [['unit', 'Laundry centre', 486.73]]);
+    const p = await profitReport({ from: '2026-10-16', to: '2026-10-16' });
+    equal(p.buckets[0].revenue, 50);
+    equal(p.buckets[0].unpricedRevenue, 1);
+  } finally { await done(); }
+});
