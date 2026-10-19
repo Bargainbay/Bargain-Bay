@@ -694,6 +694,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   const [routeBase, setRouteBase] = useState('cda');
   const [routeWho, setRouteWho] = useState('');       // '' = the unassigned column
   const [routeMsg, setRouteMsg] = useState('');
+  const [routeFirst, setRouteFirst] = useState('');     // a stop to do first, '' = let the route decide
   const [editing, setEditing] = useState(null);      // the job being corrected
   const editPanel = useRef(null);
   // The form renders above the columns. On a phone the columns stack, so Edit on
@@ -785,7 +786,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   // Put one column in driving order from a base (CDA's depot by default).
   async function routeColumn() {
     setRouteMsg('');
-    const d = await sendFor({ action: 'route_day', date: board.date, driverId: routeWho || null, baseKey: routeBase });
+    const d = await sendFor({ action: 'route_day', date: board.date, driverId: routeWho || null, baseKey: routeBase, firstJobId: routeFirst || null });
     const p = d?.plan;
     if (!p) return;
     setRouteMsg(p.order.length
@@ -1158,6 +1159,11 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
             </select>
             <select value={routeBase} onChange={(e) => setRouteBase(e.target.value)}>
               {ROUTE_BASES.map((b) => <option key={b.key} value={b.key}>from {b.name}</option>)}
+            </select>
+            <select value={routeFirst} onChange={(e) => setRouteFirst(e.target.value)} title="A stop that has to go first (a big load, say)">
+              <option value="">no stop pinned first</option>
+              {board.jobs.filter((j) => String(j.driverId || '') === String(routeWho || '') && !['done', 'failed', 'cancelled'].includes(j.status))
+                .map((j) => <option key={j.id} value={j.id}>first: {j.customerName || j.address}</option>)}
             </select>
             <button type="button" className="btn" disabled={busy} onClick={routeColumn}>🧭 Order by route</button>
           </span>

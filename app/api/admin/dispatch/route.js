@@ -602,7 +602,7 @@ export async function PATCH(req) {
     // order from a base. Writes the running order and nothing else.
     if (body.action === 'route_day') {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.date || ''))) return NextResponse.json({ error: 'Which day?' }, { status: 400 });
-      return NextResponse.json({ ok: true, plan: await routeDay(body.date, body.driverId || null, body.baseKey || 'cda') });
+      return NextResponse.json({ ok: true, plan: await routeDay(body.date, body.driverId || null, body.baseKey || 'cda', body.firstJobId || null) });
     }
     if (body.action === 'resequence') {
       return NextResponse.json({ ok: true, ...(await resequence(body.driverId, body.date, body.jobIds, who(s))) });
