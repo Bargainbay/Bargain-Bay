@@ -97,6 +97,24 @@ test('an open giveaway takes the hero over a running deal', () => {
   const h = heroFor({ giveaway: true, active: [{ title: 'Laundry Week', hero: { headline: 'x', sub: 'y' }, to: '2026-10-19' }] });
   equal(h.cta, { label: 'Enter now', href: '/giveaway' });
 });
+test('the 31-hour flash takes the hero from an open giveaway, and keeps the giveaway one click away', () => {
+  const flash = DEALS.find((d) => d.id === 'halloween');
+  const h = heroFor({ giveaway: true, active: [{ ...flash, coupon: { code: 'BOO31', kind: 'amount', value: 31, minSubtotal: 500, endsAt: '2026-10-31' } }] });
+  equal(h.headline, '31 hours. $31 off.');
+  equal(h.code.code, 'BOO31');
+  equal(h.secondary, { label: 'Enter the giveaway', href: '/giveaway' });
+  assert(h.bg && h.bg.includes('halloween'), 'shares the giveaway backdrop');
+  equal(h.ends, '2026-10-31');
+});
+test('with the flash running but no giveaway open, its second button is the ordinary one', () => {
+  const flash = DEALS.find((d) => d.id === 'halloween');
+  const h = heroFor({ giveaway: false, active: [{ ...flash, coupon: { code: 'BOO31', kind: 'amount', value: 31, minSubtotal: 500, endsAt: '2026-10-31' } }] });
+  equal(h.secondary, { label: 'Shop all appliances', href: '/shop' });
+});
+test('an ordinary deal still does NOT take the hero from an open giveaway', () => {
+  const h = heroFor({ giveaway: true, active: [{ title: 'Laundry Week', hero: { headline: 'x', sub: 'y' }, to: '2026-10-19' }] });
+  equal(h.cta, { label: 'Enter now', href: '/giveaway' });
+});
 test('with no giveaway the soonest deal shows, with its live code', () => {
   const h = heroFor({ giveaway: false, active: [{ title: 'Laundry Week', to: '2026-10-19', hero: { headline: 'Laundry Week.', sub: 's' },
     coupon: { code: 'LAUNDRY100', kind: 'amount', value: 100, minSubtotal: 1000, endsAt: '2026-10-19' } }] });
