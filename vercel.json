@@ -63,6 +63,14 @@
     {
       "path": "/api/cron/affiliate-payouts",
       "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/cron/daily-report",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-report",
+      "schedule": "0 12 * * 1"
     }
   ]
 }
