@@ -4333,6 +4333,15 @@ migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
   `profitReport`. An office "Fix times" on Team clock repairs a forgotten clock-out.
 - **Not built:** an xlsx/Sheet export of the daily table, service-line revenue
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
+### The Daily and Weekly report emails (added 2026-10-26)
+`lib/pnl-email.js`, `/api/cron/daily-report` (02:00 UTC, i.e. 9-10pm Toronto) and `/api/cron/weekly-report`
+(Mondays 12:00 UTC, covers the last full Mon-Sun). They mail `SERVICE_EMAIL` the Daily P&L table from
+`dailyPnl()` itself, so the email, the page and the dispatch Profit tab cannot disagree. Net is shown after
+overhead (the page's number) AND before it. Both crons are in `EXPECTED`; `?dry=1` builds without sending.
+- **Service calls and pickups are $0 income** (owner, 2026-10-26): `JOB_REVENUE` in `lib/dispatch-money.js`
+  ignores any charge or order fee on those types, and they are never counted as "unpriced". They still cost
+  driver time. Client invoicing (`invoiceClientJobs`) reads `charge_amount` separately and is unchanged.
+
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
 Built so far (Phase 1, slices 1–9): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
