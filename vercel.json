@@ -61,6 +61,10 @@
       "schedule": "*/20 * * * *"
     },
     {
+      "path": "/api/cron/vesta",
+      "schedule": "30 9 * * *"
+    },
+    {
       "path": "/api/cron/affiliate-payouts",
       "schedule": "0 13 * * 1"
     },

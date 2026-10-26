@@ -62,7 +62,9 @@ export default function ProductGallery({ images = [], alt = '', badge = null }) 
 
       {/* The caption is load-bearing, not decoration — see the note above. */}
       <div className="gal-caption">
-        {cur.kind === 'stock'
+        {cur.kind === 'vesta'
+          ? 'Photo from Vesta Kitchen.'
+          : cur.kind === 'stock'
           ? 'Manufacturer photo — the same model, not this unit.'
           : cur.kind === 'rsops'
             ? `Photo of this exact unit — ${cur.label}, taken during inspection.`

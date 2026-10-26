@@ -34,7 +34,7 @@ export default function ProductCard({ unit, count = 1 }) {
         <div style={{ marginTop: 'auto', paddingTop: 8 }}>
           {grouped
             ? <a className="btn block" href={href}>View {count} units →</a>
-            : unit.vendor && !unit.orderable
+            : (unit.vendor || unit.vesta) && !unit.orderable
               ? <a className="btn block" href={href}>View details →</a>
               : <AddToCartButton sku={unit.id} small price={unit.price} name={name} />}
         </div>
