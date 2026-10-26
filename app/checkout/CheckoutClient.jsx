@@ -42,6 +42,25 @@ export default function CheckoutClient({ catalog, session, prefill }) {
     return onCartChange(setSkus);
   }, []);
 
+  // Somebody arrived through an affiliate's link (components/RefCapture.jsx remembers it for 30
+  // days): try their code once, as if the shopper had typed it. A code that does not hold is
+  // dropped without a word - the shopper never asked for it.
+  const refTried = useRef(false);
+  useEffect(() => {
+    if (refTried.current || !skus || skus.length === 0) return;
+    refTried.current = true;
+    let code = '';
+    try {
+      const r = JSON.parse(localStorage.getItem('bb_ref') || 'null');
+      if (r && r.code && Date.now() - r.at < 30 * 86400000) code = String(r.code);
+    } catch { /* storage blocked: no referral */ }
+    if (!code) return;
+    fetch('/api/coupon', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, skus }) })
+      .then((res) => res.json())
+      .then((d) => { if (d && d.ok && d.code) { setPromo(code); setApplied({ code: d.code, discount: Number(d.discount) || 0, label: d.label }); } })
+      .catch(() => {});
+  }, [skus]);
+
   useEffect(() => {
     if (!skus || skus.length === 0) { setAuto(null); return undefined; }
     let live = true;

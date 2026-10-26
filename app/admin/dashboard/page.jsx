@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
-import { revenueDashboard, hstRemittance, leadReport, repScorecard, DASH_PERIODS } from '../../../lib/analytics';
+import { revenueDashboard, hstRemittance, leadReport, repScorecard, repProfit, DASH_PERIODS } from '../../../lib/analytics';
 import { getSetting } from '../../../lib/settings';
 import DashboardShell from '../../../components/DashboardShell';
 import DashboardFilters from '../../../components/DashboardFilters';
@@ -12,6 +12,8 @@ import ApprovalRequests from '../../../components/ApprovalRequests';
 import GoalEditor from '../../../components/GoalEditor';
 import RepScorecard from '../../../components/RepScorecard';
 import MyQuota from '../../../components/MyQuota';
+import MyProfit from '../../../components/MyProfit';
+import TeamProfit from '../../../components/TeamProfit';
 import TaxOwed from '../../../components/TaxOwed';
 import LeadSources from '../../../components/LeadSources';
 import { Kpi, Donut, Funnel, TrendChart } from '../../../components/charts';
@@ -48,16 +50,19 @@ export default async function SalesDashboardPage({ searchParams }) {
 
   const period = DASH_PERIODS.some((p) => p.key === sParams?.period) ? sParams.period : 'month';
 
-  let data = null, goal = 0, tax = null, leads = null, team = null, error = '';
+  let data = null, goal = 0, tax = null, leads = null, team = null, profit = null, error = '';
   try {
     // The tax panel is owner-only, so a sales associate's page never pays for it.
     // Where the sales came from is NOT owner-only: it is the selling side's own
     // work, and the rep who recorded the answer should be able to see it land.
-    [data, goal, tax, leads, team] = await Promise.all([
+    [data, goal, tax, leads, team, profit] = await Promise.all([
       revenueDashboard(period), getSetting('revenue_goal_monthly', 0),
       salesOnly ? null : hstRemittance(period).catch(() => null),
       leadReport(period).catch(() => null),
-      repScorecard(period, { name: session.name, email: session.email }).catch((e) => { console.error('repScorecard failed', e.message); return null; })
+      repScorecard(period, { name: session.name, email: session.email }).catch((e) => { console.error('repScorecard failed', e.message); return null; }),
+      // The rep's own gross profit and commission. The whole-team table rides
+      // along for an admin only: it carries everyone's profit.
+      repProfit({ name: session.name, email: session.email }, { all: !salesOnly }).catch((e) => { console.error('repProfit failed', e.message); return null; })
     ]);
   } catch (e) {
     console.error('sales dashboard load failed', e.message);
@@ -83,7 +88,9 @@ export default async function SalesDashboardPage({ searchParams }) {
       </div>
 
       {/* A rep's own quota comes first: it is the number they are working to. */}
+      {profit?.me && <MyProfit initial={profit} />}
       {team?.me && <MyQuota data={team} />}
+      {!salesOnly && <TeamProfit data={profit} />}
 
       {/* Before the numbers. A dashboard tells you how the month went; this is
           the only thing on the page that is owed to somebody TODAY. */}
