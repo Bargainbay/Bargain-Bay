@@ -4335,11 +4335,12 @@ migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
 ### The Daily and Weekly report emails (added 2026-10-26)
 `lib/pnl-email.js`, `/api/cron/daily-report` (02:00 UTC, i.e. 9-10pm Toronto) and `/api/cron/weekly-report`
-(Mondays 12:00 UTC, covers the last full Mon-Sun). They mail `SERVICE_EMAIL` the Daily P&L table from
+(Sunday 9-10pm Toronto = Monday 02:00 UTC; covers the Mon-Sun week ending that night). They mail `SERVICE_EMAIL` the Daily P&L table from
 `dailyPnl()` itself, so the email, the page and the dispatch Profit tab cannot disagree. Net is shown after
 overhead (the page's number) AND before it. Both crons are in `EXPECTED`; `?dry=1` builds without sending.
-- **Service calls and pickups are $0 income** (owner, 2026-10-26): `JOB_REVENUE` in `lib/dispatch-money.js`
-  ignores any charge or order fee on those types, and they are never counted as "unpriced". They still cost
+- **Service calls and pickups** (owner, 2026-10-26): in-house = $0; an external one counts only if a charge is
+  typed on it. `JOB_REVENUE` in `lib/dispatch-money.js` never applies the order fee to them and they are never
+  "unpriced" (nothing to chase). They still cost
   driver time. Client invoicing (`invoiceClientJobs`) reads `charge_amount` separately and is unchanged.
 
 ## The marketplace (started 2026-10-08)
