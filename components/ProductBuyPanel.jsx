@@ -27,13 +27,16 @@ export default function ProductBuyPanel({ units, initialId }) {
   // Stock photo first, then every real photograph of THIS unit: the ones the
   // sales floor took at intake (`photos`), then RS Ops's inspection set. Same
   // order rule the cards and the Meta feed follow.
-  const slides = [
+  const slides = sel.vesta
+    // Every photograph Vesta publishes for the product, in their order; none is "the actual unit".
+    ? (sel.vestaImages || []).map((url, n) => ({ url, kind: 'vesta', label: `photo ${n + 1} of ${sel.vestaImages.length}` }))
+    : [
     { url: sel.image, kind: 'stock', label: 'stock photo' },
     // A vendor's own photographs of this exact unit, captioned as the seller's.
     ...(sel.vendorPhotos || []).map((p, n) => ({ url: p.url, kind: 'vendor', label: `photo ${n + 1}`, by: sel.vendor?.name })),
     ...(sel.photos || []).map((p, n) => ({ url: p.url, kind: 'own', label: `photo ${n + 1}` })),
     ...(sel.rsopsPhotos || []).map((p) => ({ url: p.url, kind: 'rsops', label: p.slot || 'inspection' }))
-  ].filter((x, n, all) => x.url && all.findIndex((y) => y.url === x.url) === n);
+    ].filter((x, n, all) => x.url && all.findIndex((y) => y.url === x.url) === n);
 
   return (
     <div className="product-layout">
@@ -68,7 +71,9 @@ export default function ProductBuyPanel({ units, initialId }) {
         <div className="meta-list">
           <div>Model #: <b style={{ color: 'var(--ink)' }}>{sel.model}</b></div>
           <div>SKU: {sel.id}</div>
-          {sel.vendor
+          {sel.vesta
+            ? <div>🆕 <b style={{ color: 'var(--ink)' }}>New</b> — {sel.inStock ? 'in stock at Vesta Kitchen' : 'currently out of stock at Vesta Kitchen'}.</div>
+            : sel.vendor
             ? <div>⚡ <b style={{ color: 'var(--ink)' }}>One-of-a-kind unit</b> from our marketplace. When it&apos;s gone, it&apos;s gone.</div>
             : multi
             ? <div>⚡ <b style={{ color: 'var(--ink)' }}>{units.length} of this model available</b> — each a separate, individually-tested unit. Pick yours below.</div>
@@ -109,13 +114,21 @@ export default function ProductBuyPanel({ units, initialId }) {
         )}
 
         <div style={{ maxWidth: 360, marginTop: 14 }}>
-          {sel.marketplace && !sel.orderable
+          {sel.vesta && !sel.inStock
+            ? <button className="btn block" disabled>Out of stock</button>
+            : (sel.marketplace || sel.vesta) && !sel.orderable
             ? <button className="btn block" disabled>Ordering opens soon</button>
             : <AddToCartButton sku={sel.id} available={!sel.sold} price={sel.price} name={name} />}
         </div>
 
         <div className="meta-list" style={{ marginTop: 18 }}>
-          {sel.vendor ? (
+          {sel.vesta ? (
+            <>
+              <div>🚚 Delivery arranged by Bargain Bay to Pickering, Scarborough &amp; the GTA.</div>
+              <div>✔️ Brand new, with Vesta&apos;s manufacturer warranty.</div>
+              <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns policy</a></div>
+            </>
+          ) : sel.vendor ? (
             <>
               <div>{sel.lane === 'C'
                 ? '🚚 Shipped by the seller to your address.'

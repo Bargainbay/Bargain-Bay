@@ -4678,5 +4678,16 @@ not shown anywhere until the storefront slice.
   any time). If a part is in RS Ops, RS Ops is where its price lives, or it would
   be counted twice.
 
+## Vesta Kitchen's range (added 2026-10-26)
+`lib/vesta.js`, migration 0039 (`vesta_products`), `/api/cron/vesta` (daily) + `/api/admin/vesta` (sync now).
+Mirrors ca.vesta.kitchen's public `/products.json` into its OWN table and merges it into the storefront readers
+that pass `{ marketplace: true }`, exactly like seller units: never the feeds, Sarah, pickers or the tracker.
+SKUs are `VS-<shopify id>`; they are NOT one-of-a-kind so reservations skip them.
+- **Imported:** each product's base variant, every image Vesta publishes, Vesta's price and compare-at.
+  **Not imported:** the 63 `warranty` add-ons and placeholder prices (under $5 or $9,000+).
+- **Browsing is on** (`VESTA_STOREFRONT=off` hides it); **buying is off** until `VESTA_ORDERING=1`, and only
+  in-stock items are orderable. We hold no cost for these, so no member price, clearance or promo applies.
+- A feed that returns under half of what we hold retires nothing (a partial read must not delist the range).
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.

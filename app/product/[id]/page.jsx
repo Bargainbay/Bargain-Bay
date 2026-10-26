@@ -5,6 +5,7 @@ import { getSession } from '../../../lib/auth';
 import { isUnavailable } from '../../../lib/reservations';
 import { conditionCopy, leadSentence, specRows, seoDescription } from '../../../lib/specs';
 import { marketplaceConditionCopy } from '../../../lib/marketplace-storefront';
+import { VESTA_HOST } from '../../../lib/vesta';
 import { SITE_URL, jsonLd } from '../../../lib/site';
 import ProductBuyPanel from '../../../components/ProductBuyPanel';
 import PixelView from '../../../components/PixelView';
@@ -34,12 +35,18 @@ export async function generateMetadata({ params }) {
 
 // Slim, serializable shape handed to the client buy panel — only the fields the
 // picker needs, so we don't ship the whole spec blob to the browser.
-const explain = (x) => (x.marketplace
+const explain = (x) => (x.vesta
+  ? 'Brand new in the manufacturer’s box, sold and shipped from Vesta Kitchen’s range through Bargain Bay.'
+  : x.marketplace
   ? marketplaceConditionCopy(x.condition, x.vendor?.name, x.refurbNotes)
   : conditionCopy(x.condition));
 
 function forPanel(x, sold) {
   return {
+    ...(x.vesta ? {
+      vesta: true, vestaImages: x.vestaImages || [], inStock: !!x.inStock, orderable: !!x.orderable,
+      warrantyMonths: x.warrantyMonths || 24
+    } : {}),
     // A vendor's unit carries who sells it and what they promise; ours carries none of this.
     ...(x.marketplace ? {
       marketplace: true, vendor: x.vendor, lane: x.lane, warrantyMonths: x.warrantyMonths,
@@ -101,7 +108,7 @@ export default async function Product({ params }) {
       '@type': 'Offer',
       price: Number(u.price).toFixed(2),
       priceCurrency: 'CAD',
-      availability: sold ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+      availability: sold || (u.vesta && !u.inStock) ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
       itemCondition: CONDITION_SCHEMA[u.condition] || 'https://schema.org/UsedCondition',
       url: `${SITE_URL}/product/${encodeURIComponent(u.id)}`
     }
@@ -119,9 +126,17 @@ export default async function Product({ params }) {
             slides in the gallery at the top of the page (components/ProductGallery).
             Leaving them here as well would show every photograph twice and bury
             the spec table another screen down. */}
-        <h2>About this unit</h2>
-        <p>{leadSentence(u)}</p>
-        {u.marketplace ? (
+        <h2>{u.vesta ? 'About this product' : 'About this unit'}</h2>
+        {!u.vesta && <p>{leadSentence(u)}</p>}
+        {u.vesta ? (
+          <>
+            {u.vestaDescription && <p style={{ whiteSpace: 'pre-line' }}>{u.vestaDescription}</p>}
+            <p>
+              This is a new {u.make} product from the Vesta Kitchen range, listed at Vesta&apos;s price. It is not
+              from our warehouse stock and is not a one-of-a-kind unit. Vesta&apos;s manufacturer warranty applies.
+            </p>
+          </>
+        ) : u.marketplace ? (
           <>
             {u.sellerDescription && <p style={{ whiteSpace: 'pre-line' }}>{u.sellerDescription}</p>}
             <p>
@@ -144,6 +159,7 @@ export default async function Product({ params }) {
         <h2>Specifications</h2>
         <table className="spec-table">
           <tbody>
+            {u.vesta && <tr><th>Subcategory</th><td>{u.style || u.category}</td></tr>}
             {rows.map(([k, v]) => (
               <tr key={k}><th>{k}</th><td>{v}</td></tr>
             ))}
