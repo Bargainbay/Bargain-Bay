@@ -4263,9 +4263,23 @@ code** (a $10,000 stove pays $500). Landing/ads page to link: `/affiliate`.
 - **An affiliate sees no customer detail** — date, product titles, goods, commission, status.
   An affiliate's identity is the signed-in account's email; ids/emails are never read from a
   request. They are independent contractors: don't give them hours, targets or training.
-- **Not built:** automatic payouts, an approval email, click counts, a footer/sitemap link, and
-  commission on phone/walk-in/invoice sales (those carry no code). Commission is a % of the
-  PRICE, not of profit, so on a thin-margin unit it can exceed what the sale made — watch it.
+- **Emails** (`lib/affiliate-mail.js`, transactional, awaited, never throw): the office on a new
+  application; the affiliate on approval (ONCE — only when they move into `approved`, so editing a rate
+  does not resend) and when a payout is recorded (to their PAYOUT address). A mail failure never undoes
+  the approval or the payment.
+- **Visits** (`affiliate_clicks`, migration 0038): `RefCapture` pings `/api/affiliate/click` once a day per
+  code per browser with a random id kept in localStorage — no IP, no shared cookie. One row per
+  affiliate+visitor+day (UNIQUE), bots ignored, 300/hour/code cap, approved codes only. "Visitors" is a
+  distinct count; it is NOT a conversion rate (typed-code sales have no visit).
+- **THE PAYOUT RUN PROPOSES; A PERSON SENDS THE MONEY.** `payoutRun()` = balance ≥ $50 with a payout
+  address; `/api/cron/affiliate-payouts` (Mondays 13:00 UTC, heartbeat + `EXPECTED`) emails the office
+  the list only when somebody is owed; the admin page offers a CSV and **Record all as sent**, which
+  records each row with reference `RUN-<date>-<id>` (a second press records nothing). There is NO bank
+  payment rail in this system, so the e-transfers themselves are sent from the bank by hand. Wiring a
+  real payments API would be a separate, deliberate change.
+- **Not built:** commission on phone/walk-in/invoice sales (they carry no code), and a one-time prompt
+  for existing customers. Commission is a % of the PRICE, not of profit, so on a thin-margin unit it can
+  exceed what the sale made — watch it.
 
 ## Daily P&L, the cost list, and everyone's clock (added 2026-10-08)
 `lib/daily-pnl.js`, `lib/daily-cost-math.js` (no imports), `lib/team-clock.js`,

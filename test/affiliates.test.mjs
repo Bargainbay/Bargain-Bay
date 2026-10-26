@@ -156,3 +156,110 @@ test('an affiliate sees only their own record and can change only where they are
     assert(!JSON.stringify(d).includes('buyer@x.ca'), 'no customer details are in an affiliate’s data');
   } finally { done(); }
 });
+
+// ---- email, visits, and the payout run --------------------------------------
+import { recordClick, clickStats, payoutRun, payoutRunCsv, recordPayoutRun } from '../lib/affiliates.js';
+
+// Run `fn` as production with Resend stubbed, returning every email "sent".
+async function withMail(fn) {
+  const keys = ['VERCEL_ENV', 'RESEND_API_KEY', 'STAGING_EMAIL_TO', 'ALLOW_REAL_OUTBOUND'];
+  const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  const realFetch = globalThis.fetch; const sent = [];
+  try {
+    process.env.VERCEL_ENV = 'production'; process.env.RESEND_API_KEY = 're_test';
+    globalThis.fetch = async (url, init) => { try { sent.push(JSON.parse(init.body)); } catch { /* not a mail call */ } return { ok: true, status: 200, text: async () => '{}', json: async () => ({}) }; };
+    await fn(sent);
+  } finally {
+    globalThis.fetch = realFetch;
+    for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+  }
+}
+
+suite('affiliate emails');
+test('APPROVAL EMAILS THEM ONCE, WITH THEIR CODE; RE-EDITING AN APPROVED AFFILIATE DOES NOT RESEND', async () => {
+  const { done } = await fresh();
+  try {
+    await withMail(async (sent) => {
+      const { affiliate } = await apply();
+      const toOffice = sent.filter((m) => /New affiliate application/.test(m.subject));
+      equal(toOffice.length, 1, 'the office hears about the application');
+      const a = await approveAffiliate(affiliate.id, {}, { email: 'owner@x.ca' });
+      const welcome = sent.filter((m) => /approved/.test(m.subject));
+      equal(welcome.length, 1);
+      assert(JSON.stringify(welcome[0].to).includes('dave@promo.ca'), 'goes to the applicant');
+      assert(welcome[0].html.includes(a.code) && welcome[0].html.includes('ref=' + a.code), 'carries the code and the link');
+      await approveAffiliate(affiliate.id, { pct: 6 });
+      equal(sent.filter((m) => /approved/.test(m.subject)).length, 1, 'an edit is not a second welcome');
+    });
+  } finally { done(); }
+});
+test('a payout emails the affiliate at their PAYOUT address', async () => {
+  const { client, done } = await fresh();
+  try {
+    await withMail(async (sent) => {
+      const a = await approveAffiliate((await apply()).affiliate.id);
+      await sale(client, a, { goods: 10000, status: 'delivered', daysAgoDelivered: 20 });
+      await recordPayout(a.id, { amount: 500, ref: 'ET-5' });
+      const m = sent.find((x) => /commission/i.test(x.subject) && /sent/.test(x.subject));
+      assert(m, 'a payout email was sent');
+      assert(JSON.stringify(m.to).includes('dave.pay@promo.ca'));
+      assert(m.html.includes('$500.00') && m.html.includes('ET-5'));
+    });
+  } finally { done(); }
+});
+test('a mail failure never undoes an approval or a recorded payout', async () => {
+  const { client, done } = await fresh();
+  const realFetch = globalThis.fetch;
+  const keys = ['VERCEL_ENV', 'RESEND_API_KEY']; const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+  try {
+    process.env.VERCEL_ENV = 'production'; process.env.RESEND_API_KEY = 're_test';
+    globalThis.fetch = async () => { throw new Error('resend down'); };
+    const a = await approveAffiliate((await apply()).affiliate.id);
+    equal(a.status, 'approved');
+    await sale(client, a, { goods: 10000, status: 'delivered', daysAgoDelivered: 20 });
+    equal((await recordPayout(a.id, { amount: 500 })).paid, 500);
+  } finally {
+    globalThis.fetch = realFetch;
+    for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+    done();
+  }
+});
+
+suite('affiliate visits');
+test('ONE VISITOR, ONE DAY, ONE VISIT - and bots, strangers and unapproved codes count for nothing', async () => {
+  const { done } = await fresh();
+  try {
+    const a = await approveAffiliate((await apply()).affiliate.id);
+    equal(await recordClick(a.code, 'visitor-aaaa1111'), true);
+    await recordClick(a.code, 'visitor-aaaa1111');                  // refresh
+    await recordClick(a.code.toLowerCase(), 'visitor-bbbb2222');
+    equal(await recordClick(a.code, 'visitor-cccc3333', 'Googlebot/2.1'), false, 'a crawler');
+    equal(await recordClick('NOSUCHCODE', 'visitor-dddd4444'), false, 'a code nobody has');
+    equal(await recordClick(a.code, 'x'), false, 'a junk visitor id');
+    const s = await clickStats(a.id);
+    equal(s.visitors, 2); equal(s.visits, 2);
+    await setAffiliateStatus(a.id, 'suspend');
+    equal(await recordClick(a.code, 'visitor-eeee5555'), false, 'a suspended code is not counted');
+  } finally { done(); }
+});
+
+suite('affiliate payout run');
+test('THE RUN LISTS ONLY WHAT IS PAYABLE AND OVER THE MINIMUM; RECORDING IT TWICE PAYS NOBODY TWICE', async () => {
+  const { client, done } = await fresh();
+  try {
+    const a = await approveAffiliate((await apply()).affiliate.id);
+    const b = await approveAffiliate((await applyAsAffiliate({ email: 'small@x.ca', name: 'Small Fry' }, { name: 'Small Fry', payoutEmail: 'sf@x.ca', audience: 'My street group chat.', acceptTerms: true })).affiliate.id);
+    await sale(client, a, { goods: 10000, status: 'delivered', daysAgoDelivered: 20 });   // $500
+    await sale(client, a, { goods: 5000, status: 'confirmed' });                          // not yet
+    await sale(client, b, { goods: 600, status: 'delivered', daysAgoDelivered: 20 });     // $30: under the $50 minimum
+    const run = await payoutRun();
+    equal(run.rows.length, 1); equal(run.rows[0].name, 'Dave Promo'); equal(run.total, 500);
+    const csv = payoutRunCsv([{ name: '=cmd|x', payoutEmail: 'a@b.ca', amount: 12.5, ref: 'R' }, { name: 'Smith, J', payoutEmail: 'j@b.ca', amount: 60, ref: 'R2' }]);
+    assert(csv.includes("'=cmd|x"), 'formula neutralised'); assert(csv.includes('"Smith, J"'), 'comma quoted');
+    const r1 = await recordPayoutRun({ email: 'owner@x.ca' });
+    equal(r1.recorded.length, 1); equal(r1.total, 500);
+    const r2 = await recordPayoutRun({ email: 'owner@x.ca' });
+    equal(r2.recorded.length, 0, 'nothing left to pay, so the second press pays nobody');
+    equal((await dashboardFor(session)).summary.balance, 0);
+  } finally { done(); }
+});
