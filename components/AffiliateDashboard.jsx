@@ -12,7 +12,7 @@ const STATE = {
 };
 
 export default function AffiliateDashboard({ data, siteUrl }) {
-  const { affiliate: a, sales, payouts, summary: s } = data;
+  const { affiliate: a, sales, payouts, summary: s, clicks } = data;
   const link = `${siteUrl}/?ref=${encodeURIComponent(a.code)}`;
   const [copied, setCopied] = useState('');
   const [pay, setPay] = useState(a.payoutEmail);
@@ -51,6 +51,7 @@ export default function AffiliateDashboard({ data, siteUrl }) {
           <Stat label="Owed to you now" value={$(Math.max(0, s.balance))} strong note={s.balance > 0 && s.balance < s.minPayout ? `We pay from ${$(s.minPayout)}` : 'Delivered, past the return window'} />
           <Stat label="Coming" value={$(s.waiting + s.hold)} note={`Not delivered yet, or inside the ${s.holdDays}-day return window`} />
           <Stat label="Paid to you" value={$(s.paid)} />
+          <Stat label="Link visitors" value={clicks ? clicks.visitors : 0} note="People who opened your link (once per day each)" />
           <Stat label="Sales" value={s.sales} note={`${$(s.sold)} in goods`} />
         </div>
         {s.balance < 0 && <p className="hint" style={{ marginTop: 8 }}>A refund on an order we had already paid you for will be taken off your next payment.</p>}
