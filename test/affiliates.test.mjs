@@ -1,0 +1,158 @@
+// Affiliates: the code is a coupon, the commission is read off the sales, and
+// money only goes out once an order is delivered and its return window has closed.
+import { suite, test, assert, equal } from './_harness.mjs';
+import { withTestDb } from './db.mjs';
+import { ensureCouponSchema, redeemCouponWithClient, validateCoupon } from '../lib/coupons.js';
+import {
+  applyAsAffiliate, approveAffiliate, setAffiliateStatus, affiliateSales, dashboardFor, recordPayout, listAffiliates, setPayoutEmail
+} from '../lib/affiliates.js';
+
+async function rejects(fn, msg = 'should have been refused') {
+  let threw = false;
+  try { await fn(); } catch { threw = true; }
+  assert(threw, msg);
+}
+
+async function fresh() {
+  const db = await withTestDb();
+  await ensureCouponSchema();
+  return db;
+}
+const session = { email: 'dave@promo.ca', name: 'Dave Promo' };
+const apply = (s = session) => applyAsAffiliate(s, { name: s.name, payoutEmail: 'dave.pay@promo.ca', audience: 'A Facebook group of 4,000 Durham landlords.', acceptTerms: true });
+let n = 100;
+// A sale through the affiliate's code. `daysAgoDelivered` null = not delivered.
+async function sale(client, aff, { goods, discount = 0, status = 'confirmed', daysAgoDelivered = null, buyer = 'buyer@x.ca' }) {
+  n += 1;
+  const { rows } = await client.query(
+    `INSERT INTO orders (order_number, email, name, status, subtotal, discount, total, hst, delivered_at)
+     VALUES ($1,$2,'B',$3,$4,$5,$4,0, ${daysAgoDelivered == null ? 'NULL' : `now() - interval '${daysAgoDelivered} days'`}) RETURNING id`,
+    [`BB-A${n}`, buyer, status, goods, discount]);
+  await client.query(`INSERT INTO order_items (order_id, sku, title, price, kind) VALUES ($1,$2,'Range',$3,'unit')`, [rows[0].id, `S${n}`, goods]);
+  await client.query('BEGIN');
+  await redeemCouponWithClient(client, { id: aff.couponId, code: aff.code, affiliate: aff.name, commissionPct: aff.commissionPct }, { orderId: rows[0].id, email: buyer, subtotal: goods, discount });
+  await client.query('COMMIT');
+  return rows[0].id;
+}
+
+suite('affiliate approval');
+test('applying needs a payout address, a plan and the terms; the email is the account’s', async () => {
+  const { done } = await fresh();
+  try {
+    await rejects(() => applyAsAffiliate(session, { name: 'Dave', payoutEmail: 'nope', audience: 'long enough audience text', acceptTerms: true }));
+    await rejects(() => applyAsAffiliate(session, { name: 'Dave', payoutEmail: 'a@b.ca', audience: 'short', acceptTerms: true }));
+    await rejects(() => applyAsAffiliate(session, { name: 'Dave', payoutEmail: 'a@b.ca', audience: 'long enough audience text', acceptTerms: false }));
+    const r = await apply();
+    equal(r.affiliate.status, 'pending'); equal(r.affiliate.email, 'dave@promo.ca');
+    assert((await apply()).created === false, 'applying twice is one application');
+  } finally { done(); }
+});
+test('approving cuts a working coupon code at 5% commission', async () => {
+  const { done } = await fresh();
+  try {
+    const { affiliate } = await apply();
+    const a = await approveAffiliate(affiliate.id, {}, { email: 'owner@x.ca' });
+    equal(a.status, 'approved'); equal(a.commissionPct, 5); equal(a.code, 'DAVE');
+    const ok = await validateCoupon('dave', { subtotal: 1000 });
+    assert(ok.ok, 'the code works at checkout'); equal(ok.coupon.commissionPct, 5);
+    // A second Dave gets a different code, not a collision.
+    const b = (await applyAsAffiliate({ email: 'dave2@x.ca', name: 'Dave Two' }, { name: 'Dave Two', payoutEmail: 'd2@x.ca', audience: 'Word of mouth in my building.', acceptTerms: true })).affiliate;
+    equal((await approveAffiliate(b.id)).code, 'DAVE2');
+    // Suspending switches the code off; the history stays.
+    await setAffiliateStatus(affiliate.id, 'suspend');
+    assert(!(await validateCoupon('DAVE', { subtotal: 1000 })).ok, 'a suspended code stops working');
+    await setAffiliateStatus(affiliate.id, 'reinstate');
+    assert((await validateCoupon('DAVE', { subtotal: 1000 })).ok);
+  } finally { done(); }
+});
+
+suite('affiliate commission');
+test('A $10,000 STOVE PAYS $500, AND ONLY WHEN DELIVERED AND PAST THE RETURN WINDOW', async () => {
+  const { client, done } = await fresh();
+  try {
+    const { affiliate } = await apply();
+    const a = await approveAffiliate(affiliate.id);
+    await sale(client, a, { goods: 10000, status: 'delivered', daysAgoDelivered: 20 });   // payable
+    await sale(client, a, { goods: 2000, status: 'delivered', daysAgoDelivered: 3 });     // in the window
+    await sale(client, a, { goods: 1000, status: 'confirmed' });                          // not delivered
+    await sale(client, a, { goods: 4000, status: 'cancelled' });                          // void
+    const d = await dashboardFor(session);
+    equal(d.summary.payable, 500); equal(d.summary.hold, 100); equal(d.summary.waiting, 50);
+    equal(d.summary.balance, 500); equal(d.summary.sales, 3);
+    const states = d.sales.map((s) => s.state).sort();
+    equal(states.join(), ['hold', 'payable', 'void', 'waiting'].join());
+  } finally { done(); }
+});
+test('commission is on the goods after the code’s discount, never on delivery or tax', async () => {
+  const { client, done } = await fresh();
+  try {
+    const a = await approveAffiliate((await apply()).affiliate.id);
+    await sale(client, a, { goods: 1000, discount: 100, status: 'delivered', daysAgoDelivered: 30 });
+    const [s] = await affiliateSales(a.id);
+    equal(s.base, 900); equal(s.commission, 45);
+  } finally { done(); }
+});
+test('the rate in force when the code was used is the rate that sale earns', async () => {
+  const { client, done } = await fresh();
+  try {
+    const a = await approveAffiliate((await apply()).affiliate.id);
+    await sale(client, a, { goods: 1000, status: 'delivered', daysAgoDelivered: 30 });
+    await approveAffiliate(a.id, { pct: 10 });                    // raised afterwards
+    await sale(client, { ...a, commissionPct: 10 }, { goods: 1000, status: 'delivered', daysAgoDelivered: 30 });
+    const sales = await affiliateSales(a.id);
+    equal(sales.map((s) => s.commission).sort((x, y) => x - y).join(), '50,100');
+  } finally { done(); }
+});
+test('NOBODY EARNS COMMISSION ON THEIR OWN ORDER', async () => {
+  const { client, done } = await fresh();
+  try {
+    const a = await approveAffiliate((await apply()).affiliate.id);
+    await sale(client, a, { goods: 5000, status: 'delivered', daysAgoDelivered: 30, buyer: 'Dave@Promo.ca' });
+    await sale(client, a, { goods: 5000, status: 'delivered', daysAgoDelivered: 30, buyer: 'dave.pay@promo.ca' });
+    const d = await dashboardFor(session);
+    equal(d.summary.payable, 0); equal(d.sales.every((s) => s.own && s.commission === 0), true);
+  } finally { done(); }
+});
+
+suite('affiliate payouts');
+test('a payout is capped at what is payable, can’t be doubled by reference, and brings the balance down', async () => {
+  const { client, done } = await fresh();
+  try {
+    const a = await approveAffiliate((await apply()).affiliate.id);
+    await sale(client, a, { goods: 10000, status: 'delivered', daysAgoDelivered: 20 });  // $500
+    await sale(client, a, { goods: 4000, status: 'confirmed' });                          // $200 not yet payable
+    await rejects(() => recordPayout(a.id, { amount: 600 }), 'more than is payable');
+    await rejects(() => recordPayout(a.id, { amount: 0 }));
+    const r = await recordPayout(a.id, { amount: 300, ref: 'ET-1' }, { email: 'owner@x.ca' });
+    equal(r.balance, 200);
+    await rejects(() => recordPayout(a.id, { amount: 100, ref: 'et-1' }), 'same reference twice');
+    await recordPayout(a.id, { amount: 200, ref: 'ET-2' });
+    const d = await dashboardFor(session);
+    equal(d.summary.balance, 0); equal(d.summary.paid, 500); equal(d.payouts.length, 2);
+  } finally { done(); }
+});
+test('a refund after payout leaves the balance negative and nets off the next one', async () => {
+  const { client, done } = await fresh();
+  try {
+    const a = await approveAffiliate((await apply()).affiliate.id);
+    const id = await sale(client, a, { goods: 10000, status: 'delivered', daysAgoDelivered: 20 });
+    await recordPayout(a.id, { amount: 500, ref: 'ET-9' });
+    await client.query(`UPDATE orders SET status='refunded' WHERE id=$1`, [id]);
+    equal((await dashboardFor(session)).summary.balance, -500);
+    const list = await listAffiliates();
+    equal(list[0].summary.balance, -500);
+  } finally { done(); }
+});
+test('an affiliate sees only their own record and can change only where they are paid', async () => {
+  const { client, done } = await fresh();
+  try {
+    const a = await approveAffiliate((await apply()).affiliate.id);
+    await sale(client, a, { goods: 1000, status: 'delivered', daysAgoDelivered: 30 });
+    const other = await dashboardFor({ email: 'stranger@x.ca' });
+    equal(other.affiliate, null);
+    await setPayoutEmail(session, 'new.pay@promo.ca');
+    equal((await dashboardFor(session)).affiliate.payoutEmail, 'new.pay@promo.ca');
+    const d = await dashboardFor(session);
+    assert(!JSON.stringify(d).includes('buyer@x.ca'), 'no customer details are in an affiliate’s data');
+  } finally { done(); }
+});

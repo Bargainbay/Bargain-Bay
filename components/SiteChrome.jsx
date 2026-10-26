@@ -5,6 +5,7 @@ import Footer from './Footer';
 import ChatWidget from './ChatWidget';
 import TeamAssistant from './TeamAssistant';
 import CartCapture from './CartCapture';
+import RefCapture from './RefCapture';
 import { DASHBOARD_ROUTES } from '../lib/dashboards';
 
 // Decides the page chrome from the route:
@@ -35,6 +36,7 @@ export default function SiteChrome({ children, promo = null }) {
       <Footer />
       <ChatWidget />
       <CartCapture />
+      <RefCapture />
     </>
   );
 }

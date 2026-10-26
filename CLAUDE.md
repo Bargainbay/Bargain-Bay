@@ -4203,6 +4203,70 @@ old "By salesperson" panel on `/admin/dashboard`.
     two periods, and a running-total line by day number. Each series is in a legend
     and the tooltip, so colour is never the only signal.
 
+## Rep commission and the gross-profit card (added 2026-10-26)
+`lib/commission-rules.js` (no imports), `repProfit` at the foot of `lib/analytics.js`,
+`components/MyProfit.jsx` (the rep's card, top of the Sales dashboard, refreshes every
+60s), `components/TeamProfit.jsx` (admin-only table), `GET /api/admin/rep-profit` (staff),
+`test/rep-profit.test.mjs`.
+
+- **The plan (owner):** a rep earns **10% of the day's gross profit on any day that reaches
+  $3,000** — a CLIFF, not a marginal rate ($2,999 pays $0, $3,000 pays $300, $4,200 pays
+  $420). Base is $1,000/wk after a 2-week paid training period at $20/hr. It is in
+  `REP_COMMISSION_PCT` / `REP_COMMISSION_THRESHOLD` and nowhere else.
+- **Gross profit = the Daily P&L's product profit**, per order: unit lines at price less
+  cost, plus credit lines (discounts, trade-ins), less a checkout coupon. Credited to whoever
+  CLOSED it (`orders.sales_rep`), on the Toronto day of the order/invoice (same `SALE`
+  predicate as the revenue dashboards). A unit with no cost counts as ZERO profit and is
+  reported (`missingCost`, "cost missing" pill) rather than as pure profit.
+- **THE ONE PLACE A SALES LOGIN SEES A COST-DERIVED FIGURE** — owner's instruction. Narrowly:
+  the rep's OWN sales and the profit on each; never a unit's cost, never anyone else's
+  numbers. The viewer comes from the session; the team table (`all: true`) is computed for
+  an admin only. The Profit KPI and the per-line cost input stay hidden from sales as before.
+  A one-unit order's profit does reveal its cost by subtraction; that was accepted.
+- **No card for a login that matches no rep** (`resolveViewerRep`), same as the quota card.
+- Commission shown here is what to PAY; nothing pays it automatically.
+
+## Affiliates (added 2026-10-26)
+`lib/affiliates.js`, migration `0037_affiliates`, `/affiliate` (public pitch + application +
+the affiliate's own dashboard), `/admin/affiliates` (ADMIN), `/api/affiliate`,
+`/api/admin/affiliates`, `components/RefCapture.jsx` (in `SiteChrome`),
+`test/affiliates.test.mjs`. Owner's rule: **5% of the goods on every sale made with their
+code** (a $10,000 stove pays $500). Landing/ads page to link: `/affiliate`.
+
+- **THE CODE IS A COUPON.** Approval creates a `coupons` row (affiliate name + `commission_pct`)
+  so the checkout, the redemption booking inside its transaction and the abandoned-order
+  release all just work. The coupon system will not hold a code that takes nothing off, so
+  the customer gets `AFFILIATE_CUSTOMER_PCT` (3%) off by default, editable at approval.
+  `affiliates` is the PERSON: approval, payout address, terms version. `affiliate_payouts` is
+  the money that left.
+- **WHAT IS EARNED IS NEVER STORED.** Read off `coupon_redemptions` + the order each time
+  (`affiliateSales`), so a cancelled/refunded order takes its commission with it. The rate is
+  snapshotted on `coupon_redemptions.commission_pct` at redemption — changing an affiliate's
+  rate never rewrites an old sale. (`ensureCouponSchema` also adds that column: the checkout
+  INSERT names it and a missing column would LOSE THE ORDER.)
+- **Base** = `subtotal − vendor_subtotal − discount` (goods, pre-tax, no delivery, no seller
+  lines). **Payable only when the order is `delivered` and `AFFILIATE_HOLD_DAYS` (14, the
+  returns policy's change-of-mind window) have passed since `delivered_at`.**
+  `updateOrderStatus` now stamps `delivered_at` (first time only) because a pickup marked
+  delivered from the board never had one and its commission could not mature.
+- **Void, never paid:** cancelled/refunded orders, and any order placed with the affiliate's own
+  email or payout email (`own`).
+- **Balance = payable − paid and CAN GO NEGATIVE** (a refund after a payout). It is shown, and
+  nets off the next payment. `recordPayout` records an e-transfer a person has ALREADY sent —
+  it moves no money — capped at the balance, under an advisory lock, and a repeated reference
+  is refused.
+- **An automatic promotion that beats the code does not cut the affiliate out**: checkout keeps
+  the code as a second, zero-discount redemption (`attributeTo`).
+- **Link tracking is browser-local**: `/?ref=CODE` is kept 30 days in localStorage (`bb_ref`)
+  and `CheckoutClient` tries it once as a typed code. A code that does not hold is dropped
+  silently. There is NO click tracking and no cookie.
+- **An affiliate sees no customer detail** — date, product titles, goods, commission, status.
+  An affiliate's identity is the signed-in account's email; ids/emails are never read from a
+  request. They are independent contractors: don't give them hours, targets or training.
+- **Not built:** automatic payouts, an approval email, click counts, a footer/sitemap link, and
+  commission on phone/walk-in/invoice sales (those carry no code). Commission is a % of the
+  PRICE, not of profit, so on a thin-margin unit it can exceed what the sale made — watch it.
+
 ## Daily P&L, the cost list, and everyone's clock (added 2026-10-08)
 `lib/daily-pnl.js`, `lib/daily-cost-math.js` (no imports), `lib/team-clock.js`,
 migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
