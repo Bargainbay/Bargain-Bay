@@ -39,6 +39,8 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     { key: 'marketplace', label: 'Marketplace', href: '/admin/marketplace', sales: true },
     { key: 'campaigns', label: 'Campaigns', href: '/admin/campaigns' },
     { key: 'coupons', label: 'Coupons', href: '/admin/coupons' },
+    // The people who promote our stock for a percentage: applications, their codes, what they are owed.
+    { key: 'affiliates', label: 'Affiliates', href: '/admin/affiliates' },
     { key: 'giveaway', label: 'Giveaway', href: '/admin/giveaway' },
     { key: 'payroll', label: 'Payroll', href: '/admin/payroll' },
     // Everyone who isn't driving clocks in on /clock; this is where they are

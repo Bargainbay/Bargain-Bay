@@ -177,9 +177,14 @@ export async function POST(req) {
   // unit's floor (cost; cost + 20% for consigned stock), so it can never be the
   // reason something sells at a loss. Worked out here from scratch: what the
   // cart page showed is only a preview.
+  // An affiliate's code earns them commission even when an automatic promotion is worth more to the
+  // shopper and wins the discount: the attribution is kept as a second, zero-discount redemption so
+  // the person who sent the customer is not cut out by the shopper getting the better deal.
+  let attributeTo = null;
   try {
     const auto = await bestAutoCoupon(items.filter((u) => !u.marketplace), priced, { email });
     if (auto && auto.discount > discount) {
+      if (coupon && coupon.commissionPct > 0) attributeTo = coupon;
       coupon = auto.coupon; discount = auto.discount; couponError = null;
     }
   } catch (e) {
@@ -277,6 +282,7 @@ export async function POST(req) {
       // Book the redemption in the same transaction as the order it belongs to —
       // a coupon must never be counted against an order that failed to be created.
       if (coupon) await redeemCouponWithClient(client, coupon, { orderId, email, subtotal, discount });
+      if (attributeTo) await redeemCouponWithClient(client, attributeTo, { orderId, email, subtotal, discount: 0 });
       // A seller's units: re-verify they are still on sale, then write each seller's part of the order.
       await createVendorOrdersTx(client, {
         orderId, orderNumber: numbered[0].order_number, units: items, deliveryMethod,
