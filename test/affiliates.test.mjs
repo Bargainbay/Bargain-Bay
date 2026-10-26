@@ -1,6 +1,7 @@
 // Affiliates: the code is a coupon, the commission is read off the sales, and
 // money only goes out once an order is delivered and its return window has closed.
 import { suite, test, assert, equal } from './_harness.mjs';
+import { AFFILIATE_TERMS_VERSION } from '../lib/affiliate-terms.js';
 import { withTestDb } from './db.mjs';
 import { ensureCouponSchema, redeemCouponWithClient, validateCoupon } from '../lib/coupons.js';
 import {
@@ -19,7 +20,7 @@ async function fresh() {
   return db;
 }
 const session = { email: 'dave@promo.ca', name: 'Dave Promo' };
-const apply = (s = session) => applyAsAffiliate(s, { name: s.name, payoutEmail: 'dave.pay@promo.ca', audience: 'A Facebook group of 4,000 Durham landlords.', acceptTerms: true });
+const apply = (s = session) => applyAsAffiliate(s, { name: s.name, payoutEmail: 'dave.pay@promo.ca', audience: 'A Facebook group of 4,000 Durham landlords.', acceptTerms: true, termsVersion: AFFILIATE_TERMS_VERSION });
 let n = 100;
 // A sale through the affiliate's code. `daysAgoDelivered` null = not delivered.
 async function sale(client, aff, { goods, discount = 0, status = 'confirmed', daysAgoDelivered = null, buyer = 'buyer@x.ca' }) {
@@ -39,12 +40,25 @@ suite('affiliate approval');
 test('applying needs a payout address, a plan and the terms; the email is the account’s', async () => {
   const { done } = await fresh();
   try {
-    await rejects(() => applyAsAffiliate(session, { name: 'Dave', payoutEmail: 'nope', audience: 'long enough audience text', acceptTerms: true }));
-    await rejects(() => applyAsAffiliate(session, { name: 'Dave', payoutEmail: 'a@b.ca', audience: 'short', acceptTerms: true }));
+    await rejects(() => applyAsAffiliate(session, { name: 'Dave', payoutEmail: 'nope', audience: 'long enough audience text', acceptTerms: true, termsVersion: AFFILIATE_TERMS_VERSION }));
+    await rejects(() => applyAsAffiliate(session, { name: 'Dave', payoutEmail: 'a@b.ca', audience: 'short', acceptTerms: true, termsVersion: AFFILIATE_TERMS_VERSION }));
     await rejects(() => applyAsAffiliate(session, { name: 'Dave', payoutEmail: 'a@b.ca', audience: 'long enough audience text', acceptTerms: false }));
     const r = await apply();
     equal(r.affiliate.status, 'pending'); equal(r.affiliate.email, 'dave@promo.ca');
     assert((await apply()).created === false, 'applying twice is one application');
+  } finally { done(); }
+});
+test('THE APPLICANT MUST HAVE ACCEPTED THE CURRENT VERSION OF THE AGREEMENT', async () => {
+  const { done } = await fresh();
+  try {
+    const base = { name: 'Dave', payoutEmail: 'a@b.ca', audience: 'long enough audience text', acceptTerms: true };
+    await rejects(() => applyAsAffiliate(session, base), 'no version sent');
+    await rejects(() => applyAsAffiliate(session, { ...base, termsVersion: '2020-01-01' }), 'an old version');
+    const r = await applyAsAffiliate(session, { ...base, termsVersion: AFFILIATE_TERMS_VERSION });
+    equal(r.affiliate.status, 'pending');
+    const { rows } = await (await import('../lib/db.js')).query('SELECT terms_version, terms_accepted_at FROM affiliates');
+    equal(rows[0].terms_version, AFFILIATE_TERMS_VERSION);
+    assert(rows[0].terms_accepted_at, 'the time of acceptance is recorded');
   } finally { done(); }
 });
 test('approving cuts a working coupon code at 5% commission', async () => {
@@ -56,7 +70,7 @@ test('approving cuts a working coupon code at 5% commission', async () => {
     const ok = await validateCoupon('dave', { subtotal: 1000 });
     assert(ok.ok, 'the code works at checkout'); equal(ok.coupon.commissionPct, 5);
     // A second Dave gets a different code, not a collision.
-    const b = (await applyAsAffiliate({ email: 'dave2@x.ca', name: 'Dave Two' }, { name: 'Dave Two', payoutEmail: 'd2@x.ca', audience: 'Word of mouth in my building.', acceptTerms: true })).affiliate;
+    const b = (await applyAsAffiliate({ email: 'dave2@x.ca', name: 'Dave Two' }, { name: 'Dave Two', payoutEmail: 'd2@x.ca', audience: 'Word of mouth in my building.', acceptTerms: true, termsVersion: AFFILIATE_TERMS_VERSION })).affiliate;
     equal((await approveAffiliate(b.id)).code, 'DAVE2');
     // Suspending switches the code off; the history stays.
     await setAffiliateStatus(affiliate.id, 'suspend');
@@ -248,7 +262,7 @@ test('THE RUN LISTS ONLY WHAT IS PAYABLE AND OVER THE MINIMUM; RECORDING IT TWIC
   const { client, done } = await fresh();
   try {
     const a = await approveAffiliate((await apply()).affiliate.id);
-    const b = await approveAffiliate((await applyAsAffiliate({ email: 'small@x.ca', name: 'Small Fry' }, { name: 'Small Fry', payoutEmail: 'sf@x.ca', audience: 'My street group chat.', acceptTerms: true })).affiliate.id);
+    const b = await approveAffiliate((await applyAsAffiliate({ email: 'small@x.ca', name: 'Small Fry' }, { name: 'Small Fry', payoutEmail: 'sf@x.ca', audience: 'My street group chat.', acceptTerms: true, termsVersion: AFFILIATE_TERMS_VERSION })).affiliate.id);
     await sale(client, a, { goods: 10000, status: 'delivered', daysAgoDelivered: 20 });   // $500
     await sale(client, a, { goods: 5000, status: 'confirmed' });                          // not yet
     await sale(client, b, { goods: 600, status: 'delivered', daysAgoDelivered: 20 });     // $30: under the $50 minimum

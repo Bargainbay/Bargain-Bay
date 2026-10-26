@@ -4260,6 +4260,15 @@ code** (a $10,000 stove pays $500). Landing/ads page to link: `/affiliate`.
 - **Link tracking is browser-local**: `/?ref=CODE` is kept 30 days in localStorage (`bb_ref`)
   and `CheckoutClient` tries it once as a typed code. A code that does not hold is dropped
   silently. There is NO click tracking and no cookie.
+- **THE AGREEMENT IS ACCEPTED BY SCROLLING TO THE END AND PRESSING ACCEPT** (owner, 2026-10-27: no separate
+  forms, no signing). `lib/affiliate-terms.js` is the one text (`AFFILIATE_TERMS`, `AFFILIATE_TERMS_VERSION`),
+  rendered in a scroll box by `components/AffiliateApply.jsx`; the Accept button stays disabled until the box
+  has been scrolled to the bottom. That is a UI guard, not proof of reading. What is recorded is the VERSION
+  shown (`affiliates.terms_version`) and the time (`terms_accepted_at`); `applyAsAffiliate` refuses a missing or
+  stale version, so a page left open across a change must be reloaded. **Changing the wording means a new
+  version AND a new pinned hash in `test/affiliate-terms.test.mjs`** — the test fails otherwise, which is what
+  keeps "what did they accept" answerable. The figures in the text come from `lib/commission-rules.js`. The
+  longer Word-style agreement in Drive (Agreements folder) is the reference copy; the web text is the binding one.
 - **An affiliate sees no customer detail** — date, product titles, goods, commission, status.
   An affiliate's identity is the signed-in account's email; ids/emails are never read from a
   request. They are independent contractors: don't give them hours, targets or training.
