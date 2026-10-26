@@ -1,26 +1,32 @@
 'use client';
 import { useState } from 'react';
 import HoneypotField, { HONEYPOT_FIELD } from './HoneypotField';
+import AgreementScroll from './AgreementScroll';
 
 const BLANK = {
   legalName: '', tradeName: '', businessNo: '', hstNo: '', sourceOfGoods: '', contactName: '', contactEmail: '',
-  contactPhone: '', address: '', city: '', postal: '', acceptsTerms: false
+  contactPhone: '', address: '', city: '', postal: ''
 };
 const SOURCES = ['Liquidation / overstock', 'Dealer or retailer overstock', 'Trade-ins and customer returns', 'Refurbishing used units', 'Manufacturer / distributor', 'Other'];
 
-export default function VendorApplyForm() {
+// `policies` = the required seller documents in force: [{ slug, title, version, sections }], passed in by the page.
+export default function VendorApplyForm({ policies = [] }) {
   const [f, setF] = useState(BLANK);
   const [hp, setHp] = useState('');
+  const [read, setRead] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(false);
-  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
+  const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
+  // One scroll box: each document's title, then its sections.
+  const sections = policies.flatMap((p) => [{ h: p.title, group: true, body: [] }, ...p.sections]);
 
   async function submit(e) {
     e.preventDefault();
+    if (!read) return;
     setBusy(true); setErr('');
     try {
-      const res = await fetch('/api/marketplace/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, [HONEYPOT_FIELD]: hp }) });
+      const res = await fetch('/api/marketplace/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, [HONEYPOT_FIELD]: hp, acceptedPolicies: policies.map((p) => ({ policy: p.slug, version: p.version })) }) });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not send your application.'); return; }
       setDone(true);
@@ -48,9 +54,10 @@ export default function VendorApplyForm() {
         <div className="field"><label>City</label><input value={f.city} onChange={set('city')} /></div>
         <div className="field"><label>Postal code</label><input value={f.postal} onChange={set('postal')} /></div>
       </div>
-      <div className="field"><label><input type="checkbox" checked={f.acceptsTerms} onChange={set('acceptsTerms')} required />{' '}
-        I have read the <a href="/marketplace/policies" target="_blank" rel="noreferrer">marketplace policies</a>. I understand every unit needs a one-year warranty from me, pre-owned units are sold as Refurbished, and accounts with three strikes are restricted.</label></div>
-      <button className="btn primary" disabled={busy}>{busy ? 'Sending…' : 'Send application'}</button>
+      <h3 style={{ margin: '16px 0 6px', fontSize: 16 }}>Seller Agreement</h3>
+      <p style={{ fontSize: 13.5, margin: '0 0 8px' }}>Read to the end, then accept. This is everything we ask of sellers: how we work together, what you list, how you ship, and how you are paid.</p>
+      <AgreementScroll sections={sections} label="Seller Agreement" read={read} onRead={() => setRead(true)} maxHeight={460} />
+      <button className="btn primary" disabled={busy || !read}>{busy ? 'Sending…' : 'Accept and send application'}</button>
     </form>
   );
 }

@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
+import AgreementScroll from './AgreementScroll';
 
 // The policies a seller has to accept, and the button that accepts them. The versions on the page travel
 // with the click, so a policy that changed in the meantime is refused rather than silently accepted.
-export default function VendorPolicies({ docs, isOwner, accepted, pending }) {
+export default function VendorPolicies({ docs, isOwner, accepted, pending, pendingSections = [] }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [read, setRead] = useState(false);
@@ -28,15 +29,12 @@ export default function VendorPolicies({ docs, isOwner, accepted, pending }) {
       {pending.length > 0 ? (
         <div className="panel" style={{ background: 'var(--warnbg)' }}>
           <h2 style={{ marginTop: 0, fontSize: 17 }}>Please read and accept our policies</h2>
-          <p style={{ fontSize: 14 }}>You can list and sell once the account owner has accepted them. Open each one below, then accept.</p>
+          <p style={{ fontSize: 14 }}>You can list and sell once the account owner has accepted them. Read to the end, then accept.</p>
           {isOwner ? (
             <>
-              <label style={{ fontSize: 14, display: 'block', marginBottom: 10 }}>
-                <input type="checkbox" checked={read} onChange={(e) => setRead(e.target.checked)} />{' '}
-                I have read the policies marked <b>Required</b> below and I accept them on behalf of the business.
-              </label>
+              <AgreementScroll sections={pendingSections} label="Marketplace policies" read={read} onRead={() => setRead(true)} maxHeight={360} />
               {err && <div className="error-box">{err}</div>}
-              <button className="btn primary" disabled={busy || !read} onClick={accept}>Accept the policies</button>
+              <button className="btn primary" disabled={busy || !read} onClick={accept}>Accept and continue</button>
             </>
           ) : <p style={{ fontSize: 14, marginBottom: 0 }}>Only the account owner can accept them. Ask them to sign in and do so.</p>}
         </div>

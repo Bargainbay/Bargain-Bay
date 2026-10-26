@@ -22,6 +22,7 @@ export default async function PoliciesPage() {
         docs={docs} isOwner={vendor.role === 'owner'}
         accepted={JSON.parse(JSON.stringify(status.accepted))}
         pending={status.pending.map((p) => ({ slug: p.slug, title: p.title, version: p.version }))}
+        pendingSections={status.pending.flatMap((p) => [{ h: p.title, group: true, body: [] }, ...p.sections()])}
       />
     </div>
   );
