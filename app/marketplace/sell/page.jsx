@@ -1,9 +1,12 @@
 import VendorApplyForm from '../../../components/VendorApplyForm';
+import { requiredPolicies } from '../../../lib/marketplace-policies';
 import { WARRANTY_MONTHS, ACCEPT_HOURS, READY_HOURS, STRIKE_LIMIT, DEFAULT_COMMISSION_BPS } from '../../../lib/marketplace-rules';
 
 export const metadata = { title: 'Sell on Bargain Bay', description: 'Apply to sell appliances to Bargain Bay customers across Durham Region and the GTA.' };
 
 export default function SellPage() {
+  // What a seller accepts on this form: every required policy at its current version, shown in one scroll box.
+  const policies = requiredPolicies().map((p) => ({ slug: p.slug, title: p.title, version: p.version, sections: p.sections() }));
   return (
     <div className="narrow" style={{ maxWidth: 760 }}>
       <div className="panel">
@@ -13,7 +16,7 @@ export default function SellPage() {
         <p style={{ fontSize: 14 }}><strong>What we ask.</strong> Every unit carries at least a {WARRANTY_MONTHS}-month warranty from you. Pre-owned units are sold as Refurbished and never described as new. {STRIKE_LIMIT} strikes (missed deadlines, cancellations, misdescribed units) restrict an account.</p>
       </div>
       <p style={{ fontSize: 14 }}>Not sure yet? Read the <a href="/marketplace/guides/getting-started">getting-started guide</a>, the <a href="/marketplace/guides/packing-and-handover">packing guide</a> and the <a href="/marketplace/policies">policies</a> — everything is out in the open.</p>
-      <div className="panel"><VendorApplyForm /></div>
+      <div className="panel"><VendorApplyForm policies={policies} /></div>
     </div>
   );
 }

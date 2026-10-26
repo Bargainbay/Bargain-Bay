@@ -3,6 +3,9 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { createApplication, decideApplication, issueStrike } from '../lib/vendors.js';
 import { listVendors, vendorDetail, setTier, submitPublicApplication } from '../lib/vendor-admin.js';
+import { requiredPolicies } from '../lib/marketplace-policies.js';
+import { pendingPolicies } from '../lib/policy-acceptance.js';
+import { query } from '../lib/db.js';
 
 async function rejects(fn, re) {
   let err;
@@ -12,7 +15,7 @@ async function rejects(fn, re) {
 }
 const apply = (o = {}) => ({
   legalName: 'Alpha Appliances Ltd', tradeName: 'Alpha', contactName: 'Ana', contactEmail: 'ana@alpha.example',
-  sourceOfGoods: 'Dealer or retailer overstock', acceptsTerms: true, ...o
+  sourceOfGoods: 'Dealer or retailer overstock', acceptedPolicies: requiredPolicies().map((p) => ({ policy: p.slug, version: p.version })), ...o
 });
 
 suite('marketplace admin — vendors, money visibility and applying');
@@ -64,7 +67,7 @@ test('the public application grants nothing, needs the essentials, and is thrott
   try {
     await rejects(() => submitPublicApplication(apply({ contactName: '' })), /name/);
     await rejects(() => submitPublicApplication(apply({ sourceOfGoods: '' })), /stock/);
-    await rejects(() => submitPublicApplication(apply({ acceptsTerms: false })), /guidelines/);
+    await rejects(() => submitPublicApplication(apply({ acceptedPolicies: [] })), /accept/);
     const r = await submitPublicApplication(apply());
     const d = await vendorDetail(r.id);
     equal(d.vendor.status, 'applied'); equal(d.users.length, 0);       // no access of any kind
@@ -80,5 +83,23 @@ test('an HST number on the form is recorded as registered; applying twice with a
     const r = await submitPublicApplication(apply({ hstNo: '123456789 RT0001' }));
     equal((await vendorDetail(r.id)).vendor.hstStatus, 'registered');
     await submitPublicApplication(apply({ contactEmail: 'other@beta.example', legalName: 'Beta' }));
+  } finally { done(); }
+});
+
+
+test('APPLYING IS ACCEPTING: the seller agreement is recorded at application and is not asked for again once approved', async () => {
+  const { done } = await withTestDb();
+  try {
+    const need = requiredPolicies();
+    assert(need.length > 0, 'there are required policies in force');
+    // Missing one, or a stale version, is refused and creates nothing.
+    await rejects(() => submitPublicApplication(apply({ acceptedPolicies: need.slice(1).map((p) => ({ policy: p.slug, version: p.version })) })), /accept/);
+    await rejects(() => submitPublicApplication(apply({ acceptedPolicies: need.map((p) => ({ policy: p.slug, version: p.version + 1 })) })), /updated/);
+    equal((await query('SELECT count(*)::int AS n FROM vendors')).rows[0].n, 0, 'a refused application creates no vendor');
+    const r = await submitPublicApplication(apply(), { ip: '203.0.113.9' });
+    const { rows } = await query('SELECT policy, version, accepted_by, ip FROM policy_acceptances WHERE vendor_id = $1', [r.id]);
+    equal(rows.length, need.length);
+    assert(rows.every((x) => x.accepted_by === 'ana@alpha.example' && x.ip === '203.0.113.9'), 'recorded under the applicant, with the ip');
+    equal((await pendingPolicies(r.id)).length, 0, 'nothing left for them to accept after approval');
   } finally { done(); }
 });

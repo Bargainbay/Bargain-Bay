@@ -4269,6 +4269,22 @@ code** (a $10,000 stove pays $500). Landing/ads page to link: `/affiliate`.
   version AND a new pinned hash in `test/affiliate-terms.test.mjs`** — the test fails otherwise, which is what
   keeps "what did they accept" answerable. The figures in the text come from `lib/commission-rules.js`. The
   longer Word-style agreement in Drive (Agreements folder) is the reference copy; the web text is the binding one.
+- **THE SAME AGREEMENT FORMAT FOR AFFILIATES, MEMBERS AND SELLERS (owner, 2026-10-27: "as effortless as possible").**
+  `components/AgreementScroll.jsx` is the one component: the agreement in a scroll box, Accept dead until the end is
+  reached, and the parent sends the VERSION it showed. Sections use the marketplace-policy format
+  (`{ h, body: [string | {p, lead?, list?} | {list} | {steps} | {table}] }`), so a seller's policies render in it unchanged.
+  - **Affiliates:** `lib/affiliate-terms.js`, version recorded in `affiliates.terms_version`.
+  - **Members:** `lib/member-terms.js` (MEMBER_TERMS, version-pinned by `test/member-terms.test.mjs`), shown in
+    `app/account/MemberRequest.jsx`; `/api/account/membership` refuses a missing or stale version;
+    `users.member_terms_version/_accepted_at` (migration 0041, and `requestMembership` adds the columns itself if the
+    migration has not been run). Members approved before this have NULLs and are NOT asked retroactively.
+    **The member text is a first draft of terms nobody had written down; it promises no discount figure** (a test
+    fails if a percentage appears) because the price is whatever `lib/pricing.js` says.
+  - **Sellers:** the application form (`/marketplace/sell`) shows EVERY required published marketplace policy in one
+    scroll box and sends `acceptedPolicies`; `submitPublicApplication` refuses anything but the current versions and
+    records them in `policy_acceptances` against the vendor row the application creates (`accepted_by` = the applicant's
+    email, `at: 'application'` in the event), so approved sellers are not asked again. `/vendor/policies` uses the same
+    box for any policy that changes later. This replaced the old tick-box that linked to the policies page.
 - **An affiliate sees no customer detail** — date, product titles, goods, commission, status.
   An affiliate's identity is the signed-in account's email; ids/emails are never read from a
   request. They are independent contractors: don't give them hours, targets or training.
