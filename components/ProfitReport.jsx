@@ -252,6 +252,11 @@ export default function ProfitReport({ drivers = [], date }) {
                 ))}
               </tbody>
             </table></div>
+            {data.totals.ownerHours > 0 && (
+              <p className="hint" style={{ margin: '4px 0' }}>
+                {data.totals.ownerHours}h of owner time is recorded but not costed.
+              </p>
+            )}
             {(data.totals.unpricedShifts > 0 || data.totals.noRateShifts > 0) && (
               <div className="error-box">
                 {data.totals.unpricedShifts > 0 && (

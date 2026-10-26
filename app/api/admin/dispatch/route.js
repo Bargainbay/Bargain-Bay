@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { routeDay } from '../../../../lib/route-plan';
+import { routeDay, addBaseStop } from '../../../../lib/route-plan';
 import { isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { dispatchAccess } from '../../../../lib/dispatch-access';
 import { listDispatchers, grantDispatcher, revokeDispatcher, markTourSeen } from '../../../../lib/dispatchers';
@@ -12,7 +12,7 @@ import {
   profitReport, stopTimes, addExpense, listExpenses, deleteExpense, EXPENSE_KINDS
 } from '../../../../lib/dispatch-money';
 import {
-  shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate, setShiftTimes, createShift, mergeShifts } from '../../../../lib/shifts';
+  shiftReport, mileageReport, listVehicles, upsertVehicle, setDriverRate, setPaidAsOwner, setShiftTimes, createShift, mergeShifts } from '../../../../lib/shifts';
 import { livePositions, driverTrail, vehicleTrail } from '../../../../lib/driver-location';
 import { pollTrackers, trackerStatus } from '../../../../lib/tracker-watch';
 import { sendSms, smsConfigured } from '../../../../lib/sms';
@@ -427,6 +427,17 @@ export async function POST(req) {
     // What an hour of a driver costs is PAY, so it sits behind the same gate as
     // the hours and the Profit tab — not the staff-level gate the van rates use.
     // A truck's day rate is a fact about a truck; a person's rate is their wage.
+    if (body.action === 'driver_owner') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can change that.' }, { status: 403 });
+      try { return NextResponse.json({ ok: true, driver: await setPaidAsOwner(body.driverId, body.paidAsOwner) }); }
+      catch (e) { return NextResponse.json({ error: e?.message || 'Could not save that.' }, { status: 400 }); }
+    }
+    // "Head to base first": put the base on this driver's day as their first stop.
+    if (body.action === 'base_stop') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.date || ''))) return NextResponse.json({ error: 'Which day?' }, { status: 400 });
+      try { return NextResponse.json({ ok: true, ...(await addBaseStop(body.date, body.driverId || null, body.baseKey || 'cda', who(s))) }); }
+      catch (e) { return NextResponse.json({ error: e?.message || 'Could not add the base stop.' }, { status: 400 }); }
+    }
     if (body.action === 'driver_rate') {
       if (!s.full) {
         return NextResponse.json({ error: 'Only an admin can set a driver\'s rate.' }, { status: 403 });

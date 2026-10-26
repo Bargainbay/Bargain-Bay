@@ -795,6 +795,13 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
     await refresh();
   }
 
+  // Put the base on this column's day as its first stop.
+  async function headToBase() {
+    setRouteMsg('');
+    const d = await sendFor({ action: 'base_stop', date: board.date, driverId: routeWho || null, baseKey: routeBase });
+    if (d) setRouteMsg(d.existed ? 'That base is already on this run.' : `Added ${d.job.jobNumber}: head to the base first.`);
+  }
+
   // The times, corrected from the office.
   const [basing, setBasing] = useState(null);   // { bases, rows:[{id,name,baseId,on}] }
 
@@ -1166,6 +1173,8 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
                 .map((j) => <option key={j.id} value={j.id}>first: {j.customerName || j.address}</option>)}
             </select>
             <button type="button" className="btn" disabled={busy} onClick={routeColumn}>🧭 Order by route</button>
+            <button type="button" className="btn" disabled={busy} onClick={headToBase}
+              title="Add the base as the first stop so the crew loads there before heading out">➕ Head to base first</button>
           </span>
           {routeMsg && <span className="hint">{routeMsg}</span>}
           {/* A sheet that landed under the wrong company is fixed here, not by

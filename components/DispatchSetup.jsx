@@ -323,6 +323,21 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
     finally { setBusy(''); }
   }
 
+  async function toggleOwner(d) {
+    setBusy(`own${d.id}`); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'driver_owner', driverId: d.id, paidAsOwner: !d.paidAsOwner })
+      });
+      const j = await res.json();
+      if (!res.ok) { setErr(j.error || 'Could not save that.'); return; }
+      setOk(`${d.name || d.email}: ${j.driver.paidAsOwner ? 'paid as owner — hours are recorded but not costed.' : 'back on an hourly rate.'}`);
+      await loadRoster();
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(''); }
+  }
+
   async function toggleVan(v) {
     setBusy(`van${v.id}`); setErr('');
     try {
@@ -817,13 +832,19 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                   {d.lastSeen
                     ? `on their phone ${new Date(d.lastSeen).toLocaleDateString('en-CA')}`
                     : d.linkSentAt ? 'texted, not opened yet' : 'no link sent yet'}
-                  {canManageDrivers && (d.hourlyRate ? ` · $${d.hourlyRate.toFixed(2)}/h` : ' · no hourly rate')}
+                  {canManageDrivers && (d.paidAsOwner ? ' · paid as owner (hours not costed)' : d.hourlyRate ? ` · $${d.hourlyRate.toFixed(2)}/h` : ' · no hourly rate')}
                 </span>
                 {canManageDrivers && (
                 <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
                   onClick={() => setEditDrv(editDrv?.id === d.id ? null
                     : { id: d.id, hourlyRate: d.hourlyRate == null ? '' : String(d.hourlyRate) })}>
                   hourly rate
+                </button>)}
+                {canManageDrivers && (
+                <button type="button" className="disp-toggle" style={{ marginLeft: 8 }} disabled={!!busy}
+                  title="An owner's hours are recorded but never costed"
+                  onClick={() => toggleOwner(d)}>
+                  {d.paidAsOwner ? 'owner ✓' : 'paid as owner'}
                 </button>)}
                 {canManageDrivers && editDrv?.id === d.id && (
                   <div className="disp-setup-form" style={{ marginTop: 8 }}>
