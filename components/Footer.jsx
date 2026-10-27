@@ -23,6 +23,7 @@ export default function Footer() {
             <a href="/shop">All inventory</a>
             <a href="/shop?collection=under-500">Deals under $500</a>
             <a href="/refurbished">Refurbished</a>
+            <a href="/brands/bertazzoni-fulgor-milano">Bertazzoni &amp; Fulgor</a>
             <a href="/cart">Cart</a>
             <a href="/track">Track your order</a>
             <a href="/marketplace">Marketplace</a>
