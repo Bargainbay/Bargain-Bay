@@ -12,6 +12,7 @@ import PayReport from './PayReport';
 import ClientBilling from './ClientBilling';
 import StopTimes from './StopTimes';
 import { cashAtTheDoor } from '../lib/cash-at-the-door';
+import { ROUTE_BASES } from '../lib/constants';
 import ProfitReport from './ProfitReport';
 import LiveMap from './LiveMap';
 
@@ -179,10 +180,10 @@ function DayCostForm({ date, drivers, busy, onSave }) {
   const [amount, setAmount] = useState('');
   const [driverId, setDriverId] = useState('');
   const [note, setNote] = useState('');
-  return (
   // Receipts say "$45.20" and "1,200.00"; Number() of either is NaN, which left
   // Record disabled with no hint why. Strip the dressing before judging it.
   const amt = Number(String(amount).replace(/[$,\s]/g, ''));
+  return (
     <form
       className="disp-setup-form"
       style={{ margin: '0 0 12px' }}
@@ -693,6 +694,9 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [adding, setAdding] = useState(false);
+  const [routeBase, setRouteBase] = useState('cda');
+  const [routeWho, setRouteWho] = useState('');       // '' = the unassigned column
+  const [routeMsg, setRouteMsg] = useState('');
   const [editing, setEditing] = useState(null);      // the job being corrected
   const editPanel = useRef(null);
   // The form renders above the columns. On a phone the columns stack, so Edit on
@@ -779,6 +783,18 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
     const ids = run.map((j) => j.id);
     [ids[from], ids[to]] = [ids[to], ids[from]];
     return send('PATCH', { action: 'resequence', driverId: job.driverId, date: board.date, jobIds: ids });
+  }
+
+  // Put one column in driving order from a base (CDA's depot by default).
+  async function routeColumn() {
+    setRouteMsg('');
+    const d = await sendFor({ action: 'route_day', date: board.date, driverId: routeWho || null, baseKey: routeBase });
+    const p = d?.plan;
+    if (!p) return;
+    setRouteMsg(p.order.length
+      ? `${p.order.length} stop(s) ordered from ${p.base.name}: ${p.totalKm} km, about ${p.totalMin} min driving${p.source === 'approx' ? ' (approximate, city to city)' : ''}.${p.unplaced?.length ? ` ${p.unplaced.length} unplaceable went last.` : ''}`
+      : 'Nothing open in that column to order.');
+    await refresh();
   }
 
   // The times, corrected from the office.
@@ -1137,6 +1153,18 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
               title={`Record gas or another cost against ${board.date}`}
               onClick={() => { setErr(''); setGassing((v) => !v); }}>{gassing ? 'Close' : '⛽ Gas'}</button>
           )}
+          <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}
+            title="Number a column's stops in driving order, starting from the base">
+            <select value={routeWho} onChange={(e) => setRouteWho(e.target.value)}>
+              <option value="">To assign</option>
+              {board.drivers.map((dr) => <option key={dr.id} value={dr.id}>{dr.name}</option>)}
+            </select>
+            <select value={routeBase} onChange={(e) => setRouteBase(e.target.value)}>
+              {ROUTE_BASES.map((b) => <option key={b.key} value={b.key}>from {b.name}</option>)}
+            </select>
+            <button type="button" className="btn" disabled={busy} onClick={routeColumn}>🧭 Order by route</button>
+          </span>
+          {routeMsg && <span className="hint">{routeMsg}</span>}
           {/* A sheet that landed under the wrong company is fixed here, not by
               opening every card. */}
           <button type="button" className="btn" disabled={busy}

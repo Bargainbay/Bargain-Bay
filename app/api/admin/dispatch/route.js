@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { routeDay } from '../../../../lib/route-plan';
 import { isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { dispatchAccess } from '../../../../lib/dispatch-access';
 import { listDispatchers, grantDispatcher, revokeDispatcher, markTourSeen } from '../../../../lib/dispatchers';
@@ -338,7 +339,7 @@ export async function POST(req) {
       return NextResponse.json({ ok: true, number: raw });
     }
     if (body.action === 'import_approve') {
-      return NextResponse.json({ ok: true, ...(await approveBatch(body.batchId, who(s))) });
+      return NextResponse.json({ ok: true, ...(await approveBatch(body.batchId, who(s), { routeBase: body.routeBase || null })) });
     }
     if (body.action === 'import_cancel') {
       return NextResponse.json({ ok: true, batch: await cancelBatch(body.batchId, who(s)) });
@@ -596,6 +597,12 @@ export async function PATCH(req) {
     }
     if (body.action === 'ticket_status') {
       return NextResponse.json({ ok: true, ticket: await setTicketStatus(body.ticketId, body.status, who(s)) });
+    }
+    // Put one column of the day (a driver's, or the unassigned ones) in driving
+    // order from a base. Writes the running order and nothing else.
+    if (body.action === 'route_day') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.date || ''))) return NextResponse.json({ error: 'Which day?' }, { status: 400 });
+      return NextResponse.json({ ok: true, plan: await routeDay(body.date, body.driverId || null, body.baseKey || 'cda') });
     }
     if (body.action === 'resequence') {
       return NextResponse.json({ ok: true, ...(await resequence(body.driverId, body.date, body.jobIds, who(s))) });
