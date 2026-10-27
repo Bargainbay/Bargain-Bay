@@ -4475,6 +4475,13 @@ not shown anywhere until the storefront slice.
 - **Test gotcha:** the checkout route's runtime-DDL helpers (`ensureAttributionColumns` etc.) memoise "done" in
   module scope, so a second FRESH test database never gets their columns. Every test file that drives the real
   route uses `test/shared-checkout-db.mjs` (one database, re-installed on each call).
+- **Seller legitimacy gate (added 2026-10-26, migration 0039, `lib/business-ids.js`, `recordIdentityCheck` / `decideApplication` in `lib/vendors.js`).**
+  Business Number AND HST number are mandatory on `/marketplace/sell` (browser + `submitPublicApplication`). They must be well-formed
+  (9-digit BN with Luhn check digit; HST = BN + `RT` + 4 digits), the HST must be the BN's own, and neither may sit on another
+  non-rejected vendor. **Approval is refused until a person has looked the HST account up in the CRA GST/HST registry and recorded
+  the registry's name (must match the legal/trading name) and that it is active** — the format checks prove coherence, only the
+  registry proves existence, and there is no automatic CRA lookup (the CRA web service needs enrolment). Small-supplier (no HST)
+  sellers are no longer accepted. Tests that are about something else approve via `test/approved-vendor.mjs`.
 - Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
 - **Warranty claims and seller deductions (`lib/warranty-claims.js`, migration 0025).** The customer contacts
   US; staff open a claim on a DELIVERED vendor order inside its 12 months (Admin > Marketplace > Claims). The
