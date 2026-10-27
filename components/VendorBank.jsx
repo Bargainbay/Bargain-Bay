@@ -34,6 +34,7 @@ export default function VendorBank({ initial, isOwner, configured }) {
         <div className="error-box">
           {err}{' '}
           {mfa === 'stepup' && <a href="/vendor/mfa?next=/vendor/payouts&fresh=1">Enter a fresh code →</a>}
+          {mfa === 'two_step' && <a href="/vendor/security?next=/vendor/payouts">Confirm your 2-step verification →</a>}
           {mfa === 'enrol' && <a href="/vendor/security?next=/vendor/payouts">Set up two-factor sign-in →</a>}
           {mfa === 'verify' && <a href="/vendor/mfa?next=/vendor/payouts">Enter your code →</a>}
         </div>

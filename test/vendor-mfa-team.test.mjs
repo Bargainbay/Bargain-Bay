@@ -413,7 +413,7 @@ test('the gate: a marker from before a token_version bump is refused even with a
   __setTestCookies(null);
 });
 
-test('the gate: an owner has a grace period, then must enrol; other roles never must', async () => {
+test('the gate: the authenticator is optional — nobody is turned away for not enrolling, an owner is prompted to declare 2-step verification', async () => {
   const owner = await member(V1, 'owner', 'grace-owner');
   const mgr = await member(V1, 'manager', 'grace-mgr');
   await sessionJar(owner);
@@ -423,7 +423,12 @@ test('the gate: an owner has a grace period, then must enrol; other roles never 
   assert(new Date(g).getTime() > nowMs() + 13 * 86400000 && new Date(g).getTime() < nowMs() + 15 * 86400000, 'grace is 14 days from the grant');
   await query(`UPDATE vendor_users SET mfa_grace_until = now() - interval '1 day' WHERE lower(email) = $1`, [owner.email]);
   r = await checkVendor('portal.view');
-  equal(r.reason, 'mfa_enrol', 'after the grace the owner is turned away to enrol');
+  assert(r.ok && r.ctx.mfa.mustEnrol === false, 'owner decision 2026-10-16: an owner past the old grace is NOT turned away');
+  assert(r.ctx.mfa.twoStepPrompt === true, 'but is prompted to confirm 2-step verification');
+  await query(`UPDATE vendor_users SET two_step_attested_at = now(), two_step_method = 'google' WHERE lower(email) = $1`, [owner.email]);
+  r = await checkVendor('portal.view');
+  assert(r.ok && r.ctx.mfa.twoStepPrompt === false && r.ctx.mfa.twoStepAttested === true, 'once declared the prompt goes away');
+  await query(`UPDATE vendor_users SET two_step_attested_at = NULL, two_step_method = NULL WHERE lower(email) = $1`, [owner.email]);
   await query(`UPDATE vendor_users SET mfa_grace_until = NULL WHERE lower(email) = $1`, [owner.email]).catch(() => {});
   // a manager with an expired grace is not forced
   await query(`UPDATE vendor_users SET mfa_grace_until = now() - interval '1 day' WHERE lower(email) = $1`, [mgr.email]);
@@ -454,10 +459,12 @@ test('the gate: a missing action refuses everything; nobody and non-vendors are 
   __setTestCookies(null);
 });
 
-test('step-up: enrolment is required outright, and the last code must be under ten minutes old', async () => {
+test('step-up: a declaration of 2-step verification is required; an enrolled authenticator is held to a code under ten minutes old', async () => {
   const u = await member(V1, 'owner', 'stepup');
   await sessionJar(u);
-  equal((await checkVendor('bank.edit', { stepUp: true })).reason, 'mfa_enrol', 'unenrolled owner in grace still cannot change the bank');
+  equal((await checkVendor('bank.edit', { stepUp: true })).reason, 'two_step', 'an owner who has declared nothing cannot change the bank');
+  await query(`UPDATE vendor_users SET two_step_attested_at = now(), two_step_method = 'google' WHERE lower(email) = $1`, [u.email]);
+  assert((await checkVendor('bank.edit', { stepUp: true })).ok, 'once they declare 2-step verification they can, with no authenticator');
   await enrol(u, nowMs() - 600000);
   const at = (min) => signMarker(u.id, { nowMs: nowMs() - min * 60000 });
   await sessionJar(u, { marker: await at(STEP_UP_MINUTES + 1) });
@@ -503,7 +510,7 @@ test('permission matrix over the real routes: every role x every vendor handler 
         const expectRefused = !can(role, action) || stepUp;
         if (expectRefused !== refused) failures.push(`${role} ${h.method} ${rel(f)} (${action}${stepUp ? ', stepUp' : ''}) -> ${r.threw || r.status}`);
         expectRefused ? refusedChecked++ : allowedChecked++;
-        if (stepUp && can(role, action)) equal(r.body?.mfa, 'enrol', `${role} ${rel(f)} tells the page what to do`);
+        if (stepUp && can(role, action)) equal(r.body?.mfa, 'two_step', `${role} ${rel(f)} tells the page what to do`);
       }
     }
   }
@@ -599,14 +606,14 @@ test('the last owner can be neither removed nor demoted; a second owner unlocks 
   // connection, so that cannot be raced here.)
 });
 
-test('promoting someone to owner starts their MFA grace; unchanged roles are no-ops', async () => {
+test('changing a role records who did it, and an unchanged role is a no-op', async () => {
   const v = await vendorNamed('Zeta'); await member(v, 'owner', 'zeta-o');
   const m = await member(v, 'manager', 'zeta-m');
   await query(`UPDATE vendor_users SET mfa_grace_until = now() - interval '30 days' WHERE lower(email) = $1`, [m.email]);
   equal((await changeVendorUserRole(v.id, m.email, 'manager', { by: 'x' })).unchanged, true);
   await changeVendorUserRole(v.id, m.email, 'owner', { by: 'x' });
   const g = (await query('SELECT mfa_grace_until, role_changed_by FROM vendor_users WHERE lower(email) = $1', [m.email])).rows[0];
-  assert(new Date(g.mfa_grace_until).getTime() > nowMs() + 13 * 86400000, 'a fresh 14 days');
+  equal((await vendorAccess(m.email)).role, 'owner');
   equal(g.role_changed_by, 'x');
 });
 
@@ -695,7 +702,7 @@ test('admin reset over HTTP: an admin may; staff and the vendor owner may not', 
   __setTestCookies(null);
 });
 
-test('team API: the owner needs a fresh second factor to change anything; others cannot even list', async () => {
+test('team API: the owner needs 2-step verification declared to change anything; others cannot even list', async () => {
   const v = await vendorNamed('Nu'); const o = await member(v, 'owner', 'nu-o'); const m = await member(v, 'manager', 'nu-m');
   const mod = await routeModule(join(root, 'app/api/vendor/team/route.js'));
   const post = (body) => mod.POST(new NextRequest('http://localhost/api/vendor/team', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
@@ -705,15 +712,28 @@ test('team API: the owner needs a fresh second factor to change anything; others
   await sessionJar(o);
   equal((await mod.GET()).status, 200, 'the owner (in grace) can look');
   let res = await post({ action: 'invite', email: 'new@y.test', role: 'viewer' });
-  equal([res.status, (await res.json()).mfa], [403, 'enrol'], 'but changing it needs an enrolled authenticator');
-  await enrol(o, nowMs() - 600000);
-  await sessionJar(o, { marker: await signMarker(o.id) });
+  equal([res.status, (await res.json()).mfa], [403, 'two_step'], 'but changing it needs 2-step verification declared');
+  await query(`UPDATE vendor_users SET two_step_attested_at = now(), two_step_method = 'phone' WHERE lower(email) = $1`, [o.email]);
   res = await post({ action: 'invite', email: 'new@y.test', role: 'viewer' });
   equal(res.status, 200);
   equal((await vendorAccess('new@y.test')).role, 'viewer');
   res = await post({ action: 'role', email: o.email, role: 'viewer' });
   equal(res.status, 400, 'the last owner cannot demote themselves');
   __setTestCookies(null);
+});
+
+test('declaring 2-step verification: dated, kept with its method, logged, and only for a listed method and a member of that vendor', async () => {
+  const { attestTwoStep } = await import('../lib/vendor-mfa.js');
+  const v = await vendorNamed('Xi'); const o = await member(v, 'owner', 'xi-o');
+  let err; try { await attestTwoStep(v.id, o.email, 'carrier-pigeon'); } catch (e) { err = e; }
+  assert(err && /Choose how/.test(err.message), 'only a listed method');
+  const other = await vendorNamed('Omicron'); await member(other, 'owner', 'omi-o');
+  err = null; try { await attestTwoStep(other.id, o.email, 'google'); } catch (e) { err = e; }
+  assert(err && /No such team member/.test(err.message), 'one vendor cannot declare for another vendor\'s user');
+  await attestTwoStep(v.id, o.email, 'google', { by: o.email });
+  const a = await vendorAccess(o.email);
+  equal(a.two_step_method, 'google'); assert(a.two_step_attested_at, 'dated');
+  equal((await query(`SELECT 1 FROM vendor_events WHERE vendor_id = $1 AND event = 'two_step_declared'`, [v.id])).rows.length, 1);
 });
 
 test('tear down the test database', () => {

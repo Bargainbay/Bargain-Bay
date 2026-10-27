@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSession } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { requestMembership } from '../../../../lib/members';
+import { MEMBER_TERMS_VERSION } from '../../../../lib/member-terms';
 import { notifyOwner, esc } from '../../../../lib/email';
 
 export const dynamic = 'force-dynamic';
@@ -14,8 +15,11 @@ export async function POST(req) {
   const businessName = String(body.businessName || '').trim();
   if (!businessName) return NextResponse.json({ error: 'Business name is required.' }, { status: 400 });
   const note = String(body.note || '').trim();
+  // They must have accepted the CURRENT agreement. If it changed while their page was open they are asked to read it again.
+  if (!body.acceptTerms) return NextResponse.json({ error: 'Please read and accept the member agreement.' }, { status: 400 });
+  if (body.termsVersion !== MEMBER_TERMS_VERSION) return NextResponse.json({ error: 'The member agreement was just updated. Please reload the page, read it and accept again.' }, { status: 400 });
   try {
-    await requestMembership(session.userId, businessName, note);
+    await requestMembership(session.userId, businessName, note, { termsVersion: MEMBER_TERMS_VERSION });
     notifyOwner(
       `New member application: ${businessName}`,
       `<p>A business requested wholesale member access on Bargain Bay.</p>

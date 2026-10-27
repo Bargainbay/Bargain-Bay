@@ -46,13 +46,26 @@ test('every document is complete, uniquely named and renderable', () => {
   }
 });
 
-test('the legal and customer-facing documents are DRAFTS and nobody is asked to accept a draft', () => {
+test('the legal and customer-facing documents are published as INTERIM wording, say so, and contain no open lawyer placeholders', () => {
+  // Owner decision, 2026-10-16: publish plain-language interim versions for the pilot. They must not pass
+  // themselves off as lawyer-reviewed, and none may carry an unfinished "[Lawyer: …]" placeholder.
   for (const slug of ['vendor-agreement', 'ip-takedown', 'buyer-protection', 'marketplace-terms']) {
-    assert(!isPublished(POLICY_BY_SLUG[slug]), `${slug} is a draft until reviewed`);
+    const p = POLICY_BY_SLUG[slug];
+    assert(isPublished(p), `${slug} is published as interim wording`);
+    const text = flat(p);
+    assert(/not been reviewed by a lawyer/i.test(text), `${slug} says it has not been reviewed by a lawyer`);
+    assert(!/\[Lawyer|\bDRAFT\b/.test(text), `${slug} has no open placeholder`);
   }
   assert(requiredPolicies().every(isPublished), 'only published documents are required');
-  assert(requiredPolicies().length >= 7 && !requiredPolicies().some((p) => p.slug === 'vendor-agreement'), 'the operational rules are required, the draft agreement is not yet');
-  assert(publishedPolicies().length + 4 === POLICIES.length, 'exactly the four drafts');
+  assert(requiredPolicies().some((p) => p.slug === 'vendor-agreement'), 'the vendor agreement is now required of sellers');
+  assert(publishedPolicies().length === POLICIES.length, 'everything is published');
+});
+
+test('the customer-facing pages promise only what is built, and point customers at Bargain Bay', () => {
+  const customer = all('buyer-protection') + '\n' + all('marketplace-terms');
+  assert(!/\breviews?\b/i.test(all('marketplace-terms')),'no customer reviews exist yet, so the terms must not promise them');
+  assert(!/rssolutions\.ca/i.test(customer), 'customers contact Bargain Bay, not the RS Solutions address');
+  assert(/customerservice@bargainbay\.ca/.test(customer), 'the customer service address is shown');
 });
 
 test('THE NUMBERS ARE THE ENFORCED NUMBERS', () => {

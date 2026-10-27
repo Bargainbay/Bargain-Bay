@@ -12,18 +12,20 @@ function Poster({ p, ratio }) {
           <div className="poster-label">Still</div>
           <img src={p.still} alt={`${p.title}, still`} loading="lazy" style={{ aspectRatio: ratio }} />
         </div>
-        <div>
-          <div className="poster-label">Animated</div>
-          <video controls muted loop playsInline preload="none" poster={p.still} style={{ aspectRatio: ratio }}>
-            <source src={p.video} type="video/mp4" />
-          </video>
-        </div>
+        {p.video && (
+          <div>
+            <div className="poster-label">Animated</div>
+            <video controls muted loop playsInline preload="none" poster={p.still} style={{ aspectRatio: ratio }}>
+              <source src={p.video} type="video/mp4" />
+            </video>
+          </div>
+        )}
       </div>
       <figcaption>
         <b>{p.title}</b>
         <span className="poster-dl">
           <a href={p.still} download>Still (JPG)</a>
-          <a href={p.video} download>Animated (MP4)</a>
+          {p.video && <a href={p.video} download>Animated (MP4)</a>}
         </span>
       </figcaption>
     </figure>

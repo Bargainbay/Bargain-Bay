@@ -4,6 +4,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { createApplication, decideApplication, recordIdentityCheck, identityProblems } from '../lib/vendors.js';
 import { submitPublicApplication } from '../lib/vendor-admin.js';
+import { requiredPolicies } from '../lib/marketplace-policies.js';
 import { checkBusinessIds, normBn, normHst, namesAgree } from '../lib/business-ids.js';
 
 async function rejects(fn, re) {
@@ -14,7 +15,7 @@ async function rejects(fn, re) {
 }
 const apply = (o = {}) => ({
   legalName: 'Alpha Appliances Ltd', tradeName: 'Alpha', contactName: 'Ana', contactEmail: 'ana@alpha.example',
-  sourceOfGoods: 'Dealer or retailer overstock', acceptsTerms: true, businessNo: '123456782', hstNo: '123456782 RT 0001', ...o
+  sourceOfGoods: 'Dealer or retailer overstock', acceptedPolicies: requiredPolicies().map((p) => ({ policy: p.slug, version: p.version })), businessNo: '123456782', hstNo: '123456782 RT 0001', ...o
 });
 
 suite('seller identity — Business Number, HST account, CRA check');

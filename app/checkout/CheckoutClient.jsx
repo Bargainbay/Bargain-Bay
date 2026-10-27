@@ -136,6 +136,9 @@ export default function CheckoutClient({ catalog, session, prefill }) {
   const mustDeliver = items.some(notPickable);
   const method = mustDeliver ? 'delivery' : form.deliveryMethod;
   const shipments = Math.max(1, shipmentCount(items));
+  // Sellers who ship their own unit are given the customer's contact details (Marketplace Terms), so the
+  // customer is told here, at the moment they agree to buy — not only on a policy page.
+  const sellerShips = [...new Set(items.filter((u) => u.marketplace && u.lane === 'C').map((u) => u.vendor?.name).filter(Boolean))];
   const delivery = method === 'delivery' ? round2(DELIVERY_FEE * shipments) : 0;
   const subtotal = round2(items.reduce((a, u) => a + Number(u.price), 0));
   // A typed code and an automatic promotion never stack; the shopper gets the
@@ -377,6 +380,14 @@ export default function CheckoutClient({ catalog, session, prefill }) {
             <div className="summary-row"><span>HST (13%)</span><span>{money(hst)}</span></div>
             <div className="summary-row total"><span>Total (CAD)</span><span>{money(total)}</span></div>
             {error && <div className="error-box">{error}</div>}
+            {sellerShips.length > 0 && (
+              <div className="hint" style={{ marginTop: 12, padding: 10, border: '1px solid var(--line, #ddd)', borderRadius: 8 }}>
+                <b>Shipped by the seller.</b> {sellerShips.join(' and ')} ship{sellerShips.length === 1 ? 's' : ''} {sellerShips.length === 1 ? 'a unit in your order' : 'units in your order'} directly.
+                By placing this order you agree that we give {sellerShips.length === 1 ? 'that seller' : 'those sellers'} your <b>name, delivery address, phone number and email address</b> so
+                they can ship it and contact you about the delivery. They may use them only for this order and may not market to you.{' '}
+                <a href="/marketplace/policies/marketplace-terms" target="_blank" rel="noreferrer">Details</a>
+              </div>
+            )}
             <button className="btn accent block" style={{ marginTop: 14 }} disabled={busy}>
               {busy ? 'Placing order…' : 'Place order'}
             </button>

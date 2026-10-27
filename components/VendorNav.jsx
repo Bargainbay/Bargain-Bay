@@ -1,4 +1,5 @@
 import NavSignOut from './NavSignOut';
+import TwoStepPrompt from './TwoStepPrompt';
 import { can } from '../lib/vendor-permissions';
 
 // The vendor portal's nav. A vendor is on no staff list, so there is no link here to anything
@@ -24,6 +25,7 @@ const ITEMS = [
 export default function VendorNav({ active, name, role, mfa, unread = 0 }) {
   const items = ITEMS.filter((i) => !role || !i.action || can(role, i.action)).map((i) => (i.key === 'messages' && unread ? { ...i, label: `Messages (${unread})` } : i));
   const nudge = mfa && mfa.required && !mfa.enrolled && mfa.available;
+  const twoStep = mfa && mfa.twoStepPrompt;
   return (
     <div className="admin-nav">
       <span className="admin-nav-title">{name ? `${name} — ` : ''}Marketplace</span>
@@ -34,6 +36,7 @@ export default function VendorNav({ active, name, role, mfa, unread = 0 }) {
         <a href="/shop" className="admin-nav-link">View store →</a>
         <NavSignOut />
       </div>
+      {twoStep && <TwoStepPrompt />}
       {nudge && (
         <div className="panel" style={{ flexBasis: '100%', margin: '8px 0 0', borderColor: 'var(--danger, #b00020)' }}>
           <strong>Set up two-factor sign-in.</strong>{' '}

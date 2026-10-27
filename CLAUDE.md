@@ -4260,6 +4260,31 @@ code** (a $10,000 stove pays $500). Landing/ads page to link: `/affiliate`.
 - **Link tracking is browser-local**: `/?ref=CODE` is kept 30 days in localStorage (`bb_ref`)
   and `CheckoutClient` tries it once as a typed code. A code that does not hold is dropped
   silently. There is NO click tracking and no cookie.
+- **THE AGREEMENT IS ACCEPTED BY SCROLLING TO THE END AND PRESSING ACCEPT** (owner, 2026-10-27: no separate
+  forms, no signing). `lib/affiliate-terms.js` is the one text (`AFFILIATE_TERMS`, `AFFILIATE_TERMS_VERSION`),
+  rendered in a scroll box by `components/AffiliateApply.jsx`; the Accept button stays disabled until the box
+  has been scrolled to the bottom. That is a UI guard, not proof of reading. What is recorded is the VERSION
+  shown (`affiliates.terms_version`) and the time (`terms_accepted_at`); `applyAsAffiliate` refuses a missing or
+  stale version, so a page left open across a change must be reloaded. **Changing the wording means a new
+  version AND a new pinned hash in `test/affiliate-terms.test.mjs`** — the test fails otherwise, which is what
+  keeps "what did they accept" answerable. The figures in the text come from `lib/commission-rules.js`. The
+  longer Word-style agreement in Drive (Agreements folder) is the reference copy; the web text is the binding one.
+- **THE SAME AGREEMENT FORMAT FOR AFFILIATES, MEMBERS AND SELLERS (owner, 2026-10-27: "as effortless as possible").**
+  `components/AgreementScroll.jsx` is the one component: the agreement in a scroll box, Accept dead until the end is
+  reached, and the parent sends the VERSION it showed. Sections use the marketplace-policy format
+  (`{ h, body: [string | {p, lead?, list?} | {list} | {steps} | {table}] }`), so a seller's policies render in it unchanged.
+  - **Affiliates:** `lib/affiliate-terms.js`, version recorded in `affiliates.terms_version`.
+  - **Members:** `lib/member-terms.js` (MEMBER_TERMS, version-pinned by `test/member-terms.test.mjs`), shown in
+    `app/account/MemberRequest.jsx`; `/api/account/membership` refuses a missing or stale version;
+    `users.member_terms_version/_accepted_at` (migration 0041, and `requestMembership` adds the columns itself if the
+    migration has not been run). Members approved before this have NULLs and are NOT asked retroactively.
+    **The member text is a first draft of terms nobody had written down; it promises no discount figure** (a test
+    fails if a percentage appears) because the price is whatever `lib/pricing.js` says.
+  - **Sellers:** the application form (`/marketplace/sell`) shows EVERY required published marketplace policy in one
+    scroll box and sends `acceptedPolicies`; `submitPublicApplication` refuses anything but the current versions and
+    records them in `policy_acceptances` against the vendor row the application creates (`accepted_by` = the applicant's
+    email, `at: 'application'` in the event), so approved sellers are not asked again. `/vendor/policies` uses the same
+    box for any policy that changes later. This replaced the old tick-box that linked to the policies page.
 - **An affiliate sees no customer detail** — date, product titles, goods, commission, status.
   An affiliate's identity is the signed-in account's email; ids/emails are never read from a
   request. They are independent contractors: don't give them hours, targets or training.
@@ -4308,6 +4333,16 @@ migration 0018 (`employees`, `staff_shifts`, `recurring_costs`), pages
   `profitReport`. An office "Fix times" on Team clock repairs a forgotten clock-out.
 - **Not built:** an xlsx/Sheet export of the daily table, service-line revenue
   (haul-aways etc.) in the daily income, and a clock-out reminder text for staff.
+### The Daily and Weekly report emails (added 2026-10-26)
+`lib/pnl-email.js`, `/api/cron/daily-report` (02:00 UTC, i.e. 9-10pm Toronto) and `/api/cron/weekly-report`
+(Sunday 9-10pm Toronto = Monday 02:00 UTC; covers the Mon-Sun week ending that night). They mail `SERVICE_EMAIL` the Daily P&L table from
+`dailyPnl()` itself, so the email, the page and the dispatch Profit tab cannot disagree. Net is shown after
+overhead (the page's number) AND before it. Both crons are in `EXPECTED`; `?dry=1` builds without sending.
+- **Service calls and pickups** (owner, 2026-10-26): in-house = $0; an external one counts only if a charge is
+  typed on it. `JOB_REVENUE` in `lib/dispatch-money.js` never applies the order fee to them and they are never
+  "unpriced" (nothing to chase). They still cost
+  driver time. Client invoicing (`invoiceClientJobs`) reads `charge_amount` separately and is unchanged.
+
 ## The marketplace (started 2026-10-08)
 Plan and every owner decision: `docs/marketplace/PLAN.md` (read §2 first — it overrides the rest).
 Built so far (Phase 1, slices 1–9): `db/migrations/0016_marketplace_foundation` (vendors, strikes,
@@ -4475,7 +4510,7 @@ not shown anywhere until the storefront slice.
 - **Test gotcha:** the checkout route's runtime-DDL helpers (`ensureAttributionColumns` etc.) memoise "done" in
   module scope, so a second FRESH test database never gets their columns. Every test file that drives the real
   route uses `test/shared-checkout-db.mjs` (one database, re-installed on each call).
-- **Seller legitimacy gate (added 2026-10-26, migration 0039, `lib/business-ids.js`, `recordIdentityCheck` / `decideApplication` in `lib/vendors.js`).**
+- **Seller legitimacy gate (added 2026-10-26, migration 0042, `lib/business-ids.js`, `recordIdentityCheck` / `decideApplication` in `lib/vendors.js`).**
   Business Number AND HST number are mandatory on `/marketplace/sell` (browser + `submitPublicApplication`). They must be well-formed
   (9-digit BN with Luhn check digit; HST = BN + `RT` + 4 digits), the HST must be the BN's own, and neither may sit on another
   non-rejected vendor. **Approval is refused until a person has looked the HST account up in the CRA GST/HST registry and recorded
@@ -4659,6 +4694,17 @@ not shown anywhere until the storefront slice.
 - Parts typed on `/admin/part-costs` are for parts that are not in RS Ops (any SKU,
   any time). If a part is in RS Ops, RS Ops is where its price lives, or it would
   be counted twice.
+
+## Vesta Kitchen's range (added 2026-10-26)
+`lib/vesta.js`, migration 0039 (`vesta_products`), `/api/cron/vesta` (daily) + `/api/admin/vesta` (sync now).
+Mirrors ca.vesta.kitchen's public `/products.json` into its OWN table and merges it into the storefront readers
+that pass `{ marketplace: true }`, exactly like seller units: never the feeds, Sarah, pickers or the tracker.
+SKUs are `VS-<shopify id>`; they are NOT one-of-a-kind so reservations skip them.
+- **Imported:** each product's base variant, every image Vesta publishes, Vesta's price and compare-at.
+  **Not imported:** the 63 `warranty` add-ons and placeholder prices (under $5 or $9,000+).
+- **Browsing is on** (`VESTA_STOREFRONT=off` hides it); **buying is off** until `VESTA_ORDERING=1`, and only
+  in-stock items are orderable. We hold no cost for these, so no member price, clearance or promo applies.
+- A feed that returns under half of what we hold retires nothing (a partial read must not delist the range).
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.

@@ -65,18 +65,6 @@ export default async function AffiliatePage() {
       )}
       {a?.status === 'approved' && dash && <AffiliateDashboard data={dash} siteUrl={SITE_URL} />}
 
-      <div className="panel" style={{ marginTop: 14 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)', fontSize: 18 }}>The rules (they protect you and us)</h2>
-        <ul style={{ fontSize: 14, lineHeight: 1.6, paddingLeft: 18 }}>
-          <li><b>Say you earn a commission</b> whenever you post (“#ad”, “I earn a commission”). Canadian advertising law requires it.</li>
-          <li>Use our photos and descriptions, and don’t promise anything we haven’t. Each unit is one-of-a-kind and may sell before a customer gets to it.</li>
-          <li><b>No unsolicited texts or emails</b> in our name or about our products. Canada’s anti-spam law (CASL) applies to you as well as to us.</li>
-          <li>No fake reviews, and no ordering through your own code: orders placed with your own email are not commissionable.</li>
-          <li>Commission is {AFFILIATE_DEFAULT_PCT}% (or the rate on your approval) of the goods before tax and delivery. It is paid on delivered orders after the {AFFILIATE_HOLD_DAYS}-day return window; a cancelled or refunded order earns nothing.</li>
-          <li>You are an independent affiliate, not an employee: you choose your own hours and methods and you are responsible for reporting your own income.</li>
-          <li>We may pause a code that breaks these rules.</li>
-        </ul>
-      </div>
     </div>
   );
 }

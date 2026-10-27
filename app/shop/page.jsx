@@ -26,7 +26,7 @@ export default async function ShopPage({ searchParams }) {
     ...u,
     kw: unitKeywords(u, specs[u.id]),
     // Subcategory ("type") for the shop filter — French Door, Front Load, etc.
-    style: styleFor(u, specs[u.id])
+    style: u.vesta ? u.style : styleFor(u, specs[u.id])
   }));
   return (
     <ShopClient

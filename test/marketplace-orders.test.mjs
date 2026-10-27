@@ -347,3 +347,30 @@ test('a vendor unit is never written to the tracker as sold, and checkout can bu
     done();
   }
 });
+
+test('LANE C SHIP-TO: the seller who ships itself gets the customer\'s name, address, phone and email once it has accepted — never in Lanes A/B', async () => {
+  const { done } = await withTestDb();
+  try {
+    const a = await vendor('Alpha', { tier: 1 });
+    const lc = await listing(a.id, 'C', 500); const la = await listing(a.id, 'A', 1000);
+    const oc = await order([unit(lc, a, 'C', 500)]);
+    await query(`UPDATE orders SET name = 'Cust Private', address = '9 Customer St', city = 'Toronto', postal = 'M1M 1M1', phone = '416-555-0199', email = 'cust-private@example.com' WHERE id = $1`, [oc.id]);
+    await confirmVendorOrders(oc.id, { now: T0 });
+    const idc = (await vo(oc.id, 'C')).id;
+    equal((await listVendorOrders(a.id))[0].shipTo, null);                                   // not before it has accepted
+    await acceptVendorOrder(a.id, idc, { now: plus(1) });
+    const row = (await listVendorOrders(a.id)).find((x) => x.id === idc);
+    equal(row.shipTo.name, 'Cust Private'); equal(row.shipTo.address, '9 Customer St'); equal(row.shipTo.postal, 'M1M 1M1');
+    equal(row.shipTo.phone, '416-555-0199'); equal(row.shipTo.email, 'cust-private@example.com');
+    const oa = await order([unit(la, a, 'A', 1000)]);
+    await confirmVendorOrders(oa.id, { now: T0 });
+    const ida = (await vo(oa.id, 'A')).id;
+    await acceptVendorOrder(a.id, ida, { insurance: 'declined', now: plus(1) });
+    const laneA = (await listVendorOrders(a.id)).find((x) => x.id === ida);
+    equal(laneA.shipTo, null);                                                                // we move Lane A: the seller has no use for it
+    assert(!/cust-private@example|416-555-0199/.test(JSON.stringify(laneA)), 'a Lane A order carries no customer contact at all');
+    await markVendorOrderReady(a.id, idc, { carrier: 'Purolator', trackingNumber: 'PUR1234567890', now: plus(5) });
+    await query(`UPDATE vendor_orders SET status = 'delivered' WHERE id = $1`, [idc]);
+    equal((await listVendorOrders(a.id)).find((x) => x.id === idc).shipTo, null);            // gone once delivered
+  } finally { done(); }
+});
