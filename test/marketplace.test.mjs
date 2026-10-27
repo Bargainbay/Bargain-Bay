@@ -5,11 +5,8 @@ import {
   orderClocks, standing, commissionCents, splitLaneCDelivery, payoutBreakdown,
   warrantyOk, strikeDueForReview, canSell, canSelfShip, toCents
 } from '../lib/marketplace-rules.js';
-import {
-  createApplication, decideApplication, grantVendorUser, revokeVendorUser, vendorAccess,
-  commissionBpsFor, setCommission, issueStrike, reviseStrike, reinstateVendor,
-  strikesAwaitingReview, markStrikeReviewed, strikeMeter, slugify
-} from '../lib/vendors.js';
+import { createApplication, grantVendorUser, revokeVendorUser, vendorAccess, commissionBpsFor, setCommission, issueStrike, reviseStrike, reinstateVendor, strikesAwaitingReview, markStrikeReviewed, strikeMeter, slugify } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 
 const H = 3600 * 1000;
 const t0 = new Date('2026-10-10T12:00:00Z');
@@ -120,15 +117,14 @@ test('slugs are tidy and unique', async () => {
   } finally { done(); }
 });
 
-test('an applicant has no portal; approval needs an HST position and a name', async () => {
+test('an applicant has no portal; approval needs a name', async () => {
   const { done } = await withTestDb();
   try {
     const v = await createApplication({ legalName: 'NoHst Inc', contactEmail: 'n@example.com' });
     await grantVendorUser(v.id, { email: 'n@example.com', role: 'owner', by: 'staff@bb.ca' });
     equal(await vendorAccess('n@example.com'), null);                 // still applied
-    await rejects(() => decideApplication(v.id, { approve: true, by: 'staff@bb.ca' }), /HST/);
     await rejects(() => decideApplication(v.id, { approve: true }), /Who/);
-    await decideApplication(v.id, { approve: true, by: 'staff@bb.ca', hstStatus: 'small_supplier' });
+    await decideApplication(v.id, { approve: true, by: 'staff@bb.ca' });
     const acc = await vendorAccess('N@Example.com');                  // case-insensitive
     equal(acc.status, 'approved'); equal(acc.tier, 0); equal(acc.role, 'owner');
   } finally { done(); }

@@ -1,7 +1,8 @@
 // Marketplace bulk upload: the parser (pure) and preview/confirm against a real database.
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
-import { createApplication, decideApplication } from '../lib/vendors.js';
+import { createApplication } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import { acceptPolicies } from '../lib/policy-acceptance.js';
 import { requiredPolicies } from '../lib/marketplace-policies.js';
 import { createDraft, submitListing, listVendorListings, getVendorListing } from '../lib/marketplace-listings.js';

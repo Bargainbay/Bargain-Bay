@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { checkBusinessIds } from '../lib/business-ids';
 import HoneypotField, { HONEYPOT_FIELD } from './HoneypotField';
 
 const BLANK = {
@@ -18,6 +19,8 @@ export default function VendorApplyForm() {
 
   async function submit(e) {
     e.preventDefault();
+    const ids = checkBusinessIds(f);
+    if (!ids.ok) { setErr(ids.problems[0]); return; }
     setBusy(true); setErr('');
     try {
       const res = await fetch('/api/marketplace/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, [HONEYPOT_FIELD]: hp }) });
@@ -37,8 +40,8 @@ export default function VendorApplyForm() {
       <div className="field"><label>Legal business name</label><input value={f.legalName} onChange={set('legalName')} required /></div>
       <div className="field"><label>Trading name (if different)</label><input value={f.tradeName} onChange={set('tradeName')} /></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '0 16px' }}>
-        <div className="field"><label>Business number (optional)</label><input value={f.businessNo} onChange={set('businessNo')} /></div>
-        <div className="field"><label>HST number (leave blank if not registered)</label><input value={f.hstNo} onChange={set('hstNo')} /></div>
+        <div className="field"><label>Business Number (required)</label><input value={f.businessNo} onChange={set('businessNo')} placeholder="123456782" inputMode="numeric" required /></div>
+        <div className="field"><label>HST number (required)</label><input value={f.hstNo} onChange={set('hstNo')} placeholder="123456782 RT 0001" required /></div>
         <div className="field"><label>Your name</label><input value={f.contactName} onChange={set('contactName')} required /></div>
         <div className="field"><label>Business email</label><input type="email" value={f.contactEmail} onChange={set('contactEmail')} required /></div>
         <div className="field"><label>Phone</label><input value={f.contactPhone} onChange={set('contactPhone')} /></div>
@@ -50,6 +53,7 @@ export default function VendorApplyForm() {
       </div>
       <div className="field"><label><input type="checkbox" checked={f.acceptsTerms} onChange={set('acceptsTerms')} required />{' '}
         I have read the <a href="/marketplace/policies" target="_blank" rel="noreferrer">marketplace policies</a>. I understand every unit needs a one-year warranty from me, pre-owned units are sold as Refurbished, and accounts with three strikes are restricted.</label></div>
+      <p style={{ fontSize: 13, color: 'var(--muted)' }}>We check every Business Number and HST account against the CRA registry, and the name on it must match your legal business name. Only HST-registered businesses can sell here.</p>
       <button className="btn primary" disabled={busy}>{busy ? 'Sending…' : 'Send application'}</button>
     </form>
   );

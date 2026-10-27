@@ -4,7 +4,8 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
-import { createApplication, decideApplication, grantVendorUser } from '../lib/vendors.js';
+import { createApplication, grantVendorUser } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import {
   startVendorThread, replyVendor, listVendorThreads, getVendorThread, vendorUnreadCount, startStaffThread, replyStaff, listStaffThreads,
   getStaffThread, assignThread, closeThread, reopenThread, staffUnreadCount, ContactDetailsError, MAX_BODY, VENDOR_MESSAGES_PER_HOUR, VENDOR_THREADS_PER_DAY

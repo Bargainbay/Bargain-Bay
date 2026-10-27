@@ -12,7 +12,8 @@ import { withTestDb } from './db.mjs';
 import { __setTestCookies } from './stubs/next-headers.mjs';
 import { query } from '../lib/db.js';
 import { createSessionToken, SESSION_COOKIE, isStaff } from '../lib/auth.js';
-import { createApplication, decideApplication, grantVendorUser, vendorAccess, revokeVendorUser, changeVendorUserRole } from '../lib/vendors.js';
+import { createApplication, grantVendorUser, vendorAccess, revokeVendorUser, changeVendorUserRole } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import { hotp, totp, base32Encode, base32Decode, matchStep, STEP_SECONDS, stepAt } from '../lib/totp.js';
 import {
   VENDOR_ROLES, ACTIONS, can, actionsFor, MFA_GRACE_DAYS, STEP_UP_MINUTES, MFA_MAX_FAILURES

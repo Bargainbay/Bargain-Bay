@@ -2,7 +2,8 @@
 // presented as in force, and a seller cannot list until the owner has accepted the current version.
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
-import { createApplication, decideApplication } from '../lib/vendors.js';
+import { createApplication } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import { createDraft } from '../lib/marketplace-listings.js';
 import { POLICIES, POLICY_BY_SLUG, requiredPolicies, publishedPolicies, isPublished } from '../lib/marketplace-policies.js';
 import { pendingPolicies, acceptPolicies, acceptanceStatus, mustAccept } from '../lib/policy-acceptance.js';

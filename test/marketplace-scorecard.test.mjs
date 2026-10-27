@@ -1,7 +1,8 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
-import { createApplication, decideApplication, grantVendorUser } from '../lib/vendors.js';
+import { createApplication, grantVendorUser } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import { vendorScorecard, pct } from '../lib/vendor-scorecard.js';
 
 suite('vendor order scorecard');
