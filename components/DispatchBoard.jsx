@@ -1132,7 +1132,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
           {canManageClients && (
             <button type="button" className="btn" disabled={busy}
               title={`Record gas or another cost against ${board.date}`}
-              onClick={() => setGassing((v) => !v)}>{gassing ? 'Close' : '⛽ Gas'}</button>
+              onClick={() => { setErr(''); setGassing((v) => !v); }}>{gassing ? 'Close' : '⛽ Gas'}</button>
           )}
           {/* A sheet that landed under the wrong company is fixed here, not by
               opening every card. */}
