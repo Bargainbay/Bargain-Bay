@@ -60,3 +60,9 @@ test('sync stores all images, serves them, and retires what left the feed', asyn
     equal((await vestaUnits()).map((u) => u.id), ['VS-1']);
   } finally { t.done(); }
 });
+
+test('a product with a poor first photo leads with the chosen one and keeps the rest', () => {
+  const imgs = ['https://c/Montreal30SSBottom.jpg', 'https://c/b.png', 'https://c/Montreal30SSLow.jpg'].map((src) => ({ src }));
+  const r = toRow(prod({ id: 8807224967405, images: imgs }));
+  equal(r.images, ['https://c/Montreal30SSLow.jpg', 'https://c/Montreal30SSBottom.jpg', 'https://c/b.png']);
+});
