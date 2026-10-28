@@ -38,6 +38,7 @@ export default function Header({ promo = null }) {
             <a href="/premium" className="nav-premium">Premium Brands</a>
             <a href="/vesta">Vesta</a>
             <a href="/bundle">Bundle &amp; Save</a>
+            <a href="/resellers">Resellers</a>
             <a href="/track">Track Order</a>
             <a href="/contact">Contact</a>
           </nav>

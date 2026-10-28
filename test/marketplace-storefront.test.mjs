@@ -3,7 +3,8 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
-import { createApplication, decideApplication, issueStrike } from '../lib/vendors.js';
+import { createApplication, issueStrike } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import {
   marketplaceUnits, publicVendor, vendorsWithStock, publicPhotoPath, toUnit,
   marketplaceConditionCopy, storefrontOn, orderingOn, isMarketplaceSku

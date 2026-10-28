@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isStaff, isAdmin } from '../../../../../lib/auth';
 import { listVendors, vendorDetail, setTier } from '../../../../../lib/vendor-admin';
 import {
-  decideApplication, grantVendorUser, revokeVendorUser, setCommission, issueStrike, reviseStrike,
+  decideApplication, recordIdentityCheck, grantVendorUser, revokeVendorUser, setCommission, issueStrike, reviseStrike,
   markStrikeReviewed, reinstateVendor, strikesAwaitingReview
 } from '../../../../../lib/vendors';
 import { STRIKE_REASONS } from '../../../../../lib/marketplace-rules';
@@ -45,6 +45,7 @@ export async function POST(req) {
     switch (b?.action) {
       // staff
       case 'approve': return NextResponse.json(await decideApplication(vendorId, { approve: true, by, hstStatus: b.hstStatus }));
+      case 'verify_identity': return NextResponse.json(await recordIdentityCheck(vendorId, { by, registryName: b.registryName, active: b.active === true, note: b.note }));
       case 'reject': return NextResponse.json(await decideApplication(vendorId, { approve: false, by, reason: b.reason }));
       case 'grant_user': {
         const role = VENDOR_ROLES.includes(b.role) ? b.role : 'viewer';

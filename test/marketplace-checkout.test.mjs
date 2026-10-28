@@ -3,7 +3,8 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import { sharedCheckoutDb } from './shared-checkout-db.mjs';
 import { query } from '../lib/db.js';
-import { createApplication, decideApplication } from '../lib/vendors.js';
+import { createApplication } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import { POST } from '../app/api/checkout/route.js';
 import { confirmVendorOrders } from '../lib/vendor-orders.js';
 import { updateOrderStatus } from '../lib/orders.js';

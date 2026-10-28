@@ -2,7 +2,8 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query, withTransaction } from '../lib/db.js';
-import { createApplication, decideApplication, grantVendorUser } from '../lib/vendors.js';
+import { createApplication, grantVendorUser } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import { zoneForKm, zoneRateTable, collectionFeeCents, STARTER_ZONE_RATES } from '../lib/pickup-zones.js';
 import { createVendorOrdersTx, confirmVendorOrders, acceptVendorOrder, setZoneRate, deliveryZoneRates } from '../lib/vendor-orders.js';
 import { reviewListing, ensurePickupDistance } from '../lib/marketplace-listings.js';

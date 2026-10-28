@@ -68,11 +68,12 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
           <h2 style={{ marginTop: 0, fontSize: 17 }}>Applications</h2>
           {apps.length === 0 ? <p style={{ margin: 0 }}>No applications waiting.</p> : apps.map((a) => (
             <ApplicationRow key={a.id} a={a} busy={busy} isAdmin={isAdmin}
-              onApprove={(hstStatus) => act(() => post('/api/admin/marketplace/vendors', { action: 'approve', vendorId: a.id, hstStatus }), `${a.name} approved.`)}
+              onVerify={(v) => act(() => post('/api/admin/marketplace/vendors', { action: 'verify_identity', vendorId: a.id, ...v }), 'Registry check recorded.')}
+              onApprove={() => act(() => post('/api/admin/marketplace/vendors', { action: 'approve', vendorId: a.id }), `${a.name} approved.`)}
               onReject={(reason) => act(() => post('/api/admin/marketplace/vendors', { action: 'reject', vendorId: a.id, reason }), 'Rejected.')} />
           ))}
           <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 0 }}>
-            Before approving: verify the owner&rsquo;s ID, that the business exists and has a real address, and where the stock comes from.
+            Before approving: verify the owner&rsquo;s ID, that the business has a real address, and where the stock comes from.
             After approving, open the vendor and add their login (they sign up at /signup with that email).
           </p>
         </div>
@@ -163,18 +164,36 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
   );
 }
 
-function ApplicationRow({ a, busy, isAdmin, onApprove, onReject }) {
-  const [hst, setHst] = useState(a.hstStatus || '');
+function ApplicationRow({ a, busy, isAdmin, onVerify, onApprove, onReject }) {
   const [reason, setReason] = useState('');
+  const [regName, setRegName] = useState('');
+  const [active, setActive] = useState(false);
+  const [vnote, setVnote] = useState('');
+  const verified = !!a.identityVerifiedAt;
+  const blocked = (a.idCheck || []).length > 0;
   return (
     <div style={{ borderTop: '1px solid var(--line-soft)', padding: '12px 0' }}>
       <strong>{a.name}</strong> <span style={{ fontSize: 13, color: 'var(--muted)' }}>({a.legalName}) · applied {day(a.createdAt)}</span>
       <div style={{ fontSize: 14 }}>{a.contact} · {a.email}{a.phone ? ` · ${a.phone}` : ''} · stock: {a.sourceOfGoods || '—'}</div>
+      <div style={{ fontSize: 14 }}>BN: <code>{a.businessNo || 'missing'}</code> · HST: <code>{a.hstNo || 'missing'}</code> · {a.address || 'no address'} {a.city || ''} {a.postal || ''}</div>
+      {blocked && <div className="error-box" style={{ marginTop: 6 }}>{a.idCheck.join(' ')} This application cannot be approved — reject it, or ask them to reapply with correct numbers.</div>}
+      {!blocked && !verified && (
+        <div style={{ marginTop: 8, padding: 10, border: '1px solid var(--line-soft)', borderRadius: 6 }}>
+          <div style={{ fontSize: 13, marginBottom: 6 }}>
+            <strong>Check them in the CRA registry first.</strong> Look the HST number up at{' '}
+            <a href="https://www.cra-arc.gc.ca/gsthstregistry/" target="_blank" rel="noreferrer">CRA GST/HST Registry Search ↗</a>, then type the legal name it shows.
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input placeholder="Legal name exactly as the registry shows it" value={regName} onChange={(e) => setRegName(e.target.value)} style={{ width: 300 }} />
+            <label style={{ fontSize: 13 }}><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Registry shows the account as active</label>
+            <input placeholder="Note (optional)" value={vnote} onChange={(e) => setVnote(e.target.value)} style={{ width: 200 }} />
+            <button className="btn" disabled={busy || !regName.trim() || !active} onClick={() => onVerify({ registryName: regName, active, note: vnote })}>Record check</button>
+          </div>
+        </div>
+      )}
+      {verified && <div style={{ fontSize: 13, marginTop: 6 }}><span className="pill ok">CRA registry checked</span> as &ldquo;{a.identityRegistryName}&rdquo; by {a.identityVerifiedBy}, {day(a.identityVerifiedAt)}</div>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, alignItems: 'center' }}>
-        <select value={hst} onChange={(e) => setHst(e.target.value)} style={{ width: 'auto' }}>
-          <option value="">HST position…</option><option value="registered">HST registered</option><option value="small_supplier">Small supplier (not registered)</option>
-        </select>
-        <button className="btn primary" disabled={busy || !hst} onClick={() => onApprove(hst)}>Approve (probation)</button>
+        <button className="btn primary" disabled={busy || blocked || !verified} onClick={onApprove}>Approve (probation)</button>
         <input placeholder="Reason, if rejecting" value={reason} onChange={(e) => setReason(e.target.value)} style={{ width: 230 }} />
         <button className="btn danger" disabled={busy || !reason.trim()} onClick={() => onReject(reason)}>Reject</button>
       </div>
@@ -294,7 +313,7 @@ function VendorPanel({ d, isAdmin, busy, strikeReasons, onClose, run }) {
       <button className="btn" onClick={onClose}>← Vendors</button>
       <h2 style={{ fontSize: 17 }}>{v.tradeName || v.legalName} <span className={`pill ${STANDING[v.status] || ''}`}>{v.status}</span> <span className="pill">{TIERS[v.tier]}</span></h2>
       <p style={{ fontSize: 14 }}>{v.legalName} · {v.contactName} · {v.contactEmail} · {v.contactPhone || 'no phone'}<br />
-        HST: {v.hstStatus || 'not recorded'}{v.hstNo ? ` (${v.hstNo})` : ''} · {v.address || 'no address'} {v.city || ''} {v.postal || ''} · stock: {v.sourceOfGoods || '—'}<br />
+        BN {v.businessNo || 'not recorded'} · HST {v.hstNo || 'not recorded'}{v.identityVerifiedAt ? ' (CRA checked)' : ' (not CRA checked)'} · {v.address || 'no address'} {v.city || ''} {v.postal || ''} · stock: {v.sourceOfGoods || '—'}<br />
         Listings: {Object.entries(d.listingCounts).map(([k, n]) => `${k.replace('_', ' ')} ${n}`).join(' · ') || 'none'}<br />
         Policies: {!d.policies ? 'unknown' : d.policies.pending.length ? <span className="pill warn">not accepted: {d.policies.pending.join(', ')}</span> : <span className="pill ok">accepted {d.policies.acceptedAt ? `${day(d.policies.acceptedAt)} by ${d.policies.acceptedBy}` : ''}</span>}</p>
 

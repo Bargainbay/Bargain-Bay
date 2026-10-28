@@ -1,7 +1,8 @@
 // The staff side of the marketplace: vendor lists, who sees money, tier overrides and the public application.
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
-import { createApplication, decideApplication, issueStrike } from '../lib/vendors.js';
+import { createApplication, issueStrike } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import { listVendors, vendorDetail, setTier, submitPublicApplication } from '../lib/vendor-admin.js';
 import { requiredPolicies } from '../lib/marketplace-policies.js';
 import { pendingPolicies } from '../lib/policy-acceptance.js';
@@ -15,7 +16,7 @@ async function rejects(fn, re) {
 }
 const apply = (o = {}) => ({
   legalName: 'Alpha Appliances Ltd', tradeName: 'Alpha', contactName: 'Ana', contactEmail: 'ana@alpha.example',
-  sourceOfGoods: 'Dealer or retailer overstock', acceptedPolicies: requiredPolicies().map((p) => ({ policy: p.slug, version: p.version })), ...o
+  sourceOfGoods: 'Dealer or retailer overstock', acceptedPolicies: requiredPolicies().map((p) => ({ policy: p.slug, version: p.version })), businessNo: '100000009', hstNo: '100000009RT0001', ...o
 });
 
 suite('marketplace admin — vendors, money visibility and applying');
@@ -71,7 +72,7 @@ test('the public application grants nothing, needs the essentials, and is thrott
     const r = await submitPublicApplication(apply());
     const d = await vendorDetail(r.id);
     equal(d.vendor.status, 'applied'); equal(d.users.length, 0);       // no access of any kind
-    equal(d.vendor.hstStatus, null);                                   // no HST number given: not assumed
+    equal(d.vendor.hstStatus, 'registered');                         // the HST number is mandatory now
     await submitPublicApplication(apply({ legalName: 'Alpha Two' }));
     await rejects(() => submitPublicApplication(apply({ legalName: 'Alpha Three' })), /already have/);
   } finally { done(); }
@@ -80,7 +81,7 @@ test('the public application grants nothing, needs the essentials, and is thrott
 test('an HST number on the form is recorded as registered; applying twice with another email is not blocked', async () => {
   const { done } = await withTestDb();
   try {
-    const r = await submitPublicApplication(apply({ hstNo: '123456789 RT0001' }));
+    const r = await submitPublicApplication(apply({ hstNo: '100000009 RT0001' }));
     equal((await vendorDetail(r.id)).vendor.hstStatus, 'registered');
     await submitPublicApplication(apply({ contactEmail: 'other@beta.example', legalName: 'Beta' }));
   } finally { done(); }

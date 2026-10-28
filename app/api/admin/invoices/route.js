@@ -6,6 +6,7 @@ import { stockRuleProblem } from '../../../../lib/stock-reconcile';
 import { createAndSendInvoice, priceInvoice, listInvoices, listInvoiceAuthors, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, refundInvoiceAmount, deleteInvoice,
          updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, voidInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
 import { confirmDoorCollection, rejectDoorCollection } from '../../../../lib/door-money';
+import { QUICK_SALE_EMAIL } from '../../../../lib/constants';
 import { consignmentFloorProblem } from '../../../../lib/consignment';
 
 
@@ -68,8 +69,13 @@ export async function POST(req) {
   let body;
   try { body = await req.json(); } catch { body = {}; }
 
-  const email = normalizeEmail(body.email);
-  const name = String(body.name || '').trim();
+  // Quick sale: a walk-in who wants no paperwork. No customer, nothing emailed, and
+  // it can be taken as paid on the spot (cash is the usual case).
+  const quickSale = !!body.quickSale;
+  const email = quickSale ? QUICK_SALE_EMAIL : normalizeEmail(body.email);
+  const name = quickSale ? String(body.name || '').trim() || 'Walk-in sale' : String(body.name || '').trim();
+  const paidNowMethod = quickSale && PAYMENT_METHODS[body.paidNow] ? body.paidNow : null;
+  const hideHstNumber = !!body.hideHstNumber && !!body.taxInclusive && !!body.addHst;
   const items = Array.isArray(body.items) ? body.items : [];
   const addHst = !!body.addHst;
   // The rep typed prices with the tax already in them. The split happens in the
@@ -82,7 +88,7 @@ export async function POST(req) {
   const city = String(body.city || '').trim();
   const postal = String(body.postal || '').trim();
   const phone = String(body.phone || '').trim();
-  const sendEmail = body.sendEmail !== false; // default true; only false explicitly skips the email
+  const sendEmail = quickSale ? false : body.sendEmail !== false; // default true; only false explicitly skips the email
   const invoiceDate = String(body.invoiceDate || '').trim(); // optional 'YYYY-MM-DD' backdate (validated in lib)
   // Where the lead came from, and who sent it. Normalised in the lib (an
   // unrecognised source becomes NULL rather than its own bucket), so nothing is
@@ -90,7 +96,7 @@ export async function POST(req) {
   const leadSource = String(body.leadSource || '').trim();
   const leadBy = String(body.leadBy || '').trim();
 
-  if (!validEmail(email)) return NextResponse.json({ error: 'Enter a valid customer email.' }, { status: 400 });
+  if (!quickSale && !validEmail(email)) return NextResponse.json({ error: 'Enter a valid customer email.' }, { status: 400 });
   if (!items.some((it) => String(it?.description || '').trim() && Number(it?.amount) > 0)) {
     return NextResponse.json({ error: 'Add at least one line item with a description and a positive amount.' }, { status: 400 });
   }
@@ -123,9 +129,10 @@ export async function POST(req) {
     const invoice = await createAndSendInvoice({
       name, email, items, addHst, taxInclusive, daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate,
       createdBy: { email: session?.email, name: session?.name },
-      leadSource, leadBy
+      leadSource, leadBy, hideHstNumber
     });
-    await audit(session, { action: 'invoice.create', entity: 'invoice', entityId: invoice?.number, summary: `Invoice raised, total ${invoice?.total ?? '?'}`, detail: { total: invoice?.total ?? null, lines: items.length } });
+    if (paidNowMethod) await markInvoicePaid(invoice.id, paidNowMethod, invoiceDate || undefined);
+    await audit(session, { action: 'invoice.create', entity: 'invoice', entityId: invoice?.number, summary: `${quickSale ? 'Quick sale' : 'Invoice'} raised, total ${invoice?.total ?? '?'}${paidNowMethod ? ', paid ' + paidNowMethod : ''}${hideHstNumber ? ', HST number hidden on customer copy' : ''}`, detail: { total: invoice?.total ?? null, lines: items.length } });
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
     console.error('create invoice failed', e?.message || e);

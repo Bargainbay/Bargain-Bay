@@ -4,7 +4,8 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { encryptSecret, decryptSecret, secretsConfigured } from '../lib/secret-box.js';
-import { createApplication, decideApplication, setCommission, issueStrike } from '../lib/vendors.js';
+import { createApplication, setCommission, issueStrike } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import {
   validateBank, nameLooksRight, submitBankAccount, verifyBankAccount, rejectBankAccount, payableAccount,
   bankSummary, pendingBankAccounts, revealAccount

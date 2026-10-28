@@ -28,7 +28,8 @@ export default function MarketingOptIn({ checked, onChange, id = 'marketing-opt-
         type="checkbox"
         checked={!!checked}
         onChange={(e) => onChange(e.target.checked)}
-        style={{ marginTop: 2, flex: '0 0 auto' }}
+        // The site-wide `input { width: 100% }` rule stretches a checkbox across the row and pushes the wording off to the side.
+        style={{ marginTop: 2, flex: '0 0 auto', width: 'auto', padding: 0 }}
       />
       <span>{CONSENT_TEXT}</span>
     </label>

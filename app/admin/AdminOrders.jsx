@@ -8,6 +8,15 @@ const STATUSES = ['pending_payment', 'confirmed', 'ready', 'out_for_delivery', '
 // sale comes back off the books. Separate from STATUSES above, which is what an
 // admin may SET on a row — 'refunded' is deliberately absent there (a refund has
 // to go through refundOrder so the units relist) and must still be COUNTED here.
+// A pickup order never goes out on a van: it is "Ready for pickup" then "Picked up".
+// Same stored statuses (ready / delivered) so revenue, HST, stock and the web invoice
+// mirror all behave exactly as before — only the words and the choices change.
+const statusLabel = (o, s) =>
+  o.delivery_method === 'delivery' ? STATUS_LABELS[s]
+    : s === 'ready' ? 'Ready for pickup' : s === 'delivered' ? 'Picked up' : STATUS_LABELS[s];
+const statusChoices = (o) =>
+  o.delivery_method === 'delivery' ? STATUSES : STATUSES.filter((s) => s !== 'out_for_delivery' || o.status === s);
+
 const STATUS_ORDER = ['pending_payment', 'confirmed', 'ready', 'out_for_delivery', 'delivered', 'cancelled', 'refunded'];
 
 // Format a stored pickup slot ("YYYY-MM-DDTHH:MM", store-local) for display.
@@ -311,7 +320,7 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
                     </>
                   ) : (
                     <>
-                      <span className={`status-chip status-${o.status}`} style={{ marginBottom: 6, display: 'inline-block' }}>{STATUS_LABELS[o.status]}</span>
+                      <span className={`status-chip status-${o.status}`} style={{ marginBottom: 6, display: 'inline-block' }}>{statusLabel(o, o.status)}</span>
                       {o.status === 'confirmed' && (
                         <div style={{ marginTop: 6 }}>
                           <button
@@ -334,7 +343,7 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
                         disabled={savingId === o.id}
                         onChange={(e) => setStatus(o.id, e.target.value)}
                       >
-                        {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                        {statusChoices(o).map((s) => <option key={s} value={s}>{statusLabel(o, s)}</option>)}
                       </select>
                       <label style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: 'var(--muted)' }} title="Uncheck to change status without emailing the customer (e.g. a quiet in-person payment).">
                         <input type="checkbox" style={{ width: 'auto', marginRight: 4 }} checked={!silent[o.id]} onChange={(e) => setSilent((s) => ({ ...s, [o.id]: !e.target.checked }))} />

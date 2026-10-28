@@ -180,14 +180,17 @@ function DayCostForm({ date, drivers, busy, onSave }) {
   const [amount, setAmount] = useState('');
   const [driverId, setDriverId] = useState('');
   const [note, setNote] = useState('');
+  // Receipts say "$45.20" and "1,200.00"; Number() of either is NaN, which left
+  // Record disabled with no hint why. Strip the dressing before judging it.
+  const amt = Number(String(amount).replace(/[$,\s]/g, ''));
   return (
     <form
       className="disp-setup-form"
       style={{ margin: '0 0 12px' }}
       onSubmit={(e) => {
         e.preventDefault();
-        if (!(Number(amount) > 0)) return;
-        onSave({ date, kind, amount: Number(amount), driverId: driverId || null, note });
+        if (!(amt > 0)) return;
+        onSave({ date, kind, amount: amt, driverId: driverId || null, note });
       }}
     >
       <span className="hint" style={{ margin: 0, alignSelf: 'center' }}>{prettyDate(date)}</span>
@@ -201,7 +204,7 @@ function DayCostForm({ date, drivers, busy, onSave }) {
         {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
       </select>
       <input value={note} placeholder="Note (optional)" onChange={(e) => setNote(e.target.value)} />
-      <button className="btn accent" disabled={busy || !(Number(amount) > 0)}>Record</button>
+      <button className="btn accent" disabled={busy || !(amt > 0)}>Record</button>
     </form>
   );
 }

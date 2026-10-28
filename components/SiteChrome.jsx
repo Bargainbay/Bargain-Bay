@@ -24,6 +24,9 @@ export default function SiteChrome({ children, promo = null }) {
     : PAPER.test(path) ? null : <TeamAssistant />;
   const isDash = DASHBOARD_ROUTES.some((r) => path === r || path.startsWith(r + '/'));
   if (isDash) return <>{children}{crew}</>;
+  // The workshop page is RS Solutions' own landing page: it draws its own header
+  // and footer, and the storefront's cart, chat and cart-capture have no business on it.
+  if (path === '/workshop') return <>{children}</>;
   const isPortal = path.startsWith('/admin') || path.startsWith('/driver') || path.startsWith('/clock');
   if (isPortal) return <><main className="wrap">{children}</main>{crew}</>;
   return (

@@ -8,9 +8,8 @@ import {
   hammingDistance, isSamePicture, MARKET_CATEGORIES, LISTING_CONDITIONS
 } from '../lib/listing-rules.js';
 import { processListingImage, sniffImage } from '../lib/image-checks.js';
-import {
-  createApplication, decideApplication, issueStrike
-} from '../lib/vendors.js';
+import { createApplication, issueStrike } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import { acceptPolicies } from '../lib/policy-acceptance.js';
 import { requiredPolicies } from '../lib/marketplace-policies.js';
 import {

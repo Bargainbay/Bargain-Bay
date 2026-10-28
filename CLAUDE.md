@@ -227,6 +227,24 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   shopper. That also means a deliberate below-cost clearance markdown still stands
   for members; only the extra 10% underneath it is floored. A cost of 0 (haul-away)
   is a real answer and floors nothing.
+- **The four member numbers are SETTINGS now, not constants (2026-10-28).** `/admin/member-pricing`
+  (ADMIN; `lib/member-rates.js`, `lib/member-rate-rules.js`, settings keys `member_rates` and
+  `member_price_overrides`) sets the 55% / 90% / cost + 10% / $200, and a typed member price for one SKU.
+  The constants in `lib/pricing.js` are the DEFAULTS, used until something is saved and if the settings
+  cannot be read. **Every change is previewed against live stock through `unitPrices()` — the same function
+  `decorate()` and checkout use — so the screen cannot disagree with what a member is charged.**
+  Hard limits live in `MEMBER_RATE_LIMITS`: the cost floor cannot go under 100% of cost, so no setting can
+  sell a member something below cost. Overrides are still held between the floor and the public price.
+  Rates are cached 30s per instance and a failed read keeps the last good value. Each save is in `audit_log`.
+  Only an APPROVED MEMBER's price ever reads the saved rates. The June `data/member-prices.json` table still
+  applies where no typed override exists.
+- **Reseller front door (2026-10-28).** `/resellers` is the public landing page and apply form (header, footer and
+  sitemap link it): signed out -> create account / sign in, then the existing `MemberRequest` form and agreement
+  appear on the same page (`#apply`); pending -> "under review"; approved -> redirected to `/account/member`.
+  **It quotes NO percentage** — the rates are editable now, so a figure written into marketing copy goes stale.
+  `/account/member` is the approved member's dashboard (wholesale catalogue with their price, orders, open
+  invoices and quotes); anyone else is redirected to `/resellers`. **Wholesale prices are shown to approved
+  members only**, and only because `decorate()` itself gives a member price to nobody else.
 - **Clearance keeps the standard ONE-YEAR warranty** (`warranty_months` default 12 — NOT the 3 months that was originally spec'd). Clearance threshold = units aged > 45 days.
 - A real bug we already fixed: checkout/cart once charged full catalog price on clearance units. `lib/pricing.js` is now authoritative for both display AND checkout. Keep it that way.
 
@@ -4510,6 +4528,13 @@ not shown anywhere until the storefront slice.
 - **Test gotcha:** the checkout route's runtime-DDL helpers (`ensureAttributionColumns` etc.) memoise "done" in
   module scope, so a second FRESH test database never gets their columns. Every test file that drives the real
   route uses `test/shared-checkout-db.mjs` (one database, re-installed on each call).
+- **Seller legitimacy gate (added 2026-10-26, migration 0042, `lib/business-ids.js`, `recordIdentityCheck` / `decideApplication` in `lib/vendors.js`).**
+  Business Number AND HST number are mandatory on `/marketplace/sell` (browser + `submitPublicApplication`). They must be well-formed
+  (9-digit BN with Luhn check digit; HST = BN + `RT` + 4 digits), the HST must be the BN's own, and neither may sit on another
+  non-rejected vendor. **Approval is refused until a person has looked the HST account up in the CRA GST/HST registry and recorded
+  the registry's name (must match the legal/trading name) and that it is active** — the format checks prove coherence, only the
+  registry proves existence, and there is no automatic CRA lookup (the CRA web service needs enrolment). Small-supplier (no HST)
+  sellers are no longer accepted. Tests that are about something else approve via `test/approved-vendor.mjs`.
 - Card payments stay OFF; vendors are paid by direct deposit/wire from a ledger, 2% held 12 months.
 - **Warranty claims and seller deductions (`lib/warranty-claims.js`, migration 0025).** The customer contacts
   US; staff open a claim on a DELIVERED vendor order inside its 12 months (Admin > Marketplace > Claims). The

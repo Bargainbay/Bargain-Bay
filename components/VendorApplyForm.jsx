@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { checkBusinessIds } from '../lib/business-ids';
 import HoneypotField, { HONEYPOT_FIELD } from './HoneypotField';
 import AgreementScroll from './AgreementScroll';
 
@@ -24,6 +25,8 @@ export default function VendorApplyForm({ policies = [] }) {
   async function submit(e) {
     e.preventDefault();
     if (!read) return;
+    const ids = checkBusinessIds(f);
+    if (!ids.ok) { setErr(ids.problems[0]); return; }
     setBusy(true); setErr('');
     try {
       const res = await fetch('/api/marketplace/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, [HONEYPOT_FIELD]: hp, acceptedPolicies: policies.map((p) => ({ policy: p.slug, version: p.version })) }) });
@@ -43,8 +46,8 @@ export default function VendorApplyForm({ policies = [] }) {
       <div className="field"><label>Legal business name</label><input value={f.legalName} onChange={set('legalName')} required /></div>
       <div className="field"><label>Trading name (if different)</label><input value={f.tradeName} onChange={set('tradeName')} /></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '0 16px' }}>
-        <div className="field"><label>Business number (optional)</label><input value={f.businessNo} onChange={set('businessNo')} /></div>
-        <div className="field"><label>HST number (leave blank if not registered)</label><input value={f.hstNo} onChange={set('hstNo')} /></div>
+        <div className="field"><label>Business Number (required)</label><input value={f.businessNo} onChange={set('businessNo')} placeholder="123456782" inputMode="numeric" required /></div>
+        <div className="field"><label>HST number (required)</label><input value={f.hstNo} onChange={set('hstNo')} placeholder="123456782 RT 0001" required /></div>
         <div className="field"><label>Your name</label><input value={f.contactName} onChange={set('contactName')} required /></div>
         <div className="field"><label>Business email</label><input type="email" value={f.contactEmail} onChange={set('contactEmail')} required /></div>
         <div className="field"><label>Phone</label><input value={f.contactPhone} onChange={set('contactPhone')} /></div>
@@ -54,6 +57,7 @@ export default function VendorApplyForm({ policies = [] }) {
         <div className="field"><label>City</label><input value={f.city} onChange={set('city')} /></div>
         <div className="field"><label>Postal code</label><input value={f.postal} onChange={set('postal')} /></div>
       </div>
+      <p style={{ fontSize: 13, color: 'var(--muted)' }}>We check every Business Number and HST account against the CRA registry, and the name on it must match your legal business name. Only HST-registered businesses can sell here.</p>
       <h3 style={{ margin: '16px 0 6px', fontSize: 16 }}>Seller Agreement</h3>
       <p style={{ fontSize: 13.5, margin: '0 0 8px' }}>Read to the end, then accept. This is everything we ask of sellers: how we work together, what you list, how you ship, and how you are paid.</p>
       <AgreementScroll sections={sections} label="Seller Agreement" read={read} onRead={() => setRead(true)} maxHeight={460} />

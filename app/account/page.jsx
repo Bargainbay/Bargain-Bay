@@ -57,7 +57,7 @@ export default async function AccountPage() {
       <div className="panel">
         <h2>Wholesale / Member access</h2>
         {membership?.role === 'member' && membership?.member_status === 'approved' ? (
-          <p style={{ fontSize: 14.5, margin: 0 }}><b style={{ color: '#0B6B3A' }}>✓ You're a member.</b> Wholesale pricing is active across the store and at checkout.</p>
+          <p style={{ fontSize: 14.5, margin: 0 }}><b style={{ color: '#0B6B3A' }}>✓ You're a member.</b> Wholesale pricing is active across the store and at checkout. <a href="/account/member" style={{ textDecoration: 'underline', fontWeight: 700 }}>Open your member dashboard →</a></p>
         ) : membership?.member_status === 'pending' ? (
           <p style={{ fontSize: 14.5, margin: 0 }}>Your member application is <b>under review</b>. We'll email you once it's approved.</p>
         ) : (

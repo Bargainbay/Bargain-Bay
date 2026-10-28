@@ -4,7 +4,7 @@ import { getInvoiceByNumber } from '../../../../lib/invoices';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { verifyLinkToken } from '../../../../lib/links';
 import { brandFor } from '../../../../lib/brands';
-import { warrantyLabel, PICKUP_ADDRESS, RETURN_POLICY_SUMMARY, ETRANSFER_EMAIL } from '../../../../lib/constants';
+import { warrantyLabel, PICKUP_ADDRESS, RETURN_POLICY_SUMMARY, ETRANSFER_EMAIL, isQuickSaleEmail } from '../../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -40,7 +40,7 @@ function render(invoice, B) {
     doc.fillColor(ink).font('Helvetica-Bold').fontSize(20).text(String(B.name).toUpperCase(), L, 50);
     doc.font('Helvetica').fontSize(9).fillColor(grey)
       .text(`${B.legal} - ${B.address}`, L, 76, { width: 340 })
-      .text(`${B.contactEmail} - HST# ${B.hst}`, L, doc.y);
+      .text(invoice.hide_hst_number ? B.contactEmail : `${B.contactEmail} - HST# ${B.hst}`, L, doc.y);
     doc.fillColor(ink).font('Helvetica-Bold').fontSize(16).text('INVOICE', 380, 50, { width: R - 380, align: 'right' });
     doc.font('Helvetica').fontSize(11).text(invoice.number, 380, 70, { width: R - 380, align: 'right' });
     doc.fontSize(9).fillColor(grey).text(statusLabel, 380, 86, { width: R - 380, align: 'right' });
@@ -62,7 +62,7 @@ function render(invoice, B) {
     doc.font('Helvetica-Bold').fontSize(10).fillColor(ink);
     let leftY = by;
     doc.text(invoice.name || '', L, by, { width: 240 });
-    doc.font('Helvetica').text(invoice.email || '', L, doc.y, { width: 240 });
+    doc.font('Helvetica').text(isQuickSaleEmail(invoice.email) ? '' : (invoice.email || ''), L, doc.y, { width: 240 });
     if (invoice.phone) doc.text(invoice.phone, L, doc.y, { width: 240 });
     leftY = doc.y;
     if (delivery) {

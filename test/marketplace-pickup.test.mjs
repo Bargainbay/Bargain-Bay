@@ -3,7 +3,8 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query, withTransaction } from '../lib/db.js';
-import { createApplication, decideApplication, grantVendorUser, strikeMeter } from '../lib/vendors.js';
+import { createApplication, grantVendorUser, strikeMeter } from '../lib/vendors.js';
+import { decideApplication } from './approved-vendor.mjs';
 import {
   createVendorOrdersTx, confirmVendorOrders, acceptVendorOrder, markVendorOrderReady, cancelVendorOrder,
   onOrderStatus, listVendorOrders, allVendorOrders
