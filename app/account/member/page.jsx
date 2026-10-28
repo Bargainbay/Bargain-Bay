@@ -9,7 +9,8 @@ import { invoicesForEmail } from '../../../lib/invoices';
 import { quotesForEmail } from '../../../lib/quotes';
 import { linkToken } from '../../../lib/links';
 import { money, STATUS_LABELS } from '../../../lib/constants';
-import MemberCatalogue from '../../../components/MemberCatalogue';
+import MemberPortal from '../../../components/MemberPortal';
+import { recordVisit } from '../../../lib/member-prefs';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Member dashboard — Bargain Bay' };
@@ -35,15 +36,16 @@ export default async function MemberDashboard() {
 
   const catalogue = units.map((u) => ({
     id: u.id, title: u.title || `${u.make} ${u.model}`, category: u.category || '', condition: u.condition || '',
-    retail: u.compareAt || null, publicPrice: u.clientPrice, price: u.price, onClearance: !!u.onClearance
+    retail: u.compareAt || null, publicPrice: u.clientPrice, price: u.price, onClearance: !!u.onClearance,
+    make: u.make || '', model: u.model || '', image: u.image || ''
   }));
   const counted = orders.filter((o) => !DONE.has(o.status));
   const spent = counted.reduce((s, o) => s + (Number(o.total) || 0), 0);
   const owing = invoices.filter((i) => i.status === 'open' || i.status === 'partial');
   const openQuotes = quotes.filter((q) => q.status === 'open');
-  const discounted = catalogue.filter((u) => u.price < u.publicPrice).length;
+  // What they had already seen, and what they asked us to watch for. Soft-fails to "nothing new".
+  const visit = await recordVisit(session.userId, catalogue.map((u) => u.id));
 
-  const tile = { margin: 0, textAlign: 'center' };
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
@@ -52,20 +54,11 @@ export default async function MemberDashboard() {
       </div>
       <p className="hint" style={{ marginTop: 0 }}>Signed in as {session.email}. Your wholesale price applies in the shop and at checkout automatically.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 16 }}>
-        <div className="panel" style={tile}><div style={{ fontSize: 26, fontWeight: 800 }}>{catalogue.length}</div><div className="hint">units in stock</div></div>
-        <div className="panel" style={tile}><div style={{ fontSize: 26, fontWeight: 800 }}>{discounted}</div><div className="hint">at a member discount</div></div>
-        <div className="panel" style={tile}><div style={{ fontSize: 26, fontWeight: 800 }}>{counted.length}</div><div className="hint">orders · {money(spent)}</div></div>
-        <div className="panel" style={tile}>
-          <div style={{ fontSize: 26, fontWeight: 800, color: owing.length ? '#b45309' : undefined }}>{owing.length}</div>
-          <div className="hint">open invoice{owing.length === 1 ? '' : 's'}</div>
-        </div>
-      </div>
-
       <h2 style={{ color: 'var(--charcoal)' }}>Wholesale catalogue</h2>
       {catalogue.length === 0
         ? <div className="panel">No stock is available right now. New units arrive often, so check back soon.</div>
-        : <MemberCatalogue units={catalogue} />}
+        : <MemberPortal units={catalogue} newSkus={visit.newSkus} firstVisit={visit.firstVisit} initialWatch={visit.watch}
+            stats={{ orders: counted.length, spent, owing: owing.length }} />}
 
       <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Your orders</h2>
       {orders.length === 0 ? (
