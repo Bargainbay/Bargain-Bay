@@ -236,6 +236,7 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   Hard limits live in `MEMBER_RATE_LIMITS`: the cost floor cannot go under 100% of cost, so no setting can
   sell a member something below cost. Overrides are still held between the floor and the public price.
   Rates are cached 30s per instance and a failed read keeps the last good value. Each save is in `audit_log`.
+  A typed price applies to clearance units too (`unitPrices` in `lib/pricing.js`; it was read only on the regular path, so a typed price on a clearance unit was silently ignored until 2026-10-28), still held between the floor and the clearance price.
   Only an APPROVED MEMBER's price ever reads the saved rates. The June `data/member-prices.json` table still
   applies where no typed override exists.
 - **Reseller front door (2026-10-28).** `/resellers` is the public landing page and apply form (header, footer and
