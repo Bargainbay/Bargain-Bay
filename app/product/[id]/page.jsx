@@ -3,7 +3,7 @@ import { getById, getSiblings } from '../../../lib/inventory';
 import { decorateOne, decorate } from '../../../lib/pricing';
 import { getSession } from '../../../lib/auth';
 import { isUnavailable } from '../../../lib/reservations';
-import { conditionCopy, leadSentence, specRows, seoDescription } from '../../../lib/specs';
+import { conditionCopy, leadSentence, specRows, seoDescription, warrantyPhrase } from '../../../lib/specs';
 import { marketplaceConditionCopy } from '../../../lib/marketplace-storefront';
 import { VESTA_HOST } from '../../../lib/vesta';
 import { SITE_URL, jsonLd } from '../../../lib/site';
@@ -43,6 +43,7 @@ const explain = (x) => (x.vesta
 
 function forPanel(x, sold) {
   return {
+    warrantyMonths: x.warrantyMonths,
     ...(x.vesta ? {
       vesta: true, vestaImages: x.vestaImages || [], inStock: !!x.inStock, orderable: !!x.orderable,
       warrantyMonths: x.warrantyMonths || 24
@@ -58,7 +59,7 @@ function forPanel(x, sold) {
     category: x.category,
     title: x.title || `${x.make} ${x.model}`,
     condition: x.condition,
-    explainer: explain(x),
+    explainer: explain(x).replace(/one-year warranty/gi, warrantyPhrase(x.warrantyMonths)),
     price: x.price,
     compareAt: x.compareAt || 0,
     clientPrice: x.clientPrice,
@@ -89,9 +90,9 @@ export default async function Product({ params }) {
   const units = [forPanel(u, sold), ...siblings.map((s) => forPanel(s, false))]
     .sort((a, b) => a.price - b.price);
 
-  const explainer = explain(u);
+  const explainer = explain(u).replace(/one-year warranty/gi, warrantyPhrase(u.warrantyMonths));
   const rows = specRows(u);
-  const warrantyLabel = 'one-year warranty';
+  const warrantyLabel = warrantyPhrase(u.warrantyMonths);
   const vendorName = u.vendor?.name;
 
   const productSchema = {

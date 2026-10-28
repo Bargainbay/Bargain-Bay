@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { money, pctOff, PICKUP_ADDRESS } from '../lib/constants';
+import { warrantyPhrase } from '../lib/specs';
 import ConditionPill from './ConditionPill';
 import AddToCartButton from './AddToCartButton';
 import ProductGallery from './ProductGallery';
@@ -140,7 +141,7 @@ export default function ProductBuyPanel({ units, initialId }) {
             <>
               <div>🚚 Free pickup at {PICKUP_ADDRESS} (by appointment), flat-fee local delivery, or freight — Pickering, Scarborough &amp; the GTA.</div>
               <div>✔️ Bench-tested &amp; certified working before listing.</div>
-              <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; one-year warranty</a></div>
+              <div>📄 <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; {warrantyPhrase(sel.warrantyMonths)}</a></div>
             </>
           )}
         </div>
