@@ -22,9 +22,10 @@ export async function POST(req) {
   const unsold = (Array.isArray(b.unsold) ? b.unsold : []).map((u) => (typeof u === 'string' ? u : u?.sku));
   // Status written to the `unsold` rows. Default is the reversal of a sale
   // ('Tested Working'); 'Salvage For Parts Only' takes a unit off the storefront
-  // without it being a sale (sent back to a vendor, a duplicate entry). Only these
-  // two are accepted: a free-text status would silently take stock off the site.
-  const UNSOLD_STATUSES = ['Tested Working', 'Salvage For Parts Only'];
+  // without it being a sale (sent back to a vendor, a duplicate entry);
+  // 'Tested Not Working - Needs Parts' is a unit waiting on a part. Only these
+  // three are accepted: a free-text status would silently take stock off the site.
+  const UNSOLD_STATUSES = ['Tested Working', 'Salvage For Parts Only', 'Tested Not Working - Needs Parts'];
   const unsoldStatus = UNSOLD_STATUSES.includes(b.unsoldStatus) ? b.unsoldStatus : 'Tested Working';
   const costs = Array.isArray(b.costs) ? b.costs : [];
   // Which purchase invoice a unit came in on: [{ sku, invoice, lot?, vendor? }].
