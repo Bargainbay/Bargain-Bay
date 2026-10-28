@@ -20,6 +20,9 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
   const [taxMode, setTaxMode] = useState('exclusive');
   const addHst = true;
   const [sendEmail, setSendEmail] = useState(true);
+  const [quickSale, setQuickSale] = useState(false);   // walk-in, no customer details, nothing emailed
+  const [paidNow, setPaidNow] = useState('cash');       // quick sales are taken as paid on the spot ('' = leave open)
+  const [hideHst, setHideHst] = useState(false);        // cash + tax-in: customer copy leaves our HST number off
   const [daysUntilDue, setDaysUntilDue] = useState(14);
   const [invoiceDate, setInvoiceDate] = useState(todayToronto());
   const [memo, setMemo] = useState('');
@@ -129,7 +132,7 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
   // type="email" is happy with "jane@gmail" — no dot, no TLD — and the server is
   // not, so a plain typo came back as a refusal with nothing pointing at it.
   function whatsWrong() {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim().toLowerCase())) {
+    if (!quickSale && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim().toLowerCase())) {
       return `“${email.trim() || 'blank'}” isn’t a complete email address — it needs a domain with a dot, like jane@gmail.com.`;
     }
     const priced = toPayload(items).filter((it) => String(it.description || '').trim() && Number(it.amount) > 0);
@@ -181,9 +184,9 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
       const res = await fetch('/api/admin/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, items: toPayload(items), addHst, taxInclusive: taxMode === 'inclusive', belowFloorOk: belowFloorOk,
+        body: JSON.stringify({ name: quickSale ? name : name, email: quickSale ? '' : email, items: toPayload(items), addHst, taxInclusive: taxMode === 'inclusive', belowFloorOk: belowFloorOk,
           daysUntilDue, memo, deliveryMethod, address, city, postal, phone, sendEmail, invoiceDate,
-          leadSource, leadBy })
+          leadSource, leadBy, quickSale, paidNow: quickSale ? paidNow : '', hideHstNumber: hideHst && taxMode === 'inclusive' })
       });
       const d = await res.json();
       if (!res.ok) {
@@ -225,7 +228,7 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
     return (
       <div className="notice-box" style={{ lineHeight: 1.6 }}>
         ✓ Invoice <b>{done.number}</b> for <b>{fmt(done.total)}</b>{' '}
-        {done.emailed ? <>emailed to <b>{done.email}</b> with e-transfer instructions.</> : <>created (<b>not emailed</b>) — for <b>{done.email}</b>.</>}
+        {done.emailed ? <>emailed to <b>{done.email}</b> with e-transfer instructions.</> : /walk-in\.invalid$/.test(done.email || '') ? <>recorded as a quick sale (no customer details, not emailed).</> : <>created (<b>not emailed</b>) — for <b>{done.email}</b>.</>}
         {done.hostedUrl && <> <a href={done.hostedUrl} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>View invoice →</a></>}
         {done.orderNumber && (
           <div style={{ marginTop: 6 }}>
@@ -249,16 +252,42 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
 
   return (
     <form onSubmit={submit}>
-      <div className="form-2col">
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, marginBottom: 10 }}
+        title="For a walk-in who does not want an invoice. No name or email needed, nothing is sent, and no customer record is made. The sale still counts in revenue, stock and HST.">
+        <input type="checkbox" style={{ width: 'auto' }} checked={quickSale} onChange={(e) => setQuickSale(e.target.checked)} />
+        <b>Quick sale</b> — no customer details, nothing emailed
+      </label>
+      {quickSale && (
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+            Paid by
+            <select value={paidNow} onChange={(e) => setPaidNow(e.target.value)}>
+              <option value="cash">Cash</option><option value="etransfer">E-transfer</option>
+              <option value="card">Card</option><option value="">Not paid yet</option>
+            </select>
+          </label>
+          <label style={{ fontSize: 14 }}>Label (optional){' '}
+            <input style={{ width: 200 }} value={name} onChange={(e) => setName(e.target.value)} placeholder="Walk-in sale" />
+          </label>
+        </div>
+      )}
+      {taxMode === 'inclusive' && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, marginBottom: 10 }}
+          title="The HST is still on the invoice and still reported by us. Only our HST registration number is left off the customer's copy.">
+          <input type="checkbox" style={{ width: 'auto' }} checked={hideHst} onChange={(e) => setHideHst(e.target.checked)} />
+          Leave our HST number off the customer&apos;s copy
+        </label>
+      )}
+      {!quickSale && <><div className="form-2col">
         <div className="field">
           <label>Customer name</label>
           <input value={name} onChange={(e) => { setName(e.target.value); setCustOpen(true); }} placeholder="Jane Smith" />
         </div>
         <div className="field">
           <label>Customer email *</label>
-          <input type="email" required value={email} onChange={(e) => { setEmail(e.target.value); setCustOpen(true); }} placeholder="jane@example.com" autoComplete="off" />
+          <input type="email" required={!quickSale} value={email} onChange={(e) => { setEmail(e.target.value); setCustOpen(true); }} placeholder="jane@example.com" autoComplete="off" />
         </div>
-      </div>
+      </div></>}
       {custMatches.length > 0 && (
         <div style={{ border: '1px solid var(--line)', borderRadius: 8, margin: '-6px 0 12px', maxHeight: 200, overflowY: 'auto' }}>
           <div style={{ fontSize: 12, color: 'var(--muted)', padding: '6px 11px', borderBottom: '1px solid var(--line-soft)' }}>Existing customers</div>
@@ -373,7 +402,7 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
               the subtotal beside it is the part they never keyed. */}
           {taxMode === 'inclusive' && <span> — the {fmt(preview.quoted)} you typed</span>}
         </div>
-        <button className="btn accent" disabled={busy}>{busy ? 'Creating…' : (sendEmail ? 'Create & send invoice' : 'Create invoice')}</button>
+        <button className="btn accent" disabled={busy}>{busy ? 'Creating…' : (quickSale ? 'Record quick sale' : sendEmail ? 'Create & send invoice' : 'Create invoice')}</button>
       </div>
     </form>
   );

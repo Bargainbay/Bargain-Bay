@@ -5,7 +5,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { verifyLinkToken } from '../../../lib/links';
 import { brandFor } from '../../../lib/brands';
 import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel,
-         BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY } from '../../../lib/constants';
+         BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY, isQuickSaleEmail } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoice' };
@@ -74,7 +74,7 @@ export default async function InvoicePage({ params, searchParams }) {
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--charcoal)' }}>{B.name}</div>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>{B.legal} · {B.address}</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{B.contactEmail} · HST# {B.hst}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{B.contactEmail}{invoice.hide_hst_number ? '' : ` · HST# ${B.hst}`}</div>
         </div>
         <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>INVOICE</div>
@@ -95,7 +95,7 @@ export default async function InvoicePage({ params, searchParams }) {
         <div style={{ flex: '1 1 220px' }}>
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', marginBottom: 3 }}>Bill to</div>
           {invoice.name && <div style={{ fontWeight: 700 }}>{invoice.name}</div>}
-          <div>{invoice.email}</div>
+          {!isQuickSaleEmail(invoice.email) && <div>{invoice.email}</div>}
           {invoice.phone && <div>{invoice.phone}</div>}
         </div>
         <div style={{ flex: '1 1 220px' }}>
@@ -177,7 +177,7 @@ export default async function InvoicePage({ params, searchParams }) {
         )}
         {invoice.memo && <p style={{ margin: '10px 0 0', fontSize: 13.5, color: 'var(--muted)' }}>{invoice.memo}</p>}
         <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--muted)' }}>
-          {B.legal} — GST/HST # {B.hst}.
+          {B.legal}{invoice.hide_hst_number ? '' : ` — GST/HST # ${B.hst}`}.
         </p>
       </div>
 
