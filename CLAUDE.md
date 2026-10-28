@@ -227,6 +227,17 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   shopper. That also means a deliberate below-cost clearance markdown still stands
   for members; only the extra 10% underneath it is floored. A cost of 0 (haul-away)
   is a real answer and floors nothing.
+- **The four member numbers are SETTINGS now, not constants (2026-10-28).** `/admin/member-pricing`
+  (ADMIN; `lib/member-rates.js`, `lib/member-rate-rules.js`, settings keys `member_rates` and
+  `member_price_overrides`) sets the 55% / 90% / cost + 10% / $200, and a typed member price for one SKU.
+  The constants in `lib/pricing.js` are the DEFAULTS, used until something is saved and if the settings
+  cannot be read. **Every change is previewed against live stock through `unitPrices()` — the same function
+  `decorate()` and checkout use — so the screen cannot disagree with what a member is charged.**
+  Hard limits live in `MEMBER_RATE_LIMITS`: the cost floor cannot go under 100% of cost, so no setting can
+  sell a member something below cost. Overrides are still held between the floor and the public price.
+  Rates are cached 30s per instance and a failed read keeps the last good value. Each save is in `audit_log`.
+  Only an APPROVED MEMBER's price ever reads the saved rates. The June `data/member-prices.json` table still
+  applies where no typed override exists.
 - **Clearance keeps the standard ONE-YEAR warranty** (`warranty_months` default 12 — NOT the 3 months that was originally spec'd). Clearance threshold = units aged > 45 days.
 - A real bug we already fixed: checkout/cart once charged full catalog price on clearance units. `lib/pricing.js` is now authoritative for both display AND checkout. Keep it that way.
 

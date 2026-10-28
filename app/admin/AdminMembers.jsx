@@ -28,7 +28,7 @@ export default function AdminMembers({ initialMembers }) {
     <div>
       <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Member applications ({pending.length} pending)</h2>
       <p className="hint" style={{ marginBottom: 12 }}>
-        Approving a business unlocks wholesale member pricing on their account — 55% of retail on regular items, 10% off on clearance.
+        Approving a business unlocks wholesale member pricing on their account. The rates are set on <a href="/admin/member-pricing">Member pricing</a>.
       </p>
       {err && <div className="error-box">{err}</div>}
       {pending.length === 0 ? (
