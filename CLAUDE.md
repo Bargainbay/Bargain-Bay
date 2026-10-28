@@ -245,6 +245,19 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   `/account/member` is the approved member's dashboard (wholesale catalogue with their price, orders, open
   invoices and quotes); anyone else is redirected to `/resellers`. **Wholesale prices are shown to approved
   members only**, and only because `decorate()` itself gives a member price to nobody else.
+- **The member dashboard is a portal, not a table (2026-10-28).** `components/MemberPortal.jsx` on
+  `/account/member`: category chips, **one row per model with a quantity stepper** (each + adds ONE specific unit,
+  cheapest first, because every unit is one of a kind and the cart is a set of SKUs; "See each unit" lists them),
+  a sticky **order tray** with subtotal, HST, savings (reads the same `bb_cart` the rest of the site uses), and
+  **new since your last visit** and a **watchlist**, both in `lib/member-prefs.js` (settings row
+  `member_prefs:<user id>`, no migration). **"New" is a comparison of SKUs, not dates** — `products` has no
+  arrival date (`synced_at` is rewritten on every sync) but a SKU never comes back. First visit flags nothing; the
+  baseline moves forward only after `SEEN_REFRESH_MS` (6h), so a reload keeps the badges (a test caught the first
+  version advancing the baseline on the very visit that flagged them). A failed read never writes, or a database
+  blip would empty somebody's watchlist. Watchlist terms are lower-case substrings of make / model / category /
+  title, saved through `/api/account/member-prefs` (approved members only, member taken from the session).
+  **Not built:** "total saved this year" (needs the public price stored on each order line — only what they paid is
+  kept today) and a quote request from the tray (it links to /bundle).
 - **Clearance keeps the standard ONE-YEAR warranty** (`warranty_months` default 12 — NOT the 3 months that was originally spec'd). Clearance threshold = units aged > 45 days.
 - A real bug we already fixed: checkout/cart once charged full catalog price on clearance units. `lib/pricing.js` is now authoritative for both display AND checkout. Keep it that way.
 
