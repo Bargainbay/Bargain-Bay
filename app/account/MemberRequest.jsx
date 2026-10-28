@@ -7,7 +7,6 @@ import { MEMBER_TERMS, MEMBER_TERMS_VERSION } from '../../lib/member-terms';
 // scrolled to the end (components/AgreementScroll.jsx); the version shown goes to the server and is recorded.
 export default function MemberRequest() {
   const [biz, setBiz] = useState('');
-  const [note, setNote] = useState('');
   const [read, setRead] = useState(false);
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -20,7 +19,7 @@ export default function MemberRequest() {
     try {
       const r = await fetch('/api/account/membership', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ businessName: biz, note, acceptTerms: true, termsVersion: MEMBER_TERMS_VERSION })
+        body: JSON.stringify({ businessName: biz, acceptTerms: true, termsVersion: MEMBER_TERMS_VERSION })
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setErr(d.error || 'Could not submit your request.'); return; }
@@ -33,13 +32,11 @@ export default function MemberRequest() {
   return (
     <form onSubmit={submit}>
       <p style={{ fontSize: 14.5, marginTop: 0 }}>
-        Buying for a business? Property managers, stores, and resellers get <b>member (wholesale) pricing</b> once approved. Tell us about your business:
+        Buying for a business? Property managers, stores, and resellers get <b>member (wholesale) pricing</b> once approved. What is your business called?
       </p>
       {err && <div className="error-box">{err}</div>}
       <input value={biz} onChange={(e) => setBiz(e.target.value)} placeholder="Business name" required
         style={{ display: 'block', width: '100%', maxWidth: 420, padding: '9px 11px', margin: '8px 0', border: '1px solid var(--line)', borderRadius: 8 }} />
-      <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="What do you buy, and how often? (optional)" rows={3}
-        style={{ display: 'block', width: '100%', maxWidth: 420, padding: '9px 11px', marginBottom: 8, border: '1px solid var(--line)', borderRadius: 8 }} />
       <h3 style={{ margin: '14px 0 6px', fontSize: 15 }}>Member Agreement</h3>
       <div style={{ maxWidth: 560 }}>
         <AgreementScroll sections={MEMBER_TERMS} label="Member Agreement" read={read} onRead={() => setRead(true)} maxHeight={260} />
