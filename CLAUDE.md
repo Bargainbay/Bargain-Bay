@@ -238,6 +238,13 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   Rates are cached 30s per instance and a failed read keeps the last good value. Each save is in `audit_log`.
   Only an APPROVED MEMBER's price ever reads the saved rates. The June `data/member-prices.json` table still
   applies where no typed override exists.
+- **Reseller front door (2026-10-28).** `/resellers` is the public landing page and apply form (header, footer and
+  sitemap link it): signed out -> create account / sign in, then the existing `MemberRequest` form and agreement
+  appear on the same page (`#apply`); pending -> "under review"; approved -> redirected to `/account/member`.
+  **It quotes NO percentage** — the rates are editable now, so a figure written into marketing copy goes stale.
+  `/account/member` is the approved member's dashboard (wholesale catalogue with their price, orders, open
+  invoices and quotes); anyone else is redirected to `/resellers`. **Wholesale prices are shown to approved
+  members only**, and only because `decorate()` itself gives a member price to nobody else.
 - **Clearance keeps the standard ONE-YEAR warranty** (`warranty_months` default 12 — NOT the 3 months that was originally spec'd). Clearance threshold = units aged > 45 days.
 - A real bug we already fixed: checkout/cart once charged full catalog price on clearance units. `lib/pricing.js` is now authoritative for both display AND checkout. Keep it that way.
 
