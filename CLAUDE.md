@@ -255,6 +255,12 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   new-application email to the owner links here (it used to link to bare `/admin`). The nav tab carries a red
   pending count (`components/PendingBadge.jsx`, fetched client-side from `/api/admin/members?count=1` like the clock
   pill, so `AdminNav` stays a data-free server component; shows nothing at zero or on any failure).
+- **An existing account can be made a reseller from the back end (2026-10-29).** "Add a reseller without an application" on
+  `/admin/resellers` (`components/AddReseller.jsx`, `listUnappliedAccounts` / `addAsReseller` in `lib/members.js`, `decision: 'add'`
+  on `/api/admin/members`, admin): lists accounts with no application (driver accounts left out), search, type the business name,
+  approve. Same end state as an approval (role member, approved, "you're approved" email awaited), with `member_note` saying it was
+  added by an admin and an `audit_log` row (`member.add`). Refuses a driver or an account already a member. Exists so a customer
+  who signed up and never finished the form is not asked to apply again.
 - **The member dashboard is a portal, not a table (2026-10-28).** `components/MemberPortal.jsx` on
   `/account/member`: category chips, **one row per model with a quantity stepper** (each + adds ONE specific unit,
   cheapest first, because every unit is one of a kind and the cart is a set of SKUs; "See each unit" lists them),
