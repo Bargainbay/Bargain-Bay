@@ -20,11 +20,11 @@ export default async function SellPage() {
     <div className="narrow" style={{ maxWidth: 760 }}>
       <div className="panel">
         <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Sell on Bargain Bay</h1>
-        <p style={{ fontSize: 18, margin: '0 0 14px', color: 'var(--muted)' }}>Turn your appliances into sales.</p>
+        <p style={{ fontSize: 18, margin: '0 0 14px', color: 'var(--muted)' }}>Let us help you turn your products into sales.</p>
         <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 14px', display: 'grid', gap: 10, fontSize: 18 }}>
-          <li>🚚&nbsp; <strong>We deliver</strong> every sale</li>
           <li>📣&nbsp; <strong>We market</strong> your listings</li>
-          <li>💸&nbsp; <strong>You get paid</strong> after every sale</li>
+          <li>🚚&nbsp; <strong>We pick up and deliver</strong></li>
+          <li>💸&nbsp; <strong>You get paid</strong></li>
         </ul>
         <p style={{ fontSize: 14, margin: 0 }}>Fees and standards are in the <a href="/marketplace/policies">policies</a>.</p>
       </div>

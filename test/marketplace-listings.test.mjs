@@ -391,7 +391,7 @@ test('staff see the private serial and the evidence photo; every transition is i
 
 void MARKET_CATEGORIES;
 
-test('the category list reaches beyond appliances; a sofa needs no rating plate, interior or controls photo and no serial', () => {
+test('the category list reaches beyond appliances; a sofa needs no rating plate, interior or controls photo, but every category needs a model and serial', () => {
   for (const c of ['Television', 'Laptop', 'Sofa / Sectional', 'Mattress', 'BBQ / Grill', 'Power Tool', 'Toy']) assert(MARKET_CATEGORIES.includes(c), `${c} is listable`);
   equal(new Set(MARKET_CATEGORIES).size, MARKET_CATEGORIES.length);              // no category twice, so the shop never shows one twice
   assert(MARKET_CATEGORY_GROUPS.every((g) => g.cats.length > 0), 'no empty group');
@@ -400,4 +400,7 @@ test('the category list reaches beyond appliances; a sofa needs no rating plate,
   assert(photoProblems(six(), 'Refurbished', 'Sofa / Sectional').length === 0, 'a sofa needs only front and back');
   assert(photoProblems(six(), 'Refurbished', 'Refrigerator').length > 0, 'a fridge still needs the strict set');
   assert(photoProblems(six(), 'Refurbished').length > 0, 'no category chosen yet is the strict set');
+  const sofa = good({ category: 'Sofa / Sectional' });
+  assert(validateForSubmit({ ...sofa, serial: null }, photos(['front', 'back', 'other', 'other', 'other', 'other'])).some((x) => x.field === 'serial'), 'serial is mandatory for every category');
+  assert(validateForSubmit({ ...sofa, model: null }, photos(['front', 'back', 'other', 'other', 'other', 'other'])).some((x) => x.field === 'model'), 'model is mandatory for every category');
 });
