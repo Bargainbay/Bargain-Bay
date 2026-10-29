@@ -69,7 +69,7 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
           {apps.length === 0 ? <p style={{ margin: 0 }}>No applications waiting.</p> : apps.map((a) => (
             <ApplicationRow key={a.id} a={a} busy={busy} isAdmin={isAdmin}
               onVerify={(v) => act(() => post('/api/admin/marketplace/vendors', { action: 'verify_identity', vendorId: a.id, ...v }), 'Registry check recorded.')}
-              onApprove={() => act(() => post('/api/admin/marketplace/vendors', { action: 'approve', vendorId: a.id }), `${a.name} approved.`)}
+              onApprove={() => act(() => post('/api/admin/marketplace/vendors', { action: 'approve', vendorId: a.id }), `${a.name} approved and emailed. Now give their owner login (Vendors tab).`)}
               onReject={(reason) => act(() => post('/api/admin/marketplace/vendors', { action: 'reject', vendorId: a.id, reason }), 'Rejected.')} />
           ))}
           <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 0 }}>

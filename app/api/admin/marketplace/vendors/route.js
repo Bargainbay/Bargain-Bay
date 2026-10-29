@@ -9,6 +9,7 @@ import {
   markStrikeReviewed, reinstateVendor, strikesAwaitingReview
 } from '../../../../../lib/vendors';
 import { STRIKE_REASONS } from '../../../../../lib/marketplace-rules';
+import { notifyApplicantDecision } from '../../../../../lib/vendor-mail';
 import { VENDOR_ROLES, VENDOR_ROLE_LABELS } from '../../../../../lib/vendor-permissions';
 import { resetMemberMfa } from '../../../../../lib/vendor-team';
 
@@ -44,9 +45,15 @@ export async function POST(req) {
   try {
     switch (b?.action) {
       // staff
-      case 'approve': return NextResponse.json(await decideApplication(vendorId, { approve: true, by, hstStatus: b.hstStatus }));
+      case 'approve': {
+        const r = await decideApplication(vendorId, { approve: true, by, hstStatus: b.hstStatus });
+        return NextResponse.json({ ...r, emailed: (await notifyApplicantDecision(vendorId, true)).ok });
+      }
       case 'verify_identity': return NextResponse.json(await recordIdentityCheck(vendorId, { by, registryName: b.registryName, active: b.active === true, note: b.note }));
-      case 'reject': return NextResponse.json(await decideApplication(vendorId, { approve: false, by, reason: b.reason }));
+      case 'reject': {
+        const r = await decideApplication(vendorId, { approve: false, by, reason: b.reason });
+        return NextResponse.json({ ...r, emailed: (await notifyApplicantDecision(vendorId, false)).ok });
+      }
       case 'grant_user': {
         const role = VENDOR_ROLES.includes(b.role) ? b.role : 'viewer';
         if (role === 'owner' && !admin) return NextResponse.json({ error: 'Only an admin can give someone the owner login (it controls the bank account).' }, { status: 403 });
