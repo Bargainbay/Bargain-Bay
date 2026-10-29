@@ -11,6 +11,7 @@ import BulkClient from './BulkClient';
 import PayReport from './PayReport';
 import ClientBilling from './ClientBilling';
 import StopTimes from './StopTimes';
+import OrderNotes from './OrderNotes';
 import { cashAtTheDoor } from '../lib/cash-at-the-door';
 import { ROUTE_BASES } from '../lib/constants';
 import ProfitReport from './ProfitReport';
@@ -253,6 +254,41 @@ function JobHistory({ jobId }) {
 //
 // Deliberately NOT scoped to the day on screen: money reported at 7pm gets
 // confirmed the next morning, and a queue that empties at midnight loses money.
+// Extra work the crew did that wasn't on the job, still waiting for somebody to
+// decide whether the bill changes. Not scoped to the day on screen: an extra
+// noted on Friday is billed on Monday. "Mark billed" moves no money — it just
+// clears the line once the invoice reflects it.
+function ExtrasToBill({ rows, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  if (!rows?.length) return null;
+  async function billed(id) {
+    setBusy(true);
+    await fetch('/api/admin/order-notes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'billed', noteId: id, billed: true })
+    }).catch(() => {});
+    setBusy(false);
+    onChanged?.();
+  }
+  return (
+    <div className="disp-extras">
+      <h3>Extras to bill ({rows.length})</h3>
+      <ul style={{ margin: 0, paddingLeft: 18 }}>
+        {rows.map((r) => (
+          <li key={r.id}>
+            <b>{r.customer || r.jobNumber}</b>
+            {r.orderNumber ? ` · ${r.orderNumber}` : r.jobNumber ? ` · ${r.jobNumber}` : ''}
+            {r.jobDate ? ` · ${r.jobDate}` : ''} — {r.body}
+            <span className="onotes-meta">{r.author}{r.role === 'driver' ? ' (driver)' : ''} · {new Date(r.at).toLocaleDateString('en-CA')} ·{' '}
+              <button type="button" className="onotes-link" disabled={busy} onClick={() => billed(r.id)}>mark billed</button>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function MoneyToConfirm({ rows, busy, canConfirm, onConfirm, onReject }) {
   if (!rows?.length) return null;
   const total = rows.reduce((a, r) => a + Number(r.amount || 0), 0);
@@ -401,12 +437,13 @@ function savePod(job) {
   }, i * 400));
 }
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onEdit, onMove, onTimes, onCharge, onPay, seat, helpingFor }) {
+function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onEdit, onMove, onTimes, onCharge, onPay, onNotesChanged, seat, helpingFor }) {
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [timing, setTiming] = useState(false);
   const [history, setHistory] = useState(false);
   const [money, setMoney] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const closed = ['done', 'failed', 'cancelled'].includes(job.status);
   // Clocked in and not yet out: the stop is live and the card has to say so in
   // a number that keeps moving.
@@ -506,6 +543,9 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
           {job.clientName || (job.source === 'bargain_bay' ? 'Bargain Bay' : 'Own job')}
         </span>
         {job.driver2Name && <span className="disp-tag is-pair">2 crew</span>}
+        {job.extraCount > 0 && <span className="onotes-badge is-extra" title="The crew did extra work on this stop — check the bill">
+          {job.extraCount} extra{job.extraCount === 1 ? '' : 's'} to bill
+        </span>}
         <span className="disp-num">
           {job.ticketNumber || job.jobNumber}
           {job.orderNumber && <b className="disp-order"> · {job.orderNumber}</b>}
@@ -672,6 +712,12 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
               {money ? 'Hide money' : (job.chargeAmount == null ? 'Set charge' : 'Charge / pay')}
             </button>
           )}
+          <button type="button" className="btn" onClick={() => setNotesOpen((v) => !v)}>
+            {notesOpen ? 'Hide notes' : 'Notes'}
+            {job.noteCount > 0 && <span className={'onotes-badge' + (job.extraCount ? ' is-extra' : '')}>
+              {job.extraCount ? `${job.extraCount} extra${job.extraCount === 1 ? '' : 's'}` : job.noteCount}
+            </span>}
+          </button>
           <button type="button" className="btn" onClick={() => setHistory((v) => !v)}>
             {history ? 'Hide history' : 'History'}
           </button>
@@ -683,6 +729,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
             <MoneyForm job={job} busy={busy} onCharge={onCharge} onPay={onPay} onDone={() => setMoney(false)} />
           )}
           {history && <JobHistory jobId={job.id} />}
+          {notesOpen && <OrderNotes jobId={job.id} onChanged={() => onNotesChanged?.()} />}
         </div>
       )}
     </div>
@@ -1318,6 +1365,8 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
         </div>
       )}
 
+      <ExtrasToBill rows={board.extras} onChanged={() => refresh()} />
+
       <MoneyToConfirm rows={board.moneyToConfirm} busy={busy} canConfirm={!!canConfirmMoney}
         onConfirm={onConfirmMoney} onReject={onRejectMoney} />
 
@@ -1336,7 +1385,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
             <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
               onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
               onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes}
-              onCharge={canManageClients ? onCharge : null} onPay={onPay} />
+              onCharge={canManageClients ? onCharge : null} onPay={onPay} onNotesChanged={() => refresh()} />
           ))}
           {board.unscheduled.length > 0 && (
             <>
@@ -1345,7 +1394,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                   onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
                   onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes}
-              onCharge={canManageClients ? onCharge : null} onPay={onPay} />
+              onCharge={canManageClients ? onCharge : null} onPay={onPay} onNotesChanged={() => refresh()} />
               ))}
             </>
           )}
@@ -1383,7 +1432,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
                   <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                     onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
                     onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onMove={onMove} onTimes={onTimes}
-                    onCharge={canManageClients ? onCharge : null} onPay={onPay}
+                    onCharge={canManageClients ? onCharge : null} onPay={onPay} onNotesChanged={() => refresh()}
                     helpingFor={j.driver2Id === d.id ? j.driverName : null}
                     seat={k >= 0 ? { n: k + 1, first: k === 0, last: k === own.length - 1 } : null} />
                 );
