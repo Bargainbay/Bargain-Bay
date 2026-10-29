@@ -10,10 +10,11 @@ export default function SellPage() {
     <div className="narrow" style={{ maxWidth: 760 }}>
       <div className="panel">
         <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Sell on Bargain Bay</h1>
-        <ul style={{ fontSize: 18, lineHeight: 1.7, margin: '0 0 12px', paddingLeft: 22 }}>
-          <li>Reach GTA buyers.</li>
-          <li>We market and deliver.</li>
-          <li>Get paid fast.</li>
+        <p style={{ fontSize: 18, margin: '0 0 14px', color: 'var(--muted)' }}>Turn your appliances into sales.</p>
+        <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 14px', display: 'grid', gap: 10, fontSize: 18 }}>
+          <li>🚚&nbsp; <strong>We deliver</strong> every sale</li>
+          <li>📣&nbsp; <strong>We market</strong> your listings</li>
+          <li>💸&nbsp; <strong>You get paid</strong> by direct deposit</li>
         </ul>
         <p style={{ fontSize: 14, margin: 0 }}>Fees and standards are in the <a href="/marketplace/policies">policies</a>.</p>
       </div>
