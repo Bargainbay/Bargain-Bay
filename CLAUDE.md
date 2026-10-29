@@ -1064,6 +1064,22 @@ Refunds are **not** exposed to Sarah with a fee — `refund_invoice` still calls
 both functions with the default 0%. Keeping a fifth of a customer's money is the
 owner's call, not the phone agent's.
 
+## Packages — washer/dryer pairs and whole-kitchen bundles (added 2026-10-28)
+`lib/bundles.js`, migration `0043_bundles` (run **Run schema migration** after deploy), `/bundles` (storefront,
+header + sitemap), `/admin/bundles` (ADMIN), `/api/admin/bundles`, `components/{BundlesManager,AddBundleButton}.jsx`,
+`test/bundles.test.mjs`. Not to be confused with `/bundle`, the "ask for a custom quote" form.
+
+- **A package names specific SKUs and one price** (stock is one-of-a-kind). It shows only while EVERY unit is still for
+  sale, and only if its price beats the units' current prices.
+- **The price reaches an order as a discount, worked out in `/api/checkout` from authoritative prices**: the units'
+  prices minus the package price, only when the whole package is in the cart. It competes with a typed code and an
+  automatic promotion (shopper gets the best ONE, never both) and is recorded as `orders.coupon_code = BUNDLE-<id>`
+  with a "Package price" discount line. It is NOT a coupon row, so nothing is redeemed.
+- **Floors hold**: each unit gives up at most price minus cost (cost + 20% for consigned stock), and saving a package
+  below the units' total floor is refused. A member whose prices are already under the package price gets no extra.
+- Buying the same units one by one still earns the package price; the "Add the package" button is only a shortcut.
+- Marketplace sellers' and Vesta units are never packaged.
+
 ## Coupons & affiliates (added 2026-08-26)
 `/admin/coupons` (ADMIN only — a coupon changes what the storefront charges,
 which is not a selling-surface permission). `lib/coupons.js`, tables `coupons` /
