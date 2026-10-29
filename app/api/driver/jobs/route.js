@@ -12,6 +12,7 @@ import {
 } from '../../../../lib/jobs';
 import { getSetting } from '../../../../lib/settings';
 import { recordDoorCollection } from '../../../../lib/door-money';
+import { addNote, listNotes } from '../../../../lib/order-notes';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -32,7 +33,14 @@ const fail = (e) => NextResponse.json({ error: e?.message || 'That didn\'t work.
 export async function GET(req) {
   const s = await driver();
   if (!s) return nope();
-  const date = new URL(req.url).searchParams.get('date') || '';
+  const sp = new URL(req.url).searchParams;
+  // One stop's notes, for the notes box on its card.
+  if (sp.get('notes')) {
+    const id = Number(sp.get('notes'));
+    if (!(await jobBelongsToDriver(id, s.userId))) return NextResponse.json({ error: 'That stop is not assigned to you.' }, { status: 403 });
+    return NextResponse.json({ notes: await listNotes({ jobId: id }) });
+  }
+  const date = sp.get('date') || '';
   touchDriverSeen(s.userId).catch(() => {});
   try {
     // The review link rides along with the stop list so it is on the phone
@@ -63,6 +71,14 @@ export async function PATCH(req) {
   }
 
   try {
+    // A note for the next person on this customer, or an extra the crew did that
+    // was not on the job. Allowed on a finished stop too: it is remembered after.
+    if (body.action === 'note') {
+      const note = await addNote({
+        jobId, kind: body.kind === 'extra' ? 'extra' : 'note', body: body.body, by: who(s), role: 'driver'
+      });
+      return NextResponse.json({ ok: true, note });
+    }
     if (body.action === 'status') {
       const { rows } = await query('SELECT status FROM jobs WHERE id = $1', [jobId]);
       // Replay of something already done, or of a step the stop has moved past:

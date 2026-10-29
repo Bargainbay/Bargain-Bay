@@ -1006,6 +1006,19 @@ card is then a category placeholder AND `/feed` skips the unit entirely
 form; the first drop-off shipped exactly this way and was noticed days later.
 It **warns, never blocks** — the unit is perfectly sellable without one.
 
+## Internal notes and extras on orders and stops (added 2026-10-29)
+`lib/order-notes.js`, migration `0044_order_notes` (**run Run schema migration after deploy**), `components/OrderNotes.jsx`,
+`/api/admin/order-notes` (anyone with dispatch access: sales, coordinator, owner), driver notes via `PATCH /api/driver/jobs`
+`action: 'note'` (+ `GET ?notes=<jobId>`), `test/order-notes.test.mjs`.
+
+- **A note is for the next person handling the customer; never shown to the customer.** An **extra** is a note saying the
+  crew did something that wasn't on the job. Open extras show as a yellow **Extras to bill** panel on the dispatch board
+  (NOT scoped to the day on screen) and an "N extras to bill" badge on the stop card; **mark billed** clears one and moves no money.
+- **Keyed on order AND/OR job.** A stop with a Bargain Bay order stores both, so the note appears on the orders board and the
+  stop; an external client's stop carries job_id alone. Append-only; author from the session, never the body.
+- Drivers add notes online only (not through the offline outbox): a failed save shows an error rather than queueing.
+- Not built: extras carrying a suggested dollar amount, and a customer-visible note.
+
 ## The orders board has its own tab (added 2026-09-08)
 `/admin/orders` (staff) renders the same `AdminOrders` the Operations page has
 always folded away, and `lib/order-board.js` is the ONE loader behind both — the

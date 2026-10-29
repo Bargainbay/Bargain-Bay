@@ -1859,3 +1859,22 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
   .mp-buy { grid-column: 1 / -1; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
   .mp-price { margin: 0; }
 }
+
+/* Internal notes + extras (components/OrderNotes.jsx) */
+.onotes { margin-top: 8px; padding: 8px; border: 1px solid var(--border, #ddd); border-radius: 8px; font-size: 13px; text-align: left; }
+.onotes-head { font-weight: 700; margin-bottom: 4px; }
+.onotes-head span { font-weight: 400; color: var(--muted, #666); font-size: 12px; }
+.onotes-item { padding: 4px 0; border-bottom: 1px solid var(--border, #eee); white-space: pre-wrap; }
+.onotes-item.is-extra { background: #fff7e0; padding: 4px 6px; border-radius: 4px; }
+.onotes-item.is-billed { opacity: .6; }
+.onotes-tag { color: #8a5a00; font-size: 11px; }
+.onotes-meta { display: block; color: var(--muted, #666); font-size: 11px; }
+.onotes-link { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font-size: 11px; }
+.onotes-form { display: grid; gap: 6px; margin-top: 6px; }
+.onotes-form textarea { width: 100%; }
+.onotes-check { font-size: 12px; }
+.disp-extras { border: 2px solid #e0a800; background: #fff7e0; border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+.disp-extras h3 { margin: 0 0 4px; font-size: 14px; }
+.disp-extras li { margin: 4px 0; font-size: 13px; }
+.onotes-badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #eee; margin-left: 6px; }
+.onotes-badge.is-extra { background: #ffd966; font-weight: 700; }
