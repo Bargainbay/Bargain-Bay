@@ -5,7 +5,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import {
   textProblems, titleProblems, normalizeFields, validateForSubmit, photoProblems, tierProblem,
-  hammingDistance, isSamePicture, MARKET_CATEGORIES, LISTING_CONDITIONS
+  hammingDistance, isSamePicture, MARKET_CATEGORIES, MARKET_CATEGORY_GROUPS, isApplianceCategory, LISTING_CONDITIONS
 } from '../lib/listing-rules.js';
 import { processListingImage, sniffImage } from '../lib/image-checks.js';
 import { createApplication, issueStrike } from '../lib/vendors.js';
@@ -390,3 +390,14 @@ test('staff see the private serial and the evidence photo; every transition is i
 });
 
 void MARKET_CATEGORIES;
+
+test('the category list reaches beyond appliances; a sofa needs no rating plate, interior or controls photo and no serial', () => {
+  for (const c of ['Television', 'Laptop', 'Sofa / Sectional', 'Mattress', 'BBQ / Grill', 'Power Tool', 'Toy']) assert(MARKET_CATEGORIES.includes(c), `${c} is listable`);
+  equal(new Set(MARKET_CATEGORIES).size, MARKET_CATEGORIES.length);              // no category twice, so the shop never shows one twice
+  assert(MARKET_CATEGORY_GROUPS.every((g) => g.cats.length > 0), 'no empty group');
+  assert(isApplianceCategory('Refrigerator') && !isApplianceCategory('Sofa / Sectional'));
+  const six = (extra = []) => photos(['front', 'back', 'other', 'other', 'other', 'other', ...extra]);
+  assert(photoProblems(six(), 'Refurbished', 'Sofa / Sectional').length === 0, 'a sofa needs only front and back');
+  assert(photoProblems(six(), 'Refurbished', 'Refrigerator').length > 0, 'a fridge still needs the strict set');
+  assert(photoProblems(six(), 'Refurbished').length > 0, 'no category chosen yet is the strict set');
+});
