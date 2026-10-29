@@ -3,7 +3,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { createApplication, issueStrike } from '../lib/vendors.js';
 import { decideApplication } from './approved-vendor.mjs';
-import { listVendors, vendorDetail, setTier, submitPublicApplication } from '../lib/vendor-admin.js';
+import { listVendors, vendorDetail, setTier, submitPublicApplication, sellerStanding } from '../lib/vendor-admin.js';
 import { requiredPolicies } from '../lib/marketplace-policies.js';
 import { pendingPolicies } from '../lib/policy-acceptance.js';
 import { query } from '../lib/db.js';
@@ -75,6 +75,21 @@ test('the public application grants nothing, needs the essentials, and is thrott
     equal(d.vendor.hstStatus, 'registered');                         // the HST number is mandatory now
     await submitPublicApplication(apply({ legalName: 'Alpha Two' }));
     await rejects(() => submitPublicApplication(apply({ legalName: 'Alpha Three' })), /already have/);
+  } finally { done(); }
+});
+
+test('sellerStanding tells an account whether it is applied, a seller, or neither; a rejection can reapply', async () => {
+  const { done } = await withTestDb();
+  try {
+    const none = await sellerStanding('nobody@example.com');
+    equal(none.access, null); equal(none.application, null);
+    const r = await submitPublicApplication(apply({ contactEmail: 'Pat@Alpha.example' }));
+    const applied = await sellerStanding('pat@alpha.example');
+    equal(applied.application.id, r.id); equal(applied.application.status, 'applied'); equal(applied.access, null);
+    await decideApplication(r.id, { approve: true, by: 'staff', hstStatus: 'registered' });
+    await query(`INSERT INTO vendor_users (vendor_id, email, role) VALUES ($1,'pat@alpha.example','owner')`, [r.id]);
+    const seller = await sellerStanding('PAT@alpha.example');
+    equal(seller.access.id, r.id); equal(seller.application.status, 'approved');
   } finally { done(); }
 });
 
