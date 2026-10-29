@@ -134,8 +134,8 @@ export default function ListingEditor({ initial, canSelfShip, canSell, tier }) {
             <select value={form.category} onChange={set('category')} disabled={!editable}><option value="">Choose…</option>
               {MARKET_CATEGORY_GROUPS.map((g) => <optgroup key={g.label} label={g.label}>{g.cats.map((c) => <option key={c}>{c}</option>)}</optgroup>)}</select></div>
           {input('make', 'Make')}
-          {input('model', isApplianceCategory(form.category) ? 'Model number (exactly as on the rating plate)' : 'Model number or item name')}
-          {input('serial', isApplianceCategory(form.category) ? 'Serial number (private — never shown to customers)' : 'Serial number, if it has one (private)')}
+          {input('model', isApplianceCategory(form.category) ? 'Model number (exactly as on the rating plate)' : 'Model number (as printed on the item or its label)')}
+          {input('serial', 'Serial number (private — never shown to customers)')}
           <div className="field"><label>Condition</label>
             <select value={form.condition} onChange={set('condition')} disabled={!editable}><option value="">Choose…</option>
               {LISTING_CONDITIONS.map((c) => <option key={c}>{c}</option>)}</select>
