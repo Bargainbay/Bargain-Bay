@@ -8,6 +8,7 @@ import DriverFinish from './DriverFinish';
 import DriverPhotos from './DriverPhotos';
 import DriverShift from './DriverShift';
 import ReviewQr from './ReviewQr';
+import OrderNotes from './OrderNotes';
 
 // The driver's day. Designed for one hand, in a van, in the sun: big targets,
 // one obvious next action per stop, and no screen that needs reading.
@@ -448,6 +449,7 @@ export default function DriverStops({ initial, driverName }) {
 }
 
 function StopCard({ stop, n, done, preview, me, onStart, onArrive, onFinish, onFail, onAddPhotos, onReview }) {
+  const [notesOpen, setNotesOpen] = useState(false);
   const addr = fullAddress(stop);
   const isService = stop.type === 'service_call';
   const cash = cashAtTheDoor(stop);
@@ -547,6 +549,14 @@ function StopCard({ stop, n, done, preview, me, onStart, onArrive, onFinish, onF
         <div className="drv-svc">{stop.services.map((k) => SERVICE_LABEL[k] || k).join(' · ')}</div>
       )}
       {stop.notes && <div className="drv-note">{stop.notes}</div>}
+      {!preview && (
+        <>
+          <button type="button" className="drv-btn small" onClick={() => setNotesOpen((v) => !v)}>
+            📝 {notesOpen ? 'Hide notes' : 'Notes / extras'}
+          </button>
+          {notesOpen && <OrderNotes mode="driver" jobId={stop.id} />}
+        </>
+      )}
       {stop.invoiceNumber && (
         <a href={`/admin/packing-slip/${stop.invoiceNumber}`} target="_blank" rel="noopener noreferrer" className="drv-svc">
           📄 Packing slip — installation / haul-away
