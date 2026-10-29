@@ -43,6 +43,9 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     { key: 'bundles', label: 'Packages', href: '/admin/bundles' },
     // What resellers pay: the four member rates, previewed against live stock, plus one-off prices.
     { key: 'member-pricing', label: 'Member pricing', href: '/admin/member-pricing' },
+    // Who has applied to buy wholesale, who is approved, and what each has bought. Admin: approving
+    // one changes what the storefront charges them.
+    { key: 'resellers', label: 'Resellers', href: '/admin/resellers' },
     // The people who promote our stock for a percentage: applications, their codes, what they are owed.
     { key: 'affiliates', label: 'Affiliates', href: '/admin/affiliates' },
     { key: 'giveaway', label: 'Giveaway', href: '/admin/giveaway' },

@@ -24,7 +24,7 @@ export async function POST(req) {
       `New member application: ${businessName}`,
       `<p>A business requested wholesale member access on Bargain Bay.</p>
        <ul><li><b>Business:</b> ${esc(businessName)}</li><li><b>Contact:</b> ${esc(session.email)}</li><li><b>Note:</b> ${esc(note) || '—'}</li></ul>
-       <p>Review &amp; approve in <a href="https://bargainbay.ca/admin">the admin panel</a>.</p>`
+       <p>Review &amp; approve on <a href="https://bargainbay.ca/admin/resellers">Admin &rarr; Resellers</a>.</p>`
     ).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (e) {

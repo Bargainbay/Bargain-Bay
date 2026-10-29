@@ -247,6 +247,12 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   `/account/member` is the approved member's dashboard (wholesale catalogue with their price, orders, open
   invoices and quotes); anyone else is redirected to `/resellers`. **Wholesale prices are shown to approved
   members only**, and only because `decorate()` itself gives a member price to nobody else.
+- **Reseller applications are reviewed at `/admin/resellers` (2026-10-29, admin; nav tab "Resellers").** Same
+  `AdminMembers` component and `/api/admin/members` as the fold on Operations (kept), so the two cannot disagree.
+  Active members show orders / spent / last order (`memberOrderStats` in `lib/members.js`): orders placed while
+  signed in to the account, pre-tax goods, cancelled left out. Guest or invoiced orders are not tied to the
+  account and are not counted. The stats read soft-fails, so Approve still works if it ever breaks. The
+  new-application email to the owner links here (it used to link to bare `/admin`).
 - **The member dashboard is a portal, not a table (2026-10-28).** `components/MemberPortal.jsx` on
   `/account/member`: category chips, **one row per model with a quantity stepper** (each + adds ONE specific unit,
   cheapest first, because every unit is one of a kind and the cart is a set of SKUs; "See each unit" lists them),
