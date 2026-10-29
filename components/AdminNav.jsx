@@ -1,5 +1,6 @@
 import ClockPill from './ClockPill';
 import NavSignOut from './NavSignOut';
+import PendingBadge from './PendingBadge';
 
 // Owner-portal top nav. `active` = 'dashboard' | 'operations' | …
 // `salesOnly` renders the sales-associate nav: selling surfaces only.
@@ -84,6 +85,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
         {items.map((i) => (
           <a key={i.key} href={i.href} className={'admin-nav-link' + (i.key === active ? ' active' : '')}>
             {i.label}
+            {i.key === 'resellers' && <PendingBadge />}
           </a>
         ))}
         {/* A coordinator has no storefront to view, and "View store" on an

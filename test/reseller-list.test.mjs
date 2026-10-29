@@ -24,3 +24,18 @@ test('an application shows as pending, approval moves it, and orders are counted
     equal(list[0].spent, 1500);
   } finally { done(); }
 });
+
+test('the nav badge count is only the applications still waiting', async () => {
+  const { client: db, done } = await withTestDb();
+  try {
+    const { pendingMemberCount } = await import('../lib/members.js');
+    equal(await pendingMemberCount(), 0);
+    const a = (await db.query(`INSERT INTO users (email, name, password_hash) VALUES ('p1@x.ca','P1','x') RETURNING id`)).rows[0].id;
+    const b = (await db.query(`INSERT INTO users (email, name, password_hash) VALUES ('p2@x.ca','P2','x') RETURNING id`)).rows[0].id;
+    await requestMembership(a, 'One', '', {});
+    await requestMembership(b, 'Two', '', {});
+    equal(await pendingMemberCount(), 2);
+    await setMembership(a, 'approve');
+    equal(await pendingMemberCount(), 1);
+  } finally { done(); }
+});

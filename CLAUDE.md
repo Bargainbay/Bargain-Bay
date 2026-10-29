@@ -252,7 +252,9 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   Active members show orders / spent / last order (`memberOrderStats` in `lib/members.js`): orders placed while
   signed in to the account, pre-tax goods, cancelled left out. Guest or invoiced orders are not tied to the
   account and are not counted. The stats read soft-fails, so Approve still works if it ever breaks. The
-  new-application email to the owner links here (it used to link to bare `/admin`).
+  new-application email to the owner links here (it used to link to bare `/admin`). The nav tab carries a red
+  pending count (`components/PendingBadge.jsx`, fetched client-side from `/api/admin/members?count=1` like the clock
+  pill, so `AdminNav` stays a data-free server component; shows nothing at zero or on any failure).
 - **The member dashboard is a portal, not a table (2026-10-28).** `components/MemberPortal.jsx` on
   `/account/member`: category chips, **one row per model with a quantity stepper** (each + adds ONE specific unit,
   cheapest first, because every unit is one of a kind and the cart is a set of SKUs; "See each unit" lists them),
