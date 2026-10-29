@@ -631,6 +631,20 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
         </div>
       )}
 
+      {/* What the crew and the office have written about this stop. Extras are
+          the ones that may change the bill, so they are listed before anything
+          else on the card can be pressed. */}
+      {job.crewNotes?.length > 0 && (
+        <div className="onotes onotes-inline">
+          {job.crewNotes.map((n) => (
+            <div key={n.id} className={'onotes-item' + (n.kind === 'extra' ? ' is-extra' : '') + (n.billedAt ? ' is-billed' : '')}>
+              {n.kind === 'extra' && <b className="onotes-tag">EXTRA{n.billedAt ? ' · billed' : ' — check the bill'}</b>} {n.body}
+              <span className="onotes-meta">{n.author}{n.role === 'driver' ? ' (driver)' : ''}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <button type="button" className="disp-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         {open ? 'Hide' : 'Actions'}
       </button>
@@ -713,7 +727,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
             </button>
           )}
           <button type="button" className="btn" onClick={() => setNotesOpen((v) => !v)}>
-            {notesOpen ? 'Hide notes' : 'Notes'}
+            {notesOpen ? 'Hide notes' : 'Add note / extra'}
             {job.noteCount > 0 && <span className={'onotes-badge' + (job.extraCount ? ' is-extra' : '')}>
               {job.extraCount ? `${job.extraCount} extra${job.extraCount === 1 ? '' : 's'}` : job.noteCount}
             </span>}
