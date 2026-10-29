@@ -400,17 +400,21 @@ function BankTab({ banks, busy, verify, reject, onVendor }) {
   const [reason, setReason] = useState({});
   return (
     <div className="panel">
-      <h2 style={{ marginTop: 0, fontSize: 17 }}>Bank accounts waiting for verification</h2>
-      <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>Only verify after you have seen a void cheque or bank letter (or a test deposit landed), and the holder&rsquo;s name matches the business. Verifying attests that, under your name.</p>
+      <h2 style={{ marginTop: 0, fontSize: 17 }}>Payout methods waiting for verification</h2>
+      <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>Only verify after you have seen a void cheque or bank letter (or a test deposit landed) — or, for an e-transfer address, sent a small test e-transfer and the seller confirmed it arrived — and the holder&rsquo;s name matches the business. Verifying attests that, under your name.</p>
       {banks.length === 0 ? <p style={{ margin: 0 }}>Nothing waiting.</p> : banks.map((b) => (
         <div key={b.id} style={{ borderTop: '1px solid var(--line-soft)', padding: '12px 0' }}>
           <strong><VendorLink id={b.vendorId} onOpen={onVendor}>{b.vendor}</VendorLink></strong> <span style={{ fontSize: 13, color: 'var(--muted)' }}>({b.legalName})</span>
           {b.replacesExisting && <span className="pill warn" style={{ marginLeft: 8 }}>Replaces an account in use — 5-day safety wait</span>}
           <div style={{ fontSize: 14 }}>Holder: <strong>{b.holderName}</strong> {b.nameLooksRight ? <span className="pill ok">looks like the business</span> : <span className="pill warn">does NOT look like the business</span>}
-            <br />Institution {b.institution} · transit {b.transit} · account ••••{b.last4} · {b.method.replace('_', ' ')} · submitted {day(b.submittedAt)} by {b.submittedBy}</div>
+            <br />{b.method === 'etransfer'
+              ? <>Interac e-transfer to <strong>{b.etransferEmail}</strong></>
+              : <>Institution {b.institution} · transit {b.transit} · account ••••{b.last4} · {b.method.replace('_', ' ')}</>} · submitted {day(b.submittedAt)} by {b.submittedBy}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-            <select value={how} onChange={(e) => setHow(e.target.value)} style={{ width: 'auto' }}><option value="void_cheque">Void cheque</option><option value="bank_letter">Bank letter</option><option value="test_deposit">Test deposit</option></select>
-            <button className="btn primary" disabled={busy} onClick={() => confirm(`I confirm the name on this account matches ${b.legalName}.`) && verify(b.id, how)}>Verify</button>
+            {b.method === 'etransfer'
+              ? <span style={{ fontSize: 13 }}>Verified by: test e-transfer received</span>
+              : <select value={how} onChange={(e) => setHow(e.target.value)} style={{ width: 'auto' }}><option value="void_cheque">Void cheque</option><option value="bank_letter">Bank letter</option><option value="test_deposit">Test deposit</option></select>}
+            <button className="btn primary" disabled={busy} onClick={() => confirm(`I confirm the name on this account matches ${b.legalName}.`) && verify(b.id, b.method === 'etransfer' ? 'etransfer_test' : how)}>Verify</button>
             <input placeholder="Reason, if rejecting" value={reason[b.id] || ''} onChange={(e) => setReason({ ...reason, [b.id]: e.target.value })} style={{ width: 220 }} />
             <button className="btn danger" disabled={busy || !(reason[b.id] || '').trim()} onClick={() => reject(b.id, reason[b.id])}>Reject</button>
           </div>
