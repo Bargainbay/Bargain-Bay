@@ -69,7 +69,11 @@ export default function AdminMarketplace({ isAdmin, vendors, queue, due, banks, 
           {apps.length === 0 ? <p style={{ margin: 0 }}>No applications waiting.</p> : apps.map((a) => (
             <ApplicationRow key={a.id} a={a} busy={busy} isAdmin={isAdmin}
               onVerify={(v) => act(() => post('/api/admin/marketplace/vendors', { action: 'verify_identity', vendorId: a.id, ...v }), 'Registry check recorded.')}
-              onApprove={() => act(() => post('/api/admin/marketplace/vendors', { action: 'approve', vendorId: a.id }), `${a.name} approved and emailed. Now give their owner login (Vendors tab).`)}
+              onApprove={() => act(async () => {
+                const r = await post('/api/admin/marketplace/vendors', { action: 'approve', vendorId: a.id });
+                if (r?.accessError) throw new Error(`${a.name} is approved and emailed, but their owner login was not given: ${r.accessError} Use Give access on their vendor page.`);
+                return r;
+              }, isAdmin ? `${a.name} approved, emailed and given their owner login.` : `${a.name} approved and emailed. An admin still needs to give their owner login (Vendors tab).`)}
               onReject={(reason) => act(() => post('/api/admin/marketplace/vendors', { action: 'reject', vendorId: a.id, reason }), 'Rejected.')} />
           ))}
           <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 0 }}>
