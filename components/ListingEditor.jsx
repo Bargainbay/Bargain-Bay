@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import {
-  MARKET_CATEGORIES, LISTING_CONDITIONS, PHOTO_ROLES, photoRequirements, EDITABLE_STATUSES, LANES
+  MARKET_CATEGORY_GROUPS, isApplianceCategory, LISTING_CONDITIONS, PHOTO_ROLES, photoRequirements, EDITABLE_STATUSES, LANES
 } from '../lib/listing-rules';
 import { CONDITIONS } from '../lib/constants';
 
@@ -26,7 +26,7 @@ export default function ListingEditor({ initial, canSelfShip, canSell, tier }) {
 
   const editable = EDITABLE_STATUSES.includes(l.status);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
-  const req = photoRequirements(form.condition);
+  const req = photoRequirements(form.condition, form.category);
 
   async function patch(body) {
     setBusy(true); setErr(''); setNote('');
@@ -132,10 +132,10 @@ export default function ListingEditor({ initial, canSelfShip, canSell, tier }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '0 16px' }}>
           <div className="field"><label>Category</label>
             <select value={form.category} onChange={set('category')} disabled={!editable}><option value="">Choose…</option>
-              {MARKET_CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></div>
+              {MARKET_CATEGORY_GROUPS.map((g) => <optgroup key={g.label} label={g.label}>{g.cats.map((c) => <option key={c}>{c}</option>)}</optgroup>)}</select></div>
           {input('make', 'Make')}
-          {input('model', 'Model number (exactly as on the rating plate)')}
-          {input('serial', 'Serial number (private — never shown to customers)')}
+          {input('model', isApplianceCategory(form.category) ? 'Model number (exactly as on the rating plate)' : 'Model number or item name')}
+          {input('serial', isApplianceCategory(form.category) ? 'Serial number (private — never shown to customers)' : 'Serial number, if it has one (private)')}
           <div className="field"><label>Condition</label>
             <select value={form.condition} onChange={set('condition')} disabled={!editable}><option value="">Choose…</option>
               {LISTING_CONDITIONS.map((c) => <option key={c}>{c}</option>)}</select>
@@ -181,7 +181,7 @@ export default function ListingEditor({ initial, canSelfShip, canSell, tier }) {
         <p style={{ fontSize: 14, marginTop: 0 }}>
           Real photos of <strong>this</strong> unit, at least {req.minPublic}, sharp and well lit, at least 1600px on the long side.
           No logos, watermarks, phone numbers or text on the pictures. Needed: {req.roles.map((r) => ROLE_LABEL[r]).join(' · ')},
-          plus a clear photo of the rating plate (customers never see it). We re-save every photo, which removes its location data.
+          {req.evidence.includes('plate') ? 'plus a clear photo of the rating plate (customers never see it). ' : ''}We re-save every photo, which removes its location data.
         </p>
         {editable && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
@@ -193,7 +193,7 @@ export default function ListingEditor({ initial, canSelfShip, canSell, tier }) {
               {/* No `capture`: on iOS it makes the input camera-only and ignores `multiple`. */}
               <input type="file" accept="image/*" multiple hidden disabled={busy} onChange={upload} />
             </label>
-            <span style={{ fontSize: 13, color: 'var(--muted)' }}>{publicPhotos.length} public · rating plate {plate ? '✓' : 'missing'}</span>
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>{publicPhotos.length} public · {req.evidence.includes('plate') ? `rating plate ${plate ? '✓' : 'missing'}` : 'no rating plate needed'}</span>
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 10 }}>
