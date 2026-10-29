@@ -43,6 +43,9 @@ export default function DriverFinish({ stop, onClose, onDone }) {
   const [partsUsed, setPartsUsed] = useState('');
   const [partsNeeded, setPartsNeeded] = useState('');
   const [note, setNote] = useState('');
+  // Work done at the door that was not on the job. Goes to the office as an
+  // "extra" so the bill can be adjusted.
+  const [extraWork, setExtraWork] = useState('');
   // Already reported on this stop (a close-out being redone, or a stop the
   // office put back). Don't pre-tick it a second time: the money is on the
   // office's list once, and twice is a claim nobody can reconcile.
@@ -68,7 +71,7 @@ export default function DriverFinish({ stop, onClose, onDone }) {
   // refs simply overwrite the earlier attempt instead of stacking a second
   // payment behind it.
   const refs = useRef(null);
-  if (!refs.current) refs.current = { payment: newRef(), complete: newRef() };
+  if (!refs.current) refs.current = { payment: newRef(), complete: newRef(), extra: newRef() };
 
   // The signature pad. Sized to its own box in device pixels so the line lands
   // under the finger on a phone.
@@ -163,6 +166,12 @@ export default function DriverFinish({ stop, onClose, onDone }) {
         await queueOrSend({
           kind: 'patch', jobId: stop.id, ref: refs.current.payment,
           body: { jobId: stop.id, action: 'payment', amount: Number(amount), method, note: 'Collected on delivery' }
+        });
+      }
+      if (extraWork.trim()) {
+        await queueOrSend({
+          kind: 'patch', jobId: stop.id, ref: refs.current.extra,
+          body: { jobId: stop.id, action: 'note', kind: 'extra', body: extraWork.trim() }
         });
       }
       await queueOrSend({
@@ -276,6 +285,13 @@ export default function DriverFinish({ stop, onClose, onDone }) {
             </div>
           </>
         )}
+
+        <div className="drv-field">
+          <label>Extra work you did that wasn&apos;t on the job (optional)</label>
+          <textarea value={extraWork} onChange={(e) => setExtraWork(e.target.value)} rows={2} maxLength={1000}
+            placeholder="e.g. carried up 3 flights, removed a door, hooked up the dryer vent, hauled an old unit" />
+          <div className="hint">The office sees this so the bill can be adjusted.</div>
+        </div>
 
         {isService && (
           <>
