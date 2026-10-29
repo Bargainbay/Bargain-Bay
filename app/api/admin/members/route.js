@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb, query } from '../../../../lib/db';
-import { listMembers, setMembership } from '../../../../lib/members';
+import { listMembers, setMembership, pendingMemberCount } from '../../../../lib/members';
 import { sendMemberApproved } from '../../../../lib/email';
 
 export const dynamic = 'force-dynamic';
 async function admin() { const s = await getSession(); return !!(s && isAdmin(s)); }
 
-export async function GET() {
+export async function GET(req) {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
+  // ?count=1 is the nav badge: just the number waiting, not the whole list with order stats.
+  if (new URL(req.url).searchParams.get('count')) return NextResponse.json({ pending: await pendingMemberCount() });
   try { return NextResponse.json({ members: await listMembers() }); }
   catch (e) { return NextResponse.json({ error: e.message }, { status: 500 }); }
 }
