@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import OrderNotes from '../../components/OrderNotes';
 import { money, STATUS_LABELS } from '../../lib/constants';
 
 const STATUSES = ['pending_payment', 'confirmed', 'ready', 'out_for_delivery', 'delivered', 'cancelled'];
@@ -31,6 +32,7 @@ function fmtPickup(value) {
 }
 
 export default function AdminOrders({ initialOrders, total: initialTotal = null, byStatus: initialByStatus = null, pageSize = 200, drivers = [], reps = [] }) {
+  const [notesFor, setNotesFor] = useState(null);
   const [orders, setOrders] = useState(initialOrders);
   // The REAL number of orders in the window being looked at, which is not the
   // same thing as how many are on screen. The heading used to print
@@ -221,6 +223,13 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>{new Date(o.created_at).toLocaleString('en-CA')}</div>
                   <a href={`/admin/orders/${o.order_number}/edit`} style={{ fontSize: 12, textDecoration: 'underline' }}
                     title="Edit contact/address, change line items, or refund — even after payment.">Edit / refund</a>
+                  <div>
+                    <button type="button" className="onotes-link" style={{ fontSize: 12 }}
+                      onClick={() => setNotesFor(notesFor === o.id ? null : o.id)}>
+                      {notesFor === o.id ? 'Hide notes' : 'Internal notes'}
+                    </button>
+                  </div>
+                  {notesFor === o.id && <OrderNotes orderId={o.id} />}
                 </td>
                 <td>
                   {o.name}<br />
