@@ -39,6 +39,8 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     { key: 'marketplace', label: 'Marketplace', href: '/admin/marketplace', sales: true },
     { key: 'campaigns', label: 'Campaigns', href: '/admin/campaigns' },
     { key: 'coupons', label: 'Coupons', href: '/admin/coupons' },
+    // Package deals: a washer + dryer pair or a whole kitchen sold together at one price.
+    { key: 'bundles', label: 'Packages', href: '/admin/bundles' },
     // What resellers pay: the four member rates, previewed against live stock, plus one-off prices.
     { key: 'member-pricing', label: 'Member pricing', href: '/admin/member-pricing' },
     // The people who promote our stock for a percentage: applications, their codes, what they are owed.

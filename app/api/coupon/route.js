@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getMany } from '../../../lib/inventory';
 import { resolvePrices } from '../../../lib/pricing';
 import { getSession, normalizeEmail } from '../../../lib/auth';
+import { bestBundleDiscount } from '../../../lib/bundles';
 import { validateCoupon, bestAutoCoupon, typedCodeUnits } from '../../../lib/coupons';
 import { round2 } from '../../../lib/constants';
 
@@ -46,6 +47,10 @@ export async function POST(req) {
   // with no code typed. /api/checkout works it out again from scratch.
   if (!code) {
     const auto = await bestAutoCoupon(items, priced, { email });
+    const pkg = await bestBundleDiscount(items, priced);
+    if (pkg && (!auto || pkg.discount > auto.discount)) {
+      return NextResponse.json({ ok: true, auto: true, discount: pkg.discount, capped: pkg.capped, code: pkg.code, label: 'Package price' });
+    }
     if (!auto) return NextResponse.json({ ok: true, none: true });
     return NextResponse.json({
       ok: true, auto: true, discount: auto.discount, capped: auto.capped,

@@ -15,6 +15,7 @@ import { resolvePrices } from '../../../lib/pricing';
 import { sendOrderEmails, sendEmail } from '../../../lib/email';
 import { readAttribution, ensureAttributionColumns } from '../../../lib/attribution';
 import { createAndSendInvoice } from '../../../lib/invoices';
+import { bestBundleDiscount } from '../../../lib/bundles';
 import { validateCoupon, bestAutoCoupon, typedCodeUnits, redeemCouponWithClient, releaseCouponForOrder, ensureCouponSchema } from '../../../lib/coupons';
 import { upsertCustomer } from '../../../lib/customers';
 import { grantConsent } from '../../../lib/consent';
@@ -190,9 +191,26 @@ export async function POST(req) {
   } catch (e) {
     console.error('automatic promotion check failed (continuing without)', e.message);
   }
-  const promoLabel = coupon
-    ? (coupon.autoApply ? `Automatic discount (${coupon.code})` : `Promo code ${coupon.code}`)
-    : '';
+  // A package price (washer + dryer, a whole kitchen) is one more thing competing for the
+  // same single discount. It wins only when it is worth more than the code or promotion above.
+  let bundleCodeUsed = null;
+  try {
+    const pkg = await bestBundleDiscount(items.filter((u) => !u.marketplace), priced);
+    if (pkg && pkg.discount > discount) {
+      if (coupon && coupon.commissionPct > 0) attributeTo = coupon;
+      coupon = null; discount = pkg.discount; couponError = null;
+      bundleCodeUsed = pkg.code;
+    }
+  } catch (e) {
+    console.error('bundle check failed (continuing without)', e.message);
+  }
+  // What the order and invoice record as the code: a real coupon's, or the package's.
+  const appliedCode = coupon ? coupon.code : bundleCodeUsed;
+  const promoLabel = bundleCodeUsed
+    ? 'Package price'
+    : coupon
+      ? (coupon.autoApply ? `Automatic discount (${coupon.code})` : `Promo code ${coupon.code}`)
+      : '';
 
   // ---- totals (the discount comes off the goods; HST applies to what's left,
   //      plus delivery — a third-party cost we pass through undiscounted) ----
@@ -262,7 +280,7 @@ export async function POST(req) {
         [userId, email, name, phone || null, deliveryMethod,
          address || null, city || null, postal || null, subtotal, hst, total,
          cardOnline ? null : paymentMethod, attr.source, attr.campaign, attr.referrer,
-         coupon ? coupon.code : null, discount,
+         appliedCode, discount,
          ip, userAgent(req), verifyToken, preVerified ? new Date() : null]
       );
       const orderId = rows[0].id;
@@ -379,7 +397,7 @@ export async function POST(req) {
       if (sessionId) {
         await query('UPDATE orders SET stripe_session_id = $2 WHERE id = $1', [order.id, sessionId]).catch(() => {});
       }
-      payload = { url, orderNumber: order.orderNumber, discount, couponCode: coupon ? coupon.code : null, couponError };
+      payload = { url, orderNumber: order.orderNumber, discount, couponCode: appliedCode, couponError };
     } catch (e) {
       console.error('Stripe session failed — cancelling order', e);
       await query("UPDATE orders SET status = 'cancelled' WHERE id = $1", [order.id]).catch(() => {});
@@ -395,7 +413,7 @@ export async function POST(req) {
     // Customer receipt + owner alert (fire-and-forget; never blocks the order).
     sendOrderEmails(
       { orderNumber: order.orderNumber, name, email, deliveryMethod, address, city, postal,
-        subtotal, hst, total, paymentMethod, discount, couponCode: coupon ? coupon.code : null },
+        subtotal, hst, total, paymentMethod, discount, couponCode: appliedCode },
       items.map((u) => ({ title: u.title || `${u.make} ${u.model}`, price: priceOf(u) }))
     ).catch((e) => console.error('order emails failed', e.message));
     // Confirm-it's-really-you link. The unit is ALREADY held at this point, so a
@@ -419,7 +437,7 @@ export async function POST(req) {
     }
     payload = {
       orderUrl: trackUrl, orderNumber: order.orderNumber,
-      discount, couponCode: coupon ? coupon.code : null, couponError,
+      discount, couponCode: appliedCode, couponError,
       verifyEmailSent: !!verifyToken
     };
   }
@@ -440,7 +458,7 @@ export async function POST(req) {
         to: SERVICE_EMAIL,
         subject: `Below-cost order ${order.orderNumber}: ${money(cost - goodsNet)} under cost`,
         html: `<p>Order <b>${order.orderNumber}</b> sells goods for ${money(goodsNet)} against a cost of ${money(cost)} (${money(cost - goodsNet)} under).</p>`
-          + `<p>${discount ? `Discount applied: ${money(discount)} (${coupon ? coupon.code : ''}).` : 'No discount was applied, so the price itself is under cost (member or clearance price).'}</p>`
+          + `<p>${discount ? `Discount applied: ${money(discount)} (${appliedCode || ''}).` : 'No discount was applied, so the price itself is under cost (member or clearance price).'}</p>`
           + `<p>${items.map((u) => `${u.id} ${u.make || ''} ${u.model || ''}: price ${money(priceOf(u))}, cost ${money(Number(u.cost) || 0)}`).join('<br>')}</p>`
       });
     }

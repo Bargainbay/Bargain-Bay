@@ -33,6 +33,7 @@ export default function Header({ promo = null }) {
           <nav className={'main-nav' + (open ? ' open' : '')} onClick={() => setOpen(false)}>
             <a href="/shop">Shop</a>
             <a href="/deals" className="nav-clearance">Deals</a>
+            <a href="/bundles" className="nav-clearance">Packages</a>
             <a href="/clearance" className="nav-clearance">Clearance</a>
             <a href="/refurbished" className="nav-refurb">Refurbished</a>
             <a href="/premium" className="nav-premium">Premium Brands</a>
