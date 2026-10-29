@@ -9,6 +9,7 @@ import {
   markStrikeReviewed, reinstateVendor, strikesAwaitingReview
 } from '../../../../../lib/vendors';
 import { STRIKE_REASONS } from '../../../../../lib/marketplace-rules';
+import { query } from '../../../../../lib/db';
 import { notifyApplicantDecision } from '../../../../../lib/vendor-mail';
 import { VENDOR_ROLES, VENDOR_ROLE_LABELS } from '../../../../../lib/vendor-permissions';
 import { resetMemberMfa } from '../../../../../lib/vendor-team';
@@ -47,7 +48,19 @@ export async function POST(req) {
       // staff
       case 'approve': {
         const r = await decideApplication(vendorId, { approve: true, by, hstStatus: b.hstStatus });
-        return NextResponse.json({ ...r, emailed: (await notifyApplicantDecision(vendorId, true)).ok });
+        // The owner login controls the bank account, so only an admin's approval hands it over. A staff
+        // approval stands, and an admin gives access afterwards ("Give access" on the vendor).
+        let access = false;
+        let accessError = null;
+        if (admin) {
+          const { rows } = await query('SELECT contact_name, contact_email FROM vendors WHERE id = $1', [vendorId]);
+          try {
+            await grantVendorUser(vendorId, { email: rows[0]?.contact_email, name: rows[0]?.contact_name, role: 'owner', by });
+            access = true;
+          } catch (e) { accessError = e?.message || 'Could not give access.'; }
+        }
+        const mail = await notifyApplicantDecision(vendorId, true, { accessGranted: access });
+        return NextResponse.json({ ...r, emailed: mail.ok, access, accessError });
       }
       case 'verify_identity': return NextResponse.json(await recordIdentityCheck(vendorId, { by, registryName: b.registryName, active: b.active === true, note: b.note }));
       case 'reject': {
