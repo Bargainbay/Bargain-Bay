@@ -1,9 +1,9 @@
 // The staff side of the marketplace: vendor lists, who sees money, tier overrides and the public application.
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
-import { createApplication, issueStrike } from '../lib/vendors.js';
+import { createApplication, issueStrike, sellerStanding } from '../lib/vendors.js';
 import { decideApplication } from './approved-vendor.mjs';
-import { listVendors, vendorDetail, setTier, submitPublicApplication, sellerStanding } from '../lib/vendor-admin.js';
+import { listVendors, vendorDetail, setTier, submitPublicApplication } from '../lib/vendor-admin.js';
 import { requiredPolicies } from '../lib/marketplace-policies.js';
 import { pendingPolicies } from '../lib/policy-acceptance.js';
 import { query } from '../lib/db.js';

@@ -2,7 +2,7 @@ import VendorApplyForm from '../../../components/VendorApplyForm';
 import { requiredPolicies } from '../../../lib/marketplace-policies';
 import { getSession } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
-import { sellerStanding } from '../../../lib/vendor-admin';
+import { sellerStanding } from '../../../lib/vendors';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Sell on Bargain Bay', description: 'Apply to sell appliances to Bargain Bay customers across Durham Region and the GTA.' };

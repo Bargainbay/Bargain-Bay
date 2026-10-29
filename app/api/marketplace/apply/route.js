@@ -2,7 +2,8 @@
 // throttles in Postgres (lib/vendor-admin.js), and it grants NOTHING — staff review every application.
 import { NextResponse } from 'next/server';
 import { honeypotTripped, isDisposableEmail, clientIp } from '../../../../lib/antifraud';
-import { submitPublicApplication, sellerStanding } from '../../../../lib/vendor-admin';
+import { submitPublicApplication } from '../../../../lib/vendor-admin';
+import { sellerStanding } from '../../../../lib/vendors';
 import { getSession } from '../../../../lib/auth';
 import { notifyOwner, esc } from '../../../../lib/email';
 
