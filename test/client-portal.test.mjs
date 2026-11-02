@@ -190,3 +190,9 @@ test('invoices billed to a client are listed with what is owing', async () => {
     equal(list.find((i) => i.number === 'INV-2').owing, 0);
   } finally { done(); }
 });
+
+test('RS Solutions invoices are paid to Service@, not the storefront accounting address', async () => {
+  const { brandFor } = await import('../lib/brands.js');
+  equal(brandFor('rs_solutions').etransferEmail, 'Service@rssolutions.ca');
+  equal(brandFor('bargain_bay').etransferEmail, 'accounting@bargainbay.ca');
+});

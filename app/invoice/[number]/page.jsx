@@ -165,7 +165,7 @@ export default async function InvoicePage({ params, searchParams }) {
         <div className="notice-box" style={{ lineHeight: 1.6 }}>
           <b>Pay by Interac e-Transfer.</b><br />
           {partial && <>We&apos;ve received <b>{money(amountPaid)}</b> so far — thank you! </>}
-          Send <b>{money(partial ? balance : invoice.total)}</b> to <b>{ETRANSFER_EMAIL}</b> (auto-deposit — no security question).
+          Send <b>{money(partial ? balance : invoice.total)}</b> to <b>{B.etransferEmail}</b> (auto-deposit — no security question).
           Put invoice number <b>{invoice.number}</b> in the message so we can match it. Prefer to pay in person?
           Reply to your invoice email and we&apos;ll arrange it.
         </div>

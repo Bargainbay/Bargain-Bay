@@ -1,4 +1,4 @@
-import { money, ETRANSFER_EMAIL, torontoDate } from '../lib/constants';
+import { money, torontoDate } from '../lib/constants';
 
 // An RS Solutions client invoice, laid out like the paper one clients already
 // know: letterhead, who it is for / who to pay / number / project / date, one row
@@ -103,7 +103,7 @@ export default function RsInvoiceDocument({ invoice, B, rows, portalHref, pdfHre
         <p className="sm noprint" style={{ marginTop: 14 }}>Paid{invoice.paid_at ? ` on ${torontoDate(invoice.paid_at)}` : ''}{invoice.payment_method ? ` · ${invoice.payment_method}` : ''} — thank you!</p>
       ) : (open || partial) && (
         <p className="sm" style={{ marginTop: 14 }}>
-          <b>Pay by Interac e-Transfer</b> to {ETRANSFER_EMAIL} (auto-deposit, no security question) and put <b>{invoice.number}</b> in the message.
+          <b>Pay by Interac e-Transfer</b> to {B.etransferEmail} (auto-deposit, no security question) and put <b>{invoice.number}</b> in the message.
         </p>
       )}
     </div>

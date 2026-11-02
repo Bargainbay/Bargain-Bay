@@ -97,7 +97,7 @@ function renderRs(invoice, B, rows) {
     doc.font('Helvetica').fontSize(8.5).fillColor(grey).text(`Notes: ${invoice.memo || ''}`, L, y, { width: 300 });
     if (['open', 'partial'].includes(invoice.status)) {
       doc.font('Helvetica').fontSize(8.5).fillColor('#222').text(
-        `Pay by Interac e-Transfer to ${ETRANSFER_EMAIL} (auto-deposit) and put ${invoice.number} in the message.`, L, y + 62, { width: R - L });
+        `Pay by Interac e-Transfer to ${B.etransferEmail} (auto-deposit) and put ${invoice.number} in the message.`, L, y + 62, { width: R - L });
     }
     doc.end();
   });
@@ -209,7 +209,7 @@ function render(invoice, B) {
       ensure(70);
       doc.moveDown(0.6).font('Helvetica-Bold').fontSize(10).fillColor(ink).text('Pay by Interac e-Transfer', L, doc.y, { width: W });
       doc.font('Helvetica').fontSize(9.5).fillColor(ink).text(
-        `Send ${cad(partial ? balance : invoice.total)} to ${ETRANSFER_EMAIL} (auto-deposit, no security question). Put invoice number ${invoice.number} in the message so we can match it.`,
+        `Send ${cad(partial ? balance : invoice.total)} to ${B.etransferEmail} (auto-deposit, no security question). Put invoice number ${invoice.number} in the message so we can match it.`,
         L, doc.y, { width: W });
     }
     if (invoice.memo) {

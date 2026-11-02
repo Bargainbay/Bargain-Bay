@@ -8,9 +8,10 @@ export default function ClientPortalStyle() {
       .cp-brand { font-size:22px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--charcoal); }
       .cp-sub { font-size:12.5px; color:var(--muted); }
       .cp h1 { margin:0 0 4px; font-size:24px; color:var(--charcoal); }
-      .cp-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin:14px 0 18px; }
-      .cp-tile { border:1px solid var(--line, #ddd); border-radius:10px; padding:12px 14px; background:var(--card, #fff); }
-      .cp-tile b { display:block; font-size:24px; line-height:1.1; color:var(--charcoal); }
+      .cp-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:14px 0 18px; }
+      .cp-tile { border:1px solid var(--line, #ddd); border-radius:10px; padding:12px 12px; background:var(--card, #fff); container-type:inline-size; min-width:0; }
+      /* The number scales with its own box, so "$2,898.45" can never spill out of it. */
+      .cp-tile b { display:block; font-size:clamp(14px, 19cqw, 24px); line-height:1.1; color:var(--charcoal); white-space:nowrap; }
       .cp-tile span { font-size:12px; color:var(--muted); }
       .cp-filter { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px; }
       .cp-filter label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); display:block; }
