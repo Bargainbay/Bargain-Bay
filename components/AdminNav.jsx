@@ -64,6 +64,9 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // The cost list that feeds it is one click from that page.
     { key: 'daily-pnl', label: 'Daily P&L', href: '/admin/daily-pnl' },
     { key: 'reports', label: 'Reports', href: '/admin/reports' },
+    // The agent village is its own section: a game-style view of every job and
+    // assistant, not a report. Admin only.
+    { key: 'village', label: 'Village', href: '/admin/agent-floor' },
     { key: 'operations', label: 'Operations', href: '/admin/operations' }
   ];
   // An accountant gets the books and nothing else — no operations, no dispatch,
