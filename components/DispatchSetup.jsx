@@ -97,7 +97,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
   }
 
   async function copyPortal(c) {
-    const url = `${window.location.origin}${c.portal_path}`;
+    const url = c.portal_url || `${window.location.origin}${c.portal_path}`;
     try { await navigator.clipboard.writeText(url); setCopied(c.id); setTimeout(() => setCopied(null), 2500); }
     catch { window.prompt('Copy this link', url); }
   }
@@ -555,14 +555,14 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                       id: c.id, name: c.name, address: c.address || '', contactName: c.contact_name || '', contactEmail: c.contact_email || '',
                       contactPhone: c.contact_phone || '', notify: !!c.notify_on_complete
                     })}>Edit</button>
-                    {c.portal_path && (
+                    {c.portal_url && (
                       <>
                         {' '}
                         <button type="button" className="btn" onClick={() => copyPortal(c)}>
                           {copied === c.id ? 'Link copied ✓' : 'Copy client link'}
                         </button>
                         {' '}
-                        <a className="btn" href={c.portal_path} target="_blank" rel="noreferrer">Preview</a>
+                        <a className="btn" href={c.portal_url} target="_blank" rel="noreferrer">Preview</a>
                       </>
                     )}
                   </>
