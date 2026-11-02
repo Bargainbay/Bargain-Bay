@@ -113,7 +113,7 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
 @media (min-width: 761px) {
   .header-row { flex-wrap: wrap; height: auto; padding: 8px 0 4px; row-gap: 2px; }
   .header-actions { order: 2; flex-shrink: 0; }
-  .logo { flex-shrink: 1; min-width: 0; }
+  .header-row .logo { flex-shrink: 1; min-width: 0; }
   .cats-row { flex-wrap: wrap; overflow-x: visible; row-gap: 4px; }
   .main-nav { order: 3; flex: 1 1 100%; flex-wrap: wrap; row-gap: 6px; column-gap: clamp(12px, 1.6vw, 22px); padding: 6px 0 8px; border-top: 1px solid var(--line-soft); min-width: 0; }
 }
