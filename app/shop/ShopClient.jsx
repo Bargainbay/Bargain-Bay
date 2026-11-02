@@ -73,6 +73,14 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
 
   const totalUnits = groups.reduce((n, g) => n + g.count, 0);
 
+  const brandCounts = useMemo(() => {
+    const c = {};
+    for (const u of units) c[u.make] = (c[u.make] || 0) + 1;
+    return c;
+  }, [units]);
+  const anyFilter = !!(q || collection || cat || style || cond || band || make);
+  const clearAll = () => { setQ(''); setCollection(''); setCat(''); setStyle(''); setCond(''); setBand(''); setMake(''); };
+
   const colLabel = COLLECTIONS.find((c) => c.slug === collection)?.label;
 
   return (
@@ -110,7 +118,7 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
         </select>
         <select value={make} onChange={(e) => setMake(e.target.value)} aria-label="Brand">
           <option value="">All brands</option>
-          {makes.map((m) => <option key={m} value={m}>{m}</option>)}
+          {makes.map((m) => <option key={m} value={m}>{m} ({brandCounts[m] || 0})</option>)}
         </select>
         <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
           <option value="newest">Sort: newest</option>
@@ -120,6 +128,7 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
       </div>
 
       <div className="result-count">
+        {anyFilter && <button className="btn" style={{ marginRight: 10, padding: '2px 10px', fontSize: 13 }} onClick={clearAll}>Clear filters</button>}
         {totalUnits} unit{totalUnits === 1 ? '' : 's'} available — each one-of-a-kind
         {groups.length !== totalUnits && ` · ${groups.length} model${groups.length === 1 ? '' : 's'}`}
       </div>
