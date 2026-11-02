@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { needsAdminMfa, ADMIN_MARKER_COOKIE, ADMIN_SESSION_COOKIE } from './lib/admin-mfa-gate.js';
 
 // dispatch.rssolutions.ca is the RS Solutions address. It points at this same
 // app, so without this it would happily serve the Bargain Bay storefront on an
@@ -46,8 +47,25 @@ const ALLOWED = [
   /^\/reset-password$/
 ];
 
-export function proxy(req) {
+export async function proxy(req) {
   const host = (req.headers.get('host') || '').toLowerCase().split(':')[0];
+  const { pathname } = req.nextUrl;
+
+  // Admin two-factor, on EVERY host. Off unless ADMIN_MFA=on (see lib/admin-mfa-gate.js).
+  if (await needsAdminMfa({
+    pathname,
+    sessionToken: req.cookies.get(ADMIN_SESSION_COOKIE)?.value,
+    markerToken: req.cookies.get(ADMIN_MARKER_COOKIE)?.value
+  })) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Two-step sign-in required.', mfa: true }, { status: 403 });
+    }
+    const url = req.nextUrl.clone();
+    url.pathname = '/admin/security';
+    url.search = `?next=${encodeURIComponent(pathname + req.nextUrl.search)}`;
+    return NextResponse.redirect(url);
+  }
+
   if (!RS_HOSTS.has(host)) {
     // A client's delivery page belongs to RS Solutions. If one is opened on any
     // other host (an old copied link), send it to the RS address.
@@ -58,7 +76,6 @@ export function proxy(req) {
     return NextResponse.next();
   }
 
-  const { pathname } = req.nextUrl;
   if (ALLOWED.some((re) => re.test(pathname))) return NextResponse.next();
 
   // Redirect rather than rewrite, so the address bar tells the truth about
