@@ -105,6 +105,18 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
 .announce b { color: #fff; font-weight: 500; }
 .announce a { text-decoration: underline; text-underline-offset: 2px; }
 .header-row { display: flex; align-items: center; gap: 16px; height: 72px; }
+/* The menu has eleven links plus a logo and the account buttons: ~1500px of
+   content that has never fit in the 1140px page column (and overflow-x is
+   `clip`, so the overflow was simply cut off). Above the phone breakpoint the
+   header is two rows — logo and account on top, the menu under them — and the
+   menu itself wraps, so it fits at any width or browser zoom. */
+@media (min-width: 761px) {
+  .header-row { flex-wrap: wrap; height: auto; padding: 8px 0 4px; row-gap: 2px; }
+  .header-actions { order: 2; flex-shrink: 0; }
+  .header-row .logo { flex-shrink: 1; min-width: 0; }
+  .cats-row { flex-wrap: wrap; overflow-x: visible; row-gap: 4px; }
+  .main-nav { order: 3; flex: 1 1 100%; flex-wrap: wrap; row-gap: 6px; column-gap: clamp(12px, 1.6vw, 22px); padding: 6px 0 8px; border-top: 1px solid var(--line-soft); min-width: 0; }
+}
 .logo { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .logo img { height: 52px; width: auto; }
 .logo-sub { font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
@@ -429,7 +441,6 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .admin-nav-link { font-family: var(--font-head); text-transform: uppercase; letter-spacing: .05em; font-size: 13px; font-weight: 500; color: var(--muted); padding: 4px 0; border-bottom: 2px solid transparent; }
 .admin-nav-link:hover { color: var(--charcoal); }
 .admin-nav-link.active { color: var(--charcoal); border-bottom-color: var(--taupe); }
-.nav-badge { display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; background: #c0392b; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; letter-spacing: 0; }
 
 .dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .kpi-card { background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 16px; }
@@ -1879,4 +1890,3 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .disp-extras li { margin: 4px 0; font-size: 13px; }
 .onotes-badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #eee; margin-left: 6px; }
 .onotes-badge.is-extra { background: #ffd966; font-weight: 700; }
-.onotes-inline { margin: 6px 0; }
