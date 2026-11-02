@@ -29,12 +29,36 @@ export default function PrivacyPage() {
       <p>We share personal information only as needed, with:</p>
       <ul>
         <li><b>Payment processors</b> (Stripe) to take payment;</li>
+        <li><b>Plaid</b>, which connects our own business bank accounts to our bookkeeping (see &ldquo;Business bank data&rdquo; below);</li>
         <li><b>Our hosting and e-commerce infrastructure</b>, which processes data on our behalf;</li>
         <li><b>Delivery and freight carriers</b> to get your order to you;</li>
         <li><b>Service providers</b> (e.g., email and analytics tools) bound by confidentiality;</li>
         <li><b>Authorities</b> when required by law.</li>
       </ul>
       <p>We do <b>not</b> sell your personal information.</p>
+
+      <h2>Business bank data</h2>
+      <p>
+        We use Plaid Technologies, Inc. (&ldquo;Plaid&rdquo;) to connect <b>our own business bank accounts</b> to our
+        bookkeeping. This is the company&apos;s account information, not a customer&apos;s: only our administrators
+        link an account, and customers are never asked to connect a bank to Bargain Bay.
+      </p>
+      <p>
+        Through Plaid we receive the transactions on those accounts (date, amount and description). We use them to
+        record business expenses, match incoming payments, prepare tax and HST filings, and keep our financial
+        records. Because we are paid by e-transfer and other transfers, a transaction may include the name of the
+        person or business that paid us, or that we paid; we use that only to match the payment to an order or
+        invoice and to keep our books.
+      </p>
+      <p>
+        We never see or store anyone&apos;s online banking username or password; they are entered into Plaid&apos;s
+        secure window. We hold only an access token and the transaction data, protected as described in
+        &ldquo;Data retention &amp; security&rdquo;, and available only to authorised people (our administrators, whose
+        accounts sign in with two-step verification, and our accountant). Plaid handles the data it processes under its own privacy policy
+        (<a href="https://plaid.com/legal/" style={{ textDecoration: 'underline' }}>plaid.com/legal</a>). We keep
+        bank transaction records as accounting records for six years, as Canadian tax law requires, and remove the
+        bank connection when we no longer need it.
+      </p>
 
       <h2>Cookies</h2>
       <p>
