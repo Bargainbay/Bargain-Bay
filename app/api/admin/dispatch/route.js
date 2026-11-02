@@ -362,6 +362,16 @@ export async function POST(req) {
       if (!s.full) return NextResponse.json({ error: 'Only an admin can invoice a client.' }, { status: 403 });
       return NextResponse.json({ ok: true, ...(await invoiceClientJobs(body.clientId, body, who(s))) });
     }
+    // The password a client's people enter to open their delivery portal. Admin
+    // only: it decides who can see a company's deliveries and invoices. Setting a
+    // new one signs everyone out of the portal; an empty password switches it off.
+    if (body.action === 'client_portal_password') {
+      if (!s.full) return NextResponse.json({ error: 'Only an admin can set a portal password.' }, { status: 403 });
+      const { setClientPassword, clearClientPassword } = await import('../../../../lib/client-portal-auth');
+      if (body.clear) await clearClientPassword(body.clientId);
+      else await setClientPassword(body.clientId, body.password);
+      return NextResponse.json({ ok: true });
+    }
     if (body.action === 'client') {
       // Open to all staff on purpose. A client is a company name — gating it
       // behind an admin is the exact friction that sends someone back to paper

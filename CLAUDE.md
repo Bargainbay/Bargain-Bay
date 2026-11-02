@@ -255,6 +255,12 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   new-application email to the owner links here (it used to link to bare `/admin`). The nav tab carries a red
   pending count (`components/PendingBadge.jsx`, fetched client-side from `/api/admin/members?count=1` like the clock
   pill, so `AdminNav` stays a data-free server component; shows nothing at zero or on any failure).
+- **An existing account can be made a reseller from the back end (2026-10-29).** "Add a reseller without an application" on
+  `/admin/resellers` (`components/AddReseller.jsx`, `listUnappliedAccounts` / `addAsReseller` in `lib/members.js`, `decision: 'add'`
+  on `/api/admin/members`, admin): lists accounts with no application (driver accounts left out), search, type the business name,
+  approve. Same end state as an approval (role member, approved, "you're approved" email awaited), with `member_note` saying it was
+  added by an admin and an `audit_log` row (`member.add`). Refuses a driver or an account already a member. Exists so a customer
+  who signed up and never finished the form is not asked to apply again.
 - **The member dashboard is a portal, not a table (2026-10-28).** `components/MemberPortal.jsx` on
   `/account/member`: category chips, **one row per model with a quantity stepper** (each + adds ONE specific unit,
   cheapest first, because every unit is one of a kind and the cart is a set of SKUs; "See each unit" lists them),
@@ -1730,6 +1736,41 @@ and e-transfer activity nobody enters. That is the gap `coverage` is there to
 make visible.
 
 
+
+## Client contacts and the client delivery portal (added 2026-11-02)
+`clients.contact_name` (migration 0046, which also fills in Canadian Discount Appliances: Matt Graham, Matt@grahams.ca,
+(519) 658-3409 — an UPDATE only, no seeded rows), **Edit** on each client in Dispatch -> People & access
+(`DispatchSetup.jsx`, POST `action: 'client'` with `id`), `lib/client-portal.js`, `/client/<id>?t=<token>`,
+`/client/<id>/job/<jobId>`, `/api/client/pod`, `test/client-portal.test.mjs`.
+
+- Invoicing a client with no email used to say "add one" with nowhere to add it; the client list could only ADD.
+  `upsertClient` on an edit keeps any field not passed (notify/active are `undefined`, not false) and validates the email.
+- The invoice carries the client's phone and "Attn: <contact>" in the memo; letterhead reads **GST/HST#** (same number as `HST_NUMBER`).
+- **The portal is a private link, not a login.** Token = `linkToken('client', id)` (HMAC, derived, not stored). Every query is
+  scoped by client_id, so changing an id in the URL returns nothing. It shows times (time in/out, minutes on site), the POD form,
+  signature and door photos. It NEVER returns `pay_amount`, `job_events` or order notes. `/client/` is in `proxy.js`'s allow-list.
+- **`/client/demo`** (and `/client/demo/job/<n>`, `/client/demo/invoice`) render the same pages from invented data in
+  `lib/client-portal-demo.js` — no database, no real names — so the owner can see what a client sees before a link is sent.
+- **Clients add their own deliveries** (`ClientRequestForm`, `POST /api/client/request`, `createClientRequest`): name, phone,
+  email, address, units, services (`CLIENT_SERVICES`), notes, optional preferred date. It lands as an UNSCHEDULED stop,
+  `source = 'client_portal'` (card says "requested by client"), emails the dispatch desk, and sets NO price. A preferred date goes
+  in the notes, never on `job_date`, or it would look scheduled with nobody assigned. Capped at 60 an hour per client.
+  Staff assign the driver/day and set the charge as for any stop. The client sees past, present and future stops, scoped by client_id.
+- **RS client invoices use the client layout** (`components/RsInvoiceDocument.jsx`, and `renderRs` in the PDF route): reference /
+  customer / services per row (`lib/invoice-job-line.js`, written by `invoiceClientJobs`, read back by `jobsForInvoice`), GST line,
+  each row a link to that stop's POD (PDF rows are link annotations). The line -> stop link is derived from the text, not stored.
+  `clients.address` (migration 0047) prints under "Invoice for". `/client/*` renders with no storefront chrome (`SiteChrome`).
+- **The portal asks for a PASSWORD (added 2026-11-02).** The link names the client; a password the office sets per client
+  (Dispatch -> People & access -> Edit -> Portal password, admin only; `client_portal_password`) lets anyone holding it in — one
+  shared password per company, no accounts. `lib/client-portal-auth.js`, `lib/client-portal-session.js` (`portalAccess`),
+  `/api/client/login`, `ClientPortalLogin`, migration 0048 (also created at runtime by `ensureJobSchema`).
+  FAIL CLOSED: no password set = nobody gets in ("Almost ready"). bcrypt hash, never sent to a browser (the client list returns only
+  `portal_password_set`). A signed httpOnly cookie `bb_cp_<id>` (30 days) is bound to a digest of the CURRENT hash, so setting a new
+  password — or "Switch portal off" — signs everybody out; use it when somebody leaves. Wrong guesses are counted in
+  `client_portal_attempts` (10 per client or 5 per IP per 15 min locks). Pages, `/api/client/pod` and `/api/client/request` all call
+  `portalAccess`; **a new client API must too.** The emailed invoice link (`/invoice/<n>?t=`) is separate and stays token-only.
+- **Invoices section** on the portal (`listClientInvoices`): invoices raised from that client's stops, balance owing, due, overdue.
+- Staff copy the link with **Copy client link** on the client row; an RS invoice page also links to it.
 
 ## Dispatch — deliveries & service calls (added 2026-08-25)
 The daily run sheet used to be built by hand because the work comes from several
@@ -4799,3 +4840,13 @@ SKUs are `VS-<shopify id>`; they are NOT one-of-a-kind so reservations skip them
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

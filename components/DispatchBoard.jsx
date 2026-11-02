@@ -577,7 +577,7 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
             three other companies' service calls is unreadable if the cards don't
             say which is which. */}
         <span className={'disp-tag is-src' + (job.source === 'bargain_bay' ? ' is-bb' : '')}>
-          {job.clientName || (job.source === 'bargain_bay' ? 'Bargain Bay' : 'Own job')}
+          {job.clientName || (job.source === 'bargain_bay' ? 'Bargain Bay' : 'Own job')}{job.source === 'client_portal' ? ' · requested by client' : ''}
         </span>
         {job.driver2Name && <span className="disp-tag is-pair">2 crew</span>}
         {job.extraCount > 0 && <span className="onotes-badge is-extra" title="The crew did extra work on this stop — check the bill">

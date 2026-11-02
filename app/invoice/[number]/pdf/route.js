@@ -4,6 +4,8 @@ import { getInvoiceByNumber } from '../../../../lib/invoices';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { verifyLinkToken } from '../../../../lib/links';
 import { brandFor } from '../../../../lib/brands';
+import { jobsForInvoice, takeJobFor } from '../../../../lib/client-portal';
+import { linkToken } from '../../../../lib/links';
 import { warrantyLabel, PICKUP_ADDRESS, RETURN_POLICY_SUMMARY, ETRANSFER_EMAIL, isQuickSaleEmail } from '../../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +19,89 @@ const cad = (n) => {
   return (v < 0 ? '-$' : '$') + s;
 };
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-CA', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Toronto' }) : '');
+
+// An RS Solutions client invoice, in the layout those clients already know.
+// Every delivery row is a clickable link to that stop's proof of delivery.
+function renderRs(invoice, B, rows) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'LETTER', margin: 50, info: { Title: `Invoice ${invoice.number}`, Author: B.name } });
+    const chunks = [];
+    doc.on('data', (c) => chunks.push(c));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    const L = 50, R = 562, NAVY = '#2b3990', LILAC = '#6b6fe8', PINK = '#e91e8c', grey = '#666666';
+    const topBar = () => doc.rect(L, 40, R - L, 5).fill(NAVY);
+    topBar();
+    doc.font('Helvetica').fontSize(22).fillColor(LILAC).text(B.name, L, 60);
+    doc.fontSize(8.5).fillColor(grey);
+    for (const part of B.address.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 3)) doc.text(part, L, doc.y);
+    doc.text(B.contactEmail, L, doc.y);
+
+    let y = doc.y + 18;
+    const kv = (k, v, x, yy) => {
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#333').text(k, x, yy);
+      doc.font('Helvetica').fontSize(8.5).fillColor(grey);
+      for (const line of [].concat(v).filter(Boolean)) doc.text(line, x, doc.y, { width: 170 });
+      return doc.y;
+    };
+    const a = kv('Invoice for', [invoice.name, [invoice.address, invoice.city, invoice.postal].filter(Boolean).join(', '), invoice.phone, invoice.email], L, y);
+    const b = kv('Payable to', [B.legal, B.contactEmail], 240, y);
+    const b2 = kv('Project', 'Deliveries/Installs', 240, b + 8);
+    const c = kv('Invoice #', invoice.number, 440, y);
+    const c2 = kv('Date', new Date(invoice.created_at).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', timeZone: 'America/Toronto' }), 440, c + 8);
+    y = Math.max(a, b2, c2) + 10;
+    doc.moveTo(L, y).lineTo(R, y).lineWidth(0.5).strokeColor('#bbbbbb').stroke();
+    y += 10;
+
+    const col = { d: L, q: 370, u: 420, t: 490 };
+    const head = () => {
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY)
+        .text('Description', col.d, y).text('Qty', col.q, y, { width: 40, align: 'right' })
+        .text('Unit price', col.u, y, { width: 60, align: 'right' }).text('Total price', col.t, y, { width: 72, align: 'right' });
+      y += 18;
+    };
+    head();
+    const cad2 = (n) => cad(n);
+    let stripe = false;
+    for (const r of rows) {
+      const lines = r.lines;
+      const h = Math.max(lines.length * 11.5 + 8 + (r.url ? 11 : 0), 24);
+      if (y + h > 720) { doc.addPage(); topBar(); y = 60; head(); }
+      if (stripe) doc.rect(L, y - 2, R - L, h).fill('#f3f3f3');
+      stripe = !stripe;
+      doc.font('Helvetica').fontSize(9.5).fillColor('#222');
+      lines.forEach((l, i) => doc.text(l, col.d, y + 2 + i * 11.5, { width: col.q - col.d - 10, align: 'center' }));
+      if (r.url) {
+        doc.font('Helvetica-Bold').fontSize(7.5).fillColor(NAVY)
+          .text('View proof of delivery & photos', col.d, y + 3 + lines.length * 11.5, { width: col.q - col.d - 10, align: 'center' });
+        doc.link(L, y - 2, R - L, h, r.url);
+      }
+      doc.font('Helvetica').fontSize(9.5).fillColor('#444')
+        .text('1', col.q, y + 2, { width: 40, align: 'right' })
+        .text(cad2(r.amount), col.u, y + 2, { width: 60, align: 'right' })
+        .text(cad2(r.amount), col.t, y + 2, { width: 72, align: 'right' });
+      y += h;
+    }
+    doc.moveTo(L, y + 2).lineTo(R, y + 2).lineWidth(0.5).strokeColor('#bbbbbb').stroke();
+    doc.font('Helvetica').fontSize(8).fillColor(grey).text(`GST: ${String(B.hst).replace(/\s+/g, '')}`, L, y + 6, { width: R - L, align: 'center' });
+    y += 24;
+    if (y + 90 > 740) { doc.addPage(); topBar(); y = 60; }
+    const tot = (k, v, yy, big) => {
+      if (big) { doc.font('Helvetica-Bold').fontSize(16).fillColor(PINK).text(v, 380, yy, { width: R - 380, align: 'right' }); return; }
+      doc.font('Helvetica').fontSize(9).fillColor(NAVY).text(k, 380, yy, { width: 80 });
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#222').text(v, 460, yy, { width: R - 460, align: 'right' });
+    };
+    tot('Subtotal', cad(invoice.subtotal), y);
+    if (Number(invoice.hst) > 0) tot('tax (HST 13%)', cad(invoice.hst), y + 15);
+    tot('', cad(invoice.total), y + 34, true);
+    doc.font('Helvetica').fontSize(8.5).fillColor(grey).text(`Notes: ${invoice.memo || ''}`, L, y, { width: 300 });
+    if (['open', 'partial'].includes(invoice.status)) {
+      doc.font('Helvetica').fontSize(8.5).fillColor('#222').text(
+        `Pay by Interac e-Transfer to ${B.etransferEmail} (auto-deposit) and put ${invoice.number} in the message.`, L, y + 62, { width: R - L });
+    }
+    doc.end();
+  });
+}
 
 function render(invoice, B) {
   return new Promise((resolve, reject) => {
@@ -40,7 +125,7 @@ function render(invoice, B) {
     doc.fillColor(ink).font('Helvetica-Bold').fontSize(20).text(String(B.name).toUpperCase(), L, 50);
     doc.font('Helvetica').fontSize(9).fillColor(grey)
       .text(`${B.legal} - ${B.address}`, L, 76, { width: 340 })
-      .text(invoice.hide_hst_number ? B.contactEmail : `${B.contactEmail} - HST# ${B.hst}`, L, doc.y);
+      .text(invoice.hide_hst_number ? B.contactEmail : `${B.contactEmail} - GST/HST# ${B.hst}`, L, doc.y);
     doc.fillColor(ink).font('Helvetica-Bold').fontSize(16).text('INVOICE', 380, 50, { width: R - 380, align: 'right' });
     doc.font('Helvetica').fontSize(11).text(invoice.number, 380, 70, { width: R - 380, align: 'right' });
     doc.fontSize(9).fillColor(grey).text(statusLabel, 380, 86, { width: R - 380, align: 'right' });
@@ -124,7 +209,7 @@ function render(invoice, B) {
       ensure(70);
       doc.moveDown(0.6).font('Helvetica-Bold').fontSize(10).fillColor(ink).text('Pay by Interac e-Transfer', L, doc.y, { width: W });
       doc.font('Helvetica').fontSize(9.5).fillColor(ink).text(
-        `Send ${cad(partial ? balance : invoice.total)} to ${ETRANSFER_EMAIL} (auto-deposit, no security question). Put invoice number ${invoice.number} in the message so we can match it.`,
+        `Send ${cad(partial ? balance : invoice.total)} to ${B.etransferEmail} (auto-deposit, no security question). Put invoice number ${invoice.number} in the message so we can match it.`,
         L, doc.y, { width: W });
     }
     if (invoice.memo) {
@@ -164,7 +249,23 @@ export async function GET(req, { params }) {
     (guestEmail && guestEmail === invoice.email?.toLowerCase());
   if (!ok) return new Response('Not authorized', { status: 403 });
 
-  const pdf = await render(invoice, brandFor(invoice.brand));
+  const B = brandFor(invoice.brand);
+  let pdf;
+  if (invoice.brand === 'rs_solutions') {
+    const { clientId, byDescription } = await jobsForInvoice(invoice.id).catch(() => ({ clientId: null, byDescription: new Map() }));
+    const ct = clientId ? linkToken('client', String(clientId)) : '';
+    const rows = invoice.items.map((it) => {
+      const jid = clientId ? takeJobFor(byDescription, it.description) : null;
+      return {
+        amount: it.amount,
+        lines: String(it.description || '').split('\n').map((x) => x.trim()).filter(Boolean),
+        url: jid ? `${B.url()}/client/${clientId}/job/${jid}?t=${ct}` : null
+      };
+    });
+    pdf = await renderRs(invoice, B, rows);
+  } else {
+    pdf = await render(invoice, B);
+  }
   return new Response(pdf, {
     headers: {
       'Content-Type': 'application/pdf',

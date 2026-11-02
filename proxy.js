@@ -22,6 +22,7 @@ const RS_HOSTS = new Set(
 //                      bounce every driver to a board they can't see.
 //   /api             — the board's own calls; blocking these breaks the page
 //   /invoice         — where an RS client lands from their invoice email
+//   /client/<id>     — the client's private view of their deliveries, PODs and photos
 //   /login, /logout  — you can't reach /admin without being able to sign in
 //   /signup, /forgot-password, /reset-password
 //                    — the dispatch coordinator's account is created and recovered
@@ -38,6 +39,7 @@ const ALLOWED = [
   /^\/d\/[^/]+$/,
   /^\/api(\/|$)/,
   /^\/invoice(\/|$)/,
+  /^\/client\/[^/]+(\/|$)/,
   /^\/login$/,
   /^\/logout$/,
   /^\/signup$/,
@@ -64,7 +66,15 @@ export async function proxy(req) {
     return NextResponse.redirect(url);
   }
 
-  if (!RS_HOSTS.has(host)) return NextResponse.next();
+  if (!RS_HOSTS.has(host)) {
+    // A client's delivery page belongs to RS Solutions. If one is opened on any
+    // other host (an old copied link), send it to the RS address.
+    if (req.nextUrl.pathname.startsWith('/client/') && process.env.VERCEL_ENV) {
+      const rs = (process.env.RS_SITE_URL || 'https://dispatch.rssolutions.ca').replace(/\/$/, '');
+      return NextResponse.redirect(`${rs}${req.nextUrl.pathname}${req.nextUrl.search}`);
+    }
+    return NextResponse.next();
+  }
 
   if (ALLOWED.some((re) => re.test(pathname))) return NextResponse.next();
 
