@@ -108,16 +108,16 @@ export default async function ClientPortal({ params, searchParams }) {
         {invoices.length === 0 ? (
           <p className="cp-sub" style={{ margin: 0 }}>No invoices yet. They appear here as soon as we raise one.</p>
         ) : (
-          <table>
+          <table className="cp-stack">
             <thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th>Stops</th><th style={{ textAlign: 'right' }}>Total</th><th style={{ textAlign: 'right' }}>Owing</th><th>Status</th></tr></thead>
             <tbody>
               {invoices.map((i) => (
                 <tr key={i.id}>
-                  <td>{demo ? <b>{i.number}</b> : <a href={`/invoice/${encodeURIComponent(i.number)}?t=${linkToken('invoice', i.number)}`}><b>{i.number}</b></a>}</td>
-                  <td>{i.date}</td><td>{i.owing > 0 ? i.due || '—' : '—'}</td><td>{i.stops}</td>
-                  <td style={{ textAlign: 'right' }}>{money(i.total)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: i.owing > 0 ? '#b02a37' : undefined }}>{i.owing > 0 ? money(i.owing) : '—'}</td>
-                  <td><span className={`cp-pill ${i.status === 'paid' ? 'done' : i.overdue ? 'failed' : 'todo'}`}>{i.status === 'paid' ? 'Paid' : i.status === 'partial' ? 'Part paid' : i.status === 'refunded' ? 'Refunded' : i.overdue ? 'Overdue' : 'Open'}</span></td>
+                  <td data-label="Invoice">{demo ? <b>{i.number}</b> : <a href={`/invoice/${encodeURIComponent(i.number)}?t=${linkToken('invoice', i.number)}`}><b>{i.number}</b></a>}</td>
+                  <td data-label="Date">{i.date}</td><td data-label="Due">{i.owing > 0 ? i.due || '—' : '—'}</td><td data-label="Stops">{i.stops}</td>
+                  <td data-label="Total" style={{ textAlign: 'right' }}>{money(i.total)}</td>
+                  <td data-label="Owing" style={{ textAlign: 'right', fontWeight: 700, color: i.owing > 0 ? '#b02a37' : undefined }}>{i.owing > 0 ? money(i.owing) : '—'}</td>
+                  <td data-label="Status"><span className={`cp-pill ${i.status === 'paid' ? 'done' : i.overdue ? 'failed' : 'todo'}`}>{i.status === 'paid' ? 'Paid' : i.status === 'partial' ? 'Part paid' : i.status === 'refunded' ? 'Refunded' : i.overdue ? 'Overdue' : 'Open'}</span></td>
                 </tr>
               ))}
             </tbody>
