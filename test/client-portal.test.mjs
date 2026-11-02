@@ -28,6 +28,7 @@ test('a client can be edited, and an unpassed field is kept', async () => {
     assert(threw, 'bad email refused');
     const list = await listClients();
     assert(list[0].portal_path.startsWith(`/client/${c.id}?t=`), 'portal link on the list');
+    assert(list[0].portal_url.startsWith(`https://dispatch.rssolutions.ca/client/${c.id}?t=`), 'the link a client gets is on the RS host');
   } finally { done(); }
 });
 

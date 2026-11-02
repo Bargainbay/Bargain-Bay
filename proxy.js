@@ -48,7 +48,15 @@ const ALLOWED = [
 
 export function proxy(req) {
   const host = (req.headers.get('host') || '').toLowerCase().split(':')[0];
-  if (!RS_HOSTS.has(host)) return NextResponse.next();
+  if (!RS_HOSTS.has(host)) {
+    // A client's delivery page belongs to RS Solutions. If one is opened on any
+    // other host (an old copied link), send it to the RS address.
+    if (req.nextUrl.pathname.startsWith('/client/')) {
+      const rs = (process.env.RS_SITE_URL || 'https://dispatch.rssolutions.ca').replace(/\/$/, '');
+      return NextResponse.redirect(`${rs}${req.nextUrl.pathname}${req.nextUrl.search}`);
+    }
+    return NextResponse.next();
+  }
 
   const { pathname } = req.nextUrl;
   if (ALLOWED.some((re) => re.test(pathname))) return NextResponse.next();
