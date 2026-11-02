@@ -4,18 +4,24 @@ import { SignJWT } from 'jose';
 import { NextRequest } from 'next/server';
 import { suite, test, assert, equal } from './_harness.mjs';
 
-process.env.AUTH_SECRET = 'admin-mfa-test-secret';
-process.env.BANK_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
-process.env.ADMIN_EMAILS = 'boss@example.test,ravi@example.test';
+// Every test file runs in ONE process and several set these at import time, so what is in the
+// environment when a test RUNS is whatever file loaded last. Each test here sets its own.
+const SECRET = 'admin-mfa-test-secret';
+const setEnv = () => {
+  process.env.AUTH_SECRET = SECRET;
+  process.env.BANK_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
+  process.env.ADMIN_EMAILS = 'boss@example.test,ravi@example.test';
+};
+setEnv();
 
 const { needsAdminMfa, signAdminMarker, adminMarkerValid, isProtectedPath } = await import('../lib/admin-mfa-gate.js');
 const { proxy } = await import('../proxy.js');
 
-const key = new TextEncoder().encode(process.env.AUTH_SECRET);
+const key = new TextEncoder().encode(SECRET);
 const session = (email, sub = '1', tv = 0) =>
   new SignJWT({ email, name: '', tv }).setProtectedHeader({ alg: 'HS256' }).setSubject(sub).setIssuedAt().setExpirationTime('1h').sign(key);
-const on = () => { process.env.ADMIN_MFA = 'on'; };
-const off = () => { delete process.env.ADMIN_MFA; };
+const on = () => { setEnv(); process.env.ADMIN_MFA = 'on'; };
+const off = () => { setEnv(); delete process.env.ADMIN_MFA; };
 
 suite('admin two-factor gate');
 {
