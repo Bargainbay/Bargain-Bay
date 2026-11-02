@@ -24,7 +24,7 @@ import {
   createJob, assignJob, resequence, setJobStatus, cancelJob,
   upsertClient, importReadyBargainBayOrders, importOneBargainBayOrder, dispatchBoard,
   jobInvoiceForPayment, noteJobEvent,
-  setTicketStatus, listTickets, reopenJob, updateJob,
+  setTicketStatus, listTickets, reopenJob, updateJob, recordPartialDelivery,
   findServiceCustomers, ordersForServiceCall,
   completeJob, setJobPay, payReport, bookRevisit, setJobTimes,
   setJobCharge, setJobsClient, billingSummary, invoiceClientJobs, jobHistory,
@@ -708,6 +708,11 @@ export async function PATCH(req) {
     }
     if (body.action === 'reopen') {
       return NextResponse.json({ ok: true, job: await reopenJob(jobId, who(s)) });
+    }
+    // A closed delivery that was really only part of the order. Staff-level: it is
+    // the dispatcher's correction, and it moves no money or stock.
+    if (body.action === 'partial_delivery') {
+      return NextResponse.json({ ok: true, ...(await recordPartialDelivery(jobId, body, who(s))) });
     }
     if (body.action === 'cancel') {
       return NextResponse.json({ ok: true, job: await cancelJob(jobId, body.reason, who(s)) });
