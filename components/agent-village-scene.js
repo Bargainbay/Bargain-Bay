@@ -80,7 +80,7 @@ function castle() {
     f.position.set(x + 0.65, 11.7, z); g.add(f); flags.push(f);
   }
   const name = nameSprite('Tracker + database', 0.95); name.position.set(0, 13.2, 0); g.add(name);
-  g.userData = { gem, flags };
+  g.userData = { gem, flags, name };
   return g;
 }
 function callTower() {
@@ -191,6 +191,7 @@ export function createVillage({ mount, data, onPick, reduceMotion = false }) {
     const len = Math.hypot(bx, bz), dx = -bx / len, dz = -bz / len;     // unit vector toward the castle
     const b = BUILDERS[k](); b.position.set(bx, 0, bz); b.rotation.y = Math.atan2(dx, dz); scene.add(b);
     const sign = nameSprite(ZONE_TITLE[k], 0.9); sign.position.set(bx, ROOF_Y[k] + 1.6, bz); scene.add(sign);
+    const signRef = sign;
     // dirt road to the castle
     const roadLen = len - 5.6 - 3;
     const road = new THREE.Group();
@@ -200,7 +201,7 @@ export function createVillage({ mount, data, onPick, reduceMotion = false }) {
     const smoke = []; const st = smokeTex();
     for (let i = 0; i < 4; i++) { const s = sprite(st, 2.6, 2.6, 3); s.visible = false; s.position.set(bx, ROOF_Y[k], bz); scene.add(s); smoke.push({ s, off: i / 4 }); }
     // where a minion hands the crate over: on the plaza, 4.6 out from the middle toward this building
-    zones[k] = { key: k, bx, bz, dx, dz, smoke, alarm: false, door: new THREE.Vector3((bx / len) * 4.6, 0, (bz / len) * 4.6) };
+    zones[k] = { key: k, sign: signRef, signText: '', bx, bz, dx, dz, smoke, alarm: false, door: new THREE.Vector3((bx / len) * 4.6, 0, (bz / len) * 4.6) };
   }
 
   // trees and rocks
@@ -246,8 +247,20 @@ export function createVillage({ mount, data, onPick, reduceMotion = false }) {
     if (!key) { a.bubble.visible = false; return; }
     a.bubble.material.map = T[key]; a.bubble.material.needsUpdate = true; a.bubble.visible = true;
   }
+  // A sign's text is redrawn only when its level changes.
+  function setSign(sprite, text, height) {
+    const l = label(text); if (sprite.material.map) sprite.material.map.dispose();
+    sprite.material.map = l.t; sprite.material.needsUpdate = true; sprite.scale.set(height * l.ratio, height, 1);
+  }
+  const castleSign = { text: '' };
   function update(next) {
     next.agents.forEach((d) => { const a = agents.get(d.id); if (a) a.d = d; });
+    (next.zones || []).forEach((zd) => {
+      const z = zones[zd.key]; if (!z || !zd.level) return;
+      const text = `${ZONE_TITLE[zd.key]} \u00b7 Lv ${zd.level}`;
+      if (z.signText !== text) { z.signText = text; setSign(z.sign, text, 0.9); }
+    });
+    if (next.castle && castleSign.text !== `Lv ${next.castle.level}`) { castleSign.text = `Lv ${next.castle.level}`; setSign(castleG.userData.name, `Tracker + database \u00b7 Lv ${next.castle.level}`, 0.95); }
     Object.values(zones).forEach((z) => { z.alarm = false; });
     next.agents.forEach((d) => { if (ATTENTION.has(d.state)) zones[d.zone].alarm = true; });
   }

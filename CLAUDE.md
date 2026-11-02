@@ -4850,3 +4850,22 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## The Agent village (added 2026-11-02)
+`/admin/agent-floor` (admin; its own **Village** tab in `AdminNav`), `lib/agent-floor.js`, `lib/agent-levels.js`, `lib/agent-wake.js`,
+`components/AgentFloor.jsx` + `components/agent-village-scene.js` (three.js, lazy-loaded), migration `0049_cron_daily`
+(**run Run schema migration after deploy**), `/api/admin/agent-floor`, `test/agent-floor.test.mjs`.
+
+A Clash-of-Clans style village: a castle (the tracker + database), four buildings (Call tower, Garage, Market, Treasury), a minion
+per scheduled job or assistant. **Nothing is simulated.**
+- **State** comes from `cron_heartbeats` judged against `EXPECTED` in `lib/health.js`, so the village and the daily health email cannot
+  disagree. Sarah and RS Manager are awake while a message was stored in the last 3 min. Christina and the import caller leave no record
+  here and show as UNKNOWN, never healthy. A job with no heartbeat wrapper (`abandoned-carts`) is unknown too. Angela is paused by decision.
+- **Wake** runs the job's own cron route once (same code, same heartbeat). Only the jobs in `WAKEABLE` can be woken. Deliberately NOT:
+  `shift-nudge` (texts drivers), the reports, `health`, `inventory-gaps`, `affiliate-payouts` (emails), `vendor-orders` (strikes sellers).
+  A wake of `health` or a report would also record a success heartbeat that masks a real failure. A new cron is NOT wakeable until it is
+  added to `WAKEABLE` and `LOADERS` (a test keeps the two in step). 60 s cooldown; every wake is in the change log (`agent.wake`).
+- **Levels.** Buildings level from RELIABILITY (minion XP = 10 per successful run + 5 per clean day in a row, from `cron_daily`, written by
+  `recordHeartbeat`; history starts the day 0049 is applied, and until then the lifetime run count stands in). The castle levels from BUSINESS
+  RESULTS (10 per order placed, stop delivered and invoice paid, 1 per customer message). Each building also shows its own business figure.
+  Level n needs base * n * (n - 1) / 2 XP. A streak counts days since the last failure, so weekly jobs keep theirs.
