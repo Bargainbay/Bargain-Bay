@@ -51,7 +51,7 @@ export function proxy(req) {
   if (!RS_HOSTS.has(host)) {
     // A client's delivery page belongs to RS Solutions. If one is opened on any
     // other host (an old copied link), send it to the RS address.
-    if (req.nextUrl.pathname.startsWith('/client/')) {
+    if (req.nextUrl.pathname.startsWith('/client/') && process.env.VERCEL_ENV) {
       const rs = (process.env.RS_SITE_URL || 'https://dispatch.rssolutions.ca').replace(/\/$/, '');
       return NextResponse.redirect(`${rs}${req.nextUrl.pathname}${req.nextUrl.search}`);
     }
