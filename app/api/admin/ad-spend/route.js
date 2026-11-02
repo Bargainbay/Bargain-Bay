@@ -1,7 +1,7 @@
 // Ad spend CRUD. Admin-only.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { listAdSpend, addAdSpend, deleteAdSpend } from '../../../../lib/finance';
+import { listAdSpend, addAdSpend, deleteAdSpend, setAdSpendBrand } from '../../../../lib/finance';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -18,11 +18,21 @@ export async function POST(req) {
   let b; try { b = await req.json(); } catch { b = {}; }
   if (!b.spentOn || !(Number(b.amount) > 0)) return NextResponse.json({ error: 'Date and amount are required.' }, { status: 400 });
   try {
-    const id = await addAdSpend({ spentOn: b.spentOn, channel: b.channel, amount: b.amount, campaign: b.campaign, note: b.note });
+    const id = await addAdSpend({ spentOn: b.spentOn, channel: b.channel, amount: b.amount, campaign: b.campaign, note: b.note, brand: b.brand });
     return NextResponse.json({ ok: true, id });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not save.' }, { status: 500 });
   }
+}
+
+export async function PATCH(req) {
+  if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  let b; try { b = await req.json(); } catch { b = {}; }
+  if (!b.id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+  try {
+    const updated = await setAdSpendBrand(Number(b.id), b.brand || null, { scope: b.scope === 'campaign' ? 'campaign' : 'row' });
+    return NextResponse.json({ ok: true, updated });
+  } catch (e) { return NextResponse.json({ error: e?.message || 'Could not update.' }, { status: 500 }); }
 }
 
 export async function DELETE(req) {

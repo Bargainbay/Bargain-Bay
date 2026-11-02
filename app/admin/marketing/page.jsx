@@ -3,7 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { marketingDashboard, DASH_PERIODS } from '../../../lib/analytics';
-import { listAdSpend, AD_CHANNELS } from '../../../lib/finance';
+import { listAdSpend, AD_CHANNELS, AD_BRANDS } from '../../../lib/finance';
 import { metaConfigured } from '../../../lib/meta-ads';
 import { getSetting } from '../../../lib/settings';
 import DashboardShell from '../../../components/DashboardShell';
@@ -72,6 +72,31 @@ export default async function MarketingDashboardPage({ searchParams }) {
       </div>
 
       <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Ad spend by business · {periodLabel(period)}</h2>
+        {d.byBrand.length === 0
+          ? <p className="hint" style={{ marginTop: 0 }}>No ad spend logged for this period.</p>
+          : (() => {
+              const label = (k) => (AD_BRANDS.find((b) => b.key === k)?.label) || 'Not assigned yet';
+              const order = ['bargain_bay', 'rs_solutions', 'unassigned'];
+              const groups = order.map((k) => ({ k, rows: d.byBrand.filter((r) => r.brand === k) })).filter((g) => g.rows.length);
+              return (
+                <div className="table-wrap"><table className="admin">
+                  <thead><tr><th>Business</th><th>Channel</th><th style={{ textAlign: 'right' }}>Spend</th></tr></thead>
+                  <tbody>
+                    {groups.flatMap((g) => [
+                      ...g.rows.map((r, i) => (
+                        <tr key={g.k + r.channel}><td>{i === 0 ? label(g.k) : ''}</td><td>{r.channel}</td><td style={{ textAlign: 'right' }}>{money(r.amount)}</td></tr>
+                      )),
+                      <tr key={g.k + '-t'}><td /><td style={{ fontWeight: 700 }}>{label(g.k)} total</td><td style={{ textAlign: 'right', fontWeight: 700 }}>{money(g.rows.reduce((a, r) => a + r.amount, 0))}</td></tr>
+                    ])}
+                  </tbody>
+                </table></div>
+              );
+            })()}
+        <p className="hint" style={{ marginTop: 8 }}>Assign each row to a business in the ledger below. &ldquo;Not assigned yet&rdquo; is shown, not hidden, so a short total is never mistaken for a finished one.</p>
+      </div>
+
+      <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Revenue &amp; ROAS by channel · {periodLabel(period)}</h2>
         {d.channels.length === 0 ? (
           <p className="hint" style={{ marginTop: 0 }}>No attributed sales or spend yet. New visitors are tagged by source (UTM / referrer) and credited here on purchase.</p>
@@ -131,7 +156,7 @@ export default async function MarketingDashboardPage({ searchParams }) {
             <ol style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.7, marginTop: 6 }}>
               <li>Create a Meta developer app with Marketing API access.</li>
               <li>Get your Ad Account ID (<code>act_…</code>) and a long-lived token with <code>ads_read</code>.</li>
-              <li>Set <code>META_AD_ACCOUNT_ID</code> + <code>META_ADS_ACCESS_TOKEN</code> in Vercel, then redeploy.</li>
+              <li>Set <code>META_ADS_ACCESS_TOKEN</code> and <code>META_AD_ACCOUNTS</code> (e.g. <code>act_111:rs_solutions,act_222:bargain_bay</code>) in Vercel, then redeploy.</li>
             </ol>
           </div>
         )}
@@ -140,7 +165,7 @@ export default async function MarketingDashboardPage({ searchParams }) {
       <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Ad spend ledger</h2>
         <p className="hint" style={{ marginTop: 0 }}>Log Meta / Google / other spend so ROAS and cost-per-lead become real. {metaOn ? 'Meta rows sync automatically; add other channels here.' : 'Connect Meta above to automate the Meta rows.'}</p>
-        <div style={{ marginTop: 10 }}><AdSpendEditor initial={adSpendRows} channels={AD_CHANNELS} /></div>
+        <div style={{ marginTop: 10 }}><AdSpendEditor initial={adSpendRows} channels={AD_CHANNELS} brands={AD_BRANDS} /></div>
       </div>
     </DashboardShell>
   );
