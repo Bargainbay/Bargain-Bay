@@ -1,6 +1,7 @@
 // Client contacts are editable, and the client portal shows a company only its own work.
 import { suite, test, equal, assert } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
+import { sharedCheckoutDb } from './shared-checkout-db.mjs';
 import { upsertClient, listClients, ensureJobSchema, billingSummary } from '../lib/jobs.js';
 import {
   clientPortalPath, verifyClientToken, listClientJobs, getClientJob,
@@ -198,11 +199,13 @@ test('RS Solutions invoices are paid to Service@, not the storefront accounting 
 });
 
 test('invoiceClientJobs can bill chosen stops at chosen charges, with an extra line and a date', async () => {
-  const { client, done } = await withTestDb();
-  try {
+  // Shared database: createAndSendInvoice's runtime DDL memoises in module scope, so a
+  // throwaway database here would starve every later test file of its columns.
+  const { client } = await sharedCheckoutDb();
+  {
     await ensureJobSchema();
     const { invoiceClientJobs } = await import('../lib/jobs.js');
-    const a = await upsertClient({ name: 'A Co', contactEmail: 'a@a.ca', contactName: 'Matt' });
+    const a = await upsertClient({ name: 'Chosen Stops Co', contactEmail: 'a@a.ca', contactName: 'Matt' });
     const mk = async (n, who, charge) => (await client.query(
       `INSERT INTO jobs (job_number, type, status, client_id, customer_name, job_date, charge_amount) VALUES ($1,'delivery','done',$2,$3,'2026-10-19',$4) RETURNING id`, [n, a.id, who, charge])).rows[0].id;
     const j1 = await mk('RS-1', 'Carol', 85), j2 = await mk('RS-2', 'Yavuz', 105), j3 = await mk('RS-3', 'Left Out', 50);
@@ -217,11 +220,11 @@ test('invoiceClientJobs can bill chosen stops at chosen charges, with an extra l
     equal(Number(inv.hst), 140.4);
     equal(inv.memo, 'Invoice 1000311');
     equal(inv.brand, 'rs_solutions');
-    const left = (await client.query('SELECT id FROM jobs WHERE invoice_id IS NULL')).rows.map((x) => x.id);
+    const left = (await client.query('SELECT id FROM jobs WHERE invoice_id IS NULL AND client_id = $1', [a.id])).rows.map((x) => x.id);
     equal(left.join(','), String(j3), 'the stop not chosen stays unbilled');
     equal(Number((await client.query('SELECT charge_amount FROM jobs WHERE id = $1', [j2])).rows[0].charge_amount), 145);
     let threw = false;
     try { await invoiceClientJobs(a.id, { from: '2026-10-19', to: '2026-10-19', jobIds: [j1] }); } catch { threw = true; }
     assert(threw, 'an already-invoiced stop cannot be picked again');
-  } finally { done(); }
+  }
 });
