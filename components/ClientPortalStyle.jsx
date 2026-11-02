@@ -46,6 +46,9 @@ export default function ClientPortalStyle() {
       .cp-sig { border:1px solid var(--line, #bbb); border-radius:8px; background:#fff; padding:6px; display:inline-block; }
       .cp-sig img { max-height:110px; max-width:100%; display:block; }
       .cp-empty { text-align:center; padding:36px 12px; color:var(--muted); }
+      .cp-form label { display:block; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+      .cp-form input:not([type=checkbox]), .cp-form textarea { display:block; width:100%; margin-top:3px; padding:8px 10px; border:1px solid var(--line, #ccc); border-radius:8px; font-size:14px; text-transform:none; letter-spacing:0; color:inherit; background:var(--card, #fff); }
+      .cp-h2 { font-size:14px; text-transform:uppercase; letter-spacing:.06em; color:var(--charcoal); margin:20px 0 8px; }
       .cp-back { display:inline-block; margin-bottom:12px; font-size:14px; }
       @media print {
         .cp-noprint { display:none !important; }

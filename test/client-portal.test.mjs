@@ -73,3 +73,47 @@ test('the portal is scoped to the client the token proves', async () => {
     equal(summarize(jobs).withPod, 1);
   } finally { done(); }
 });
+
+test('a client adds a delivery: it lands unscheduled on the board, tagged, and is validated', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    await ensureJobSchema();
+    const { createClientRequest } = await import('../lib/client-portal.js');
+    const a = await upsertClient({ name: 'A Co', contactEmail: 'a@a.ca' });
+    const ok = { customerName: 'Pat Lee', phone: '5195550100', address: '1 Main St', city: 'Kitchener',
+      items: [{ description: 'LG fridge', qty: 2 }], services: ['delivery_only', 'haul_away', 'bogus'], notes: 'Side door', preferredDate: '2999-01-01' };
+    const r = await createClientRequest(a.id, ok);
+    const j = (await client.query('SELECT * FROM jobs WHERE id = $1', [r.id])).rows[0];
+    equal(j.status, 'unscheduled');
+    equal(j.source, 'client_portal');
+    equal(j.client_id, a.id);
+    equal(j.job_date, null);
+    assert(j.notes.includes('Preferred date: 2999-01-01'), 'date kept as a request, not a schedule');
+    equal(j.services.join(','), 'delivery_only,haul_away');
+    for (const bad of [{ ...ok, customerName: '' }, { ...ok, address: '' }, { ...ok, items: [] }, { ...ok, phone: '' }]) {
+      let threw = false;
+      try { await createClientRequest(a.id, bad); } catch { threw = true; }
+      assert(threw, 'incomplete request refused');
+    }
+    const mine = await listClientJobs(a.id);
+    equal(mine.length, 1);
+    equal(mine[0].requestedByClient, true);
+  } finally { done(); }
+});
+
+test('an invoice line is read back to the stop it billed', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    await ensureJobSchema();
+    const { jobsForInvoice, takeJobFor } = await import('../lib/client-portal.js');
+    const { jobLineDescription } = await import('../lib/invoice-job-line.js');
+    const a = await upsertClient({ name: 'A Co' });
+    const inv = (await client.query(`INSERT INTO invoices (email, name, status, subtotal, hst, total, number) VALUES ('a@a.ca','A Co','open',85,11.05,96.05,'INV-1') RETURNING id`)).rows[0];
+    const j = (await client.query(`INSERT INTO jobs (job_number, type, status, client_id, customer_name, invoice_id, services) VALUES ('RS-5','delivery','done',$1,'Carol Crozier',$2,'{haul_away}') RETURNING id`, [a.id, inv.id])).rows[0];
+    const { clientId, byDescription } = await jobsForInvoice(inv.id);
+    equal(clientId, a.id);
+    const desc = jobLineDescription({ ref: 'RS-5', customer: 'Carol Crozier', services: ['Haul away'] });
+    equal(takeJobFor(byDescription, desc), j.id);
+    equal(takeJobFor(byDescription, desc), null);
+  } finally { done(); }
+});

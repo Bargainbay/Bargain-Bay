@@ -6,9 +6,11 @@ import { JOB_STATUSES } from '../../../lib/jobs';
 import { getClientForPortal, listClientJobs, verifyClientToken, summarize, fmtMinutes } from '../../../lib/client-portal';
 import ClientPortalStyle from '../../../components/ClientPortalStyle';
 import PrintButton from '../../../components/PrintButton';
+import ClientRequestForm from '../../../components/ClientRequestForm';
+import { DEMO_CLIENT, DEMO_JOBS } from '../../../lib/client-portal-demo';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Your deliveries', robots: { index: false, follow: false }, referrer: 'no-referrer' };
+export const metadata = { title: { absolute: 'Your deliveries — RS Solutions' }, robots: { index: false, follow: false }, referrer: 'no-referrer' };
 
 const pillClass = (s) => (s === 'done' ? 'done' : s === 'failed' ? 'failed' : s === 'cancelled' ? 'cancelled'
   : ['on_the_way', 'arrived'].includes(s) ? 'live' : 'todo');
@@ -18,7 +20,8 @@ export default async function ClientPortal({ params, searchParams }) {
   const sp = await searchParams;
   const B = brandFor('rs_solutions');
 
-  if (!hasDb() || !verifyClientToken(id, sp?.t)) {
+  const demo = id === 'demo';
+  if (!demo && (!hasDb() || !verifyClientToken(id, sp?.t))) {
     return (
       <div className="cp narrow">
         <ClientPortalStyle />
@@ -29,15 +32,24 @@ export default async function ClientPortal({ params, searchParams }) {
       </div>
     );
   }
-  const client = await getClientForPortal(id);
+  const client = demo ? DEMO_CLIENT : await getClientForPortal(id);
   if (!client) return <div className="cp"><ClientPortalStyle /><div className="cp-panel">This account is not active.</div></div>;
 
   const filters = {
     from: sp?.from || '', to: sp?.to || '', status: sp?.status || '', q: sp?.q || ''
   };
-  const jobs = await listClientJobs(id, filters);
+  const all = demo
+    ? DEMO_JOBS.filter((j) => (!filters.status || j.status === filters.status)
+        && (!filters.q || JSON.stringify(j).toLowerCase().includes(filters.q.toLowerCase())))
+    : await listClientJobs(id, filters);
+  // What is still ahead (requested, scheduled, on the road) first and soonest
+  // first; finished work after it, newest first.
+  const isOpen = (j) => !['done', 'failed', 'cancelled'].includes(j.status);
+  const ahead = all.filter(isOpen).sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')));
+  const past = all.filter((j) => !isOpen(j));
+  const jobs = all;
   const sum = summarize(jobs);
-  const t = encodeURIComponent(sp.t);
+  const t = encodeURIComponent(sp?.t || 'demo');
   const filtered = !!(filters.from || filters.to || filters.status || filters.q);
 
   return (
@@ -52,6 +64,11 @@ export default async function ClientPortal({ params, searchParams }) {
         <div className="cp-noprint"><PrintButton label="Print / Save as PDF" /></div>
       </div>
 
+      {demo && (
+        <div className="notice-box cp-noprint">
+          <b>Preview with sample data.</b> This is exactly what {client.name} will see on their own link — names and photos here are made up.
+        </div>
+      )}
       <h1>{client.name}</h1>
       <div className="cp-sub">
         {client.contact_name ? `Welcome, ${client.contact_name}. ` : ''}Every delivery we run for you, with the time on site, signed proof of delivery and the photos taken at the door.
@@ -66,8 +83,10 @@ export default async function ClientPortal({ params, searchParams }) {
         <div className="cp-tile"><b>{fmtMinutes(sum.avgMinutes) || '—'}</b><span>Avg. time on site</span></div>
       </div>
 
+      <ClientRequestForm clientId={id} token={sp?.t || ''} demo={demo} />
+
       <form method="GET" className="cp-filter cp-noprint">
-        <input type="hidden" name="t" value={sp.t} />
+        <input type="hidden" name="t" value={sp?.t || ''} />
         <div><label htmlFor="f-q">Search</label><input id="f-q" type="search" name="q" defaultValue={filters.q} placeholder="Name, address, item, stop #" /></div>
         <div><label htmlFor="f-from">From</label><input id="f-from" type="date" name="from" defaultValue={filters.from} /></div>
         <div><label htmlFor="f-to">To</label><input id="f-to" type="date" name="to" defaultValue={filters.to} /></div>
@@ -75,7 +94,7 @@ export default async function ClientPortal({ params, searchParams }) {
           <label htmlFor="f-st">Status</label>
           <select id="f-st" name="status" defaultValue={filters.status}>
             <option value="">All</option>
-            {Object.entries(JOB_STATUSES).filter(([k]) => k !== 'unscheduled').map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries({ ...JOB_STATUSES, unscheduled: 'Requested' }).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </div>
         <button className="btn primary">Filter</button>
@@ -83,8 +102,10 @@ export default async function ClientPortal({ params, searchParams }) {
       </form>
 
       {jobs.length === 0 && <div className="cp-empty">No stops {filtered ? 'match those filters' : 'yet'}.</div>}
-
-      {jobs.map((j) => (
+      {[['Coming up & requested', ahead], ['Completed', past]].map(([title, list]) => list.length > 0 && (
+        <section key={title}>
+          <h2 className="cp-h2">{title} <span className="cp-sub">({list.length})</span></h2>
+        {list.map((j) => (
         <Link key={j.id} className="cp-card" href={`/client/${id}/job/${j.id}?t=${t}`}>
           <div className="cp-row">
             <div>
@@ -100,7 +121,7 @@ export default async function ClientPortal({ params, searchParams }) {
             <div className="cp-addr" style={{ marginTop: 6 }}>{j.items.map((i) => `${i.qty > 1 ? `${i.qty}× ` : ''}${i.description}`).join(' · ')}</div>
           )}
           <div className="cp-meta">
-            <span>{j.typeLabel}{j.services.length ? ` · ${j.services.join(', ')}` : ''}</span>
+            <span>{[...new Set([j.typeLabel, ...j.services])].join(' · ')}</span>
             {j.status === 'done' && (
               <>
                 <span>On site <b>{torontoTime(j.timeIn) || '—'}–{torontoTime(j.timeOut) || '—'}</b>{j.minutesOnSite != null ? ` (${fmtMinutes(j.minutesOnSite)})` : ''}</span>
@@ -111,6 +132,8 @@ export default async function ClientPortal({ params, searchParams }) {
             {j.status === 'failed' && j.failReason && <span>Reason <b>{j.failReason}</b></span>}
           </div>
         </Link>
+      ))}
+        </section>
       ))}
     </div>
   );

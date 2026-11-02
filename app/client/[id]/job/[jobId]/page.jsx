@@ -6,9 +6,10 @@ import { linkToken } from '../../../../../lib/links';
 import { getClientForPortal, getClientJob, verifyClientToken, fmtMinutes } from '../../../../../lib/client-portal';
 import ClientPortalStyle from '../../../../../components/ClientPortalStyle';
 import PrintButton from '../../../../../components/PrintButton';
+import { DEMO_CLIENT, DEMO_JOBS, demoImage } from '../../../../../lib/client-portal-demo';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Delivery details', robots: { index: false, follow: false }, referrer: 'no-referrer' };
+export const metadata = { title: { absolute: 'Delivery details — RS Solutions' }, robots: { index: false, follow: false }, referrer: 'no-referrer' };
 
 const TICK = (on) => (on ? '☑' : '☐');
 const stamp = (v) => (v ? `${torontoDate(v)} ${torontoTime(v)}` : null);
@@ -17,14 +18,17 @@ export default async function ClientJob({ params, searchParams }) {
   const { id, jobId } = await params;
   const sp = await searchParams;
   const B = brandFor('rs_solutions');
-  if (!hasDb() || !verifyClientToken(id, sp?.t)) {
+  const demo = id === 'demo';
+  if (!demo && (!hasDb() || !verifyClientToken(id, sp?.t))) {
     return <div className="cp narrow"><ClientPortalStyle /><div className="cp-panel"><h1>This link isn&apos;t valid</h1><p>Ask {B.contactEmail} for a fresh one.</p></div></div>;
   }
-  const [client, j] = await Promise.all([getClientForPortal(id), getClientJob(id, jobId)]);
+  const [client, j] = demo
+    ? [DEMO_CLIENT, DEMO_JOBS.find((x) => String(x.id) === String(jobId)) || null]
+    : await Promise.all([getClientForPortal(id), getClientJob(id, jobId)]);
   if (!client || !j) return <div className="cp"><ClientPortalStyle /><div className="cp-panel">We couldn&apos;t find that stop.</div></div>;
 
-  const t = encodeURIComponent(sp.t);
-  const img = (kind, val, extra = '') => `/api/client/pod?c=${id}&t=${t}&${kind}=${val}${extra}`;
+  const t = encodeURIComponent(sp?.t || 'demo');
+  const img = (kind, val, extra = '') => (demo ? demoImage(kind, val) : `/api/client/pod?c=${id}&t=${t}&${kind}=${val}${extra}`);
   const f = j.podForm || {};
   const podItems = Array.isArray(f.items) ? f.items : [];
   const label = `${j.orderNumber || j.jobNumber}-${(j.customerName || '').split(' ')[0] || 'stop'}`;
@@ -42,6 +46,7 @@ export default async function ClientJob({ params, searchParams }) {
         <div className="cp-noprint"><PrintButton label="Print / Save as PDF" /></div>
       </div>
 
+      {demo && <div className="notice-box cp-noprint"><b>Preview with sample data.</b> Nothing here is a real customer.</div>}
       <Link className="cp-back cp-noprint" href={`/client/${id}?t=${t}`}>← All deliveries for {client.name}</Link>
 
       <h1>{j.customerName || 'Delivery'}</h1>
@@ -152,7 +157,7 @@ export default async function ClientJob({ params, searchParams }) {
         )}
       </div>
 
-      {j.invoiceNumber && (
+      {j.invoiceNumber && !demo && (
         <div className="cp-panel cp-noprint">
           <h2>Billing</h2>
           <a href={`/invoice/${encodeURIComponent(j.invoiceNumber)}?t=${linkToken('invoice', j.invoiceNumber)}`}>View invoice {j.invoiceNumber} →</a>

@@ -4,7 +4,9 @@ import { getInvoiceByNumber } from '../../../lib/invoices';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { verifyLinkToken } from '../../../lib/links';
 import { query } from '../../../lib/db';
-import { clientPortalPath } from '../../../lib/client-portal';
+import { clientPortalPath, jobsForInvoice, takeJobFor } from '../../../lib/client-portal';
+import { linkToken } from '../../../lib/links';
+import RsInvoiceDocument from '../../../components/RsInvoiceDocument';
 import { brandFor } from '../../../lib/brands';
 import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel,
          BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY, isQuickSaleEmail } from '../../../lib/constants';
@@ -76,6 +78,30 @@ export default async function InvoicePage({ params, searchParams }) {
   const pdfQs = sParams?.t ? `?t=${encodeURIComponent(sParams.t)}` : guestEmail ? `?email=${encodeURIComponent(guestEmail)}` : '';
   const pdfHref = `/invoice/${encodeURIComponent(invoice.number)}/pdf${pdfQs}`;
   const statusLabel = paid ? (partialRefund ? 'Paid · partial refund' : 'Paid') : refunded ? 'Refunded' : voided ? 'Void' : partial ? 'Partially paid' : 'Open';
+
+  // RS Solutions client invoices use the client-facing layout, with a link from
+  // each delivery line to its proof of delivery.
+  if (invoice.brand === 'rs_solutions') {
+    const { clientId, byDescription } = await jobsForInvoice(invoice.id).catch(() => ({ clientId: null, byDescription: new Map() }));
+    const ct = clientId ? linkToken('client', String(clientId)) : '';
+    const rows = invoice.items.map((it) => {
+      const jid = clientId ? takeJobFor(byDescription, it.description) : null;
+      return {
+        id: it.id, amount: it.amount,
+        lines: String(it.description || '').split('\n').map((x) => x.trim()).filter(Boolean),
+        href: jid ? `/client/${clientId}/job/${jid}?t=${ct}` : null
+      };
+    });
+    return (
+      <RsInvoiceDocument
+        invoice={invoice} B={B} rows={rows}
+        portalHref={clientId ? `/client/${clientId}?t=${ct}` : null}
+        pdfHref={pdfHref} statusLabel={statusLabel}
+        paid={paid} open={open} partial={partial} amountPaid={amountPaid} balance={balance}
+      />
+    );
+  }
+
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>

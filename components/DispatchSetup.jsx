@@ -83,7 +83,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'client', id: c.id, name: c.name, contactName: c.contactName,
+          action: 'client', id: c.id, name: c.name, address: c.address, contactName: c.contactName,
           contactEmail: c.contactEmail, contactPhone: c.contactPhone, notifyOnComplete: c.notify
         })
       });
@@ -532,6 +532,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                 {editClient?.id === c.id ? (
                   <form onSubmit={saveClient} className="disp-setup-form">
                     <input value={editClient.name} onChange={(e) => setEditClient({ ...editClient, name: e.target.value })} placeholder="Company name *" />
+                    <input value={editClient.address} onChange={(e) => setEditClient({ ...editClient, address: e.target.value })} placeholder="Company address (printed on invoices)" />
                     <input value={editClient.contactName} onChange={(e) => setEditClient({ ...editClient, contactName: e.target.value })} placeholder="Contact person" />
                     <input type="email" value={editClient.contactEmail} onChange={(e) => setEditClient({ ...editClient, contactEmail: e.target.value })} placeholder="Contact email" />
                     <input value={editClient.contactPhone} onChange={(e) => setEditClient({ ...editClient, contactPhone: e.target.value })} placeholder="Contact phone" />
@@ -551,7 +552,7 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                     </span>
                     {' '}
                     <button type="button" className="btn" onClick={() => setEditClient({
-                      id: c.id, name: c.name, contactName: c.contact_name || '', contactEmail: c.contact_email || '',
+                      id: c.id, name: c.name, address: c.address || '', contactName: c.contact_name || '', contactEmail: c.contact_email || '',
                       contactPhone: c.contact_phone || '', notify: !!c.notify_on_complete
                     })}>Edit</button>
                     {c.portal_path && (
