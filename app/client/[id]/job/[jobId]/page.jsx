@@ -6,6 +6,8 @@ import { linkToken } from '../../../../../lib/links';
 import { getClientForPortal, getClientJob, verifyClientToken, fmtMinutes } from '../../../../../lib/client-portal';
 import ClientPortalStyle from '../../../../../components/ClientPortalStyle';
 import PrintButton from '../../../../../components/PrintButton';
+import { portalAccess } from '../../../../../lib/client-portal-session';
+import ClientPortalLogin from '../../../../../components/ClientPortalLogin';
 import { DEMO_CLIENT, DEMO_JOBS, demoImage } from '../../../../../lib/client-portal-demo';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +23,13 @@ export default async function ClientJob({ params, searchParams }) {
   const demo = id === 'demo';
   if (!demo && (!hasDb() || !verifyClientToken(id, sp?.t))) {
     return <div className="cp narrow"><ClientPortalStyle /><div className="cp-panel"><h1>This link isn&apos;t valid</h1><p>Ask {B.contactEmail} for a fresh one.</p></div></div>;
+  }
+  const gate = demo ? 'ok' : await portalAccess(id, sp?.t);
+  if (gate !== 'ok') {
+    // Same wall as the list: the link names the client, the password lets you in.
+    return <div className="cp narrow"><ClientPortalStyle />{gate === 'no_password'
+      ? <div className="cp-panel"><h1>Almost ready</h1><p>Portal access has not been switched on yet. Please contact {B.contactEmail}.</p></div>
+      : <ClientPortalLogin clientId={id} token={sp.t} />}</div>;
   }
   const [client, j] = demo
     ? [DEMO_CLIENT, DEMO_JOBS.find((x) => String(x.id) === String(jobId)) || null]

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { get } from '@vercel/blob';
-import { verifyClientToken, clientPhotoPath, clientSignaturePath } from '../../../../lib/client-portal';
+import { clientPhotoPath, clientSignaturePath } from '../../../../lib/client-portal';
+import { portalAccess } from '../../../../lib/client-portal-session';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -11,7 +12,7 @@ export const runtime = 'nodejs';
 export async function GET(req) {
   const url = new URL(req.url);
   const c = url.searchParams.get('c');
-  if (!verifyClientToken(c, url.searchParams.get('t'))) return new NextResponse('Not authorized', { status: 403 });
+  if ((await portalAccess(c, url.searchParams.get('t'))) !== 'ok') return new NextResponse('Not authorized', { status: 403 });
 
   const photo = url.searchParams.get('photo');
   const sig = url.searchParams.get('sig');

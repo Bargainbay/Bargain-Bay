@@ -1760,6 +1760,16 @@ make visible.
   customer / services per row (`lib/invoice-job-line.js`, written by `invoiceClientJobs`, read back by `jobsForInvoice`), GST line,
   each row a link to that stop's POD (PDF rows are link annotations). The line -> stop link is derived from the text, not stored.
   `clients.address` (migration 0047) prints under "Invoice for". `/client/*` renders with no storefront chrome (`SiteChrome`).
+- **The portal asks for a PASSWORD (added 2026-11-02).** The link names the client; a password the office sets per client
+  (Dispatch -> People & access -> Edit -> Portal password, admin only; `client_portal_password`) lets anyone holding it in — one
+  shared password per company, no accounts. `lib/client-portal-auth.js`, `lib/client-portal-session.js` (`portalAccess`),
+  `/api/client/login`, `ClientPortalLogin`, migration 0048 (also created at runtime by `ensureJobSchema`).
+  FAIL CLOSED: no password set = nobody gets in ("Almost ready"). bcrypt hash, never sent to a browser (the client list returns only
+  `portal_password_set`). A signed httpOnly cookie `bb_cp_<id>` (30 days) is bound to a digest of the CURRENT hash, so setting a new
+  password — or "Switch portal off" — signs everybody out; use it when somebody leaves. Wrong guesses are counted in
+  `client_portal_attempts` (10 per client or 5 per IP per 15 min locks). Pages, `/api/client/pod` and `/api/client/request` all call
+  `portalAccess`; **a new client API must too.** The emailed invoice link (`/invoice/<n>?t=`) is separate and stays token-only.
+- **Invoices section** on the portal (`listClientInvoices`): invoices raised from that client's stops, balance owing, due, overdue.
 - Staff copy the link with **Copy client link** on the client row; an RS invoice page also links to it.
 
 ## Dispatch — deliveries & service calls (added 2026-08-25)

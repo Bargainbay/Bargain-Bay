@@ -89,11 +89,28 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not save the client.'); return; }
-      setOk(`${d.client?.name || c.name} saved.`);
+      if (c.portalPassword) {
+        const pr = await fetch('/api/admin/dispatch', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'client_portal_password', clientId: c.id, password: c.portalPassword })
+        });
+        const pd = await pr.json();
+        if (!pr.ok) { setErr(`Saved, but the password was not set: ${pd.error || 'error'}`); onChanged?.(); return; }
+      }
+      setOk(`${d.client?.name || c.name} saved.${c.portalPassword ? ' Portal password set — everyone is signed out of the portal.' : ''}`);
       setEditClient(null);
       onChanged?.();
     } catch { setErr('Network error — nothing was saved.'); }
     finally { setBusy(''); }
+  }
+
+  async function switchOffPortal(c) {
+    if (!window.confirm(`Switch off the portal for ${c.name}? Nobody will be able to open it until you set a new password.`)) return;
+    const r = await fetch('/api/admin/dispatch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'client_portal_password', clientId: c.id, clear: true })
+    });
+    if (r.ok) { setOk(`${c.name}'s portal is switched off.`); setEditClient(null); onChanged?.(); } else setErr('Could not switch it off.');
   }
 
   async function copyPortal(c) {
@@ -536,6 +553,15 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                     <input value={editClient.contactName} onChange={(e) => setEditClient({ ...editClient, contactName: e.target.value })} placeholder="Contact person" />
                     <input type="email" value={editClient.contactEmail} onChange={(e) => setEditClient({ ...editClient, contactEmail: e.target.value })} placeholder="Contact email" />
                     <input value={editClient.contactPhone} onChange={(e) => setEditClient({ ...editClient, contactPhone: e.target.value })} placeholder="Contact phone" />
+                    {canManageDrivers && (
+                      <>
+                        <input type="text" autoComplete="off" value={editClient.portalPassword} onChange={(e) => setEditClient({ ...editClient, portalPassword: e.target.value })}
+                          placeholder={c.portal_password_set ? 'Portal password is set — type a new one to change it' : 'Portal password (min 8 characters) — needed before they can sign in'} />
+                        {c.portal_password_set && (
+                          <button type="button" className="btn" onClick={() => switchOffPortal(c)}>Switch portal off</button>
+                        )}
+                      </>
+                    )}
                     <label className="hint" style={{ margin: 0 }}>
                       <input type="checkbox" checked={editClient.notify} onChange={(e) => setEditClient({ ...editClient, notify: e.target.checked })} />
                       {' '}Email them when a stop is finished
@@ -549,11 +575,12 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
                     <span className="hint" style={{ margin: 0 }}>
                       {' '}· {[c.contact_name, c.contact_email, c.contact_phone].filter(Boolean).join(' · ')
                         || 'no contact details yet'}
+                      {' '}· {c.portal_password_set ? 'portal password set' : 'portal OFF (no password yet)'}
                     </span>
                     {' '}
                     <button type="button" className="btn" onClick={() => setEditClient({
                       id: c.id, name: c.name, address: c.address || '', contactName: c.contact_name || '', contactEmail: c.contact_email || '',
-                      contactPhone: c.contact_phone || '', notify: !!c.notify_on_complete
+                      contactPhone: c.contact_phone || '', notify: !!c.notify_on_complete, portalPassword: ''
                     })}>Edit</button>
                     {c.portal_url && (
                       <>

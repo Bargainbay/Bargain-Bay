@@ -130,3 +130,63 @@ test('a cancelled stop is not shown to the client', async () => {
     equal(jobs[0].customerName, 'Kept');
   } finally { done(); }
 });
+
+test('the portal password: set by the office, checked, locked out on guessing, and a new one signs everybody out', async () => {
+  const { done } = await withTestDb();
+  try {
+    await ensureJobSchema();
+    const auth = await import('../lib/client-portal-auth.js');
+    const a = await upsertClient({ name: 'A Co' });
+    // fail closed: no password, no entry
+    equal(await auth.portalGate(a.id, ''), 'no_password');
+    equal((await auth.attemptPortalLogin(a.id, 'whatever', '1.1.1.1')).reason, 'no_password');
+
+    let threw = false;
+    try { await auth.setClientPassword(a.id, 'short'); } catch { threw = true; }
+    assert(threw, 'a weak password is refused');
+    await auth.setClientPassword(a.id, 'Kitchener-2026');
+    equal(await auth.portalGate(a.id, ''), 'needs_password');
+    assert(!(await listClients())[0].portal_password_hash, 'the hash never leaves in the client list');
+    equal((await listClients())[0].portal_password_set, true);
+
+    const bad = await auth.attemptPortalLogin(a.id, 'nope', '2.2.2.2');
+    assert(!bad.ok && !bad.locked);
+    const good = await auth.attemptPortalLogin(a.id, 'Kitchener-2026', '3.3.3.3');
+    assert(good.ok, 'right password signs in');
+    equal(await auth.portalGate(a.id, good.cookie.value), 'ok');
+    equal(await auth.portalGate(a.id + 1, good.cookie.value), 'no_password', "a cookie is for ONE client");
+    equal(await auth.portalGate(a.id, good.cookie.value + 'x'), 'needs_password', 'a tampered cookie fails');
+
+    // five wrong guesses from one address locks that address, even for the right password
+    for (let i = 0; i < 5; i++) await auth.attemptPortalLogin(a.id, 'guess' + i, '9.9.9.9');
+    const locked = await auth.attemptPortalLogin(a.id, 'Kitchener-2026', '9.9.9.9');
+    assert(locked.locked, 'locked after repeated wrong passwords');
+
+    // changing the password invalidates every existing cookie
+    await auth.setClientPassword(a.id, 'Another-pass-1');
+    equal(await auth.portalGate(a.id, good.cookie.value), 'needs_password');
+    await auth.clearClientPassword(a.id);
+    equal(await auth.portalGate(a.id, good.cookie.value), 'no_password');
+  } finally { done(); }
+});
+
+test('invoices billed to a client are listed with what is owing', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    await ensureJobSchema();
+    const { listClientInvoices } = await import('../lib/client-portal.js');
+    const a = await upsertClient({ name: 'A Co' });
+    const o = (await client.query(`INSERT INTO invoices (email, name, status, subtotal, hst, total, number, due_date) VALUES ('a@a.ca','A Co','open',100,13,113,'INV-1','2000-01-01') RETURNING id`)).rows[0];
+    const p = (await client.query(`INSERT INTO invoices (email, name, status, subtotal, hst, total, number) VALUES ('a@a.ca','A Co','paid',200,26,226,'INV-2') RETURNING id`)).rows[0];
+    const v = (await client.query(`INSERT INTO invoices (email, name, status, subtotal, hst, total, number) VALUES ('a@a.ca','A Co','void',5,0,5,'INV-3') RETURNING id`)).rows[0];
+    for (const [n, inv] of [['RS-1', o.id], ['RS-2', p.id], ['RS-3', v.id]]) {
+      await client.query(`INSERT INTO jobs (job_number, type, status, client_id, invoice_id) VALUES ($1,'delivery','done',$2,$3)`, [n, a.id, inv]);
+    }
+    const list = await listClientInvoices(a.id);
+    equal(list.length, 2, 'void invoices are not shown');
+    const open = list.find((i) => i.number === 'INV-1');
+    equal(open.owing, 113);
+    assert(open.overdue, 'past due and unpaid is overdue');
+    equal(list.find((i) => i.number === 'INV-2').owing, 0);
+  } finally { done(); }
+});

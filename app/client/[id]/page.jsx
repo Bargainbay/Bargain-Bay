@@ -7,7 +7,13 @@ import { getClientForPortal, listClientJobs, verifyClientToken, summarize, fmtMi
 import ClientPortalStyle from '../../../components/ClientPortalStyle';
 import PrintButton from '../../../components/PrintButton';
 import ClientRequestForm from '../../../components/ClientRequestForm';
-import { DEMO_CLIENT, DEMO_JOBS } from '../../../lib/client-portal-demo';
+import { DEMO_CLIENT, DEMO_JOBS, DEMO_INVOICES } from '../../../lib/client-portal-demo';
+import { portalAccess } from '../../../lib/client-portal-session';
+import ClientPortalLogin from '../../../components/ClientPortalLogin';
+import SignOutButton from '../../../components/ClientPortalSignOut';
+import { listClientInvoices } from '../../../lib/client-portal';
+import { linkToken } from '../../../lib/links';
+import { money } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: { absolute: 'Your deliveries — RS Solutions' }, robots: { index: false, follow: false }, referrer: 'no-referrer' };
@@ -33,6 +39,14 @@ export default async function ClientPortal({ params, searchParams }) {
     );
   }
   const client = demo ? DEMO_CLIENT : await getClientForPortal(id);
+  // The link only says WHICH client. The password says who may look.
+  const gate = demo ? 'ok' : await portalAccess(id, sp?.t);
+  if (gate === 'no_password') {
+    return <div className="cp narrow"><ClientPortalStyle /><div className="cp-panel"><h1>Almost ready</h1><p>Portal access for {client?.name || 'your company'} hasn&apos;t been switched on yet. Please contact {B.name} dispatch at {B.contactEmail}.</p></div></div>;
+  }
+  if (gate !== 'ok') {
+    return <div className="cp narrow"><ClientPortalStyle /><ClientPortalLogin clientId={id} token={sp.t} clientName={client?.name} /></div>;
+  }
   if (!client) return <div className="cp"><ClientPortalStyle /><div className="cp-panel">This account is not active.</div></div>;
 
   const filters = {
@@ -48,6 +62,8 @@ export default async function ClientPortal({ params, searchParams }) {
   const ahead = all.filter(isOpen).sort((a, b) => String(a.date || '9999').localeCompare(String(b.date || '9999')));
   const past = all.filter((j) => !isOpen(j));
   const jobs = all;
+  const invoices = demo ? DEMO_INVOICES : await listClientInvoices(id);
+  const owing = invoices.reduce((a, i) => a + i.owing, 0);
   const sum = summarize(jobs);
   const t = encodeURIComponent(sp?.t || 'demo');
   const filtered = !!(filters.from || filters.to || filters.status || filters.q);
@@ -61,7 +77,10 @@ export default async function ClientPortal({ params, searchParams }) {
           <div className="cp-sub">{B.legal} · {B.address}</div>
           <div className="cp-sub">{B.contactEmail} · GST/HST# {HST_NUMBER}</div>
         </div>
-        <div className="cp-noprint"><PrintButton label="Print / Save as PDF" /></div>
+        <div className="cp-noprint" style={{ display: 'flex', gap: 8 }}>
+          <PrintButton label="Print / Save as PDF" />
+          {!demo && <SignOutButton clientId={id} token={sp.t} />}
+        </div>
       </div>
 
       {demo && (
@@ -75,6 +94,7 @@ export default async function ClientPortal({ params, searchParams }) {
       </div>
 
       <div className="cp-tiles">
+        <div className="cp-tile"><b style={{ color: owing > 0 ? '#b02a37' : undefined }}>{money(owing)}</b><span>Balance owing</span></div>
         <div className="cp-tile"><b>{sum.total}</b><span>{filtered ? 'Matching stops' : 'Total stops'}</span></div>
         <div className="cp-tile"><b>{sum.delivered}</b><span>Completed</span></div>
         <div className="cp-tile"><b>{sum.upcoming}</b><span>Coming up</span></div>
@@ -82,6 +102,28 @@ export default async function ClientPortal({ params, searchParams }) {
         <div className="cp-tile"><b>{sum.withPod}</b><span>With signed POD</span></div>
         <div className="cp-tile"><b>{fmtMinutes(sum.avgMinutes) || '—'}</b><span>Avg. time on site</span></div>
       </div>
+
+      <section className="cp-panel" id="invoices">
+        <h2>Invoices</h2>
+        {invoices.length === 0 ? (
+          <p className="cp-sub" style={{ margin: 0 }}>No invoices yet. They appear here as soon as we raise one.</p>
+        ) : (
+          <table>
+            <thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th>Stops</th><th style={{ textAlign: 'right' }}>Total</th><th style={{ textAlign: 'right' }}>Owing</th><th>Status</th></tr></thead>
+            <tbody>
+              {invoices.map((i) => (
+                <tr key={i.id}>
+                  <td>{demo ? <b>{i.number}</b> : <a href={`/invoice/${encodeURIComponent(i.number)}?t=${linkToken('invoice', i.number)}`}><b>{i.number}</b></a>}</td>
+                  <td>{i.date}</td><td>{i.owing > 0 ? i.due || '—' : '—'}</td><td>{i.stops}</td>
+                  <td style={{ textAlign: 'right' }}>{money(i.total)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700, color: i.owing > 0 ? '#b02a37' : undefined }}>{i.owing > 0 ? money(i.owing) : '—'}</td>
+                  <td><span className={`cp-pill ${i.status === 'paid' ? 'done' : i.overdue ? 'failed' : 'todo'}`}>{i.status === 'paid' ? 'Paid' : i.status === 'partial' ? 'Part paid' : i.status === 'refunded' ? 'Refunded' : i.overdue ? 'Overdue' : 'Open'}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       <ClientRequestForm clientId={id} token={sp?.t || ''} demo={demo} />
 
