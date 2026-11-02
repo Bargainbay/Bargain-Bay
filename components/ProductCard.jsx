@@ -6,6 +6,13 @@ import AddToCartButton from './AddToCartButton';
 // When `count` > 1 the card represents a model group: it shows the cheapest
 // unit, a "N available" badge, "from" pricing, and links to that unit's page
 // (where the other units of the model are listed) instead of an add-to-cart.
+// Cards show the name up to the first comma ("…French Door Refrigerator, 29.3 Cu. Ft. …" is spec text the
+// product page carries in full); the full title stays on hover and in alt text.
+function shortTitle(t) {
+  const i = t.indexOf(',');
+  return i >= 25 ? t.slice(0, i) : t;
+}
+
 export default function ProductCard({ unit, count = 1 }) {
   const grouped = count > 1;
   const off = pctOff(unit.price, unit.compareAt);
@@ -22,7 +29,7 @@ export default function ProductCard({ unit, count = 1 }) {
       </a>
       <div className="card-body">
         <ConditionPill condition={unit.condition} />
-        <a href={href} className="card-title">{name}</a>
+        <a href={href} className="card-title" title={name}>{shortTitle(name)}</a>
         <div className="card-model">{unit.make} · {unit.model}</div>
         {unit.vendor && <div className="sold-by">Sold by <b>{unit.vendor.name}</b></div>}
         <div className="price-row">

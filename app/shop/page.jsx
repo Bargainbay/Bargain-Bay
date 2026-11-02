@@ -6,6 +6,7 @@ import ShopClient from './ShopClient';
 import specs from '../../data/specs.json';
 import { unitKeywords } from '../../lib/keywords';
 import { styleFor } from '../../lib/styles';
+import { normalizeMake } from '../../lib/make';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,7 @@ export default async function ShopPage({ searchParams }) {
   const units = await decorate(await getAvailable({ marketplace: true }), await getSession());
   const enriched = units.map((u) => ({
     ...u,
+    make: normalizeMake(u.make),
     kw: unitKeywords(u, specs[u.id]),
     // Subcategory ("type") for the shop filter — French Door, Front Load, etc.
     style: u.vesta ? u.style : styleFor(u, specs[u.id])
