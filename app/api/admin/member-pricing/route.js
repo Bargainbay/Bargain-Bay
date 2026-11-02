@@ -3,11 +3,12 @@ import { audit } from '../../../../lib/audit';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { getAll, getById } from '../../../../lib/inventory';
-import { clearanceMap } from '../../../../lib/clearance';
+import { clearanceMap, upsertClearance, removeClearance } from '../../../../lib/clearance';
 import { consignmentFloors } from '../../../../lib/consignment';
 import { unitPrices } from '../../../../lib/pricing';
 import { getMemberRates, saveMemberRates, setOverride, removeOverride } from '../../../../lib/member-rates';
 import { DEFAULT_MEMBER_RATES, MEMBER_RATE_LIMITS, normalizeRates, toPercent } from '../../../../lib/member-rate-rules';
+import { money } from '../../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,14 +19,12 @@ async function requireAdmin() {
   return session && isAdmin(session) ? session : null;
 }
 
-const sample = (units, n) => {
-  if (units.length <= n) return units;
-  const sorted = [...units].sort((a, b) => a.price - b.price);
-  return Array.from({ length: n }, (_, i) => sorted[Math.round((i * (sorted.length - 1)) / (n - 1))]);
-};
+const PAGE_SIZE = 50;
 
 // What a rate set does to the shop RIGHT NOW: per unit, through the same function checkout uses.
-async function previewFor(rates, overrides, q) {
+// Every live unit is in `rows`; the screen shows one page of them (`q` narrows by SKU, brand, model
+// or title). The summary always covers the whole shop, not the page.
+async function previewFor(rates, overrides, { q = '', page = 1, pageSize = PAGE_SIZE } = {}) {
   const [all, cmap] = await Promise.all([getAll(), clearanceMap()]);
   const live = all.filter((u) => u.active !== false && u.price > 0);
   const floors = await consignmentFloors(live.map((u) => u.id)).catch(() => new Map());
@@ -45,17 +44,25 @@ async function previewFor(rates, overrides, q) {
     if (cost > 0 && next.price < cost) belowCost++;
   }
   const term = String(q || '').trim().toLowerCase();
-  const pool = term
-    ? rows.filter(({ u }) => [u.id, u.make, u.model, u.title, u.category].join(' ').toLowerCase().includes(term)).slice(0, 12)
-    : sample(rows, 12);
+  const matched = (term
+    ? rows.filter(({ u }) => [u.id, u.make, u.model, u.title, u.category].join(' ').toLowerCase().includes(term))
+    : rows
+  ).sort((a, b) => String(a.u.title || `${a.u.make} ${a.u.model}`).localeCompare(String(b.u.title || `${b.u.make} ${b.u.model}`)) || String(a.u.id).localeCompare(String(b.u.id)));
+  const size = Math.min(100, Math.max(10, Number(pageSize) || PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(matched.length / size));
+  const pg = Math.min(pages, Math.max(1, Math.floor(Number(page)) || 1));
+  const slice = matched.slice((pg - 1) * size, pg * size);
   return {
     summary: {
       units: rows.length, discounted, atPublic, belowMinProfit, belowCost,
       avgDiscountPct: discounted ? Math.round((discSum / discounted) * 1000) / 10 : 0
     },
-    rows: pool.map(({ u, now, next, cost }) => ({
+    total: matched.length, page: pg, pages, pageSize: size,
+    rows: slice.map(({ u, now, next, cost }) => ({
       sku: u.id, title: u.title || `${u.make} ${u.model}`, retail: u.compareAt || null,
-      public: next.clientPrice, onClearance: cmap.has(u.id), cost,
+      // `listPrice` is what the tracker says; `public` is what the shop charges (a clearance markdown
+      // can be lower).
+      listPrice: u.price, public: next.clientPrice, onClearance: cmap.has(u.id), cost,
       memberNow: now.price, memberNext: next.price,
       marginNow: cost ? Math.round((now.price - cost) * 100) / 100 : null,
       marginNext: cost ? Math.round((next.price - cost) * 100) / 100 : null,
@@ -78,7 +85,7 @@ export async function GET() {
   return NextResponse.json({
     rates: cur.rates, defaults: DEFAULT_MEMBER_RATES, limits: MEMBER_RATE_LIMITS,
     overrides: await overridesWithTitles(cur.overrides),
-    preview: await previewFor(cur.rates, cur.overrides, '')
+    preview: await previewFor(cur.rates, cur.overrides, {})
   });
 }
 
@@ -93,7 +100,7 @@ export async function POST(req) {
     if (body.action === 'preview') {
       const r = normalizeRates(body.rates, cur.rates);
       if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
-      return NextResponse.json({ preview: await previewFor(r.rates, cur.overrides, body.q) });
+      return NextResponse.json({ preview: await previewFor(r.rates, cur.overrides, { q: body.q, page: body.page }) });
     }
     if (body.action === 'save_rates' || body.action === 'reset_rates') {
       const input = body.action === 'reset_rates' ? DEFAULT_MEMBER_RATES : body.rates;
@@ -107,7 +114,7 @@ export async function POST(req) {
         summary: changes.length ? `Member pricing: ${changes.join(', ')}` : 'Member pricing saved (no change)',
         detail: { before: r.before, after: r.rates }
       });
-      return NextResponse.json({ ok: true, rates: r.rates, preview: await previewFor(r.rates, cur.overrides, '') });
+      return NextResponse.json({ ok: true, rates: r.rates, preview: await previewFor(r.rates, cur.overrides, {}) });
     }
     if (body.action === 'set_override') {
       const sku = String(body.sku || '').trim();
@@ -127,6 +134,45 @@ export async function POST(req) {
         summary: `Member price override for ${sku} removed (was $${r.before})`, detail: { before: r.before } });
       const next = await getMemberRates();
       return NextResponse.json({ ok: true, overrides: await overridesWithTitles(next.overrides) });
+    }
+    // One unit, both prices, from the table: { sku, member?, publicPrice? }. A number sets it; null puts
+    // it back (member -> the rates decide again, public -> the tracker price).
+    if (body.action === 'set_prices') {
+      const sku = String(body.sku || '').trim();
+      const u = await getById(sku).catch(() => null);
+      if (!u) return NextResponse.json({ error: `No product with SKU ${sku}.` }, { status: 404 });
+      const done = [];
+      if ('publicPrice' in body) {
+        if (body.publicPrice === null || body.publicPrice === '') {
+          const n = await removeClearance(sku);
+          if (n) { await audit(session, { action: 'clearance.remove', entity: 'clearance', entityId: sku, summary: 'Public price put back to the tracker price (member pricing screen)' }); done.push('public price back to normal'); }
+        } else {
+          const price = Math.round(Number(body.publicPrice) * 100) / 100;
+          if (!Number.isFinite(price) || price <= 0) return NextResponse.json({ error: 'Enter a public price greater than zero.' }, { status: 400 });
+          if (price > Number(u.price) + 0.005) return NextResponse.json({ error: `${sku} is listed at ${money(u.price)} on the tracker. A price here can only mark it down; to raise it, change its Retail or Condition on the tracker.` }, { status: 400 });
+          // Consigned stock can't be marked down under cost + 20% (same rule as /api/admin/clearance).
+          const floors = await consignmentFloors([sku]).catch(() => new Map());
+          const f = floors.get(sku);
+          if (f && f.floor > 0 && price + 0.005 < f.floor) return NextResponse.json({ error: `${sku} is ${f.vendor ? `${f.vendor}'s` : 'a vendor\u2019s'} drop-off stock: we owe ${money(f.cost)} for it when it sells, so it can't go under ${money(f.floor)}.` }, { status: 400 });
+          const cl = (await clearanceMap()).get(sku);
+          await upsertClearance({ sku, price, warrantyMonths: cl?.warrantyMonths, note: cl?.note });
+          await audit(session, { action: 'clearance.set', entity: 'clearance', entityId: sku, summary: `Public price ${money(price)} (member pricing screen)`, detail: { price } });
+          done.push(`public price ${money(price)}`);
+        }
+      }
+      if ('member' in body) {
+        if (body.member === null || body.member === '') {
+          const r = await removeOverride(sku);
+          if (r.removed) { await audit(session, { action: 'member_pricing.override_removed', entity: 'member_pricing', entityId: sku, summary: `Member price override for ${sku} removed (was $${r.before})`, detail: { before: r.before } }); done.push('member price back to the rates'); }
+        } else {
+          const r = await setOverride(sku, body.member);
+          if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
+          await audit(session, { action: 'member_pricing.override', entity: 'member_pricing', entityId: sku, summary: `Member price for ${sku} set to $${r.price}${r.before != null ? ` (was $${r.before})` : ''}`, detail: { price: r.price, before: r.before } });
+          done.push(`member price ${money(r.price)}`);
+        }
+      }
+      const next = await getMemberRates();
+      return NextResponse.json({ ok: true, done, preview: await previewFor(next.rates, next.overrides, { q: body.q, page: body.page }) });
     }
     if (body.action === 'search') {
       const term = String(body.q || '').trim().toLowerCase();

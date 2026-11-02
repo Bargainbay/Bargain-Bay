@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 
-export default function AdminMembers({ initialMembers }) {
+export default function AdminMembers({ initialMembers, heading }) {
   const [members, setMembers] = useState(initialMembers || []);
   const [busy, setBusy] = useState(null);
   const [err, setErr] = useState('');
@@ -22,11 +22,12 @@ export default function AdminMembers({ initialMembers }) {
   const pending = members.filter((m) => m.member_status === 'pending');
   const approved = members.filter((m) => m.member_status === 'approved');
   const declined = members.filter((m) => m.member_status === 'rejected');
+  const money = (n) => '$' + Number(n || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const dt = (s) => (s ? new Date(s).toLocaleDateString('en-CA') : '—');
 
   return (
     <div>
-      <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Member applications ({pending.length} pending)</h2>
+      <h2 style={{ color: 'var(--charcoal)', marginTop: heading ? 4 : 28 }}>{heading || 'Member applications'} ({pending.length} pending)</h2>
       <p className="hint" style={{ marginBottom: 12 }}>
         Approving a business unlocks wholesale member pricing on their account. The rates are set on <a href="/admin/member-pricing">Member pricing</a>.
       </p>
@@ -75,12 +76,15 @@ export default function AdminMembers({ initialMembers }) {
         <div className="panel" style={{ fontSize: 14, color: 'var(--muted)' }}>No active members yet.</div>
       ) : (
         <div className="table-wrap"><table className="admin">
-          <thead><tr><th>Business</th><th>Contact</th><th>Member since</th><th></th></tr></thead>
+          <thead><tr><th>Business</th><th>Contact</th><th>Member since</th><th>Orders</th><th>Spent</th><th>Last order</th><th></th></tr></thead>
           <tbody>{approved.map((m) => (
             <tr key={m.id}>
               <td><b>{m.business_name || '—'}</b></td>
               <td>{m.name || '—'}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.email}</div></td>
               <td style={{ fontSize: 12.5 }}>{dt(m.member_approved_at)}</td>
+              <td>{m.orders || 0}</td>
+              <td>{money(m.spent)}</td>
+              <td style={{ fontSize: 12.5 }}>{m.last_order_at ? dt(m.last_order_at) : 'never'}</td>
               <td><button className="btn" style={{ padding: '5px 10px', fontSize: 12.5 }} disabled={busy === m.id} onClick={() => act(m.id, 'revoke')}>Revoke</button></td>
             </tr>))}
           </tbody>

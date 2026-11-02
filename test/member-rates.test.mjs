@@ -57,6 +57,16 @@ test('a typed override is held between the floor and the public price', () => {
   equal(memberRegular(unit, r, { U1: 99999 }), 1000, 'too high is capped at the public price');
 });
 
+test('a typed override applies to a clearance unit, held between the floor and the clearance price', () => {
+  const r = DEFAULT_MEMBER_RATES;
+  const cl = { price: 1000 };
+  equal(unitPrices(unit, { cl, member: true, rates: r, overrides: { U1: 700 } }).price, 700, 'typed price stands');
+  equal(unitPrices(unit, { cl, member: true, rates: r, overrides: { U1: 10 } }).price, 600, 'lifted to the floor');
+  equal(unitPrices(unit, { cl, member: true, rates: r, overrides: { U1: 99999 } }).price, 1000, 'capped at the clearance price');
+  equal(unitPrices(unit, { cl, member: true, rates: r, overrides: {} }).price, 900, 'no typed price: the usual 90%');
+  equal(unitPrices(unit, { cl, member: false, rates: r, overrides: { U1: 700 } }).price, 1000, 'the public never sees it');
+});
+
 test('a clearance rate change moves only the member cut', () => {
   const r = normalizeRates({ clearanceRate: 0.80 }).rates;
   equal(memberClearance(unit, { price: 1000 }, r), 800);

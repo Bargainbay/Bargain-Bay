@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import OrderNotes from '../../components/OrderNotes';
 import { money, STATUS_LABELS } from '../../lib/constants';
 
@@ -217,7 +217,8 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
           </thead>
           <tbody>
             {orders.map((o) => (
-              <tr key={o.id}>
+              <Fragment key={o.id}>
+              <tr>
                 <td>
                   <a href={`/order/${o.order_number}?email=${encodeURIComponent(o.email)}`} style={{ fontWeight: 700, color: 'var(--charcoal)' }}>{o.order_number}</a>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>{new Date(o.created_at).toLocaleString('en-CA')}</div>
@@ -229,7 +230,7 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
                       {notesFor === o.id ? 'Hide notes' : 'Internal notes'}
                     </button>
                   </div>
-                  {notesFor === o.id && <OrderNotes orderId={o.id} />}
+
                 </td>
                 <td>
                   {o.name}<br />
@@ -382,6 +383,10 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
                   </div>
                 </td>
               </tr>
+              {notesFor === o.id && (
+                <tr><td colSpan={6} style={{ background: 'var(--cream, #faf7f2)' }}><OrderNotes orderId={o.id} /></td></tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -34,7 +34,7 @@ export default async function MemberPricingPage() {
   return (
     <div>
       <AdminNav active="member-pricing" />
-      <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 8px' }}>Member pricing</h1>
+      <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 8px' }}>Adjust member pricing</h1>
       {data
         ? <MemberPricingManager initial={{ rates: data.rates, overrides: data.overrides, preview: data.preview }} />
         : <div className="panel">Could not load pricing. Current rates: {JSON.stringify(cur.rates)}</div>}

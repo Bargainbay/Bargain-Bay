@@ -236,8 +236,10 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   Hard limits live in `MEMBER_RATE_LIMITS`: the cost floor cannot go under 100% of cost, so no setting can
   sell a member something below cost. Overrides are still held between the floor and the public price.
   Rates are cached 30s per instance and a failed read keeps the last good value. Each save is in `audit_log`.
+  A typed price applies to clearance units too (`unitPrices` in `lib/pricing.js`; it was read only on the regular path, so a typed price on a clearance unit was silently ignored until 2026-10-28), still held between the floor and the clearance price.
   Only an APPROVED MEMBER's price ever reads the saved rates. The June `data/member-prices.json` table still
   applies where no typed override exists.
+- **`/admin/member-pricing` is one table (2026-10-28, owner).** "Adjust member pricing": every unit on sale, 50 per page, search by SKU / brand / model / name, and a public price and a member price typed in the row (`set_prices` on `/api/admin/member-pricing`). A typed member price is the same override as before (`member_price_overrides`); the old separate "specific price for one unit" form is gone. **A public price here is a clearance markdown** (`clearance` table, same consignment floor as `/api/admin/clearance`), so it can only mark a unit DOWN from its tracker price and the unit shows on `/clearance`; "Back to tracker price" removes it. To raise a public price, change Retail or Condition on the tracker. The four shop-wide rates are underneath in a fold.
 - **Reseller front door (2026-10-28).** `/resellers` is the public landing page and apply form (header, footer and
   sitemap link it): signed out -> create account / sign in, then the existing `MemberRequest` form and agreement
   appear on the same page (`#apply`); pending -> "under review"; approved -> redirected to `/account/member`.
@@ -245,6 +247,14 @@ fresh key each time (`/api/photo` is cached an hour). The second tab manages
   `/account/member` is the approved member's dashboard (wholesale catalogue with their price, orders, open
   invoices and quotes); anyone else is redirected to `/resellers`. **Wholesale prices are shown to approved
   members only**, and only because `decorate()` itself gives a member price to nobody else.
+- **Reseller applications are reviewed at `/admin/resellers` (2026-10-29, admin; nav tab "Resellers").** Same
+  `AdminMembers` component and `/api/admin/members` as the fold on Operations (kept), so the two cannot disagree.
+  Active members show orders / spent / last order (`memberOrderStats` in `lib/members.js`): orders placed while
+  signed in to the account, pre-tax goods, cancelled left out. Guest or invoiced orders are not tied to the
+  account and are not counted. The stats read soft-fails, so Approve still works if it ever breaks. The
+  new-application email to the owner links here (it used to link to bare `/admin`). The nav tab carries a red
+  pending count (`components/PendingBadge.jsx`, fetched client-side from `/api/admin/members?count=1` like the clock
+  pill, so `AdminNav` stays a data-free server component; shows nothing at zero or on any failure).
 - **The member dashboard is a portal, not a table (2026-10-28).** `components/MemberPortal.jsx` on
   `/account/member`: category chips, **one row per model with a quantity stepper** (each + adds ONE specific unit,
   cheapest first, because every unit is one of a kind and the cart is a set of SKUs; "See each unit" lists them),

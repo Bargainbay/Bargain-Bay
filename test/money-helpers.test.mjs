@@ -1,7 +1,7 @@
 // The small money helpers. Each is a handful of lines and each decides
 // something a customer or a vendor sees.
 import { suite, test, assert, equal } from './_harness.mjs';
-import { splitAmount } from '../lib/stock-match.js';
+import { splitAmount, describeUnit } from '../lib/stock-match.js';
 import {
   round2, consignmentFloor, CONSIGNMENT_MIN_MARGIN_PCT,
   isUnitLine, isCreditLine, normalizeLineKind, HST_RATE, RESTOCKING_FEE_PCT
@@ -146,4 +146,21 @@ test('round2 is Math.round on cents, WITH the usual binary caveat', () => {
   equal(round2(0), 0);
   equal(round2(-1.235), -1.24, '-1.235*100 = -123.50000000000001 -> away from zero');
   equal(round2(-1.005), -1, '-1.005*100 = -100.49999999999999 -> toward zero');
+});
+
+suite('describeUnit — brand is not printed twice');
+
+test('a name that already starts with the brand is left alone', () => {
+  equal(describeUnit('Whirlpool', 'Whirlpool 27” Dryer'), 'Whirlpool 27” Dryer');
+  equal(describeUnit('Maytag', 'maytag 27” Electric Dryer'), 'maytag 27” Electric Dryer');
+  equal(describeUnit('LG', 'LG DLEX3250W'), 'LG DLEX3250W');
+});
+
+test('a name without the brand gets it, and a missing half is just the other', () => {
+  equal(describeUnit('Amana', '27” Electric Dryer'), 'Amana 27” Electric Dryer');
+  equal(describeUnit('Amana', 'NFW5800HW0'), 'Amana NFW5800HW0');
+  equal(describeUnit('', 'Beko DDT38532X'), 'Beko DDT38532X');
+  equal(describeUnit('Beko', ''), 'Beko');
+  // a brand that is only a prefix of a longer word is not "already there"
+  equal(describeUnit('GE', 'GEN2 Dishwasher'), 'GE GEN2 Dishwasher');
 });

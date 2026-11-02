@@ -11,8 +11,8 @@ const BLANK = {
 const SOURCES = ['Liquidation / overstock', 'Dealer or retailer overstock', 'Trade-ins and customer returns', 'Refurbishing used units', 'Manufacturer / distributor', 'Other'];
 
 // `policies` = the required seller documents in force: [{ slug, title, version, sections }], passed in by the page.
-export default function VendorApplyForm({ policies = [] }) {
-  const [f, setF] = useState(BLANK);
+export default function VendorApplyForm({ policies = [], accountEmail = '' }) {
+  const [f, setF] = useState({ ...BLANK, contactEmail: accountEmail });
   const [hp, setHp] = useState('');
   const [read, setRead] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -36,7 +36,7 @@ export default function VendorApplyForm({ policies = [] }) {
     } catch { setErr('Network error — please try again.'); } finally { setBusy(false); }
   }
 
-  if (done) return <div><h2 style={{ marginTop: 0 }}>Thank you</h2><p>We have your application and will be in touch by email. We review each one by hand, usually within two business days.</p></div>;
+  if (done) return <div><h2 style={{ marginTop: 0 }}>Thank you</h2><p>We have your application. We review each one by hand, usually within two business days, and email you when you are approved. Then sign in and open your seller dashboard.</p></div>;
 
   return (
     <form onSubmit={submit}>
@@ -49,7 +49,8 @@ export default function VendorApplyForm({ policies = [] }) {
         <div className="field"><label>Business Number (required)</label><input value={f.businessNo} onChange={set('businessNo')} placeholder="123456782" inputMode="numeric" required /></div>
         <div className="field"><label>HST number (required)</label><input value={f.hstNo} onChange={set('hstNo')} placeholder="123456782 RT 0001" required /></div>
         <div className="field"><label>Your name</label><input value={f.contactName} onChange={set('contactName')} required /></div>
-        <div className="field"><label>Business email</label><input type="email" value={f.contactEmail} onChange={set('contactEmail')} required /></div>
+        <div className="field"><label>Your account email</label><input type="email" value={accountEmail || f.contactEmail} readOnly style={{ background: '#f4f4f2' }} />
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>You are signed in with this email. Approval opens the seller portal for it.</span></div>
         <div className="field"><label>Phone</label><input value={f.contactPhone} onChange={set('contactPhone')} /></div>
         <div className="field"><label>Where does your stock come from?</label>
           <select value={f.sourceOfGoods} onChange={set('sourceOfGoods')} required><option value="">Choose…</option>{SOURCES.map((s) => <option key={s}>{s}</option>)}</select></div>

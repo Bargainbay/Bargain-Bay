@@ -162,6 +162,64 @@ test('revealing a full number needs a reason and is logged', async () => {
 });
 
 // ---------------------------------------------------------------------------
+suite('e-transfer payout method — the same safety path as a bank account');
+
+test('validates the address, hides it from the vendor view, and needs an e-transfer test to verify', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    const v = await vendor('Alpha');
+    const et = (o = {}) => ({ method: 'etransfer', holderName: 'Alpha Appliances Ltd', etransferEmail: 'Pay@Alpha.CA', ...o });
+    await rejects(() => submitBankAccount({ vendorId: v.id, role: 'owner', by: 'o' }, et({ etransferEmail: 'nope' })), /email/i);
+    await rejects(() => submitBankAccount({ vendorId: v.id, role: 'staff', by: 's' }, et()), /owner/);
+    const s = await submitBankAccount({ vendorId: v.id, role: 'owner', by: 'o' }, et());
+    equal(await payableAccount(v.id), null);                                   // nothing pays until verified
+    const pending = (await pendingBankAccounts())[0];
+    equal(pending.method, 'etransfer'); equal(pending.etransferEmail, 'pay@alpha.ca');
+    const seen = JSON.stringify(await bankSummary(v.id));
+    assert(!seen.includes('pay@alpha.ca'), 'the full address is not in the vendor view');
+    assert(seen.includes('p•••@alpha.ca'), 'it is masked');
+    await rejects(() => verifyBankAccount(s.id, { by: 'admin', how: 'void_cheque', nameMatched: true }), /e-transfer test/);
+    await rejects(() => verifyBankAccount(s.id, { by: 'admin', how: 'etransfer_test', nameMatched: false }), /matches/);
+    await verifyBankAccount(s.id, { by: 'admin', how: 'etransfer_test', nameMatched: true });
+    equal((await payableAccount(v.id)).id, s.id);
+    const { rows } = await client.query('SELECT institution, account_enc FROM vendor_bank_accounts WHERE id = $1', [s.id]);
+    equal(rows[0].institution, null); equal(rows[0].account_enc, null);
+    // and a bank account cannot be "verified" by an e-transfer test
+    const b = await submitBankAccount({ vendorId: v.id, role: 'owner', by: 'o' }, bank());
+    await rejects(() => verifyBankAccount(b.id, { by: 'admin', how: 'etransfer_test', nameMatched: true }), /only verifies an e-transfer/);
+  } finally { done(); }
+});
+
+test('replacing a verified bank account with an e-transfer address starts the cooling-off', async () => {
+  const { done } = await withTestDb();
+  try {
+    const v = await payable('Alpha');
+    const s = await submitBankAccount({ vendorId: v.id, role: 'owner', by: 'o' }, { method: 'etransfer', holderName: 'Alpha', etransferEmail: 'pay@alpha.ca' });
+    await verifyBankAccount(s.id, { by: 'admin', how: 'etransfer_test', nameMatched: true });
+    equal((await payableAccount(v.id)).id, v.bankId);                           // the old account is still the payable one
+  } finally { done(); }
+});
+
+test('a vendor paid by e-transfer is proposed, approved, and appears in the payout file with the address', async () => {
+  const { done } = await withTestDb();
+  try {
+    const v = await vendor('Alpha');
+    const s = await submitBankAccount({ vendorId: v.id, role: 'owner', by: 'o' }, { method: 'etransfer', holderName: 'Alpha', etransferEmail: 'pay@alpha.ca' });
+    await verifyBankAccount(s.id, { by: 'admin', how: 'etransfer_test', nameMatched: true });
+    await clearFirstPayout(v.id, { by: 'admin' });
+    await sale(v.id, 'BB-ET', 100000);
+    const run = await proposePayouts({ by: 'system' });
+    equal(run.proposed.length, 1);
+    const id = run.proposed[0].payoutId;
+    await approvePayout(id, { by: 'admin' });
+    const file = await payoutFile([id], { by: 'admin' });
+    const lines = file.csv.trim().split('\n');
+    assert(/etransfer_email/.test(lines[0]), 'header names the column');
+    assert(lines[1].includes('etransfer') && lines[1].includes('pay@alpha.ca'), 'the row carries the address');
+  } finally { done(); }
+});
+
+// ---------------------------------------------------------------------------
 suite('the ledger — append-only, derived, idempotent');
 
 test('a settled order books the sale, commission, fees and the 2% hold — and nets to the breakdown', async () => {
