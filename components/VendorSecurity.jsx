@@ -1,7 +1,9 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import qrcode from 'qrcode-generator';
-import { safeNext } from '../lib/vendor-next';
+import { safeNext as vendorNext } from '../lib/vendor-next';
+
+const adminNext = (n) => (typeof n === 'string' && /^\/(admin|api\/admin)(\/|$|\?)/.test(n) && !n.includes('..') && !n.startsWith('//') ? n : '/admin');
 
 // Setting up the authenticator. The QR is drawn HERE, in the browser, from the otpauth URL the
 // server returned once — the secret is never put in a URL or an image request. Recovery codes
@@ -19,8 +21,8 @@ function Qr({ url }) {
   return <div ref={box} style={{ width: 200, height: 200, background: '#fff' }} aria-label="QR code to scan with your authenticator app" role="img" />;
 }
 
-async function post(body) {
-  const res = await fetch('/api/vendor/mfa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+async function post(body, endpoint = '/api/vendor/mfa') {
+  const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const j = await res.json().catch(() => ({}));
   if (!res.ok || j.ok === false) throw new Error(j.error || 'That did not work.');
   return j;
@@ -46,7 +48,8 @@ function RecoveryCodes({ codes, onDone }) {
   );
 }
 
-export default function VendorSecurity({ initial, next }) {
+export default function VendorSecurity({ initial, next, endpoint = '/api/vendor/mfa', admin = false }) {
+  const safeNext = admin ? adminNext : vendorNext;
   const [state, setState] = useState(initial);
   const [setup, setSetup] = useState(null);
   const [code, setCode] = useState('');
@@ -60,14 +63,14 @@ export default function VendorSecurity({ initial, next }) {
     setBusy(false);
   }
 
-  const begin = () => run(async () => { setSetup(await post({ action: 'begin' })); setCode(''); });
+  const begin = () => run(async () => { setSetup(await post({ action: 'begin' }, endpoint)); setCode(''); });
   const confirm = () => run(async () => {
-    const j = await post({ action: 'confirm', code });
+    const j = await post({ action: 'confirm', code }, endpoint);
     setCodes(j.recoveryCodes); setSetup(null); setCode('');
     setState({ ...state, enrolled: true, verified: true, mustEnrol: false, recoveryLeft: j.recoveryCodes.length });
   });
   const regenerate = () => run(async () => {
-    const j = await post({ action: 'recovery_codes', code });
+    const j = await post({ action: 'recovery_codes', code }, endpoint);
     setCodes(j.recoveryCodes); setCode('');
     setState({ ...state, recoveryLeft: j.recoveryCodes.length });
   });
@@ -79,8 +82,8 @@ export default function VendorSecurity({ initial, next }) {
   return (
     <div>
       <div className="panel">
-        <h1 style={{ marginTop: 0, fontSize: 20 }}>Two-factor sign-in</h1>
-        {!state.available && <p>Two-factor sign-in is not available yet. Please contact marketplace support.</p>}
+        <h1 style={{ marginTop: 0, fontSize: 20 }}>{admin ? 'Administrator two-factor sign-in' : 'Two-factor sign-in'}</h1>
+        {!state.available && <p>Two-factor sign-in is not available yet. Please contact support.</p>}
         {state.available && state.enrolled && (
           <>
             <p style={{ fontSize: 14 }}><span className="pill ok">On</span> You have {state.recoveryLeft} recovery code(s) left.</p>
@@ -88,7 +91,7 @@ export default function VendorSecurity({ initial, next }) {
             <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 0 }}>Enter a current code from your app. The old recovery codes stop working.</p>
             <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" placeholder="123456" style={{ width: 140 }} />{' '}
             <button type="button" className="btn" disabled={busy || !code.trim()} onClick={regenerate}>Replace recovery codes</button>
-            <p style={{ fontSize: 13 }}>Need to confirm it is you before a sensitive change? <a href={`/vendor/mfa?next=${encodeURIComponent(next || '/vendor')}&fresh=1`}>Enter a fresh code</a>.</p>
+            {!admin && <p style={{ fontSize: 13 }}>Need to confirm it is you before a sensitive change? <a href={`/vendor/mfa?next=${encodeURIComponent(next || '/vendor')}&fresh=1`}>Enter a fresh code</a>.</p>}
           </>
         )}
         {state.available && !state.enrolled && !setup && (

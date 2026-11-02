@@ -1,9 +1,12 @@
 'use client';
 import { useState } from 'react';
 
-import { safeNext } from '../lib/vendor-next';
+import { safeNext as vendorNext } from '../lib/vendor-next';
 
-export default function VendorMfaVerify({ next, stepUp }) {
+const adminNext = (n) => (typeof n === 'string' && /^\/admin(\/|$|\?)/.test(n) && !n.includes('..') && !n.startsWith('//') ? n : '/admin');
+
+export default function VendorMfaVerify({ next, stepUp, endpoint = '/api/vendor/mfa', admin = false }) {
+  const safeNext = admin ? adminNext : vendorNext;
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -13,7 +16,7 @@ export default function VendorMfaVerify({ next, stepUp }) {
     e.preventDefault();
     setBusy(true); setErr('');
     try {
-      const res = await fetch('/api/vendor/mfa', {
+      const res = await fetch(endpoint, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'verify', code })
       });
@@ -46,7 +49,7 @@ export default function VendorMfaVerify({ next, stepUp }) {
         </button>
       </div>
       <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 0 }}>
-        Lost your phone and your recovery codes? Contact marketplace support; we will reset it after checking who you are.
+        {admin ? 'Lost your phone and your recovery codes? Ask the other administrator or your developer to reset it.' : 'Lost your phone and your recovery codes? Contact marketplace support; we will reset it after checking who you are.'}
       </p>
     </form>
   );
