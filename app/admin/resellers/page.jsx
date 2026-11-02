@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
-import { listMembers } from '../../../lib/members';
+import { listMembers, listUnappliedAccounts } from '../../../lib/members';
 import AdminNav from '../../../components/AdminNav';
 import AdminMembers from '../AdminMembers';
+import AddReseller from '../../../components/AddReseller';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Resellers — Bargain Bay' };
@@ -25,15 +26,16 @@ export default async function ResellersPage() {
     return <div><AdminNav active="resellers" /><div className="panel">Database not configured — set POSTGRES_URL.</div></div>;
   }
   let members = [];
+  let unapplied = [];
   let failed = '';
-  try { members = await listMembers(); } catch (e) { failed = e.message; }
+  try { members = await listMembers(); unapplied = await listUnappliedAccounts(); } catch (e) { failed = e.message; }
   return (
     <div>
       <AdminNav active="resellers" />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 8px' }}>Resellers</h1>
       {failed
         ? <div className="error-box">Could not load resellers: {failed}</div>
-        : <AdminMembers initialMembers={members} heading="Applications" />}
+        : <><AdminMembers initialMembers={members} heading="Applications" /><AddReseller initialAccounts={unapplied} /></>}
     </div>
   );
 }
