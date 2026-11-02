@@ -1731,6 +1731,20 @@ make visible.
 
 
 
+## Client contacts and the client delivery portal (added 2026-11-02)
+`clients.contact_name` (migration 0046, which also fills in Canadian Discount Appliances: Matt Graham, Matt@grahams.ca,
+(519) 658-3409 — an UPDATE only, no seeded rows), **Edit** on each client in Dispatch -> People & access
+(`DispatchSetup.jsx`, POST `action: 'client'` with `id`), `lib/client-portal.js`, `/client/<id>?t=<token>`,
+`/client/<id>/job/<jobId>`, `/api/client/pod`, `test/client-portal.test.mjs`.
+
+- Invoicing a client with no email used to say "add one" with nowhere to add it; the client list could only ADD.
+  `upsertClient` on an edit keeps any field not passed (notify/active are `undefined`, not false) and validates the email.
+- The invoice carries the client's phone and "Attn: <contact>" in the memo; letterhead reads **GST/HST#** (same number as `HST_NUMBER`).
+- **The portal is a private link, not a login.** Token = `linkToken('client', id)` (HMAC, derived, not stored). Every query is
+  scoped by client_id, so changing an id in the URL returns nothing. It shows times (time in/out, minutes on site), the POD form,
+  signature and door photos. It NEVER returns `pay_amount`, `job_events` or order notes. `/client/` is in `proxy.js`'s allow-list.
+- Staff copy the link with **Copy client link** on the client row; an RS invoice page also links to it.
+
 ## Dispatch — deliveries & service calls (added 2026-08-25)
 The daily run sheet used to be built by hand because the work comes from several
 client companies through several channels (email, spreadsheet, phone) and no one

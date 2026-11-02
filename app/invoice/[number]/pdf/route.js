@@ -40,7 +40,7 @@ function render(invoice, B) {
     doc.fillColor(ink).font('Helvetica-Bold').fontSize(20).text(String(B.name).toUpperCase(), L, 50);
     doc.font('Helvetica').fontSize(9).fillColor(grey)
       .text(`${B.legal} - ${B.address}`, L, 76, { width: 340 })
-      .text(invoice.hide_hst_number ? B.contactEmail : `${B.contactEmail} - HST# ${B.hst}`, L, doc.y);
+      .text(invoice.hide_hst_number ? B.contactEmail : `${B.contactEmail} - GST/HST# ${B.hst}`, L, doc.y);
     doc.fillColor(ink).font('Helvetica-Bold').fontSize(16).text('INVOICE', 380, 50, { width: R - 380, align: 'right' });
     doc.font('Helvetica').fontSize(11).text(invoice.number, 380, 70, { width: R - 380, align: 'right' });
     doc.fontSize(9).fillColor(grey).text(statusLabel, 380, 86, { width: R - 380, align: 'right' });
