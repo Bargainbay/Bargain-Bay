@@ -32,7 +32,18 @@ export default function RsInvoiceDocument({ invoice, B, rows, portalHref, pdfHre
         .rsinv .big { color:${PINK}; font-size:24px; font-weight:700; justify-content:flex-end !important; padding-top:8px !important; }
         .rsinv .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
         .rsinv .hint2 { font-size:12.5px; color:#555; }
-        @media (max-width: 640px) { .rsinv .grid { grid-template-columns:1fr 1fr; } .rsinv td.d { width:auto; } }
+        @media (max-width: 640px) {
+          .rsinv { padding: 16px 12px 24px; }
+          .rsinv h1 { font-size: 22px; }
+          .rsinv .grid { grid-template-columns: 1fr; gap: 12px; }
+          .rsinv .bar .btn { flex: 1 1 auto; text-align: center; }
+          .rsinv table { table-layout: auto; }
+          .rsinv th, .rsinv td { padding: 8px 6px; font-size: 12.5px; }
+          .rsinv td.d { width: auto; }
+          /* Unit price equals total on every row, so the phone drops it. */
+          .rsinv th:nth-child(3), .rsinv td:nth-child(3) { display: none; }
+          .rsinv .tot { width: 100%; }
+        }
         @media print { .rsinv .bar, .rsinv .noprint { display:none !important; } .rsinv { border-top-width:6px; padding:0; } }
       `}</style>
 

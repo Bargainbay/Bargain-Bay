@@ -51,6 +51,43 @@ export default function ClientPortalStyle() {
       .cp-form input:not([type=checkbox]), .cp-form textarea { display:block; width:100%; margin-top:3px; padding:8px 10px; border:1px solid var(--line, #ccc); border-radius:8px; font-size:14px; text-transform:none; letter-spacing:0; color:inherit; background:var(--card, #fff); }
       .cp-h2 { font-size:14px; text-transform:uppercase; letter-spacing:.06em; color:var(--charcoal); margin:20px 0 8px; }
       .cp-back { display:inline-block; margin-bottom:12px; font-size:14px; }
+      .cp-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+      .cp-head > div { min-width:0; }
+      /* ── Phones ─────────────────────────────────────────────────────────── */
+      @media (max-width: 640px) {
+        .cp { padding-bottom: 28px; }
+        .cp-head { align-items:flex-start; flex-direction:column; gap:10px; }
+        .cp-head .cp-noprint { width:100%; flex-wrap:wrap; }
+        .cp-brand { font-size:18px; }
+        .cp h1 { font-size:20px; overflow-wrap:anywhere; }
+        .cp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px; }
+        .cp-tile { padding:10px; }
+        .cp-tile span { font-size:11.5px; }
+        .cp-filter { gap:8px; }
+        .cp-filter > div { flex:1 1 100%; }
+        .cp-filter > div:nth-child(2), .cp-filter > div:nth-child(3) { flex:1 1 calc(50% - 4px); }
+        .cp-filter input, .cp-filter select { width:100%; box-sizing:border-box; min-width:0; font-size:16px; }
+        .cp-filter input[type=search] { min-width:0; }
+        .cp-filter .btn { flex:1 1 auto; }
+        .cp-card { padding:12px; }
+        .cp-row { flex-direction:column; gap:6px; }
+        .cp-row > div:last-child { text-align:left !important; }
+        .cp-meta { gap:6px 12px; }
+        .cp-panel { padding:14px 12px; }
+        .cp-grid { grid-template-columns:1fr; gap:10px; }
+        .cp-form .cp-grid { grid-template-columns:1fr; }
+        .cp-form input:not([type=checkbox]), .cp-form textarea { font-size:16px; }
+        .cp-time { display:grid; grid-template-columns:1fr 1fr; }
+        .cp-step b { font-size:16px; }
+        .cp-shots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        /* An invoice row becomes a small card instead of a table that cannot fit. */
+        .cp table.cp-stack thead { display:none; }
+        .cp table.cp-stack, .cp table.cp-stack tbody, .cp table.cp-stack tr, .cp table.cp-stack td { display:block; width:100%; }
+        .cp table.cp-stack tr { border:1px solid var(--line, #ddd); border-radius:10px; padding:8px 10px; margin-bottom:8px; }
+        .cp table.cp-stack td { border:0; padding:3px 0; display:flex; justify-content:space-between; gap:12px; text-align:right !important; }
+        .cp table.cp-stack td::before { content:attr(data-label); color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.05em; text-align:left; }
+        .cp table.cp-stack td:first-child { font-size:15px; }
+      }
       @media print {
         .cp-noprint { display:none !important; }
         .wrap { max-width:none !important; padding:0 !important; }
