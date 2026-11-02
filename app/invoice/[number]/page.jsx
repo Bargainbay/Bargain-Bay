@@ -3,6 +3,10 @@ import { hasDb } from '../../../lib/db';
 import { getInvoiceByNumber } from '../../../lib/invoices';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { verifyLinkToken } from '../../../lib/links';
+import { query } from '../../../lib/db';
+import { clientPortalPath, jobsForInvoice, takeJobFor } from '../../../lib/client-portal';
+import { linkToken } from '../../../lib/links';
+import RsInvoiceDocument from '../../../components/RsInvoiceDocument';
 import { brandFor } from '../../../lib/brands';
 import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel,
          BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY, isQuickSaleEmail } from '../../../lib/constants';
@@ -53,6 +57,14 @@ export default async function InvoicePage({ params, searchParams }) {
     );
   }
 
+  // An RS Solutions client billed for deliveries can open each one: times, POD,
+  // photos. Found through the jobs this invoice billed.
+  let portalHref = null;
+  if (invoice.brand === 'rs_solutions') {
+    const r = await query('SELECT client_id FROM jobs WHERE invoice_id = $1 AND client_id IS NOT NULL LIMIT 1', [invoice.id]).catch(() => null);
+    if (r?.rows[0]) portalHref = clientPortalPath(r.rows[0].client_id);
+  }
+
   const open = invoice.status === 'open';
   const partial = invoice.status === 'partial';
   const paid = invoice.status === 'paid';
@@ -67,6 +79,30 @@ export default async function InvoicePage({ params, searchParams }) {
   const pdfHref = `/invoice/${encodeURIComponent(invoice.number)}/pdf${pdfQs}`;
   const statusLabel = paid ? (partialRefund ? 'Paid · partial refund' : 'Paid') : refunded ? 'Refunded' : voided ? 'Void' : partial ? 'Partially paid' : 'Open';
 
+  // RS Solutions client invoices use the client-facing layout, with a link from
+  // each delivery line to its proof of delivery.
+  if (invoice.brand === 'rs_solutions') {
+    const { clientId, byDescription } = await jobsForInvoice(invoice.id).catch(() => ({ clientId: null, byDescription: new Map() }));
+    const ct = clientId ? linkToken('client', String(clientId)) : '';
+    const rows = invoice.items.map((it) => {
+      const jid = clientId ? takeJobFor(byDescription, it.description) : null;
+      return {
+        id: it.id, amount: it.amount,
+        lines: String(it.description || '').split('\n').map((x) => x.trim()).filter(Boolean),
+        href: jid ? `/client/${clientId}/job/${jid}?t=${ct}` : null
+      };
+    });
+    return (
+      <RsInvoiceDocument
+        invoice={invoice} B={B} rows={rows}
+        portalHref={clientId ? `/client/${clientId}?t=${ct}` : null}
+        pdfHref={pdfHref} statusLabel={statusLabel}
+        paid={paid} open={open} partial={partial} amountPaid={amountPaid} balance={balance}
+      />
+    );
+  }
+
+
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
       {/* Business letterhead */}
@@ -74,7 +110,7 @@ export default async function InvoicePage({ params, searchParams }) {
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--charcoal)' }}>{B.name}</div>
           <div style={{ fontSize: 12, color: 'var(--muted)' }}>{B.legal} · {B.address}</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{B.contactEmail}{invoice.hide_hst_number ? '' : ` · HST# ${B.hst}`}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{B.contactEmail}{invoice.hide_hst_number ? '' : ` · GST/HST# ${B.hst}`}</div>
         </div>
         <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--charcoal)' }}>INVOICE</div>
@@ -174,6 +210,9 @@ export default async function InvoicePage({ params, searchParams }) {
             <div className="summary-row"><span>Refunded</span><span>−{money(refundTotal)}</span></div>
             <div className="summary-row total"><span>Net after refund</span><span>{money(Math.max(0, Number(invoice.total) - refundTotal))}</span></div>
           </>
+        )}
+        {portalHref && (
+          <p style={{ margin: '10px 0 0' }}><a className="btn" href={portalHref}>View each delivery — times, proof of delivery &amp; photos →</a></p>
         )}
         {invoice.memo && <p style={{ margin: '10px 0 0', fontSize: 13.5, color: 'var(--muted)' }}>{invoice.memo}</p>}
         <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--muted)' }}>

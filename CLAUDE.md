@@ -1737,6 +1737,31 @@ make visible.
 
 
 
+## Client contacts and the client delivery portal (added 2026-11-02)
+`clients.contact_name` (migration 0046, which also fills in Canadian Discount Appliances: Matt Graham, Matt@grahams.ca,
+(519) 658-3409 — an UPDATE only, no seeded rows), **Edit** on each client in Dispatch -> People & access
+(`DispatchSetup.jsx`, POST `action: 'client'` with `id`), `lib/client-portal.js`, `/client/<id>?t=<token>`,
+`/client/<id>/job/<jobId>`, `/api/client/pod`, `test/client-portal.test.mjs`.
+
+- Invoicing a client with no email used to say "add one" with nowhere to add it; the client list could only ADD.
+  `upsertClient` on an edit keeps any field not passed (notify/active are `undefined`, not false) and validates the email.
+- The invoice carries the client's phone and "Attn: <contact>" in the memo; letterhead reads **GST/HST#** (same number as `HST_NUMBER`).
+- **The portal is a private link, not a login.** Token = `linkToken('client', id)` (HMAC, derived, not stored). Every query is
+  scoped by client_id, so changing an id in the URL returns nothing. It shows times (time in/out, minutes on site), the POD form,
+  signature and door photos. It NEVER returns `pay_amount`, `job_events` or order notes. `/client/` is in `proxy.js`'s allow-list.
+- **`/client/demo`** (and `/client/demo/job/<n>`, `/client/demo/invoice`) render the same pages from invented data in
+  `lib/client-portal-demo.js` — no database, no real names — so the owner can see what a client sees before a link is sent.
+- **Clients add their own deliveries** (`ClientRequestForm`, `POST /api/client/request`, `createClientRequest`): name, phone,
+  email, address, units, services (`CLIENT_SERVICES`), notes, optional preferred date. It lands as an UNSCHEDULED stop,
+  `source = 'client_portal'` (card says "requested by client"), emails the dispatch desk, and sets NO price. A preferred date goes
+  in the notes, never on `job_date`, or it would look scheduled with nobody assigned. Capped at 60 an hour per client.
+  Staff assign the driver/day and set the charge as for any stop. The client sees past, present and future stops, scoped by client_id.
+- **RS client invoices use the client layout** (`components/RsInvoiceDocument.jsx`, and `renderRs` in the PDF route): reference /
+  customer / services per row (`lib/invoice-job-line.js`, written by `invoiceClientJobs`, read back by `jobsForInvoice`), GST line,
+  each row a link to that stop's POD (PDF rows are link annotations). The line -> stop link is derived from the text, not stored.
+  `clients.address` (migration 0047) prints under "Invoice for". `/client/*` renders with no storefront chrome (`SiteChrome`).
+- Staff copy the link with **Copy client link** on the client row; an RS invoice page also links to it.
+
 ## Dispatch — deliveries & service calls (added 2026-08-25)
 The daily run sheet used to be built by hand because the work comes from several
 client companies through several channels (email, spreadsheet, phone) and no one
@@ -4805,3 +4830,13 @@ SKUs are `VS-<shopify id>`; they are NOT one-of-a-kind so reservations skip them
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -20,6 +20,9 @@ const PAPER = /\/(print|labels|pod|packing-slip)(\/|$)/;
 
 export default function SiteChrome({ children, promo = null }) {
   const path = usePathname() || '';
+  // A client's delivery page is RS Solutions' own, for people outside the company:
+  // no storefront header, no crew assistant, no chat.
+  if (path.startsWith('/client/')) return <main className="wrap">{children}</main>;
   const crew = path.startsWith('/driver') ? <TeamAssistant placement="driver" />
     : PAPER.test(path) ? null : <TeamAssistant />;
   const isDash = DASHBOARD_ROUTES.some((r) => path === r || path.startsWith(r + '/'));

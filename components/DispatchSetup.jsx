@@ -7,8 +7,14 @@ import { useCallback, useEffect, useState } from 'react';
 // exactly the friction this whole thing exists to remove.
 export default function DispatchSetup({ clients = [], drivers = [], canManageDrivers, isOwner = false, onChanged }) {
   const [name, setName] = useState('');
+  const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  // The client being edited. Adding was the only thing this list could do, so a
+  // client added without an email stayed that way, and invoicing them said to
+  // "add one" with nowhere to add it.
+  const [editClient, setEditClient] = useState(null);   // { id, name, contactName, contactEmail, contactPhone, notify }
+  const [copied, setCopied] = useState(null);
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [roster, setRoster] = useState(drivers);
@@ -56,15 +62,44 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
       const res = await fetch('/api/admin/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'client', name, contactEmail, contactPhone })
+        body: JSON.stringify({ action: 'client', name, contactName, contactEmail, contactPhone })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not add the client.'); return; }
       setOk(`${d.client?.name || name} added.`);
-      setName(''); setContactEmail(''); setContactPhone('');
+      setName(''); setContactName(''); setContactEmail(''); setContactPhone('');
       onChanged?.();
     } catch { setErr('Network error — nothing was saved.'); }
     finally { setBusy(''); }
+  }
+
+  async function saveClient(e) {
+    e.preventDefault();
+    const c = editClient;
+    if (!c.name.trim()) { setErr('The client needs a name.'); return; }
+    setBusy('clientedit'); setErr(''); setOk('');
+    try {
+      const res = await fetch('/api/admin/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'client', id: c.id, name: c.name, address: c.address, contactName: c.contactName,
+          contactEmail: c.contactEmail, contactPhone: c.contactPhone, notifyOnComplete: c.notify
+        })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Could not save the client.'); return; }
+      setOk(`${d.client?.name || c.name} saved.`);
+      setEditClient(null);
+      onChanged?.();
+    } catch { setErr('Network error — nothing was saved.'); }
+    finally { setBusy(''); }
+  }
+
+  async function copyPortal(c) {
+    const url = `${window.location.origin}${c.portal_path}`;
+    try { await navigator.clipboard.writeText(url); setCopied(c.id); setTimeout(() => setCopied(null), 2500); }
+    catch { window.prompt('Copy this link', url); }
   }
 
   // Load the roster with the bits only the office cares about (last seen, link
@@ -493,12 +528,44 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         {clients.length > 0 && (
           <ul className="disp-setup-list">
             {clients.map((c) => (
-              <li key={c.id}>
-                <strong>{c.name}</strong>
-                {(c.contact_email || c.contact_phone) && (
-                  <span className="hint" style={{ margin: 0 }}>
-                    {' '}· {[c.contact_email, c.contact_phone].filter(Boolean).join(' · ')}
-                  </span>
+              <li key={c.id} style={{ display: 'block' }}>
+                {editClient?.id === c.id ? (
+                  <form onSubmit={saveClient} className="disp-setup-form">
+                    <input value={editClient.name} onChange={(e) => setEditClient({ ...editClient, name: e.target.value })} placeholder="Company name *" />
+                    <input value={editClient.address} onChange={(e) => setEditClient({ ...editClient, address: e.target.value })} placeholder="Company address (printed on invoices)" />
+                    <input value={editClient.contactName} onChange={(e) => setEditClient({ ...editClient, contactName: e.target.value })} placeholder="Contact person" />
+                    <input type="email" value={editClient.contactEmail} onChange={(e) => setEditClient({ ...editClient, contactEmail: e.target.value })} placeholder="Contact email" />
+                    <input value={editClient.contactPhone} onChange={(e) => setEditClient({ ...editClient, contactPhone: e.target.value })} placeholder="Contact phone" />
+                    <label className="hint" style={{ margin: 0 }}>
+                      <input type="checkbox" checked={editClient.notify} onChange={(e) => setEditClient({ ...editClient, notify: e.target.checked })} />
+                      {' '}Email them when a stop is finished
+                    </label>
+                    <button className="btn accent" disabled={busy === 'clientedit'}>{busy === 'clientedit' ? 'Saving…' : 'Save'}</button>
+                    <button type="button" className="btn" onClick={() => setEditClient(null)}>Cancel</button>
+                  </form>
+                ) : (
+                  <>
+                    <strong>{c.name}</strong>
+                    <span className="hint" style={{ margin: 0 }}>
+                      {' '}· {[c.contact_name, c.contact_email, c.contact_phone].filter(Boolean).join(' · ')
+                        || 'no contact details yet'}
+                    </span>
+                    {' '}
+                    <button type="button" className="btn" onClick={() => setEditClient({
+                      id: c.id, name: c.name, address: c.address || '', contactName: c.contact_name || '', contactEmail: c.contact_email || '',
+                      contactPhone: c.contact_phone || '', notify: !!c.notify_on_complete
+                    })}>Edit</button>
+                    {c.portal_path && (
+                      <>
+                        {' '}
+                        <button type="button" className="btn" onClick={() => copyPortal(c)}>
+                          {copied === c.id ? 'Link copied ✓' : 'Copy client link'}
+                        </button>
+                        {' '}
+                        <a className="btn" href={c.portal_path} target="_blank" rel="noreferrer">Preview</a>
+                      </>
+                    )}
+                  </>
                 )}
               </li>
             ))}
@@ -506,7 +573,8 @@ export default function DispatchSetup({ clients = [], drivers = [], canManageDri
         )}
         <form onSubmit={addClient} className="disp-setup-form">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Client company name *" />
-          <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="Contact email (optional)" />
+          <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Contact person (optional)" />
+          <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="Contact email (needed to invoice)" />
           <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="Contact phone (optional)" />
           <button className="btn accent" disabled={busy === 'client'}>{busy === 'client' ? 'Adding…' : 'Add client'}</button>
         </form>
