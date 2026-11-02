@@ -117,3 +117,15 @@ test('an invoice line is read back to the stop it billed', async () => {
     equal(takeJobFor(byDescription, desc), null);
   } finally { done(); }
 });
+
+test('a cancelled stop is not shown to the client', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    await ensureJobSchema();
+    const a = await upsertClient({ name: 'A Co' });
+    await client.query(`INSERT INTO jobs (job_number, type, status, client_id, customer_name) VALUES ('RS-C1','delivery','cancelled',$1,'Gone'), ('RS-C2','delivery','scheduled',$1,'Kept')`, [a.id]);
+    const jobs = await listClientJobs(a.id);
+    equal(jobs.length, 1);
+    equal(jobs[0].customerName, 'Kept');
+  } finally { done(); }
+});
