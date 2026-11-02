@@ -4,27 +4,24 @@ import { SignJWT } from 'jose';
 import { NextRequest } from 'next/server';
 import { suite, test, assert, equal } from './_harness.mjs';
 
-// Test files share one process and each sets AUTH_SECRET at import, so the last one loaded wins.
-// This file therefore sets its environment when a test RUNS (on()) and puts the old one back (off()).
-const ENV = {
-  AUTH_SECRET: 'admin-mfa-test-secret',
-  BANK_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString('base64'),
-  ADMIN_EMAILS: 'boss@example.test,ravi@example.test'
+// Every test file runs in ONE process and several set these at import time, so what is in the
+// environment when a test RUNS is whatever file loaded last. Each test here sets its own.
+const SECRET = 'admin-mfa-test-secret';
+const setEnv = () => {
+  process.env.AUTH_SECRET = SECRET;
+  process.env.BANK_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
+  process.env.ADMIN_EMAILS = 'boss@example.test,ravi@example.test';
 };
-const saved = {};
-const set = () => { for (const k of Object.keys(ENV)) { if (!(k in saved)) saved[k] = process.env[k]; process.env[k] = ENV[k]; } };
-const restore = () => { for (const k of Object.keys(saved)) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; delete saved[k]; } };
-set();
+setEnv();
 
 const { needsAdminMfa, signAdminMarker, adminMarkerValid, isProtectedPath } = await import('../lib/admin-mfa-gate.js');
 const { proxy } = await import('../proxy.js');
-restore();
 
+const key = new TextEncoder().encode(SECRET);
 const session = (email, sub = '1', tv = 0) =>
-  new SignJWT({ email, name: '', tv }).setProtectedHeader({ alg: 'HS256' }).setSubject(sub).setIssuedAt().setExpirationTime('1h')
-    .sign(new TextEncoder().encode(ENV.AUTH_SECRET));
-const on = () => { set(); process.env.ADMIN_MFA = 'on'; };
-const off = () => { delete process.env.ADMIN_MFA; restore(); };
+  new SignJWT({ email, name: '', tv }).setProtectedHeader({ alg: 'HS256' }).setSubject(sub).setIssuedAt().setExpirationTime('1h').sign(key);
+const on = () => { setEnv(); process.env.ADMIN_MFA = 'on'; };
+const off = () => { setEnv(); delete process.env.ADMIN_MFA; };
 
 suite('admin two-factor gate');
 {
