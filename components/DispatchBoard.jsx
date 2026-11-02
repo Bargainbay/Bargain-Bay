@@ -119,6 +119,42 @@ function TimesForm({ job, busy, onTimes, onDone }) {
 //
 // Both still go through their own guarded functions, one call each — setJobCharge
 // refuses to move a charge that is already on an invoice, and both are admin.
+// A stop that was closed as fully delivered but one of the units never left the
+// warehouse. Tick what is still to deliver, pick who and when, and it becomes a
+// stop of its own; the order goes back to out-for-delivery. Nothing is unsold and
+// no money moves: the unit was paid for, it just has not arrived.
+function PartialForm({ job, drivers, busy, onPartial, onDone }) {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
+  const [ids, setIds] = useState([]);
+  const [driverId, setDriverId] = useState('');
+  const [day, setDay] = useState(today);
+  const toggle = (id) => setIds((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id]));
+  return (
+    <div className="disp-form">
+      <b>Which item(s) were NOT delivered?</b>
+      {(job.items || []).map((i) => (
+        <label key={i.id} className="drv-check">
+          <input type="checkbox" checked={ids.includes(i.id)} onChange={() => toggle(i.id)} /> {i.description}
+        </label>
+      ))}
+      <div className="disp-row">
+        <select value={driverId} onChange={(e) => setDriverId(e.target.value)} aria-label="Driver for the rest">
+          <option value="">Assign later</option>
+          {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+        <input type="date" value={day} onChange={(e) => setDay(e.target.value)} aria-label="Day for the rest" />
+      </div>
+      <button type="button" className="btn" disabled={busy || !ids.length}
+        onClick={async () => {
+          const r = await onPartial(job.id, { remainingItemIds: ids, driverId: driverId ? Number(driverId) : null, jobDate: day || null });
+          if (r) onDone();
+        }}>
+        Save — put the rest on {driverId ? 'that driver\u2019s run' : 'the board'}
+      </button>
+    </div>
+  );
+}
+
 function MoneyForm({ job, busy, onCharge, onPay, onDone }) {
   const [charge, setCharge] = useState(job.chargeAmount == null ? '' : String(job.chargeAmount));
   const [pay, setPay] = useState(job.payAmount == null ? '' : String(job.payAmount));
@@ -437,13 +473,14 @@ function savePod(job) {
   }, i * 400));
 }
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onEdit, onMove, onTimes, onCharge, onPay, onNotesChanged, seat, helpingFor }) {
+function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onPartial, onEdit, onMove, onTimes, onCharge, onPay, onNotesChanged, seat, helpingFor }) {
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [timing, setTiming] = useState(false);
   const [history, setHistory] = useState(false);
   const [money, setMoney] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [partial, setPartial] = useState(false);
   const closed = ['done', 'failed', 'cancelled'].includes(job.status);
   // Clocked in and not yet out: the stop is live and the card has to say so in
   // a number that keeps moving.
@@ -710,6 +747,12 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
               Reopen
             </button>
           )}
+          {/* Closed as delivered, but one of the units never left. */}
+          {job.status === 'done' && job.type === 'delivery' && job.orderNumber && onPartial && (job.items?.length || 0) > 0 && (
+            <button type="button" className="btn" disabled={busy} onClick={() => setPartial((v) => !v)}>
+              {partial ? 'Hide partial' : 'Partial delivery'}
+            </button>
+          )}
           <button type="button" className="btn" disabled={busy} onClick={() => onEdit(job)}>Edit</button>
           {/* Fixing the clock is not the same job as closing a stop out, and it
               happens long after: the times arrive in the WhatsApp group and get
@@ -741,6 +784,9 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
           )}
           {money && onCharge && (
             <MoneyForm job={job} busy={busy} onCharge={onCharge} onPay={onPay} onDone={() => setMoney(false)} />
+          )}
+          {partial && onPartial && (
+            <PartialForm job={job} drivers={drivers} date={job.jobDate} busy={busy} onPartial={onPartial} onDone={() => setPartial(false)} />
           )}
           {history && <JobHistory jobId={job.id} />}
           {notesOpen && <OrderNotes jobId={job.id} onChanged={() => onNotesChanged?.()} />}
@@ -828,6 +874,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   const onAssign = (jobId, patch) => send('PATCH', { action: 'assign', jobId, jobDate: board.date, ...patch });
 
   const onReopen = (jobId) => send('PATCH', { action: 'reopen', jobId });
+  const onPartial = (jobId, patch) => send('PATCH', { action: 'partial_delivery', jobId, ...patch });
 
   // Moving a stop up or down its driver's run. The whole run is sent back in its
   // new order — seq is a position, and renumbering the one card that moved would
@@ -1398,7 +1445,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
           {unassignedToday.map((j) => (
             <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
               onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-              onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes}
+              onRecord={onRecord} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onTimes={onTimes}
               onCharge={canManageClients ? onCharge : null} onPay={onPay} onNotesChanged={() => refresh()} />
           ))}
           {board.unscheduled.length > 0 && (
@@ -1407,7 +1454,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
               {board.unscheduled.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                   onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                  onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onTimes={onTimes}
+                  onRecord={onRecord} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onTimes={onTimes}
               onCharge={canManageClients ? onCharge : null} onPay={onPay} onNotesChanged={() => refresh()} />
               ))}
             </>
@@ -1445,7 +1492,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
                 return (
                   <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                     onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                    onRecord={onRecord} onReopen={onReopen} onEdit={setEditing} onMove={onMove} onTimes={onTimes}
+                    onRecord={onRecord} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onMove={onMove} onTimes={onTimes}
                     onCharge={canManageClients ? onCharge : null} onPay={onPay} onNotesChanged={() => refresh()}
                     helpingFor={j.driver2Id === d.id ? j.driverName : null}
                     seat={k >= 0 ? { n: k + 1, first: k === 0, last: k === own.length - 1 } : null} />

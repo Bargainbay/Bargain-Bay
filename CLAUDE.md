@@ -2276,6 +2276,27 @@ be reading row 4 while whoever uploaded it has already walked away.
   staff too (it's a company name). Adding a **driver** stays `isAdmin` — that one
   is a real access grant.
 
+## Partial deliveries (added 2026-11-02)
+INV-1251 was a fridge and a stove; only the fridge went. The driver's close-out form has always had a per-item
+"delivered" tick, but **nothing read it**: the stop closed, the whole order went to Delivered, and re-dispatching the
+stove **vanished silently** — `assignDelivery` found the finished stop (`status <> 'cancelled'`), `assignJob` refuses a
+closed stop, and the error was swallowed.
+
+- `job_items.delivered` (migration 0045): true went in / false stayed on the van / NULL nobody said.
+  `recordJobItemDelivery` (lib/jobs.js) reads the signed form (matched on SKU, then description, then the serial box —
+  the form's lines now carry `sku`) and writes it. `markOrderDeliveredForJob` calls it: if anything is false the order
+  is **NOT** marked delivered, **no** "delivered" email goes, only the units that arrived are marked sold, and
+  `createPartialFollowUp` makes a stop for what is left (To assign, idempotent — an existing live stop on the order is
+  returned instead).
+- **A closed stop with an undelivered item no longer counts as "on the board"** (`PARTLY_DONE_NOT` in `ORDER_FOR_BOARD`,
+  and the same test in `assignDelivery`), so Operations' assign, "Add anyway" and the pull all create the follow-up.
+  `jobFromOrder` leaves out units a finished stop already delivered.
+- **Office correction for stops closed as fully delivered** (INV-1251 itself): **Partial delivery** on a done delivery's
+  card -> `PATCH action: 'partial_delivery'` -> `recordPartialDelivery` (staff). Tick what is still to deliver, pick the
+  driver and day; the order goes back to out-for-delivery and a follow-up stop is created and assigned. **It moves no
+  stock and no money** — the unit was paid for and stays sold.
+- Not built: the customer is not emailed about a partial delivery; the follow-up is not auto-assigned to the same driver.
+
 ## The driver app (phase 2, added 2026-08-25)
 `/driver` is the driver's whole world: today's stops, and the three things they
 do to one. It replaced the order-based screen — that one could only ever show

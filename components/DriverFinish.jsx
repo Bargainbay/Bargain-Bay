@@ -34,6 +34,7 @@ export default function DriverFinish({ stop, onClose, onDone }) {
     (stop.items || []).map((it) => ({
       description: it.description || it.sku || '',
       serial: it.sku || '',
+      sku: it.sku || '',
       delivered: true,
       notes: ''
     }))
@@ -367,7 +368,7 @@ export default function DriverFinish({ stop, onClose, onDone }) {
                   </div>
                 ))}
                 <div className="hint" style={{ marginTop: 4 }}>
-                  Untick anything that didn&apos;t go in. It prints on the form the customer signs.
+                  Untick anything that didn&apos;t go in — it stays open as its own stop for the office to reschedule, and the order isn&apos;t marked delivered. It prints on the form the customer signs.
                 </div>
               </div>
             )}
