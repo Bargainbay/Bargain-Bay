@@ -196,3 +196,32 @@ test('RS Solutions invoices are paid to Service@, not the storefront accounting 
   equal(brandFor('rs_solutions').etransferEmail, 'Service@rssolutions.ca');
   equal(brandFor('bargain_bay').etransferEmail, 'accounting@bargainbay.ca');
 });
+
+test('invoiceClientJobs can bill chosen stops at chosen charges, with an extra line and a date', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    await ensureJobSchema();
+    const { invoiceClientJobs } = await import('../lib/jobs.js');
+    const a = await upsertClient({ name: 'A Co', contactEmail: 'a@a.ca', contactName: 'Matt' });
+    const mk = async (n, who, charge) => (await client.query(
+      `INSERT INTO jobs (job_number, type, status, client_id, customer_name, job_date, charge_amount) VALUES ($1,'delivery','done',$2,$3,'2026-10-19',$4) RETURNING id`, [n, a.id, who, charge])).rows[0].id;
+    const j1 = await mk('RS-1', 'Carol', 85), j2 = await mk('RS-2', 'Yavuz', 105), j3 = await mk('RS-3', 'Left Out', 50);
+    const r = await invoiceClientJobs(a.id, {
+      from: '2026-10-19', to: '2026-10-19', jobIds: [j1, j2], chargeOverrides: { [j2]: 145 },
+      extraLines: [{ description: 'Richmond Hill to Kitchener - 53ft', amount: 850 }],
+      invoiceDate: '2026-10-26', memo: 'Invoice 1000311', addHst: true
+    }, { email: 'o@x', name: 'Owner' });
+    equal(Number(r.total), 1220.4);
+    const inv = (await client.query('SELECT subtotal, hst, total, memo, brand FROM invoices WHERE id = $1', [r.invoiceId])).rows[0];
+    equal(Number(inv.subtotal), 1080);
+    equal(Number(inv.hst), 140.4);
+    equal(inv.memo, 'Invoice 1000311');
+    equal(inv.brand, 'rs_solutions');
+    const left = (await client.query('SELECT id FROM jobs WHERE invoice_id IS NULL')).rows.map((x) => x.id);
+    equal(left.join(','), String(j3), 'the stop not chosen stays unbilled');
+    equal(Number((await client.query('SELECT charge_amount FROM jobs WHERE id = $1', [j2])).rows[0].charge_amount), 145);
+    let threw = false;
+    try { await invoiceClientJobs(a.id, { from: '2026-10-19', to: '2026-10-19', jobIds: [j1] }); } catch { threw = true; }
+    assert(threw, 'an already-invoiced stop cannot be picked again');
+  } finally { done(); }
+});
