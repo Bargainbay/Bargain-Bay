@@ -225,7 +225,8 @@ export async function PATCH(req) {
         ...(has('city') ? { city: body.city } : {}),
         ...(has('postal') ? { postal: body.postal } : {}),
         ...(has('leadSource') ? { leadSource: body.leadSource } : {}),
-        ...(has('leadBy') ? { leadBy: body.leadBy } : {})
+        ...(has('leadBy') ? { leadBy: body.leadBy } : {}),
+        ...(has('brand') ? { brand: body.brand } : {})
       });
       // Optionally re-email the customer the updated invoice. The save already
       // succeeded, so a mail failure is reported as a warning, not an error.

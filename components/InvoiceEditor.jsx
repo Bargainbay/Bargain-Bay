@@ -61,6 +61,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [], a
   // existed opens blank, which is correct: nobody has answered for it yet.
   const [leadSource, setLeadSource] = useState(invoice.leadSource || '');
   const [leadBy, setLeadBy] = useState(invoice.leadBy || '');
+  const [brand, setBrand] = useState(invoice.brand || 'bargain_bay');
   const [invoiceDate, setInvoiceDate] = useState(invoice.invoiceDate || '');
   const todayToronto = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
   const [q, setQ] = useState('');
@@ -125,7 +126,7 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [], a
           taxInclusive: taxMode === 'inclusive', memo,
           resend: resend && !settled,
           name, email, phone, deliveryMethod, address, city, postal,
-          leadSource, leadBy,
+          leadSource, leadBy, brand,
           // Only send a date the owner actually changed — sending the original
           // back unchanged would still re-stamp created_at to noon that day.
           invoiceDate: invoiceDate !== (invoice.invoiceDate || '') ? invoiceDate : '' })
@@ -226,6 +227,15 @@ export default function InvoiceEditor({ invoice, inventory = [], senders = [], a
           <input style={{ width: 150 }} type="date" max={todayToronto} value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
         </label>
       </div>
+
+      <label className="field" style={{ maxWidth: 280 }}
+             title="Decides the letterhead, the sender and the contact details. Services we deliver are RS Solutions; appliances are Bargain Bay.">
+        Issued by
+        <select value={brand} onChange={(e) => setBrand(e.target.value)}>
+          <option value="bargain_bay">Bargain Bay</option>
+          <option value="rs_solutions">RS Solutions</option>
+        </select>
+      </label>
 
       <LeadSource source={leadSource} setSource={setLeadSource} by={leadBy} setBy={setLeadBy} senders={senders} />
 
