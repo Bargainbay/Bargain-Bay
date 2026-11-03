@@ -109,7 +109,7 @@ export default async function ClientPortal({ params, searchParams }) {
           <p className="cp-sub" style={{ margin: 0 }}>No invoices yet. They appear here as soon as we raise one.</p>
         ) : (
           <table className="cp-stack">
-            <thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th>Stops</th><th style={{ textAlign: 'right' }}>Total</th><th style={{ textAlign: 'right' }}>Owing</th><th>Status</th></tr></thead>
+            <thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th>Stops</th><th style={{ textAlign: 'right' }}>Total</th><th style={{ textAlign: 'right' }}>Owing</th><th>Status</th><th>PDF</th></tr></thead>
             <tbody>
               {invoices.map((i) => (
                 <tr key={i.id}>
@@ -118,6 +118,7 @@ export default async function ClientPortal({ params, searchParams }) {
                   <td data-label="Total" style={{ textAlign: 'right' }}>{money(i.total)}</td>
                   <td data-label="Owing" style={{ textAlign: 'right', fontWeight: 700, color: i.owing > 0 ? '#b02a37' : undefined }}>{i.owing > 0 ? money(i.owing) : '—'}</td>
                   <td data-label="Status"><span className={`cp-pill ${i.status === 'paid' ? 'done' : i.overdue ? 'failed' : 'todo'}`}>{i.status === 'paid' ? 'Paid' : i.status === 'partial' ? 'Part paid' : i.status === 'refunded' ? 'Refunded' : i.overdue ? 'Overdue' : 'Open'}</span></td>
+                  <td data-label="PDF">{demo ? <span style={{ color: '#888' }}>PDF</span> : <a href={`/invoice/${encodeURIComponent(i.number)}/pdf?t=${linkToken('invoice', i.number)}`} download>Download PDF</a>}</td>
                 </tr>
               ))}
             </tbody>
