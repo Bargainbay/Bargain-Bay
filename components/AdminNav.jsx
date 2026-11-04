@@ -11,6 +11,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
   const all = [
     { key: 'dashboard', label: 'Dashboards', href: '/admin/dashboard', sales: true },
     { key: 'copilot', label: 'Sarah', href: '/admin/agent' },
+    { key: 'manager', label: 'Manager', href: '/admin/manager' },
     { key: 'bookings', label: 'Bookings', href: '/admin/bookings', sales: true },
     { key: 'quotes', label: 'Quotes', href: '/admin/quotes', sales: true },
     { key: 'invoices', label: 'Invoices', href: '/admin/invoices', sales: true },

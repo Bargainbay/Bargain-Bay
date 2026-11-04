@@ -2282,6 +2282,37 @@ be reading row 4 while whoever uploaded it has already walked away.
   through on the RS host.** Narrowing that allow-list kills the call mid-
   conversation, with the batch half-answered.
 
+## The Voice Manager rings the owner (added 2026-11-04)
+`lib/manager-issues.js` (one read-only scan), `lib/manager-rules.js` (no imports: when it may ring, what it says),
+`lib/manager-call.js` (the call, its tools, the confirm rule), `POST /api/manager/call` (Twilio's webhook),
+`/api/cron/manager-call` (13:00, 17:00, 21:00 UTC), `/admin/manager` + `/api/admin/manager-call` (ADMIN; "Call me now",
+snooze, notes, recent calls; on the Reports hub and the nav), migration `0051_voice_manager` (`manager_calls`,
+`manager_notes`; also created at runtime), `test/manager.test.mjs`. Owner's instruction: an agent that reports on any issue,
+discrepancy or thing to work on, takes instructions by voice and fixes what it safely can.
+
+- **Built on the import-review call, not beside it.** Twilio places the call, `<Gather input="speech">` loops it, ElevenLabs
+  speaks, a Claude tool loop decides what to say. `twilioSignatureOk`, `sayTwiml` and `callBaseUrl` are IMPORTED from
+  `lib/import-call.js`: one definition of "really from Twilio". The webhook has the same two locks (Twilio signature + an HMAC
+  token for the call id) and must keep both.
+- **It rings ONE number: the owner's, (647) 643-3035** (`managerTarget`: env `MANAGER_CALL_TO`, setting `manager_call_to`, else
+  that default). Never a number from a request or a browser. `outbound('voice')` refuses outside production.
+- **The scan is the single list** (phone, page and email agree). Checks: scheduled jobs/config (the same `evaluateHealth` as the
+  daily email), models with no stock photo, /shop and /feed up and /feed vs the database, inventory sync age, prices at zero or
+  above retail, stock gaps, loose dispatch stops, unconfirmed door cash, pending reseller applications, the owner's notes.
+  **A check that throws becomes an issue ("Could not check X")** instead of vanishing — a scanner that reports all-clear because
+  half of it threw is the silent-failure bug this exists to end. Add a check to `CHECKS`; keep it read-only.
+- **Only high and medium issues earn a call** (`shouldCallNow`): inside 8am-8pm Toronto, not again once he has answered that day,
+  retries spaced 90 minutes, three attempts a day, none for a list of only small things. Voicemail is hung up on (the page has it).
+  Snoozed issues are hidden AND counted, never silent. The opening line is arithmetic off the scan, not the model.
+- **What it can do is a short list:** read the scan, copy one model's stock photo to another (`setModelPhoto`), refresh stock from the
+  tracker (same as Sync), snooze, keep a note, email the list. **It has no tool for money, invoices, orders, customers, prices, drivers
+  or stops**, and a test fails if one is added. Anything needing a typed link is emailed.
+- **EVERY WRITE NEEDS A SECOND YES, ENFORCED IN CODE.** A write tool only proposes (stored on `manager_calls.pending`, with the turn
+  number) and runs only when the SAME tool is called with the SAME arguments on a LATER turn, i.e. after he has spoken again. The model
+  cannot confirm its own proposal. What was done is in `manager_calls.actions`.
+- **Not built:** it cannot be called BY the owner (inbound), has no per-issue "fix it" beyond the tools above, and sends no text message.
+  Run Run schema migration after deploy (the tables are also created on first use).
+
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of
