@@ -9,6 +9,7 @@
 // reasoning that puts the vendor drop-off form in their hands.
 import { NextResponse } from 'next/server';
 import { getSession, isStaff } from '../../../../lib/auth';
+import { unitsNeedingPhotos, findUnits, resolveUnitSku } from '../../../../lib/photo-queue';
 import { addUnitPhotos, listUnitPhotos, deleteUnitPhoto, MAX_PHOTOS } from '../../../../lib/unit-photos';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,15 @@ const denied = () => NextResponse.json({ error: 'Not authorized' }, { status: 40
 
 export async function GET(req) {
   if (!(await staff())) return denied();
-  const sku = (new URL(req.url).searchParams.get('sku') || '').trim();
+  const params = new URL(req.url).searchParams;
+  // ?queue=1 — the units on sale with no picture of the actual machine yet.
+  if (params.get('queue')) {
+    try { return NextResponse.json(await unitsNeedingPhotos()); }
+    catch (e) { return NextResponse.json({ error: e?.message || 'Could not load the list.' }, { status: 500 }); }
+  }
+  // ?find=text — units matching what is typed, with how many photos each has, to PICK from.
+  if (params.get('find') != null) return NextResponse.json({ units: await findUnits(params.get('find')) });
+  const sku = (params.get('sku') || '').trim();
   if (!sku) return NextResponse.json({ error: 'Missing sku' }, { status: 400 });
   return NextResponse.json({ sku, photos: await listUnitPhotos(sku) });
 }
@@ -30,8 +39,10 @@ export async function POST(req) {
   if (!s) return denied();
   let form;
   try { form = await req.formData(); } catch { return NextResponse.json({ error: 'Invalid upload.' }, { status: 400 }); }
-  const sku = String(form.get('sku') || '').trim();
-  if (!sku) return NextResponse.json({ error: 'Missing sku' }, { status: 400 });
+  // Never trust a typed SKU: a model number or a typo would be saved, load fine, and belong to nothing.
+  const resolved = await resolveUnitSku(form.get('sku'));
+  if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: 400 });
+  const sku = resolved.sku;
   const files = form.getAll('photos').filter((p) => p && typeof p === 'object' && p.size > 0).slice(0, MAX_PHOTOS);
   if (!files.length) return NextResponse.json({ error: 'No photos in that upload.' }, { status: 400 });
   try {
