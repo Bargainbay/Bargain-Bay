@@ -46,7 +46,10 @@ async function seeded() {
     ('SS-117082-022', 'Frigidaire', 'PRFS2883AF', 'Refrigerator', 'Frigidaire Professional 36 Inch French Door', 'New Scratch & Dent', true),
     ('SS-117082-023', 'Frigidaire', 'PRFS2883AF', 'Refrigerator', 'Frigidaire Professional 36 Inch French Door', 'New Scratch & Dent', true),
     ('VD-ABC', 'LG', 'LREN6321YE', 'Range', 'LG Range', 'New Open Box', true),
-    ('SOLD-1', 'LG', 'GONE1', 'Range', 'LG Gone', 'Refurbished', false)`);
+    ('SOLD-1', 'LG', 'GONE1', 'Range', 'LG Gone', 'Refurbished', false),
+    ('HELD-1', 'Whirlpool', 'WRF535', 'Refrigerator', 'Whirlpool On Hold', 'Refurbished', true)`);
+  // HELD-1 has a live checkout hold on it: still active, no longer available.
+  await t.client.query(`INSERT INTO reservations (sku, order_id, expires_at) VALUES ('HELD-1', 1, now() + interval '20 minutes')`);
   return t;
 }
 
@@ -87,5 +90,28 @@ test('typing finds units by any words in brand, model, title or SKU, and says ho
     equal(await findUnits('GONE1'), []);          // off the site: not offered
     equal(await findUnits('x'.repeat(3) + ' nothing'), []);
     equal(await findUnits('100%_'), []);          // wildcards typed by a person are literal
+  } finally { t.done(); }
+});
+
+test('a unit that is sold, off the site, or on hold is neither offered nor accepted', async () => {
+  const t = await seeded();
+  try {
+    equal(await findUnits('whirlpool'), []);          // held: not offered
+    equal(await findUnits('GONE1'), []);              // off the site: not offered
+    const held = await resolveUnitSku('HELD-1');
+    assert(held.error && held.error.includes('not on the available inventory list'), held.error);
+    const gone = await resolveUnitSku('SOLD-1');
+    assert(gone.error && !gone.sku, 'an inactive unit must not resolve');
+    equal(await resolveUnitSku('VD-ABC'), { sku: 'VD-ABC' });   // an available one still does
+  } finally { t.done(); }
+});
+
+test('a hold on one unit of a model does not hide the free ones, or the model-number help', async () => {
+  const t = await seeded();
+  try {
+    await t.client.query(`INSERT INTO reservations (sku, order_id, expires_at) VALUES ('SS-117082-022', 2, now() + interval '20 minutes')`);
+    equal((await findUnits('PRFS2883AF')).map((u) => u.sku), ['SS-117082-023']);
+    const r = await resolveUnitSku('PRFS2883AF');
+    assert(r.error.includes('SS-117082-023') && !r.error.includes('SS-117082-022'), r.error);
   } finally { t.done(); }
 });

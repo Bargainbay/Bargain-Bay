@@ -195,7 +195,8 @@ Photograph -> Take photo (repeatable) / Choose from phone -> Save -> it leaves t
   (`photo-pick.compressPhotos`). **A failed upload keeps the shots on screen** — never costs the rep the pictures.
 - The spot (`currentLocations`) is shown when known and soft-fails to nothing.
 - **The unit is CHOSEN, never typed in full** (the "Find a unit" tab searches as you type; `?find=` -> `findUnits`). The upload
-  route runs the SKU through `resolveUnitSku` and REFUSES anything that is not a unit on the site: on 2026-11-04 Roushi typed the
+  route runs the SKU through `resolveUnitSku` and REFUSES anything that is not on the AVAILABLE inventory list (active, not sold, not held by an
+  order or checkout — the shop's own `unavailableSkus` test; the chooser offers only those too): on 2026-11-04 Roushi typed the
   MODEL number (PRFS2883AF) into the old free-text box, and two photos saved, loaded, and belonged to nothing. A model number now
   gets "pick the exact unit: <its SKUs>"; the SKU is stored as `products` spells it (case/space-insensitive). A unit booked in but
   not yet synced is refused until Sync inventory runs.
