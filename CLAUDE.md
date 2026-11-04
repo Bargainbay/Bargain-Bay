@@ -865,6 +865,15 @@ thin margin — it is our own money covering the vendor's cost.
   sees the line before quoting. **The floor is the one cost-derived figure a
   sales screen is shown** — it is a price, not a cost, and blocking somebody
   without telling them the number is not a workable rule.
+- **Abi is LISTED at a share of RETAIL by condition (owner, 2026-11-04), replacing the +20% uplift.** His cost is ~65% of
+  retail, tax included. New in Box 90%, New Open Box and Scratch & Dent 85%, Refurbished 60% (`VENDOR_LIST_RULES` /
+  `vendorListPrice` in `lib/constants.js`, applied in `lib/csv.js`). A condition the table does not name, or a row with no
+  retail, keeps the tracker price untouched. The old `upliftedPrice` ran uncapped when a row's retail read blank
+  (VD-MW2ILKUM54B listed $1,078.92 on $999 retail) and nothing compared a price to its retail; the sync report now lists
+  any unit priced above retail (`report.aboveRetail`). **The same table is written into the tracker's Suggested Sale Price
+  formula** (`applyVendorListRuleToTracker`, `POST /api/admin/tracker-writeback` `{ vendorListRule: { dryRun, revert,
+  fixTyped } }`), wrapping the original formula so `revert` restores it exactly; it replaces the earlier x1.2 wrapper
+  (`applyVendorUpliftToTracker`, legacy). Typed prices on Abi rows are listed by the dry run, never overwritten without `fixTyped`.
 - **Every check degrades OPEN**: an unreadable `consignment_units` table means
   "nothing is consigned". Losing a real sale to a failed lookup is worse than a
   thin one.
