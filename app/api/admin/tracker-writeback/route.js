@@ -42,7 +42,7 @@ export async function POST(req) {
   // A dry run changes nothing and reports what it would.
   // { typedPrices: true }: READ-ONLY list of the hand-typed Suggested Sale Price
   // cells, each checked against the pricing rules. Writes nothing.
-  // { vendorListRule: { dryRun?: true (default), revert?, fixTyped?, vendor? } }: write the
+  // { vendorListRule: { dryRun?: true (default), revert?, fixTyped?, allRows?, vendor? } }: write the
   // retail-percentage rule (VENDOR_LIST_RULES) into the Suggested Sale Price formula.
   const typedPrices = b.typedPrices === true;
   const listRule = b.vendorListRule && typeof b.vendorListRule === 'object' ? b.vendorListRule : null;
@@ -62,7 +62,7 @@ export async function POST(req) {
       ? await applyVendorUpliftToTracker({ dryRun: vendorUplift.dryRun !== false, revert: !!vendorUplift.revert, vendorKey: String(vendorUplift.vendor || 'abi').toLowerCase() })
       : null;
     const listRes = listRule
-      ? await applyVendorListRuleToTracker({ dryRun: listRule.dryRun !== false, revert: !!listRule.revert, fixTyped: !!listRule.fixTyped, vendorKey: String(listRule.vendor || 'abi').toLowerCase() })
+      ? await applyVendorListRuleToTracker({ dryRun: listRule.dryRun !== false, revert: !!listRule.revert, fixTyped: !!listRule.fixTyped, allRows: !!listRule.allRows, vendorKey: String(listRule.vendor || 'abi').toLowerCase() })
       : null;
     return NextResponse.json({
       ok: true, vendorListRule: listRes, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
