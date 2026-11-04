@@ -5,7 +5,7 @@
 // building block for the nightly Sold catch-up sweep.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, applyVendorUpliftToTracker, applyVendorListRuleToTracker, typedPriceReport, sheetsConfigured } from '../../../../lib/sheets';
+import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, applyVendorUpliftToTracker, applyVendorListRuleToTracker, typedPriceReport, appendTrackerUnits, highestSkuNumber, sheetsConfigured } from '../../../../lib/sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -47,7 +47,34 @@ export async function POST(req) {
   const typedPrices = b.typedPrices === true;
   const listRule = b.vendorListRule && typeof b.vendorListRule === 'object' ? b.vendorListRule : null;
   const vendorUplift = b.vendorUplift && typeof b.vendorUplift === 'object' ? b.vendorUplift : null;
+  // Add units found on the floor to an EXISTING lot: { addToLot: { lot, units: [{ make, model,
+  // category, description?, retail, condition, status?, invoice?, serial?, notes? }] } }. SKUs carry
+  // on from the lot's highest number (appendTrackerUnits also refuses a SKU already on Main).
+  // Cost is left blank: these are NEEDS INVOICE rows, same as the rest of a floor-count lot.
+  const addToLot = b.addToLot && typeof b.addToLot === 'object' ? b.addToLot : null;
+  const ADD_STATUSES = ['Tested Working', 'Untested'];
   try {
+    let addRes = null;
+    if (addToLot) {
+      const lot = String(addToLot.lot || '').trim();
+      const list = Array.isArray(addToLot.units) ? addToLot.units : [];
+      if (!lot || !list.length || list.length > 20) return NextResponse.json({ error: 'addToLot needs a lot and 1-20 units.' }, { status: 400 });
+      for (const u of list) {
+        if (!u?.make || !u?.model || !u?.category || !(Number(u.retail) > 0) || !u?.condition) {
+          return NextResponse.json({ error: 'Each unit needs make, model, category, retail and condition.' }, { status: 400 });
+        }
+      }
+      const start = await highestSkuNumber(lot);
+      const units = list.map((u, i) => ({
+        lot, sku: `${lot}-${String(start + i + 1).padStart(3, '0')}`,
+        category: u.category, make: u.make, model: u.model,
+        description: String(u.description || '').trim() || [u.make, u.model, u.category].filter(Boolean).join(' '),
+        serial: u.serial ? String(u.serial).trim() : null,
+        invoice: u.invoice || null, retail: Number(u.retail), condition: u.condition, notes: u.notes || null,
+        status: ADD_STATUSES.includes(u.status) ? u.status : 'Untested'
+      }));
+      addRes = await appendTrackerUnits(units);
+    }
     const soldRes = sold.length ? await writeSoldRows(sold) : { written: 0 };
     const unsoldRes = unsold.length ? await writeUnsoldRows(unsold, { status: unsoldStatus }) : { written: 0, missing: [] };
     const costRes = [];
@@ -65,7 +92,7 @@ export async function POST(req) {
       ? await applyVendorListRuleToTracker({ dryRun: listRule.dryRun !== false, revert: !!listRule.revert, fixTyped: !!listRule.fixTyped, allRows: !!listRule.allRows, vendorKey: String(listRule.vendor || 'abi').toLowerCase() })
       : null;
     return NextResponse.json({
-      ok: true, vendorListRule: listRes, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
+      ok: true, added: addRes, vendorListRule: listRes, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
       unsoldMissing: unsoldRes.missing, costsUpdated: costRes, invoices: invoiceRes, corrections: correctionRes, vendorUplift: upliftRes, typedPrices: typedRes
     });
   } catch (e) {
