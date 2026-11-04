@@ -9,7 +9,7 @@ import { linkToken } from '../../../lib/links';
 import RsInvoiceDocument from '../../../components/RsInvoiceDocument';
 import { brandFor } from '../../../lib/brands';
 import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel,
-         BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY, isQuickSaleEmail } from '../../../lib/constants';
+         BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY, DEPOSIT_NOTE, isQuickSaleEmail } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoice' };
@@ -211,6 +211,7 @@ export default async function InvoicePage({ params, searchParams }) {
             <div className="summary-row total"><span>Net after refund</span><span>{money(Math.max(0, Number(invoice.total) - refundTotal))}</span></div>
           </>
         )}
+        <p style={{ margin: '10px 0 0', fontSize: 12.5, fontWeight: 600 }}>{DEPOSIT_NOTE}</p>
         {portalHref && (
           <p style={{ margin: '10px 0 0' }}><a className="btn" href={portalHref}>View each delivery — times, proof of delivery &amp; photos →</a></p>
         )}

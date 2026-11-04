@@ -1091,6 +1091,29 @@ Refunds are **not** exposed to Sarah with a fee — `refund_invoice` still calls
 both functions with the default 0%. Keeping a fifth of a customer's money is the
 owner's call, not the phone agent's.
 
+## Store credit (added 2026-11-04)
+`lib/store-credit.js`, migration `0050_store_credit` (**run Run schema migration after deploy**), `/admin/store-credit` (ADMIN; on the
+Reports hub), `/api/store-credit` (public balance check, balance only), `test/store-credit.test.mjs`. Owner's rules: a cancelled order's
+deposit is non-refundable, 20% is kept as the restocking fee, the rest is issued as store credit; **no expiry; transferable (a code, anyone
+holding it can spend it)**; usable at checkout AND on a staff invoice.
+
+- **A credit is a CODE** (`SC-XXXX-XXXX`, no 0/O/1/I/L). Its balance is never stored: `SUM(store_credit_entries.amount)`, append-only (a
+  trigger refuses UPDATE/DELETE). A restore after a failed sale is a new `adjustment` row. Spending takes a per-credit advisory lock.
+- **Issuing** = the existing refund paths with `asCredit` (`refundInvoice`, `refundInvoiceItems`, `refundInvoiceAmount`; checkbox on the
+  refund screen, plus "Cancellation: 80% as store credit" on the amount tab). `settleRefund` writes the refund row with `to_credit = true`,
+  issues the code and emails it. **If the credit cannot be issued it THROWS, saying the refund was recorded and the customer is owed the
+  money** - the invoice is already marked refunded by then.
+- **Spending is a TENDER, not a discount**: an `invoice_payments` row with method `Store credit` (internal key `credit`, deliberately NOT in
+  `PAYMENT_METHODS`, so no dropdown or phone agent can pick it). HST is therefore charged on the full new sale; it was reversed when the
+  credit was issued. `applyStoreCreditToInvoice` (staff: "Use credit" on the invoice's payment control). A credit payment cannot be voided.
+- **At checkout** the code is validated server-side, spent INSIDE the order transaction (like a coupon), and recorded as a payment on the
+  web invoice; a credit covering the whole total settles the invoice and confirms the order. `orders.store_credit` holds the amount;
+  the e-transfer amount shown on the order page and email is `total - store_credit`. Not offered with card payment (refused).
+- **Books:** account **2170 Owed to customers (store credit)**. Refund-to-credit credits 2170 instead of the bank; a credit payment debits
+  2170 instead of the bank. Invariant (tested): 2170 equals the sum of every credit's balance. Ask the accountant to confirm.
+- **Not built:** staff cannot issue a credit that did not come from a refund; credit is not offered on the member portal; a partial-invoice
+  cancellation still needs the amount tab (the invoice stays open, nothing cancels the order for you).
+
 ## Packages — washer/dryer pairs and whole-kitchen bundles (added 2026-10-28)
 `lib/bundles.js`, migration `0043_bundles` (run **Run schema migration** after deploy), `/bundles` (storefront,
 header + sitemap), `/admin/bundles` (ADMIN), `/api/admin/bundles`, `components/{BundlesManager,AddBundleButton}.jsx`,

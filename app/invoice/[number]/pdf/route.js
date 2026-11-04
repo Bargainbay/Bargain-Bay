@@ -6,7 +6,7 @@ import { verifyLinkToken } from '../../../../lib/links';
 import { brandFor } from '../../../../lib/brands';
 import { jobsForInvoice, takeJobFor } from '../../../../lib/client-portal';
 import { linkToken } from '../../../../lib/links';
-import { warrantyLabel, PICKUP_ADDRESS, RETURN_POLICY_SUMMARY, ETRANSFER_EMAIL, isQuickSaleEmail } from '../../../../lib/constants';
+import { warrantyLabel, PICKUP_ADDRESS, RETURN_POLICY_SUMMARY, DEPOSIT_NOTE, ETRANSFER_EMAIL, isQuickSaleEmail } from '../../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -205,6 +205,8 @@ function render(invoice, B) {
       doc.moveDown(0.5).font('Helvetica').fontSize(10).fillColor(ink)
         .text(`Paid${invoice.paid_at ? ` on ${fmtDate(invoice.paid_at)}` : ''}${invoice.payment_method ? ` - ${invoice.payment_method}` : ''}. Thank you!`, L, doc.y, { width: W });
     }
+    ensure(30);
+    doc.moveDown(0.6).font('Helvetica-Bold').fontSize(9).fillColor(ink).text(DEPOSIT_NOTE, L, doc.y, { width: W });
     if (open || partial) {
       ensure(70);
       doc.moveDown(0.6).font('Helvetica-Bold').fontSize(10).fillColor(ink).text('Pay by Interac e-Transfer', L, doc.y, { width: W });

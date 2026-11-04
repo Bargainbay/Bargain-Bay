@@ -14,7 +14,8 @@ import { createVendorOrdersTx } from '../../../lib/vendor-orders';
 import { resolvePrices } from '../../../lib/pricing';
 import { sendOrderEmails, sendEmail } from '../../../lib/email';
 import { readAttribution, ensureAttributionColumns } from '../../../lib/attribution';
-import { createAndSendInvoice } from '../../../lib/invoices';
+import { createAndSendInvoice, recordInvoicePayment } from '../../../lib/invoices';
+import { getStoreCredit, spendStoreCredit, normalizeCreditCode } from '../../../lib/store-credit';
 import { bestBundleDiscount } from '../../../lib/bundles';
 import { validateCoupon, bestAutoCoupon, typedCodeUnits, redeemCouponWithClient, releaseCouponForOrder, ensureCouponSchema } from '../../../lib/coupons';
 import { upsertCustomer } from '../../../lib/customers';
@@ -49,6 +50,7 @@ export async function POST(req) {
   const cardOnline = CARD_PAYMENTS_ENABLED && stripeConfigured();
   const paymentMethod = body.paymentMethod === 'in_person' ? 'in_person' : 'etransfer';
   const couponCode = String(body.couponCode || '').trim();
+  const storeCreditRaw = String(body.storeCreditCode || '').trim();
 
   // ---- validation ----
   if (!skus.length) return NextResponse.json({ error: 'Your cart is empty.' }, { status: 400 });
@@ -222,6 +224,22 @@ export async function POST(req) {
   const hst = round2((discounted + deliveryFee) * HST_RATE);
   const total = round2(discounted + deliveryFee + hst);
 
+  // ---- store credit (authoritative; the browser's figure is never used) ----
+  // A transferable code, no expiry. Unlike a promo it is REFUSED rather than
+  // dropped when it doesn't hold: the customer is counting on it to pay.
+  let creditCode = null;
+  let creditToUse = 0;
+  if (storeCreditRaw) {
+    if (cardOnline) {
+      return NextResponse.json({ error: 'Store credit can’t be combined with card payment yet — please remove the code or contact sales@bargainbay.ca.' }, { status: 400 });
+    }
+    const credit = await getStoreCredit(storeCreditRaw).catch(() => null);
+    if (!credit) return NextResponse.json({ error: 'That store credit code wasn’t found. Check it and try again.' }, { status: 400 });
+    if (credit.balance <= 0.004) return NextResponse.json({ error: 'That store credit has no balance left.' }, { status: 400 });
+    creditCode = credit.code;
+    creditToUse = round2(Math.min(credit.balance, total));
+  }
+
   // ---- optional account creation ----
   let userId = session?.userId || null;
   let newSessionToken = null;
@@ -262,6 +280,9 @@ export async function POST(req) {
   // EVERY checkout, not just the ones with a promo.
   try { await ensureCouponSchema(); } catch (e) { console.error('coupon columns', e.message); }
   try { await ensureOrderLineKind(); } catch (e) { console.error('order line kind column', e.message); }
+  if (creditCode) {
+    try { await query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_credit numeric(10,2) NOT NULL DEFAULT 0'); } catch (e) { console.error('store credit column', e.message); }
+  }
   // A signed-in customer already proved they hold this mailbox when they set a
   // password on the account, so their order skips the confirm-your-email step
   // entirely and is stamped verified on creation. Guests get a token.
@@ -299,6 +320,11 @@ export async function POST(req) {
       }
       // Book the redemption in the same transaction as the order it belongs to —
       // a coupon must never be counted against an order that failed to be created.
+      if (creditCode && creditToUse > 0) {
+        // Taken inside the order's own transaction: a credit can never be spent on an order that failed to be created.
+        await spendStoreCredit(client, creditCode, creditToUse, { orderId, ref: numbered[0].order_number, exact: true });
+        await client.query('UPDATE orders SET store_credit = $2 WHERE id = $1', [orderId, creditToUse]);
+      }
       if (coupon) await redeemCouponWithClient(client, coupon, { orderId, email, subtotal, discount });
       if (attributeTo) await redeemCouponWithClient(client, attributeTo, { orderId, email, subtotal, discount: 0 });
       // A seller's units: re-verify they are still on sale, then write each seller's part of the order.
@@ -316,6 +342,7 @@ export async function POST(req) {
       );
     }
     if (e.code === 'NOT_PICKABLE') return NextResponse.json({ error: e.message }, { status: 400 });
+    if (creditCode && /store credit/i.test(e.message || '')) return NextResponse.json({ error: e.message }, { status: 400 });
     console.error('checkout transaction failed', e);
     return NextResponse.json({ error: 'Could not create your order. Please try again.' }, { status: 500 });
   }
@@ -345,8 +372,9 @@ export async function POST(req) {
   // itemisation and e-transfer instructions, so a second email would just confuse
   // the customer. The order remains the source of truth; the invoice mirrors it.
   // Best-effort: paperwork must never cost us the sale.
+  let webInvoice = null;
   try {
-    await createAndSendInvoice({
+    webInvoice = await createAndSendInvoice({
       name, email, phone,
       items: [
         ...items.map((u) => ({ description: u.title || `${u.make} ${u.model}`, amount: priceOf(u), sku: u.id })),
@@ -369,6 +397,17 @@ export async function POST(req) {
     });
   } catch (e) {
     console.error('web order invoice creation failed', order.orderNumber, e.message);
+  }
+  // The credit pays the invoice as a tender, so a credit that covers the whole
+  // sale settles it (and confirms the order) exactly as a payment would.
+  let creditSettled = false;
+  if (creditCode && creditToUse > 0 && webInvoice?.id) {
+    try {
+      const paid = await recordInvoicePayment(webInvoice.id, { amount: creditToUse, method: 'credit', note: `Store credit ${creditCode}` });
+      creditSettled = !!paid.fullyPaid;
+    } catch (e) {
+      console.error('store credit payment record failed', order.orderNumber, e.message);
+    }
   }
 
   const trackUrl = `/order/${order.orderNumber}` + (userId ? '' : `?email=${encodeURIComponent(email)}`);
@@ -413,7 +452,7 @@ export async function POST(req) {
     // Customer receipt + owner alert (fire-and-forget; never blocks the order).
     sendOrderEmails(
       { orderNumber: order.orderNumber, name, email, deliveryMethod, address, city, postal,
-        subtotal, hst, total, paymentMethod, discount, couponCode: appliedCode },
+        subtotal, hst, total, paymentMethod, discount, couponCode: appliedCode, storeCredit: creditToUse },
       items.map((u) => ({ title: u.title || `${u.make} ${u.model}`, price: priceOf(u) }))
     ).catch((e) => console.error('order emails failed', e.message));
     // Confirm-it's-really-you link. The unit is ALREADY held at this point, so a
@@ -438,6 +477,7 @@ export async function POST(req) {
     payload = {
       orderUrl: trackUrl, orderNumber: order.orderNumber,
       discount, couponCode: appliedCode, couponError,
+      storeCredit: creditToUse, storeCreditCode: creditCode, paidByCredit: creditSettled,
       verifyEmailSent: !!verifyToken
     };
   }

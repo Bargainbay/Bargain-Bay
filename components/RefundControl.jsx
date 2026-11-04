@@ -21,6 +21,7 @@ export default function RefundControl({ invoice }) {
   const [pct, setPct] = useState(String(RESTOCKING_FEE_PCT));
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [toCredit, setToCredit] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(null);
@@ -62,7 +63,7 @@ export default function RefundControl({ invoice }) {
       const res = await fetch('/api/admin/invoices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: id, reason: reason.trim(), ...body })
+        body: JSON.stringify({ invoiceId: id, reason: reason.trim(), asCredit: toCredit, ...body })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Refund failed.'); return; }
@@ -77,9 +78,10 @@ export default function RefundControl({ invoice }) {
   function submitItems() {
     if (!picked.size) { setErr('Tick at least one line to refund.'); return; }
     const feeLine = feeKept ? ` We keep ${fmt(feeKept)} as a ${feePct}% restocking fee.` : '';
+    const where = toCredit ? ' as STORE CREDIT (no money leaves the bank)' : '';
     const msg = allPicked
-      ? `Refund ${fmt(itemsRefund)} on ${number} and relist every remaining unit?${feeLine}`
-      : `Refund ${picked.size} line(s) of ${number} for ${fmt(itemsRefund)}? The unit(s) are relisted and that money comes off the recorded sale.${feeLine}`;
+      ? `Refund ${fmt(itemsRefund)}${where} on ${number} and relist every remaining unit?${feeLine}`
+      : `Refund ${picked.size} line(s) of ${number} for ${fmt(itemsRefund)}${where}? The unit(s) are relisted and that money comes off the recorded sale.${feeLine}`;
     post({ action: 'refund_items', itemIds: [...picked], restockingPct: feePct }, msg);
   }
 
@@ -87,7 +89,7 @@ export default function RefundControl({ invoice }) {
     if (!(amt > 0)) { setErr('Enter a refund amount greater than zero.'); return; }
     if (amt > refundable + 0.005) { setErr(`Only ${fmt(refundable)} is still refundable on ${number}.`); return; }
     post({ action: 'refund_amount', amount: amt },
-      `Refund ${fmt(amt)} against ${number}? This returns money only — no unit is relisted.`);
+      `Refund ${fmt(amt)}${toCredit ? ' as STORE CREDIT (no money leaves the bank)' : ''} against ${number}? This returns money only — no unit is relisted.`);
   }
 
   if (done) {
@@ -107,6 +109,13 @@ export default function RefundControl({ invoice }) {
           <>✓ Refunded <b>{done.refundedItems}</b> line(s) of <b>{number}</b> for <b>{fmt(done.refundAmount)}</b>. Unit(s) relisted; the recorded sale was reduced accordingly.
             {done.feeKept ? <> <b>{fmt(done.feeKept)}</b> was kept as a {done.restockingPct}% restocking fee.</> : null}
           </>
+        )}
+        {done.storeCredit && (
+          <div className="notice-box" style={{ marginTop: 10 }}>
+            Store credit issued: <b style={{ fontSize: 18, letterSpacing: 1 }}>{done.storeCredit.code}</b> worth <b>{fmt(done.storeCredit.amount)}</b>.
+            {done.storeCredit.email ? <> The code has been emailed to {done.storeCredit.email}.</> : <> No email on file — give the customer this code.</>}
+            {' '}It never expires and anyone holding the code can spend it.
+          </div>
         )}
         <div style={{ marginTop: 10 }}>
           <a className="btn" href="/admin/invoices">← Back to invoices</a>
@@ -128,6 +137,10 @@ export default function RefundControl({ invoice }) {
         </button>
       </div>
 
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, border: '1px solid var(--line)', borderRadius: 8, padding: '10px 12px', marginBottom: 14 }}>
+        <input type="checkbox" style={{ width: 'auto' }} checked={toCredit} onChange={(e) => setToCredit(e.target.checked)} />
+        <span><b>Give it back as store credit</b> <span style={{ color: 'var(--muted)' }}>(a code the customer can spend later — nothing goes back to their card or bank)</span></span>
+      </label>
       {err && <div className="error-box">{err}</div>}
 
       {tab === 'items' ? (
@@ -206,7 +219,9 @@ export default function RefundControl({ invoice }) {
             <div className="hint">
               {refundable > 0
                 ? <>Up to <b>{fmt(refundable)}</b> — what was collected and not yet returned.{' '}
-                    <button type="button" className="linkish" onClick={() => setAmount(String(refundable.toFixed(2)))}>Refund it all</button></>
+                    <button type="button" className="linkish" onClick={() => setAmount(String(refundable.toFixed(2)))}>Refund it all</button>
+                    {' · '}
+                    <button type="button" className="linkish" onClick={() => { setAmount((Math.floor(refundable * 80) / 100).toFixed(2)); setToCredit(true); }}>Cancellation: 80% as store credit</button></>
                 : 'Everything collected on this invoice has already been refunded.'}
             </div>
           </div>
