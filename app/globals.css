@@ -1718,6 +1718,49 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
   .hero-badge { right: -34px; top: 6px; width: 74px; height: 74px; }
   .hero-badge b { font-size: 21px; }
 }
+/* 3D product stage in the promo hero (added 2026-11-04). See components/Hero3D.jsx.
+   Everything is scoped under .hero-3d / .hero-scene-*; the plain promo hero is untouched. */
+.hero-scene-diwali { background-image: linear-gradient(90deg, rgba(38,8,14,.55) 0%, rgba(38,8,14,.15) 45%, rgba(38,8,14,0) 70%), radial-gradient(ellipse at 75% 55%, #b8321f 0%, #7a1226 45%, #2c0a14 100%); }
+.hero-scene-blackfriday { background-image: radial-gradient(ellipse at 72% 40%, #2b2b33 0%, #101014 60%, #050507 100%); position: relative; }
+.hero-scene-blackfriday::before { content: ''; position: absolute; right: 12%; top: -40px; width: 420px; height: 560px; pointer-events: none;
+  background: conic-gradient(from 195deg at 50% 0, transparent 0 10deg, rgba(255,255,255,.14) 14deg 24deg, transparent 28deg); filter: blur(10px); }
+.hero-scene-blackfriday .hero-kicker { background: rgba(212,166,58,.18); }
+.hero-3d { position: relative; flex: 0 0 auto; width: 420px; height: 360px; margin-right: 4%; perspective: 1100px; z-index: 1; align-self: center; }
+.h3-scene { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .15s ease-out; }
+.h3-floor { position: absolute; left: 50%; bottom: -130px; width: 400px; height: 400px; margin-left: -200px; border-radius: 50%;
+  transform: rotateX(76deg) translateZ(-4px); animation: h3spin 40s linear infinite; }
+.h3-unit { position: absolute; left: 50%; bottom: 62px; height: 250px; width: auto; transform: translate(-50%, 0) translateZ(60px);
+  filter: drop-shadow(0 26px 22px rgba(0,0,0,.55)); animation: h3float 6s ease-in-out infinite; }
+.h3-refl { position: absolute; left: 50%; bottom: -188px; height: 250px; width: auto; transform: translate(-50%, 0) translateZ(60px) scaleY(-1); opacity: .16; pointer-events: none;
+  -webkit-mask-image: linear-gradient(transparent 55%, #000); mask-image: linear-gradient(transparent 55%, #000); }
+.h3-tag { position: absolute; right: 6px; top: 18px; width: 116px; height: 116px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; line-height: 1.05; transform: translateZ(150px) rotateY(-12deg); animation: h3tag 5s ease-in-out infinite; box-shadow: 0 14px 26px rgba(0,0,0,.45);
+  background: radial-gradient(circle at 35% 30%, #ffe9a8, #e8a824 60%, #b47510); color: #4a1208; }
+.h3-tag small { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 700; }
+.h3-tag b { font-size: 32px; line-height: 1; font-weight: 800; }
+.h3-spark { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #ffd98a; box-shadow: 0 0 10px 3px rgba(255,200,90,.8); animation: h3tw 3s ease-in-out infinite; }
+.hero-3d-diwali .h3-floor { background:
+  repeating-conic-gradient(from 0deg, rgba(255,196,80,.55) 0 6deg, rgba(255,196,80,0) 6deg 15deg),
+  radial-gradient(circle, rgba(255,196,80,0) 0 30%, rgba(255,170,60,.45) 31% 33%, rgba(255,196,80,0) 34% 55%, rgba(255,170,60,.5) 56% 58%, rgba(255,196,80,0) 59%);
+  box-shadow: 0 0 70px 10px rgba(255,150,40,.35); }
+.h3-diya { position: absolute; bottom: 20px; width: 44px; height: 16px; border-radius: 0 0 44px 44px; background: linear-gradient(#d98a2b, #8a4a10); transform: translateZ(120px); }
+.h3-diya::before { content: ''; position: absolute; left: 50%; top: -30px; width: 12px; height: 30px; margin-left: -6px; border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%;
+  background: radial-gradient(ellipse at 50% 75%, #fff6c8, #ffb52e 55%, rgba(255,120,20,0)); box-shadow: 0 0 26px 12px rgba(255,170,50,.65); animation: h3flick 1.6s ease-in-out infinite; }
+.hero-3d-blackfriday .h3-floor { background: radial-gradient(circle, #2f2f38 0 45%, #1a1a20 46% 100%); border: 3px solid #d4a63a; box-shadow: 0 0 60px rgba(212,166,58,.35); }
+.hero-3d-blackfriday .h3-tag { background: radial-gradient(circle at 35% 30%, #ffe9a8, #d4a63a 60%, #8f6a14); color: #17120a; }
+@keyframes h3spin { to { transform: rotateX(76deg) translateZ(-4px) rotateZ(360deg); } }
+@keyframes h3float { 50% { transform: translate(-50%, -8px) translateZ(60px); } }
+@keyframes h3tag { 0%, 100% { transform: translateZ(150px) rotateY(-14deg); } 50% { transform: translateZ(150px) rotateY(14deg); } }
+@keyframes h3tw { 50% { opacity: .15; transform: scale(.5); } }
+@keyframes h3flick { 50% { transform: scale(1.15, .9); opacity: .85; } }
+@media (max-width: 760px) {
+  .hero-3d { width: 340px; height: 300px; margin: 0 auto -20px; transform: scale(.82); transform-origin: top center; }
+  .hero-scene-blackfriday::before { right: -60px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .h3-floor, .h3-unit, .h3-tag, .h3-spark, .h3-diya::before { animation: none; }
+  .h3-scene { transition: none; }
+}
 .hero-kicker { display: inline-block; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; font-family: var(--font-head); background: rgba(255,255,255,.16); padding: 5px 11px; border-radius: 999px; margin-bottom: 14px; }
 .hero-promo h1 { font-size: 40px; }
 .hero-code { font-size: 15px; margin: -12px 0 20px !important; }
