@@ -23,8 +23,8 @@ export default async function PromoBar() {
     if (!b) return DEFAULT_LINE;
     return (
       <>
-        <b>{b.text}</b>{' '}
-        <a href={b.href}>See the deal →</a>
+        <b>{b.text}</b>
+        {b.href && <>{' '}<a href={b.href}>{b.label || 'See the deal →'}</a></>}
         {b.extra && <> · <a href={b.extra.href}>{b.extra.text}</a></>}
       </>
     );
