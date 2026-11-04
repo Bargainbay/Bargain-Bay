@@ -5,7 +5,7 @@
 // building block for the nightly Sold catch-up sweep.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, applyVendorUpliftToTracker, typedPriceReport, sheetsConfigured } from '../../../../lib/sheets';
+import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, applyVendorUpliftToTracker, applyVendorListRuleToTracker, typedPriceReport, sheetsConfigured } from '../../../../lib/sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -42,7 +42,10 @@ export async function POST(req) {
   // A dry run changes nothing and reports what it would.
   // { typedPrices: true }: READ-ONLY list of the hand-typed Suggested Sale Price
   // cells, each checked against the pricing rules. Writes nothing.
+  // { vendorListRule: { dryRun?: true (default), revert?, fixTyped?, vendor? } }: write the
+  // retail-percentage rule (VENDOR_LIST_RULES) into the Suggested Sale Price formula.
   const typedPrices = b.typedPrices === true;
+  const listRule = b.vendorListRule && typeof b.vendorListRule === 'object' ? b.vendorListRule : null;
   const vendorUplift = b.vendorUplift && typeof b.vendorUplift === 'object' ? b.vendorUplift : null;
   try {
     const soldRes = sold.length ? await writeSoldRows(sold) : { written: 0 };
@@ -58,8 +61,11 @@ export async function POST(req) {
     const upliftRes = vendorUplift
       ? await applyVendorUpliftToTracker({ dryRun: vendorUplift.dryRun !== false, revert: !!vendorUplift.revert, vendorKey: String(vendorUplift.vendor || 'abi').toLowerCase() })
       : null;
+    const listRes = listRule
+      ? await applyVendorListRuleToTracker({ dryRun: listRule.dryRun !== false, revert: !!listRule.revert, fixTyped: !!listRule.fixTyped, vendorKey: String(listRule.vendor || 'abi').toLowerCase() })
+      : null;
     return NextResponse.json({
-      ok: true, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
+      ok: true, vendorListRule: listRes, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
       unsoldMissing: unsoldRes.missing, costsUpdated: costRes, invoices: invoiceRes, corrections: correctionRes, vendorUplift: upliftRes, typedPrices: typedRes
     });
   } catch (e) {

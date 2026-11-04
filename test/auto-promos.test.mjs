@@ -3,9 +3,9 @@
 // (2026-10-08): WRT541SZDZ priced $987 against a $790.25 cost loses money at 20%.
 import { suite, test, equal, assert } from './_harness.mjs';
 import { autoDiscountFor } from '../lib/coupons.js';
-import { upliftedPrice, vendorUpliftPct } from '../lib/constants.js';
+import { vendorListPrice, vendorListRule } from '../lib/constants.js';
 import { parseTrackerCsv } from '../lib/csv.js';
-import { wrapPriceFormula, unwrapPriceFormula, isWrapped } from '../lib/vendor-formula.js';
+import { wrapListFormula, unwrapListFormula, wrapPriceFormula, unwrapPriceFormula, isWrapped } from '../lib/vendor-formula.js';
 
 const pct = (value) => ({ kind: 'percent', value });
 const unit = (price, floor, eligible = true) => ({ price, floor, eligible });
@@ -55,41 +55,57 @@ test('a unit already at or under its floor gives nothing', () => {
   equal(autoDiscountFor(pct(10), [unit(700, 750)]), { discount: 0, capped: true });
 });
 
-suite('lib/constants: a vendor uplift lifts the public price');
+suite('lib/constants: Abi is listed at a share of retail by condition');
 
-test('Abi units are +20% (the 10% rule plus a further 10%), however the vendor name is spelled', () => {
-  equal(vendorUpliftPct('Abi'), 20);
-  equal(vendorUpliftPct(' ABI '), 20);
-  equal(vendorUpliftPct('SecondShop'), 0);
-  equal(vendorUpliftPct(null), 0);
+test('the rule applies to Abi however the name is spelled, and to nobody else', () => {
+  equal(vendorListRule('Abi')['New Open Box'], 85);
+  equal(vendorListRule(' ABI ')['Refurbished'], 60);
+  equal(vendorListRule('SecondShop'), null);
+  equal(vendorListRule(null), null);
 });
 
-test('the uplift is applied to the tracker price', () => {
-  equal(upliftedPrice(1860, 2595, 'Abi'), 2232);
+test('New Open Box and Scratch & Dent are 85% of retail, whatever the tracker price says', () => {
+  equal(vendorListPrice(899.10, 999, 'Abi', 'New Open Box'), 849.15);
+  equal(vendorListPrice(850.50, 945, 'Abi', 'New Scratch & Dent'), 803.25);
+  equal(vendorListPrice(1, 999, 'Abi', 'New Open Box'), 849.15);
 });
 
-test('another vendor, or no vendor, is untouched', () => {
-  equal(upliftedPrice(1860, 2595, 'SecondShop'), 1860);
-  equal(upliftedPrice(1860, 2595, null), 1860);
+test('it can never exceed retail, and a blank retail leaves the tracker price alone', () => {
+  equal(vendorListPrice(899.10, 0, 'Abi', 'New Open Box'), 899.10);
+  equal(vendorListPrice(0, 0, 'Abi', 'New Open Box'), 0);
 });
 
-test('it never goes past retail, and never below the price it started at', () => {
-  equal(upliftedPrice(1000, 1050, 'Abi'), 1050);
-  equal(upliftedPrice(1100, 1000, 'Abi'), 1320);   // retail below price: no cap to hold it to
-  equal(upliftedPrice(0, 500, 'Abi'), 0);
+test('New in Box is 90% and Refurbished 60%; other vendors and unnamed conditions are untouched', () => {
+  equal(vendorListPrice(700, 999, 'Abi', 'New in Box'), 899.10);
+  equal(vendorListPrice(700, 999, 'Abi', 'Refurbished'), 599.40);
+  equal(vendorListPrice(700, 999, 'Abi', 'Tested & Working'), 700);
+  equal(vendorListPrice(1860, 2595, 'SecondShop', 'New Open Box'), 1860);
+  equal(vendorListPrice(1860, 2595, null, 'New Open Box'), 1860);
 });
 
-suite('lib/csv: the tracker read applies the vendor uplift once');
+suite('lib/csv: the tracker read prices Abi off retail, once');
 
 const HEAD = 'Lot Number,Item ID / SKU,Category,Make,Model,Description,Serial Number,Vendor / Supplier,Retail Price,Condition,Condition %,Suggested Sale Price,Status,Total Cost';
-const row = (sku, vendor) => `L1,${sku},Laundry,LG,WKEX200HBA,LG tower,123,${vendor},2000,New Open Box,80%,1600,Tested Working,1000`;
+const row = (sku, vendor, cond = 'New Open Box', retail = 2000) => `L1,${sku},Laundry,LG,WKEX200HBA,LG tower,123,${vendor},${retail},${cond},80%,1600,Tested Working,1300`;
 
-test("an Abi row is priced 20% over Retail x Condition %, and everyone else's is not", () => {
+test("an Abi open-box row is 85% of retail, and everyone else's is Retail x Condition %", () => {
   const { units } = parseTrackerCsv([HEAD, row('VD-1', 'Abi'), row('SS-1', 'SecondShop'), row('X-1', '')].join('\n'));
   const price = (id) => units.find((u) => u.id === id).price;
-  equal(price('VD-1'), 1920);
+  equal(price('VD-1'), 1700);
   equal(price('SS-1'), 1600);
   equal(price('X-1'), 1600);
+});
+
+test('an Abi refurbished row is 60% of retail, a New in Box row 90%', () => {
+  const { units } = parseTrackerCsv([HEAD, row('VD-2', 'Abi', 'Refurbished'), row('VD-3', 'Abi', 'New in Box')].join('\n'));
+  equal(units[0].price, 1200);
+  equal(units[1].price, 1800);
+});
+
+test('a price above retail is reported by the read', () => {
+  const { report } = parseTrackerCsv([HEAD, row('SS-9', 'SecondShop', 'New Open Box', 1500).replace('80%', '110%')].join('\n'));
+  equal(report.aboveRetail.length, 1);
+  equal(report.aboveRetail[0].id, 'SS-9');
 });
 
 test('the strike-through retail is never touched', () => {
@@ -130,4 +146,26 @@ test('wrapping twice changes nothing', () => {
 test('a typed value is a deliberate override: never wrapped', () => {
   equal(wrapPriceFormula('1996', OPT), null);
   equal(unwrapPriceFormula('=K854*M854'), null);
+});
+
+suite('lib/vendor-formula: the retail-percentage rule wraps, and unwraps exactly');
+
+const LOPT = { vendorCell: 'H854', retailCell: 'K854', condCell: 'J854', rates: { nib: 90, nob: 85, refurb: 60 } };
+
+test('it wraps the original and gives it back character for character', () => {
+  for (const f of ['=ROUND(K854*M854,2)', '=IFERROR(K854*M854,"")', '=IF(M854="","",K854*M854)']) {
+    const w = wrapListFormula(f, LOPT);
+    assert(w.includes('"abi"') && w.includes('/100'), 'carries the rule');
+    equal(unwrapListFormula(w, LOPT), f);
+    equal(wrapListFormula(w, LOPT), w);       // idempotent
+  }
+});
+
+test('a cell still wrapped with the old x1.2 uplift is unwrapped first', () => {
+  const old = wrapPriceFormula('=ROUND(K854*M854,2)', { vendorCell: 'H854', factor: '1.2' });
+  equal(unwrapListFormula(wrapListFormula(old, LOPT), LOPT), '=ROUND(K854*M854,2)');
+});
+
+test('a typed value is never wrapped', () => {
+  equal(wrapListFormula('1078.92', LOPT), null);
 });
