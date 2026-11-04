@@ -75,6 +75,10 @@
     {
       "path": "/api/cron/weekly-report",
       "schedule": "0 2 * * 1"
+    },
+    {
+      "path": "/api/cron/manager-call",
+      "schedule": "0 13,17,21 * * *"
     }
   ]
 }
