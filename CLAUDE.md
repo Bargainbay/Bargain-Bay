@@ -184,6 +184,26 @@ server-side** (CDNs 403 servers). Uploads go to the private Blob store under a
 fresh key each time (`/api/photo` is cached an hour). The second tab manages
 `unit_photos` through the existing `/api/admin/unit-photos`.
 
+### The "To photograph" list (added 2026-11-04)
+`lib/photo-queue.js`, `components/PhotoQueue.jsx` (first tab of `/admin/photos`), `GET /api/admin/unit-photos?queue=1`
+(staff), `test/photo-queue.test.mjs`. Every unit on sale with no picture of the ACTUAL machine, worked down on a phone:
+Photograph -> Take photo (repeatable) / Choose from phone -> Save -> it leaves the list.
+- **"Has a photo" = our own `unit_photos` OR RS Ops's inspection set** (`photos` / `rsopsPhotos`), the two things the product
+  page shows after the stock picture. The stock picture does NOT count. A unit RS Ops already shot is not asked for again.
+- **Built from `getAvailable()` without `{ marketplace: true }`**, so sellers' and Vesta units never appear (we can't photograph them).
+- Two buttons, no `capture` on the multi-select input (iOS makes `capture` camera-only). Photos are shrunk on the phone
+  (`photo-pick.compressPhotos`). **A failed upload keeps the shots on screen** — never costs the rep the pictures.
+- The spot (`currentLocations`) is shown when known and soft-fails to nothing.
+- **The unit is CHOSEN, never typed in full** (the "Find a unit" tab searches as you type; `?find=` -> `findUnits`). The upload
+  route runs the SKU through `resolveUnitSku` and REFUSES anything that is not on the AVAILABLE inventory list (active, not sold, not held by an
+  order or checkout — the shop's own `unavailableSkus` test; the chooser offers only those too): on 2026-11-04 Roushi typed the
+  MODEL number (PRFS2883AF) into the old free-text box, and two photos saved, loaded, and belonged to nothing. A model number now
+  gets "pick the exact unit: <its SKUs>"; the SKU is stored as `products` spells it (case/space-insensitive). A unit booked in but
+  not yet synced is refused until Sync inventory runs.
+- **One photo per request** (`components/unit-photo-upload.js`). A serverless function takes ~4.5MB of body; two raw phone photos
+  (2.8MB + 3.0MB) exceeded it, the platform answered with an HTML "Request Entity Too Large" page, and the screen tried to parse it as
+  JSON. Photos are also shrunk on the phone first. Never go back to one multi-file request.
+
 - `lib/reservations.js` — race-safe 30-min SKU holds in Postgres. `unavailableSkus()`, `isUnavailable()`.
 - `lib/stripe.js` — Stripe Checkout (+ `app/api/stripe-webhook`). `lib/sheets.js` — read + writeSold via Google service account.
 - `lib/auth.js` — bcryptjs + jose JWT cookie `bb_session`. `lib/db.js` — lazy `pg` pool (build never needs `POSTGRES_URL`).

@@ -1933,3 +1933,59 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .disp-extras li { margin: 4px 0; font-size: 13px; }
 .onotes-badge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #eee; margin-left: 6px; }
 .onotes-badge.is-extra { background: #ffd966; font-weight: 700; }
+
+/* Photos -> "To photograph": the queue sales works down, on a phone at the rack.
+   Every tap target is 48px+; the page never scrolls sideways. */
+.pq-progress { background: var(--tint); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+.pq-progress-top { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; font-size: 15px; }
+.pq-left { margin-left: auto; font-weight: 700; }
+.pq-bar { height: 10px; background: #e3e7ea; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+.pq-bar i { display: block; height: 100%; background: #1e8a3c; border-radius: 999px; transition: width .3s; }
+.pq-done-count { margin-top: 8px; font-size: 14px; color: #1e6b34; font-weight: 600; }
+.pq-search { width: 100%; box-sizing: border-box; padding: 12px 14px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; }
+.pq-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.pq-item { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff; min-width: 0; }
+.pq-item-open { border-color: #1e8a3c; box-shadow: 0 0 0 2px rgba(30,138,60,.15); }
+.pq-row { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.pq-thumb { width: 72px; height: 72px; flex: none; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.pq-thumb-empty { display: grid; place-items: center; font-size: 11px; color: #999; }
+.pq-info { min-width: 0; flex: 1; }
+.pq-title { font-weight: 700; font-size: 16px; line-height: 1.25; overflow-wrap: anywhere; }
+.pq-meta { font-size: 13px; color: #5b6770; margin-top: 2px; overflow-wrap: anywhere; }
+.pq-spot { margin-left: 8px; font-weight: 600; color: var(--charcoal); }
+.pq-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.pq-btn {
+  flex: 1 1 140px; min-height: 50px; padding: 12px 14px; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center; text-align: center;
+  font-size: 16px; font-weight: 600; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--line); background: #fff; color: var(--charcoal);
+}
+.pq-btn-main { background: var(--charcoal); border-color: var(--charcoal); color: #fff; }
+.pq-btn-save { background: #1e8a3c; border-color: #1e8a3c; color: #fff; }
+.pq-btn:disabled, .pq-disabled { opacity: .5; pointer-events: none; }
+.pq-go { width: 100%; margin-top: 12px; }
+.pq-file { position: absolute; width: 1px; height: 1px; padding: 0; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.pq-hint { font-size: 14px; color: #5b6770; margin: 10px 0 0; }
+.pq-shots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.pq-shots button { position: relative; background: none; border: 0; padding: 0; cursor: pointer; }
+.pq-shots img { width: 78px; height: 78px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.pq-shots span { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; font-size: 12px; display: grid; place-items: center; }
+.pq-donelist { margin-top: 16px; font-size: 14px; }
+.pq-donelist summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+.pq-donelist ul { padding-left: 18px; margin: 4px 0; }
+.pq-donelist li { margin: 6px 0; overflow-wrap: anywhere; }
+.pq-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.pq-tabs .btn { flex: 1 1 auto; min-height: 44px; }
+@media (max-width: 700px) {
+  .pq-panel { padding-left: 12px; padding-right: 12px; }
+}
+
+/* "Find a unit": pick the unit from matches instead of typing a whole SKU. */
+.pq-pick { gap: 8px; }
+.pq-pick-btn { width: 100%; text-align: left; display: grid; gap: 2px; padding: 12px 14px; min-height: 56px; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; font-size: 15px; color: var(--charcoal); }
+.pq-pick-btn span { font-size: 13px; color: #5b6770; overflow-wrap: anywhere; }
+.pq-pick-btn .pq-has { color: #1e6b34; font-weight: 600; }
+.pq-pick-btn .pq-none { color: #b3261e; font-weight: 600; }
+.pq-chosen { display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px solid #1e8a3c; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; overflow-wrap: anywhere; }
+a.pq-btn { text-decoration: none; }
