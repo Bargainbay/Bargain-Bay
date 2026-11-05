@@ -20,7 +20,8 @@ export default async function FbListingsPage() {
       <p style={{ fontSize: 14 }}>Your account ({session.email}) isn&apos;t on the staff list.</p>
     </div></div>);
   }
-  const units = await decorate(await getAvailable(), session); // our own stock only, same prices as the site
+  // No session on purpose: a signed-in approved member would otherwise get the member price, and these are PUBLIC prices.
+  const units = await decorate(await getAvailable()); // our own stock only, same prices as the site
   const listings = units.map(fbListing).sort((a, b) => a.category?.localeCompare(b.category || '') || a.title.localeCompare(b.title));
   return (
     <div>
