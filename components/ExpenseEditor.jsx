@@ -23,6 +23,12 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
   const [rform, setRform] = useState({ category: categories[0] || 'Other', vendor: '', amount: '', cadence: 'monthly', dayOf: 1 });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  // Search and paging: a bank feed is hundreds of rows, far more than a table
+  // anyone can scan.
+  const [q, setQ] = useState('');
+  const [shown, setShown] = useState(100);
+  // The line being split into several: { id, total (cents), parts: [...] }.
+  const [splitting, setSplitting] = useState(null);
 
   // What actually gets stored, given which way the amount was typed. Entering a
   // receipt total is the common case, so it's supported rather than left as
@@ -78,6 +84,53 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
     } finally { setBusy(false); }
   }
 
+  // ---- splitting one bank line into several ---------------------------------
+  const centsOf = (v) => Math.round((Number(v) || 0) * 100);
+  function startSplit(r) {
+    const total = centsOf(r.amount + (r.tax == null ? 0 : r.tax));
+    const mode = r.tax == null ? 'review' : (r.tax > 0 ? 'hst' : 'none');
+    setErr('');
+    setSplitting({
+      id: r.id, total,
+      parts: [
+        { amount: (total / 100).toFixed(2), category: r.category || categories[0] || 'Other', taxMode: mode, note: '' },
+        { amount: '', category: categories[0] || 'Other', taxMode: mode, note: '' }
+      ]
+    });
+  }
+  const setPart = (i, patch) => setSplitting((sp) => ({ ...sp, parts: sp.parts.map((p, j) => (j === i ? { ...p, ...patch } : p)) }));
+  async function reload() {
+    const res = await fetch('/api/admin/expenses', { cache: 'no-store' });
+    const d = await res.json();
+    if (res.ok && Array.isArray(d.expenses)) setRows(d.expenses);
+    router.refresh();
+  }
+  async function saveSplit() {
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/expenses', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'split', id: splitting.id, parts: splitting.parts.map((p) => ({ ...p, amount: Number(p.amount) || 0 })) })
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not split.');
+      setSplitting(null);
+      await reload();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+  async function undoSplit(id) {
+    if (!window.confirm('Put this charge back as one line, exactly as the bank sent it? The other parts are removed.')) return;
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/expenses', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unsplit', id })
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not undo.');
+      await reload();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+
   async function addRecurring() {
     if (!(Number(rform.amount) > 0)) { setErr('Amount is required for a recurring expense.'); return; }
     setBusy(true); setErr('');
@@ -98,6 +151,12 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
       router.refresh();
     } finally { setBusy(false); }
   }
+
+  const needle = q.trim().toLowerCase();
+  const matching = needle
+    ? rows.filter((r) => [r.vendor, r.category, r.note, r.incurredOn, String(r.amount)].some((v) => String(v || '').toLowerCase().includes(needle)))
+    : rows;
+  const visible = matching.slice(0, shown);
 
   const inp = { padding: '7px 8px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--card)', color: 'var(--charcoal)', fontSize: 13 };
   return (
@@ -126,10 +185,20 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
       </p>
       {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
       {rows.length > 0 && (
-        <div className="table-wrap" style={{ marginTop: 12 }}><table className="admin">
+        <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input value={q} onChange={(e) => { setQ(e.target.value); setShown(100); }} placeholder="Search vendor, category, date or amount…" style={{ ...inp, minWidth: 260 }} />
+          <span className="hint" style={{ margin: 0 }}>{matching.length === rows.length ? `${rows.length} lines` : `${matching.length} of ${rows.length} lines`}</span>
+        </div>
+      )}
+      {rows.length > 0 && (
+        <div className="table-wrap" style={{ marginTop: 8 }}><table className="admin">
           <thead><tr><th>Date</th><th>Category</th><th>Vendor</th><th style={{ textAlign: 'right' }}>Amount</th><th style={{ textAlign: 'right' }}>HST</th><th /></tr></thead>
           <tbody>
-            {rows.map((r) => (edit && edit.id === r.id ? (
+            {visible.map((r) => (splitting && splitting.id === r.id ? (
+              <tr key={r.id}><td colSpan={6}>
+                <SplitForm sp={splitting} categories={categories} inp={inp} busy={busy} setPart={setPart} setSplitting={setSplitting} onSave={saveSplit} />
+              </td></tr>
+            ) : edit && edit.id === r.id ? (
               <tr key={r.id}>
                 <td><input type="date" value={edit.incurredOn || ''} onChange={(e) => setEdit({ ...edit, incurredOn: e.target.value })} style={{ ...inp, width: 140 }} /></td>
                 <td>
@@ -151,7 +220,7 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
             ) : (
               <tr key={r.id}>
                 <td>{r.incurredOn}</td>
-                <td>{r.category}{r.source === 'qbo' && <span className="pill" style={{ fontSize: 10, marginLeft: 5 }} title="Pulled from QuickBooks automatically">QB</span>}</td>
+                <td>{r.category}{r.split && <span className="pill" style={{ fontSize: 10, marginLeft: 5 }} title={r.split === 'parent' ? 'This charge was split — this is the first part' : 'One part of a split charge'}>split</span>}{r.source === 'qbo' && <span className="pill" style={{ fontSize: 10, marginLeft: 5 }} title="Pulled from QuickBooks automatically">QB</span>}</td>
                 <td>{r.vendor || '—'}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{r.note}</div></td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(r.amount)}</td>
                 {/* A dash, not $0.00 — nobody has said what the tax was, and the
@@ -163,6 +232,9 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
                 </td>
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                   <button className="dash-filter" disabled={busy} onClick={() => setEdit({ ...r })}>Edit</button>{' '}
+                  {r.split === 'parent'
+                    ? <><button className="dash-filter" disabled={busy} onClick={() => undoSplit(r.id)}>Undo split</button>{' '}</>
+                    : !r.split && <><button className="dash-filter" disabled={busy} onClick={() => startSplit(r)}>Split</button>{' '}</>}
                   {/* A QuickBooks row would just re-sync if deleted — fix it in QBO instead. */}
                   {r.source === 'qbo'
                     ? <span className="hint" style={{ fontSize: 11 }}>del. in QB</span>
@@ -172,6 +244,11 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
             )))}
           </tbody>
         </table></div>
+      )}
+      {matching.length > shown && (
+        <p style={{ margin: '8px 0 0' }}>
+          <button className="dash-filter" onClick={() => setShown((n) => n + 100)}>Show 100 more ({matching.length - shown} left)</button>
+        </p>
       )}
 
       <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
@@ -214,6 +291,49 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
             </tbody>
           </table></div>
         )}
+      </div>
+    </div>
+  );
+}
+
+
+// The parts of one bank line. The amounts are what the bank took for each part,
+// tax included, and must add back to the whole charge to the cent.
+function SplitForm({ sp, categories, inp, busy, setPart, setSplitting, onSave }) {
+  const sum = sp.parts.reduce((a, p) => a + Math.round((Number(p.amount) || 0) * 100), 0);
+  const left = sp.total - sum;
+  const f = (c) => `$${(c / 100).toFixed(2)}`;
+  const ok = left === 0 && sp.parts.length >= 2 && sp.parts.every((p) => Number(p.amount) > 0);
+  return (
+    <div style={{ padding: '10px 4px', background: 'var(--card)' }}>
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>Split this charge ({f(sp.total)} in total, tax included)</div>
+      {sp.parts.map((p, i) => (
+        <div key={i} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+          <span style={{ width: 18, color: 'var(--muted)' }}>{i + 1}</span>
+          <input type="number" step="0.01" min="0" placeholder="Amount" value={p.amount} onChange={(e) => setPart(i, { amount: e.target.value })} style={{ ...inp, width: 100, textAlign: 'right' }} />
+          <select value={p.category} onChange={(e) => setPart(i, { category: e.target.value })} style={{ ...inp, width: 'auto' }}>
+            {[...new Set([...categories, p.category].filter(Boolean))].map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={p.taxMode} onChange={(e) => setPart(i, { taxMode: e.target.value })} style={{ ...inp, width: 'auto' }}>
+            <option value="hst">HST included at 13%</option>
+            <option value="none">No recoverable tax</option>
+            <option value="review">Decide the tax later</option>
+          </select>
+          <input placeholder="Note (optional)" value={p.note} onChange={(e) => setPart(i, { note: e.target.value })} style={{ ...inp, width: 160 }} />
+          {sp.parts.length > 2 && (
+            <button className="dash-filter" disabled={busy} onClick={() => setSplitting({ ...sp, parts: sp.parts.filter((_, j) => j !== i) })}>Remove</button>
+          )}
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+        <button className="dash-filter" disabled={busy || sp.parts.length >= 12}
+          onClick={() => setSplitting({ ...sp, parts: [...sp.parts, { amount: left > 0 ? (left / 100).toFixed(2) : '', category: categories[0] || 'Other', taxMode: sp.parts[0].taxMode, note: '' }] })}>+ Add a part</button>
+        <span style={{ fontSize: 13, color: left === 0 ? 'var(--muted)' : 'var(--danger)' }}>
+          {left === 0 ? 'Adds up to the bank line.' : left > 0 ? `${f(left)} still to place` : `${f(-left)} too much`}
+        </span>
+        <span style={{ flex: 1 }} />
+        <button className="dash-filter active" disabled={busy || !ok} onClick={onSave}>{busy ? 'Saving…' : 'Save split'}</button>
+        <button className="dash-filter" disabled={busy} onClick={() => setSplitting(null)}>Cancel</button>
       </div>
     </div>
   );

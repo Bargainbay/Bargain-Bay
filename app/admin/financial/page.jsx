@@ -39,7 +39,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
   let d = null, expenses = [], recurring = [], unreviewed = [], rules = [], ledgerStart = '', suggestions = [], error = '';
   try {
     [d, expenses, recurring, unreviewed, rules, ledgerStart, suggestions] = await Promise.all([
-      financialDashboard(period), listExpenses(), listRecurringExpenses(),
+      financialDashboard(period), listExpenses(1000), listRecurringExpenses(),
       listUnreviewedExpenses().catch(() => []),
       listExpenseRules().catch(() => []),
       getLedgerStart().catch(() => ''),

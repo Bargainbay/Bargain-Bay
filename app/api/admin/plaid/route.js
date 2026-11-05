@@ -2,7 +2,7 @@
 // account is an access grant, not a selling-surface action.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { createLinkToken, exchangePublicToken, syncPlaidTransactions, plaidDisconnect, plaidStatus } from '../../../../lib/plaid';
+import { createLinkToken, exchangePublicToken, syncPlaidTransactions, plaidDisconnect, plaidStatus, plaidBalances } from '../../../../lib/plaid';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -37,6 +37,7 @@ export async function POST(req) {
       await plaidDisconnect(b.itemId);
       return NextResponse.json({ ok: true, disconnected: true });
     }
+    if (b.action === 'balances') return NextResponse.json({ ok: true, ...(await plaidBalances()) });
     if (b.action === 'status') return NextResponse.json({ ok: true, status: await plaidStatus() });
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (e) {
