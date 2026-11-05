@@ -4972,6 +4972,16 @@ SKUs are `VS-<shopify id>`; they are NOT one-of-a-kind so reservations skip them
   in-stock items are orderable. We hold no cost for these, so no member price, clearance or promo applies.
 - A feed that returns under half of what we hold retires nothing (a partial read must not delist the range).
 
+## Facebook Marketplace listing kit (added 2026-11-05)
+`/admin/fb-listings` (staff, nav tab "Facebook"), `lib/fb-kit.js` (title, caption, photo list; pure), `components/FbListings.jsx`,
+`GET /api/admin/fb-listings/zip?sku=` (photos as a zip, `lib/zip-lite.js`), `test/fb-kit.test.mjs`. The owner posts to his personal
+Marketplace BY HAND from the phone; this only prepares title / caption / price / photos. **Nothing logs into or calls Facebook**
+(Meta forbids scripting it), no table, no migration. The caption always ends with "Check out my profile ... other listings" and
+"Message me for more info". Same prices as the site (`decorate`), own stock only, no cost anywhere. The zip is built server-side
+because manufacturer CDNs send no CORS headers; a photo a CDN refuses is reported, not silently dropped. "Posted" ticks live in
+the browser's localStorage only. A unit that sells must be taken down on Facebook by hand. The bigger design (per-account queue,
+AI copy, retail screenshots, Mac Mini) was deliberately NOT built.
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
 
