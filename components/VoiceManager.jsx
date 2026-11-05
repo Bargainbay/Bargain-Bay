@@ -52,8 +52,10 @@ export default function VoiceManager() {
     load();
   }
   async function runBackup() {
+    setMsg('Running the backup, this can take up to a minute…');
     const r = await post({ action: 'backup_now' });
     if (r) setMsg(r.ok ? 'The backup ran fine.' : `The backup failed: ${r.reason}`);
+    else setMsg('');
   }
 
   if (!data) return <div className="panel">{err ? <div className="error-box">{err}</div> : 'Scanning the business…'}</div>;
