@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, canKeepBooks } from '../../../../lib/auth';
 import { audit } from '../../../../lib/audit';
+import { nameTransfersFromEmail } from '../../../../lib/interac-names';
 import {
   listForCategorize, payeeGroups, categorizeStats, categorizeAccounts,
   bulkCategorize, annotateExpenses, markNeedsReview, restoreCategorized, idsForCategorize, EXPENSE_CATEGORIES
@@ -57,6 +58,13 @@ export async function POST(req) {
       const r = await restoreCategorized(b.rows);
       await audit(session, { action: 'expense.categorize.undo', entity: 'expense', summary: `Undid a bulk categorise of ${r.updated} transaction${r.updated === 1 ? '' : 's'}`, detail: { count: r.updated } });
       return NextResponse.json({ ok: true, ...r });
+    }
+    if (b.action === 'interac') {
+      const r = await nameTransfersFromEmail();
+      if (r.named?.length) {
+        await audit(session, { action: 'expense.interac-names', entity: 'expense', summary: `Named ${r.named.length} e-transfer${r.named.length === 1 ? '' : 's'} from Interac emails`, detail: { named: r.named } });
+      }
+      return NextResponse.json({ ...r, ok: !!r.ok, error: r.ok ? undefined : r.reason }, { status: r.ok ? 200 : 502 });
     }
     if (b.action === 'annotate') {
       const r = await annotateExpenses({ ids: b.ids, payee: b.payee, userNote: b.userNote });

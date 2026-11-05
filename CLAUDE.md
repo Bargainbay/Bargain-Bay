@@ -1764,6 +1764,17 @@ env vars are set, both idempotent via `expenses.ext_id`.
 - **`saveExpenseRule` had never worked**: its `ON CONFLICT (match_text)` did not match the unique index on `lower(match_text)`, so adding a rule, or accepting a suggested one, threw.
 - Not built: money-IN lines (e-transfers received are matched to orders on Payments in, not categorized here), per-payee keyboard shortcuts, and a receipt/attachment per line.
 
+### Who an e-transfer went to — from Interac's own email (added 2026-11-05)
+`lib/interac-names.js`, `/api/cron/interac-names` (hourly, heartbeat + `EXPECTED`), `listSubjects` in `lib/gmail.js`, **Find e-transfer recipients** on `/admin/categorize`,
+`test/interac-names.test.mjs`. TD's feed carries no recipient on `SEND E-TFR *nMU EXP`; the confirmation Interac emails the sender does
+("Your $1,356.00 transfer to OURR HOME & APPLIANCES has been successfully deposited", from `catch@payments.interac.ca`).
+- **Setup (owner):** those emails land in `rssolutionsincc@gmail.com`, a personal Gmail the app cannot read. Add a Gmail filter forwarding mail from `payments.interac.ca` to
+  `INTERAC_INBOX` (default `Service@rssolutions.ca`), and make sure that mailbox is on `SARAH_EMAIL_INBOXES` or `GMAIL_EXTRA_INBOXES` and covered by domain-wide delegation. Unreadable = a throttled (24h) email to Service@, and a 500 on the cron.
+- **IT NEVER GUESSES.** A line is named only when exactly ONE email has its amount within the date window (email from 1.5 days before to 8 days after the debit) AND exactly one line fits that email.
+  A dozen $500 transfers in a month stay blank. A name a person typed (`payee_override`) is never overwritten; each email is used once (`interac_used_emails` setting).
+- Only `source = 'plaid'` lines that look like an e-transfer SENT and have no payee are considered, from the last 75 days. The note on a named line says where the name came from.
+- Only the "has been successfully deposited" subject is parsed. A different wording from the bank would need another pattern in `parseInteracSent`.
+
 ## HST remittance — the Sales dashboard panel (added 2026-08-27)
 `hstOwed()` in `lib/analytics.js`, rendered by `components/TaxOwed.jsx` on
 `/admin/dashboard` directly under the revenue KPIs. Owner-only (`!salesOnly`),

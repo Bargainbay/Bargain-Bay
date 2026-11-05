@@ -117,6 +117,21 @@ export default function CategorizeWorkspace({ categories = [] }) {
       await Promise.all([load(false), loadMeta()]);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
+  // Interac emails the recipient of every e-transfer; the bank feed does not.
+  async function lookupRecipients() {
+    setBusy(true); setErr('');
+    try {
+      const d = await post({ action: 'interac' });
+      const n = d.named?.length || 0;
+      setNote({
+        text: n
+          ? `Named ${n} e-transfer${n === 1 ? '' : 's'} from Interac's emails${d.left ? `; ${d.left} still need a name from you (more than one email could match, or none arrived)` : ''}.`
+          : `No new names found (${d.emails} Interac email${d.emails === 1 ? '' : 's'} read, ${d.left} e-transfer${d.left === 1 ? '' : 's'} still unnamed).`,
+        undo: null
+      });
+      await Promise.all([load(false), loadMeta()]);
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
   async function reviewAgain(ids) {
     setBusy(true); setErr('');
     try { await post({ action: 'review_again', ids }); await Promise.all([load(false), loadMeta()]); }
@@ -161,7 +176,11 @@ export default function CategorizeWorkspace({ categories = [] }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, margin: '0 0 6px' }}>
         <h1 style={{ margin: 0 }}>Categorize transactions</h1>
-        <a href="/admin/financial" className="hint">← Financial health</a>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button className="dash-filter" disabled={busy} onClick={lookupRecipients}
+            title="Reads Interac's confirmation emails and fills in who each e-transfer went to">Find e-transfer recipients</button>
+          <a href="/admin/financial" className="hint">← Financial health</a>
+        </div>
       </div>
       {stats && (
         <div className="panel" style={{ marginBottom: 12 }}>
