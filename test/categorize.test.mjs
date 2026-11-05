@@ -298,3 +298,22 @@ test('A NEW RULE SORTS THE LINES ALREADY IN THE LEDGER, TAKES THEM OFF THE QUEUE
     equal(b.category, 'Other'); equal(b.cat_source, 'bulk');
   } finally { done(); }
 });
+
+suite('who it was sent to');
+
+test('A GROUP SAYS WHETHER THE BANK NAMES ANYONE, AND NAMING A LINE MOVES IT INTO THAT PERSON\'S GROUP', async () => {
+  const { done } = await withTestDb();
+  try {
+    await line('t1', { vendor: 'SEND E-TFR *nMU SUPP', bankDesc: 'SEND E-TFR *nMU SUPP', payee: null });
+    await line('t2', { vendor: 'SEND E-TFR *Vav SUPP', bankDesc: 'SEND E-TFR *Vav SUPP', payee: null });
+    await line('h', { payee: 'Big Way Hot Pot', vendor: 'Big Way Hot Pot', bankDesc: 'BIG WAY HOT POT' });
+    let g = (await payeeGroups({ status: 'review' })).groups;
+    equal(g.find((x) => x.key === 'send e tfr supp').named, 0, 'the bank says nothing about who');
+    equal(g.find((x) => x.key === 'big way hot pot').named, 1);
+    await annotateExpenses({ ids: [await idOf('t1')], payee: 'Ravi Appliances' });
+    g = (await payeeGroups({ status: 'review' })).groups;
+    equal(g.find((x) => x.key === 'send e tfr supp').count, 1, 'one transfer left unnamed');
+    const ravi = g.find((x) => x.key === 'ravi appliances');
+    equal(ravi.count, 1); equal(ravi.named, 1);
+  } finally { done(); }
+});
