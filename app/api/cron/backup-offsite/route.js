@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { runOffsiteBackup } from '../../../../lib/offsite-backup';
+import { runOffsiteBackup, summariseBackupFailure } from '../../../../lib/offsite-backup';
 import { cronAuthorized } from '../../../../lib/cron-auth';
 import { withHeartbeat } from '../../../../lib/heartbeat';
 
@@ -14,7 +14,7 @@ async function run(req) {
   if (!cronAuthorized(req)) return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
   try {
     const r = await runOffsiteBackup();
-    return NextResponse.json(r, { status: r.ok ? 200 : 500 });
+    return NextResponse.json(r.ok ? r : { ...r, error: summariseBackupFailure(r) }, { status: r.ok ? 200 : 500 });
   } catch (e) {
     console.error('cron backup-offsite failed', e?.message || e);
     return NextResponse.json({ ok: false, error: e?.message || 'failed' }, { status: 500 });

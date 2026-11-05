@@ -6,6 +6,7 @@ import { scanIssues, loadSnoozes } from '../../../../lib/manager-issues';
 import {
   startManagerCall, recentCalls, openNotes, ensureManagerSchema, callConfigured, managerTarget
 } from '../../../../lib/manager-call';
+import { planStaleClose, closeStaleStops, backupNow, cdaStatus } from '../../../../lib/manager-fixes';
 import { setSetting } from '../../../../lib/settings';
 import { query } from '../../../../lib/db';
 import { audit } from '../../../../lib/audit';
@@ -65,6 +66,23 @@ export async function POST(req) {
         await query('UPDATE manager_notes SET done_at = now() WHERE id = $1', [Number(body.id)]);
         return NextResponse.json({ ok: true });
       }
+      // Fix buttons: the same functions the phone call runs. Pressing one IS the
+      // owner's yes, so there is no second confirmation here.
+      case 'plan_stale': {
+        const p = await planStaleClose(body.mode === 'cancel_all' ? 'cancel_all' : 'auto');
+        return NextResponse.json({ total: p.total, done: p.done, cancel: p.cancel, skipped: p.skipped });
+      }
+      case 'close_stale': {
+        const r = await closeStaleStops({ mode: body.mode === 'cancel_all' ? 'cancel_all' : 'auto' });
+        await audit(s, { action: 'manager.close_stale', entity: 'jobs', summary: `Closed old stops: ${r.done} done, ${r.cancelled} cancelled, ${r.skipped.length} left alone`, detail: r });
+        return NextResponse.json({ ok: true, ...r });
+      }
+      case 'backup_now': {
+        const r = await backupNow();
+        return NextResponse.json({ ok: r.ok, reason: r.reason, dormant: r.dormant });
+      }
+      case 'cda_status':
+        return NextResponse.json(await cdaStatus());
       default:
         return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
     }

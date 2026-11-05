@@ -2415,6 +2415,16 @@ discrepancy or thing to work on, takes instructions by voice and fixes what it s
   staff too (it's a company name). Adding a **driver** stays `isAdmin` — that one
   is a real access grant.
 
+### It can FIX things now (added 2026-11-04)
+`lib/manager-fixes.js`. Tools: `stale_stops_preview` / `close_stale_stops` (two-turn yes), `run_backup_now`
+(two-turn yes), `cda_status`, `request_code_change` (writes `DEV: ...` to `manager_notes`). The Manager page has the
+same fixes as buttons ("Close them", "Run backup now").
+- **Old stops:** evidence (signature, photos or clock-in) -> `done` with NO invented finish time; no trace -> `cancelled`.
+  A stop with money reported against it or a balance owing is ALWAYS left alone and named. Each closure is in the stop's history.
+- **`summariseBackupFailure`:** the backup cron used to return 500 with the reason nested and no top-level `error`, so the
+  heartbeat stored an empty reason (625 failures, no cause). It now names it.
+- **Still cannot:** touch money, invoices, orders, prices, customers or drivers, or change code or secrets.
+
 ## Partial deliveries (added 2026-11-02)
 INV-1251 was a fridge and a stove; only the fridge went. The driver's close-out form has always had a per-item
 "delivered" tick, but **nothing read it**: the stop closed, the whole order went to Delivered, and re-dispatching the

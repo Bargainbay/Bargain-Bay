@@ -42,6 +42,20 @@ export default function VoiceManager() {
     load();
   }
 
+  async function closeStale() {
+    const p = await post({ action: 'plan_stale' });
+    if (!p) return;
+    const left = p.skipped.length;
+    if (!confirm(`Close ${p.total - left} old stops?\n${p.done} marked done (signature, photos or clock-in)\n${p.cancel} cancelled (no trace they happened)\n${left} left alone (money reported or owing)`)) return;
+    const r = await post({ action: 'close_stale' });
+    if (r) setMsg(`${r.done} marked done, ${r.cancelled} cancelled, ${r.skipped.length} left for you${r.failed.length ? `, ${r.failed.length} failed` : ''}.`);
+    load();
+  }
+  async function runBackup() {
+    const r = await post({ action: 'backup_now' });
+    if (r) setMsg(r.ok ? 'The backup ran fine.' : `The backup failed: ${r.reason}`);
+  }
+
   if (!data) return <div className="panel">{err ? <div className="error-box">{err}</div> : 'Scanning the business…'}</div>;
 
   return (
@@ -67,7 +81,9 @@ export default function VoiceManager() {
             <b>{i.title}</b>
             {i.detail && i.detail !== i.title && <div className="hint" style={{ whiteSpace: 'pre-line', marginTop: 4 }}>{i.detail}</div>}
             <div style={{ marginTop: 6 }}>
-              {i.link && <a className="btn" href={i.link}>Fix it</a>}{' '}
+              {i.key === 'dispatch-loose-ends' && <button className="btn primary" disabled={busy} onClick={closeStale}>Close them</button>}{' '}
+              {i.key.startsWith('health-backup-offsite') && <button className="btn primary" disabled={busy} onClick={runBackup}>Run backup now</button>}{' '}
+              {i.link && <a className="btn" href={i.link}>Open</a>}{' '}
               <button className="btn" disabled={busy} onClick={async () => { await post({ action: 'snooze', key: i.key, days: 3 }); load(); }}>Snooze 3 days</button>
             </div>
           </div>
