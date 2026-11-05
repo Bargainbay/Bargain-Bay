@@ -1723,6 +1723,21 @@ env vars are set, both idempotent via `expenses.ext_id`.
   production keys are DIFFERENT keys: switching worlds means replacing both
   secrets, not just flipping `QBO_ENV`.
 
+### Bank balances, and splitting one bank line (added 2026-11-04)
+`plaidBalances` (lib/plaid.js, `POST /api/admin/plaid` action `balances`), shown in `PlaidPanel`; `splitExpense` / `unsplitExpense`
+(lib/finance.js, `PATCH /api/admin/expenses` actions `split` / `unsplit`), **Split** / **Undo split** on each row of Operating expenses,
+`test/expense-split.test.mjs`.
+- **Balances use `/accounts/get`** (the balance Plaid last saw, refreshed with each transactions update, no per-call charge), NOT
+  `/accounts/balance/get` (asks the bank live, billed per call). The panel prints "as of" and says it can run hours behind the banking app.
+  A credit card's balance is what is OWED and is kept out of the "total in bank accounts" line.
+- **A split is checked in whole cents against the bank's charge** (amount + tax) and nothing is written if it is off. The parent row stays and keeps
+  part 1; the other parts are new rows with ext_id `<parent>#s2`... Each part picks its own category and HST mode (13% inside / none / decide later).
+- **The record of a split lives in the `expense_splits` setting** (`{ parentId: { extId, orig, children } }`), because the bank feed re-sends a changed
+  transaction and `syncPlaidTransactions` would otherwise write the full amount back over part 1 and count the charge twice. The sync loads
+  `splitExtIds()` once and skips those lines; a bank-retracted charge, or deleting the parent, deletes the whole family. **Undo** restores the line
+  exactly as the bank sent it (from `orig`). A part cannot be split again.
+- The Operating expenses table now loads 1,000 lines (it was 100, whatever the period tab said), with a search box and "show 100 more".
+
 ## HST remittance — the Sales dashboard panel (added 2026-08-27)
 `hstOwed()` in `lib/analytics.js`, rendered by `components/TaxOwed.jsx` on
 `/admin/dashboard` directly under the revenue KPIs. Owner-only (`!salesOnly`),

@@ -1,7 +1,7 @@
 // Operating expenses CRUD (one-off + recurring templates). Admin-only.
 import { NextResponse } from 'next/server';
 import { getSession, canKeepBooks } from '../../../../lib/auth';
-import { listExpenses, addExpense, updateExpense, deleteExpense, bulkSetExpenseTax,
+import { listExpenses, addExpense, updateExpense, deleteExpense, bulkSetExpenseTax, splitExpense, unsplitExpense,
          listRecurringExpenses, addRecurringExpense, deleteRecurringExpense } from '../../../../lib/finance';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ async function admin() { return canKeepBooks(await getSession()); }
 
 export async function GET() {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
-  const [expenses, recurring] = await Promise.all([listExpenses(), listRecurringExpenses()]);
+  const [expenses, recurring] = await Promise.all([listExpenses(1000), listRecurringExpenses()]);
   return NextResponse.json({ expenses, recurring });
 }
 
@@ -50,6 +50,19 @@ export async function PATCH(req) {
       return NextResponse.json({ ok: true, ...r });
     } catch (e) {
       return NextResponse.json({ error: e?.message || 'Could not save.' }, { status: 500 });
+    }
+  }
+
+  // One bank line becomes several, or goes back to one.
+  if (b.action === 'split' || b.action === 'unsplit') {
+    const sid = Number(b.id);
+    if (!sid) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    try {
+      if (b.action === 'split') await splitExpense(sid, b.parts);
+      else await unsplitExpense(sid);
+      return NextResponse.json({ ok: true });
+    } catch (e) {
+      return NextResponse.json({ error: e?.message || 'Could not save.' }, { status: 400 });
     }
   }
 
