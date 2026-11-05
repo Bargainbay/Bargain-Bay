@@ -142,6 +142,16 @@ export default async function FinancialDashboardPage({ searchParams }) {
         </div>
       )}
 
+      {plaid.connected && (
+        <div className="panel" style={{ marginTop: 18, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 320px' }}>
+            <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Categorize transactions</h2>
+            <p className="hint" style={{ margin: '4px 0 0' }}>Go through the bank feed by payee, see who each one went to and the memo, and sort many at once.</p>
+          </div>
+          <a className="btn accent" href="/admin/categorize">Open the categorizer →</a>
+        </div>
+      )}
+
       {/* The review queue sits directly under the feed that fills it: an
           imported row claims no input tax credit until somebody says what tax
           was inside it, and this is where thousands of them get answered. */}
