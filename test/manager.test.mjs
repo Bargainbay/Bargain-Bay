@@ -122,7 +122,7 @@ test('snooze, notes and issue detail work, and bad keys are refused', async () =
 test('the agent has no tool that can touch money, orders or customers', async () => {
   const src = (await import('node:fs')).readFileSync(new URL('../lib/manager-call.js', import.meta.url), 'utf8');
   const names = [...src.matchAll(/name: '([a-z_]+)',\n\s+description/g)].map((m) => m[1]).sort();
-  equal(names, ['add_note', 'email_details', 'end_call', 'issue_details', 'run_inventory_sync', 'set_photo_from_model', 'snooze_issue']);
+  equal(names, ['add_note', 'cda_status', 'close_stale_stops', 'email_details', 'end_call', 'issue_details', 'request_code_change', 'run_backup_now', 'run_inventory_sync', 'set_photo_from_model', 'snooze_issue', 'stale_stops_preview']);
   assert(!/from '\.\/(invoices|orders|refunds|payments|customers|jobs)'/.test(src.replace(/import \{ scanIssues[^\n]*/, '')));
 });
 
@@ -150,4 +150,44 @@ test('the scan finds missing photos and bad prices, and a check that throws beco
       assert(after.issues.some((i) => i.key === 'scan-applications'), after.issues.map((i) => i.key).join());
     });
   } finally { globalThis.fetch = realFetch; }
+});
+
+suite('manager fixes');
+test('which stale stops are closed, cancelled or left alone', async () => {
+  const { decideStop } = await import('../lib/manager-fixes.js');
+  const base = { reported: 0, balanceDue: 0, hasSignature: false, photoCount: 0, timeIn: null };
+  equal(decideStop(base, 'auto').act, 'cancel');
+  equal(decideStop({ ...base, hasSignature: true }, 'auto').act, 'done');
+  equal(decideStop({ ...base, timeIn: 'x' }, 'auto').act, 'done');
+  equal(decideStop({ ...base, hasSignature: true }, 'cancel_all').act, 'cancel');
+  equal(decideStop({ ...base, reported: 50, hasSignature: true }, 'cancel_all').act, 'skip');
+  equal(decideStop({ ...base, balanceDue: 10 }, 'auto').act, 'skip');
+});
+test('closing stale stops needs a yes, closes the safe ones, and leaves money alone', async () => {
+  await withDb(async (client) => {
+    const { ensureJobSchema } = await import('../lib/jobs.js');
+    await ensureJobSchema();
+    await client.query(`INSERT INTO jobs (job_number, type, status, job_date, customer_name, address, signature_path)
+      VALUES ('RS-T1','delivery','scheduled','2020-01-01','No trace','1 St',NULL),
+             ('RS-T2','delivery','on_the_way','2020-01-02','Signed','2 St','sig/x.png'),
+             ('RS-T3','delivery','scheduled','2020-01-03','Money','3 St',NULL),
+             ('RS-T4','delivery','scheduled','2999-01-01','Future','4 St',NULL)`);
+    const t3 = (await client.query("SELECT id FROM jobs WHERE job_number='RS-T3'")).rows[0].id;
+    await client.query("INSERT INTO job_collections (job_id, amount, method, status) VALUES ($1, 100, 'cash', 'pending')", [t3]);
+    const call = await startManagerCall({ trigger: 'manual', scan: { issues: [], hidden: 0 } }).catch(() => null);
+    const id = call?.callId || (await client.query("INSERT INTO manager_calls (to_number, trigger, status, issues) VALUES ('x','manual','ringing','{}') RETURNING id")).rows[0].id;
+    const first = await runTool(id, 'close_stale_stops', {}, { turn: 1 });
+    assert(first.needs_confirmation, 'proposed, not run');
+    equal((await client.query("SELECT count(*)::int n FROM jobs WHERE status='scheduled' OR status='on_the_way'")).rows[0].n, 4);
+    const second = await runTool(id, 'close_stale_stops', {}, { turn: 2 });
+    assert(second.ok, JSON.stringify(second));
+    const st = Object.fromEntries((await client.query('SELECT job_number, status FROM jobs')).rows.map((r) => [r.job_number, r.status]));
+    equal(st['RS-T1'], 'cancelled'); equal(st['RS-T2'], 'done');
+    equal(st['RS-T3'], 'scheduled'); equal(st['RS-T4'], 'scheduled');   // owed money / not yet due: untouched
+  });
+});
+test('a failing backup is explained, not blank', async () => {
+  const { summariseBackupFailure } = await import('../lib/offsite-backup.js');
+  assert(summariseBackupFailure({ ok: false, tracker: { error: 'Service Accounts do not have storage quota' }, blobs: { failed: 2, errors: ['a: boom'] } }).includes('storage quota'));
+  assert(summariseBackupFailure({ ok: false }).length > 0);
 });
