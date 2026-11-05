@@ -323,6 +323,11 @@ function GroupCard({ g, catList, busy, qs, onApply, onAnnotate }) {
             {g.accounts.length > 0 && ` · ${g.accounts.join(', ')}`}
           </div>
           {g.samples.length > 0 && <div style={{ ...muted, marginTop: 2, wordBreak: 'break-word' }}>{g.samples.join('  ·  ')}</div>}
+          {g.named === 0 && (
+            <div style={{ ...muted, marginTop: 4 }}>
+              The bank does not say who these went to. Open the lines and type a name for each; a named line moves into that person&apos;s group.
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           <select value={category} onChange={(e) => setCategory(e.target.value)} style={inp}>
@@ -344,7 +349,9 @@ function GroupCard({ g, catList, busy, qs, onApply, onAnnotate }) {
         {g.suggest && category !== g.suggest && (
           <button className="dash-filter" onClick={() => setCategory(g.suggest)}>Suggested: {g.suggest} ({g.suggestN} earlier)</button>
         )}
-        <button className="dash-filter" onClick={showLines}>{open ? 'Hide lines' : 'Show lines'}</button>
+        <button className={`dash-filter${g.named === 0 && !open ? ' active' : ''}`} onClick={showLines}>
+          {open ? 'Hide lines' : g.named === 0 ? 'Show lines & name them' : 'Show lines'}
+        </button>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Who is this? (type a name)" style={{ ...inp, width: 190 }} />
         {name.trim() && <button className="dash-filter" disabled={busy} onClick={() => { onAnnotate(g.ids, { payee: name.trim() }); setName(''); }}>Name all {g.count}</button>}
       </div>
@@ -355,7 +362,12 @@ function GroupCard({ g, catList, busy, qs, onApply, onAnnotate }) {
               {(lines || []).map((r) => (
                 <tr key={r.id}>
                   <td style={{ whiteSpace: 'nowrap' }}>{r.date}</td>
-                  <td>{r.bankDesc || r.vendor}{r.memo && <div style={muted}>{r.memo}</div>}</td>
+                  <td>
+                    {r.bankDesc || r.vendor}{r.memo && <div style={muted}>{r.memo}</div>}
+                    <div style={{ marginTop: 3 }}>
+                      <WhoInput r={r} busy={busy} width={240} onSave={async (name) => { await onAnnotate([r.id], { payee: name }); setLines((ls) => (ls || []).filter((x) => x.id !== r.id)); }} />
+                    </div>
+                  </td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(r.gross)}</td>
                 </tr>
               ))}
@@ -396,6 +408,11 @@ function LineRow({ r, i, checked, onToggle, catList, busy, onCategory, onAnnotat
             {r.label}{r.payeeOverride && <span className="pill" style={{ fontSize: 10, marginLeft: 6 }}>named</span>}
           </div>
           {r.bankDesc && r.bankDesc !== r.label && <div style={{ ...muted, wordBreak: 'break-word' }}>{r.bankDesc}</div>}
+          {!r.payee && (
+            <div style={{ marginTop: 4 }}>
+              <WhoInput r={r} busy={busy} onSave={(name) => onAnnotate([r.id], { payee: name })} />
+            </div>
+          )}
           {r.memo && <div style={{ ...muted, fontStyle: 'italic' }}>Memo: {r.memo}</div>}
           {r.userNote && <div style={{ ...muted }}>Note: {r.userNote}</div>}
           <button className="dash-filter" style={{ marginTop: 3, fontSize: 11 }} onClick={() => setOpen(!open)}>{open ? 'Close' : 'Details / who / note'}</button>
@@ -433,5 +450,24 @@ function LineRow({ r, i, checked, onToggle, catList, busy, onCategory, onAnnotat
         </tr>
       )}
     </>
+  );
+}
+
+
+// "Who was this sent to?" Banks like TD do not put the recipient on an e-transfer
+// (only a reference code and the memo the sender typed), so for those lines it is
+// typed here: Enter or leaving the box saves it, and the line then belongs to that
+// person's group.
+function WhoInput({ r, busy, onSave, width = 210 }) {
+  const [v, setV] = useState(r.payeeOverride || '');
+  function commit() {
+    const t = v.trim();
+    if (t !== (r.payeeOverride || '')) onSave(t);
+  }
+  return (
+    <input value={v} disabled={busy} onChange={(e) => setV(e.target.value)} onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+      placeholder="Who was this sent to? Type a name, Enter"
+      style={{ ...inp, width, borderStyle: r.payeeOverride ? 'solid' : 'dashed' }} />
   );
 }
