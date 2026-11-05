@@ -4985,6 +4985,13 @@ Caption rules (owner, 2026-11-05): a description + features block comes BEFORE t
 by model, hand-checked facts only, then `data/specs.json`, then only what the title states); a Refurbished unit says a 3-MONTH warranty
 here (`fbWarrantyMonths`, Facebook captions only, the site is unchanged); no pickup address in the caption.
 
+## Refurbished = 3-month warranty (added 2026-11-05, owner)
+`REFURBISHED_WARRANTY_MONTHS` in `lib/constants.js`. `decorate()` (lib/pricing.js) and `applyClearance` (lib/clearance.js) cap a unit whose
+condition is `Refurbished` at 3 months, whatever the clearance row says; the product page, `withWarranty`, the Meta feed and the Facebook kit all
+follow. Every other condition keeps its own (default 12). Policy text updated on /policies/returns, /policies/terms, /refurbished and the footer.
+**Not changed:** the home/layout meta descriptions, order emails and the marketplace/affiliate pages still say "one-year" generically; the
+marketplace sellers' own warranty rules are untouched.
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
 
