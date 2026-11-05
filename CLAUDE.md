@@ -4981,6 +4981,9 @@ Marketplace BY HAND from the phone; this only prepares title / caption / price /
 because manufacturer CDNs send no CORS headers; a photo a CDN refuses is reported, not silently dropped. "Posted" ticks live in
 the browser's localStorage only. A unit that sells must be taken down on Facebook by hand. The bigger design (per-account queue,
 AI copy, retail screenshots, Mac Mini) was deliberately NOT built.
+Caption rules (owner, 2026-11-05): a description + features block comes BEFORE the condition (`fbDescription`: `data/fb-features.json`
+by model, hand-checked facts only, then `data/specs.json`, then only what the title states); a Refurbished unit says a 3-MONTH warranty
+here (`fbWarrantyMonths`, Facebook captions only, the site is unchanged); no pickup address in the caption.
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.

@@ -33,3 +33,17 @@ test('zip has the right signatures and entry count', () => {
   equal(z.readUInt32LE(z.length - 22), 0x06054b50);
   equal(z.readUInt16LE(z.length - 22 + 10), 2);
 });
+
+test('refurbished is 3 months, others keep theirs, and there is no pickup address', () => {
+  const r = fbListing({ ...unit, condition: 'Refurbished' }).caption;
+  assert(r.includes('3-month warranty'));
+  assert(fbListing(unit).caption.includes('one-year warranty'));
+  assert(!/Squires|pickup/i.test(r));
+});
+
+test('a description and features come before the condition', () => {
+  const c = fbListing({ ...unit, model: 'EX305CCO' }).caption;
+  assert(c.includes('Features:') && c.indexOf('Features:') < c.indexOf('Condition:'));
+  const plain = fbListing(unit).caption;
+  assert(plain.indexOf('30-inch') > -1 && plain.indexOf('30-inch') < plain.indexOf('Condition:'));
+});
