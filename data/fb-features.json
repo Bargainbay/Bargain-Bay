@@ -1,0 +1,11 @@
+{
+  "_note": "Facebook listing descriptions by MODEL number. Only put facts confirmed from the manufacturer's page. Falls back to data/specs.json, then to what the title states.",
+  "EX305CCO": {
+    "summary": "Upright carpet and upholstery cleaner with StainStriker stain-fighting technology.",
+    "features": [
+      "StainStriker technology to lift tough stains",
+      "HairPro technology to lift embedded pet hair",
+      "Built-in handheld spot and stain tool for stairs, upholstery and more"
+    ]
+  }
+}
