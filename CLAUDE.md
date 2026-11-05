@@ -1738,6 +1738,32 @@ env vars are set, both idempotent via `expenses.ext_id`.
   exactly as the bank sent it (from `orig`). A part cannot be split again.
 - The Operating expenses table now loads 1,000 lines (it was 100, whatever the period tab said), with a search box and "show 100 more".
 
+### Categorizing the bank feed at scale (added 2026-11-05)
+`/admin/categorize` (admin + granted accountant), `components/CategorizeWorkspace.jsx`, `/api/admin/categorize`, `lib/payee.js` (NO imports),
+`listForCategorize` / `payeeGroups` / `bulkCategorize` / `restoreCategorized` / `annotateExpenses` in `lib/finance.js`, migration `0052_expense_categorize`,
+`test/categorize.test.mjs`. Linked from the Financial page (once a bank is connected) and the Reports hub.
+- **The unit of work is the PAYEE, not the line.** `payeeKey` strips what is unique to one transaction (`*nMU` reference codes, `#7045` store numbers, long
+  merchant ids) so every "Home Depot" is one group and TD's `SEND E-TFR *nMU EXP` / `*Vav EXP` fold into one "send e tfr exp" group. A thousand lines become a few
+  dozen decisions. The same code runs on the server and in the browser (no imports), so a group on screen is the group applied.
+- **TD e-transfers carry NO recipient name.** The descriptor is a per-transfer reference code plus the memo the owner typed (EXP, SUPP). So "who was it sent to"
+  is a field a person types (`payee_override`, "Who is this?"): it wins over the bank's name, is written to `vendor`, and the sync never overwrites it. Name a whole group at once.
+- **The queue is `reviewed_at IS NULL`, not "category is blank"**: the bank's guess fills a category on arrival, so a blank test finds nothing. `cat_source`: `rule` (the
+  owner's own rule, counts as decided), `guess` (Plaid's category or "Other", needs a person), `manual` / `bulk` (a person decided), `qbo`. Non-bank rows are reviewed on creation.
+- **A person's decision is never undone by the bank re-sending the line** (`upsertExpense`): `manual`/`bulk` category and status are kept, and when the charge's total
+  is unchanged the cost/HST split someone worked out is kept too. This also fixed an older bug: a re-sent line wrote the gross back over a pre-tax amount that still carried
+  its tax, counting the HST twice. A changed charge takes the bank's figure and goes back to "HST not set".
+- **What the bank said is kept** (`expenses.bank` jsonb + `payee`, `bank_desc`, `memo`, `account_label`): counterparties, payment_meta (reason, reference), original description,
+  its category guess and confidence, location. The Sync asks for `include_original_description`. **Existing lines are filled in by a one-off re-read** (`DETAILS_V` on the item in
+  `plaid_items`): the cursor restarts, and while it runs `fillExpenseDetails` only UPDATES lines we already hold, so a line somebody deleted does not come back and nothing a person decided changes.
+- **Bulk apply sets category and HST in one statement** (`taxMode` hst / none / review / leave), mirroring `splitGross`. "Remember this payee" saves a rule only from
+  `rulePrefix` (text literally in the descriptor, before any code or number) and never for a bare transfer ("send e-tfr" would sweep up every transfer). The response carries what
+  each line was, and **Undo** restores it (rules the action saved stay; remove them under Sorting rules). Every bulk action and undo is in the audit log.
+- **One category list** (`EXPENSE_CATEGORIES`) = the Costs section's wording plus Fuel / delivery, Wages, Tools / supplies, Other, Loan repayment, Owner draw. Marketing and Fees were
+  merged into Advertising and Card & bank fees (migration + the schema's runtime pass rename saved rows and rules). **Interest is "Interest charges", not "Loan interest"**: the ledger
+  routes any category matching /loan|repayment/ to the loan liability, and interest is a cost.
+- **`saveExpenseRule` had never worked**: its `ON CONFLICT (match_text)` did not match the unique index on `lower(match_text)`, so adding a rule, or accepting a suggested one, threw.
+- Not built: money-IN lines (e-transfers received are matched to orders on Payments in, not categorized here), per-payee keyboard shortcuts, and a receipt/attachment per line.
+
 ## HST remittance — the Sales dashboard panel (added 2026-08-27)
 `hstOwed()` in `lib/analytics.js`, rendered by `components/TaxOwed.jsx` on
 `/admin/dashboard` directly under the revenue KPIs. Owner-only (`!salesOnly`),
