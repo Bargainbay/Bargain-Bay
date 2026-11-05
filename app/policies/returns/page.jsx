@@ -9,7 +9,7 @@ export default function ReturnsPage() {
         prices. Every unit is bench-tested before it&apos;s listed, and its condition — including any cosmetic
         imperfections — is described on the product page. Because these are discounted liquidation items, our
         return terms differ from a full-price retailer. That said, we stand behind everything we sell with a{' '}
-        <b>one-year functional warranty</b> and the protections below.
+        <b>one-year functional warranty</b> (3 months on refurbished units) and the protections below.
       </p>
 
       <h2>Inspect your item right away</h2>
@@ -71,6 +71,10 @@ export default function ReturnsPage() {
         Every covered appliance includes a <b>one-year warranty</b>: if it stops working under normal household
         use within one year of purchase, we will repair or replace it. The warranty covers functional failure —
         not cosmetic wear, customer damage, or improper installation.
+      </p>
+      <p>
+        <b>Refurbished units carry a 3-month warranty</b> on the same terms: if one stops working under normal
+        household use within three months of purchase, we will repair or replace it.
       </p>
 
       <h2>Items sold by marketplace sellers</h2>

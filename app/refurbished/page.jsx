@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = {
   title: 'Refurbished Appliances — Inspected, Repaired & Bench-Tested | Bargain Bay',
   description:
-    'Refurbished appliances at Bargain Bay — professionally inspected, repaired where needed and bench-tested back to full working order, with a one-year warranty. Pickup, delivery & freight serving Pickering, Scarborough and the GTA.'
+    'Refurbished appliances at Bargain Bay — professionally inspected, repaired where needed and bench-tested back to full working order, with a 3-month warranty. Pickup, delivery & freight serving Pickering, Scarborough and the GTA.'
 };
 
 // Same source and same filter as the Condition dropdown on /shop, so the two can
@@ -30,8 +30,8 @@ export default async function RefurbishedPage() {
           <span className="clearance-kicker">Refurbished</span>
           <h1>Inspected, repaired and bench-tested.</h1>
           <p>
-            {CONDITIONS.Refurbished} Every refurbished appliance is backed by our full{' '}
-            <b>one-year warranty</b>. One of each — when it&apos;s gone, it&apos;s gone.
+            {CONDITIONS.Refurbished} Every refurbished appliance is backed by a{' '}
+            <b>3-month warranty</b>. One of each — when it&apos;s gone, it&apos;s gone.
           </p>
         </div>
       </section>

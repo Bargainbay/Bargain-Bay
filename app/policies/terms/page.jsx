@@ -52,7 +52,7 @@ export default function TermsPage() {
 
       <h2>7. Condition, warranty &amp; returns</h2>
       <p>
-        Items are sold in the condition described, and include a <b>one-year functional warranty</b>. Returns are
+        Items are sold in the condition described, and include a <b>one-year functional warranty</b> (3 months for refurbished units). Returns are
         handled per our <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; Refund Policy</a>.
         Except as set out in those documents and as required by law, items are sold &quot;as-is&quot; with respect
         to cosmetic condition.
