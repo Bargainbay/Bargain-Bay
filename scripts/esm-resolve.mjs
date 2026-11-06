@@ -15,7 +15,10 @@ import { fileURLToPath } from 'node:url';
 // Modules the test runner substitutes. ONLY active when BB_TEST_STUBS is set,
 // which `npm test` does and `npm run migrate` does not — a resolver used by a
 // production script must not quietly swap a real module for a fake one.
-const TEST_STUBS = { 'next/headers': '../test/stubs/next-headers.mjs' };
+const TEST_STUBS = {
+  'next/headers': '../test/stubs/next-headers.mjs',
+  '@vercel/blob': '../test/stubs/vercel-blob.mjs'
+};
 
 export async function resolve(specifier, context, next) {
   if (process.env.BB_TEST_STUBS === '1' && TEST_STUBS[specifier]) {
