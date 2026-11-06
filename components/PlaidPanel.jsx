@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 // Bank feed panel on the Financial dashboard. Three states, same shape as the
@@ -37,6 +37,8 @@ export default function PlaidPanel({ status }) {
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  // Account balances, read from Plaid once the panel is on screen.
+  const [bal, setBal] = useState(null); // null = loading, { accounts, errors }
 
   async function post(body) {
     const res = await fetch('/api/admin/plaid', {
@@ -46,6 +48,16 @@ export default function PlaidPanel({ status }) {
     if (!res.ok) throw new Error(d.error || 'That failed.');
     return d;
   }
+
+  useEffect(() => {
+    if (!connected) return undefined;
+    let live = true;
+    post({ action: 'balances' })
+      .then((d) => { if (live) setBal({ accounts: d.accounts || [], errors: d.errors || [] }); })
+      .catch((e) => { if (live) setBal({ accounts: [], errors: [e.message] }); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, lastSync]);
 
   // itemId set = re-authenticating a connection whose bank login expired.
   async function link(itemId = null) {
@@ -118,6 +130,8 @@ export default function PlaidPanel({ status }) {
         {env === 'sandbox' && <b style={{ color: 'var(--danger)' }}> · Plaid is in SANDBOX — this is test data, not your bank.</b>}
       </p>
 
+      {connected && <Balances bal={bal} />}
+
       {institutions.length > 0 && (
         <div className="table-wrap" style={{ margin: '10px 0' }}>
           <table className="admin">
@@ -168,6 +182,48 @@ export default function PlaidPanel({ status }) {
 
       {msg && <div className="notice-box" style={{ marginTop: 10 }}>{msg}</div>}
       {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
+    </div>
+  );
+}
+
+
+const cad = (v, cur) => (v == null ? '—' : new Intl.NumberFormat('en-CA', { style: 'currency', currency: cur || 'CAD' }).format(v));
+
+// What the bank says is in each account. A card's "current" is what is OWED, so
+// it is labelled that way and kept out of the cash total.
+function Balances({ bal }) {
+  if (!bal) return <p className="hint" style={{ margin: '10px 0' }}>Reading balances…</p>;
+  const { accounts, errors } = bal;
+  const cash = accounts.filter((a) => a.type === 'depository');
+  const total = cash.reduce((t, a) => t + (a.current || 0), 0);
+  return (
+    <div style={{ margin: '10px 0' }}>
+      {accounts.length > 0 && (
+        <div className="table-wrap">
+          <table className="admin">
+            <thead><tr><th>Account</th><th style={{ textAlign: 'right' }}>Balance</th><th style={{ textAlign: 'right' }}>Available</th><th>As of</th></tr></thead>
+            <tbody>
+              {accounts.map((a) => (
+                <tr key={a.accountId}>
+                  <td><b>{a.institution}</b> · {a.name}{a.mask ? ` ····${a.mask}` : ''}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                    {cad(a.current, a.currency)}{a.type === 'credit' && <span className="hint" style={{ fontSize: 11 }}> owed</span>}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{a.type === 'credit' ? '—' : cad(a.available, a.currency)}</td>
+                  <td style={{ fontSize: 12, color: 'var(--muted)' }}>{a.asOf ? new Date(a.asOf).toLocaleString('en-CA') : 'recent'}</td>
+                </tr>
+              ))}
+              {cash.length > 1 && (
+                <tr><td><b>Total in bank accounts</b></td><td style={{ textAlign: 'right', fontWeight: 700 }}>{cad(total, 'CAD')}</td><td /><td /></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="hint" style={{ margin: '6px 0 0' }}>
+        The bank&apos;s balance as of its last update, refreshed with each new batch of transactions — it can run a few hours behind your banking app.
+      </p>
+      {errors.length > 0 && <div className="error-box" style={{ marginTop: 8 }}>{errors.join(' · ')}</div>}
     </div>
   );
 }

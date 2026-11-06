@@ -89,7 +89,7 @@ export default async function ClientJob({ params, searchParams }) {
       {j.items.length > 0 && (
         <div className="cp-panel">
           <h2>Items</h2>
-          <table>
+          <div className="cp-scroll"><table>
             <thead><tr><th>Item</th><th>SKU / Model</th><th style={{ width: 70 }}>Qty</th>{closed && <th style={{ width: 90 }}>Delivered</th>}</tr></thead>
             <tbody>
               {j.items.map((it, i) => (
@@ -97,7 +97,7 @@ export default async function ClientJob({ params, searchParams }) {
                   {closed && <td>{it.delivered == null ? '—' : it.delivered ? '✓ Yes' : '✗ Not delivered'}</td>}</tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
 
@@ -115,7 +115,7 @@ export default async function ClientJob({ params, searchParams }) {
             </div>
             {f.explanation && <p style={{ marginTop: 12 }}><b>Customer / driver explanation:</b> {f.explanation}</p>}
             {podItems.length > 0 && (
-              <table style={{ marginTop: 10 }}>
+              <div className="cp-scroll"><table style={{ marginTop: 10 }}>
                 <thead><tr><th>Item</th><th>Serial number</th><th style={{ width: 90 }}>Delivered</th><th>Notes</th></tr></thead>
                 <tbody>
                   {podItems.map((it, i) => (
@@ -127,7 +127,7 @@ export default async function ClientJob({ params, searchParams }) {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             )}
             {j.hasSignature && (
               <div style={{ marginTop: 14 }}>

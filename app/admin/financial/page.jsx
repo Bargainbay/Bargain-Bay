@@ -39,7 +39,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
   let d = null, expenses = [], recurring = [], unreviewed = [], rules = [], ledgerStart = '', suggestions = [], error = '';
   try {
     [d, expenses, recurring, unreviewed, rules, ledgerStart, suggestions] = await Promise.all([
-      financialDashboard(period), listExpenses(), listRecurringExpenses(),
+      financialDashboard(period), listExpenses(1000), listRecurringExpenses(),
       listUnreviewedExpenses().catch(() => []),
       listExpenseRules().catch(() => []),
       getLedgerStart().catch(() => ''),
@@ -139,6 +139,16 @@ export default async function FinancialDashboardPage({ searchParams }) {
             {plaid.connected && <span className="pill ok" style={{ marginLeft: 8, fontSize: 11 }}>connected</span>}
           </h2>
           <PlaidPanel status={plaid} />
+        </div>
+      )}
+
+      {plaid.connected && (
+        <div className="panel" style={{ marginTop: 18, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 320px' }}>
+            <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Categorize transactions</h2>
+            <p className="hint" style={{ margin: '4px 0 0' }}>Go through the bank feed by payee, see who each one went to and the memo, and sort many at once.</p>
+          </div>
+          <a className="btn accent" href="/admin/categorize">Open the categorizer →</a>
         </div>
       )}
 

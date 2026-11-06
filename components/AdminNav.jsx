@@ -11,6 +11,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
   const all = [
     { key: 'dashboard', label: 'Dashboards', href: '/admin/dashboard', sales: true },
     { key: 'copilot', label: 'Sarah', href: '/admin/agent' },
+    { key: 'manager', label: 'Manager', href: '/admin/manager' },
     { key: 'bookings', label: 'Bookings', href: '/admin/bookings', sales: true },
     { key: 'quotes', label: 'Quotes', href: '/admin/quotes', sales: true },
     { key: 'invoices', label: 'Invoices', href: '/admin/invoices', sales: true },
@@ -26,6 +27,8 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     { key: 'intake', label: 'Intake', href: '/admin/intake', sales: true },
     // The pictures the site shows: a stock photo per model, our own per unit.
     { key: 'photos', label: 'Photos', href: '/admin/photos', sales: true },
+    // Ready-to-post Facebook Marketplace listings (title, caption, photos) for every unit on sale.
+    { key: 'fb-listings', label: 'Facebook', href: '/admin/fb-listings', sales: true },
     // Where every unit is standing, and the stickers that say so. Staff: finding
     // the fridge for the customer at the counter is a selling job.
     { key: 'warehouse', label: 'Warehouse', href: '/admin/warehouse', sales: true },
@@ -64,6 +67,9 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // The cost list that feeds it is one click from that page.
     { key: 'daily-pnl', label: 'Daily P&L', href: '/admin/daily-pnl' },
     { key: 'reports', label: 'Reports', href: '/admin/reports' },
+    // The agent village is its own section: a game-style view of every job and
+    // assistant, not a report. Admin only.
+    { key: 'village', label: 'Village', href: '/admin/agent-floor' },
     { key: 'operations', label: 'Operations', href: '/admin/operations' }
   ];
   // An accountant gets the books and nothing else — no operations, no dispatch,

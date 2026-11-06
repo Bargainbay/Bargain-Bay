@@ -4,7 +4,7 @@ import { getSession, isAdmin, isStaff, validEmail, normalizeEmail } from '../../
 import { hasDb, query } from '../../../../lib/db';
 import { stockRuleProblem } from '../../../../lib/stock-reconcile';
 import { createAndSendInvoice, priceInvoice, listInvoices, listInvoiceAuthors, markInvoicePaid, voidInvoice, refundInvoice, refundInvoiceItems, refundInvoiceAmount, deleteInvoice,
-         updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, voidInvoicePayment, PAYMENT_METHODS } from '../../../../lib/invoices';
+         updateInvoice, resendInvoice, backfillInvoiceOrder, backfillAllInvoiceOrders, recordInvoicePayment, voidInvoicePayment, applyStoreCreditToInvoice, PAYMENT_METHODS } from '../../../../lib/invoices';
 import { confirmDoorCollection, rejectDoorCollection } from '../../../../lib/door-money';
 import { QUICK_SALE_EMAIL } from '../../../../lib/constants';
 import { consignmentFloorProblem } from '../../../../lib/consignment';
@@ -225,7 +225,8 @@ export async function PATCH(req) {
         ...(has('city') ? { city: body.city } : {}),
         ...(has('postal') ? { postal: body.postal } : {}),
         ...(has('leadSource') ? { leadSource: body.leadSource } : {}),
-        ...(has('leadBy') ? { leadBy: body.leadBy } : {})
+        ...(has('leadBy') ? { leadBy: body.leadBy } : {}),
+        ...(has('brand') ? { brand: body.brand } : {})
       });
       // Optionally re-email the customer the updated invoice. The save already
       // succeeded, so a mail failure is reported as a warning, not an error.
@@ -271,11 +272,16 @@ export async function PATCH(req) {
     // Whoever is signed in owns the refund, same rule as invoice creation: taken
     // from the session, never from the body.
     const actor = (await getSession())?.email || null;
+    if (body.action === 'apply_credit') {
+      const r = await applyStoreCreditToInvoice(invoiceId, body.code, { amount: body.amount, by: actor });
+      await audit(await getSession(), { action: 'invoice.store_credit_used', entity: 'invoice', entityId: r.number || invoiceId, summary: `Store credit ${r.creditCode} applied: $${Number(r.creditUsed).toFixed(2)}` });
+      return NextResponse.json({ ok: true, invoice: r });
+    }
     if (body.action === 'refund') {
       const refunded = await refundInvoice(invoiceId, {
-        restockingPct: body.restockingPct, reason: body.reason, by: actor
+        restockingPct: body.restockingPct, reason: body.reason, by: actor, asCredit: body.asCredit === true
       });
-      await audit(await getSession(), { action: 'invoice.refund', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `Full refund${body.restockingPct ? ` with ${body.restockingPct}% restocking` : ''}${body.reason ? `: ${body.reason}` : ''}` });
+      await audit(await getSession(), { action: 'invoice.refund', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `Full refund${refunded?.storeCredit ? ' to store credit ' + refunded.storeCredit.code : ''}${body.restockingPct ? ` with ${body.restockingPct}% restocking` : ''}${body.reason ? `: ${body.reason}` : ''}` });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     // Per-unit refund: refund only the selected line items (invoice_items.id).
@@ -283,18 +289,18 @@ export async function PATCH(req) {
     if (body.action === 'refund_items') {
       const itemIds = Array.isArray(body.itemIds) ? body.itemIds : [];
       const refunded = await refundInvoiceItems(invoiceId, {
-        itemIds, restockingPct: body.restockingPct, reason: body.reason, by: actor
+        itemIds, restockingPct: body.restockingPct, reason: body.reason, by: actor, asCredit: body.asCredit === true
       });
-      await audit(await getSession(), { action: 'invoice.refund_items', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${itemIds.length} line(s) refunded${body.reason ? `: ${body.reason}` : ''}`, detail: { itemIds } });
+      await audit(await getSession(), { action: 'invoice.refund_items', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${itemIds.length} line(s) refunded${refunded?.storeCredit ? ' to store credit ' + refunded.storeCredit.code : ''}${body.reason ? `: ${body.reason}` : ''}`, detail: { itemIds } });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     // Money-only refund of an arbitrary amount (price adjustment / goodwill /
     // deposit handed back). Moves no stock — the per-line refund does that.
     if (body.action === 'refund_amount') {
       const refunded = await refundInvoiceAmount(invoiceId, {
-        amount: body.amount, reason: body.reason, by: actor
+        amount: body.amount, reason: body.reason, by: actor, asCredit: body.asCredit === true
       });
-      await audit(await getSession(), { action: 'invoice.refund_amount', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${body.amount} refunded${body.reason ? `: ${body.reason}` : ''}`, detail: { amount: body.amount } });
+      await audit(await getSession(), { action: 'invoice.refund_amount', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${body.amount} refunded${refunded?.storeCredit ? ' to store credit ' + refunded.storeCredit.code : ''}${body.reason ? `: ${body.reason}` : ''}`, detail: { amount: body.amount } });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     const method = String(body.method || '').trim();

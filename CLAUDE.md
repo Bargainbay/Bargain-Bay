@@ -184,6 +184,26 @@ server-side** (CDNs 403 servers). Uploads go to the private Blob store under a
 fresh key each time (`/api/photo` is cached an hour). The second tab manages
 `unit_photos` through the existing `/api/admin/unit-photos`.
 
+### The "To photograph" list (added 2026-11-04)
+`lib/photo-queue.js`, `components/PhotoQueue.jsx` (first tab of `/admin/photos`), `GET /api/admin/unit-photos?queue=1`
+(staff), `test/photo-queue.test.mjs`. Every unit on sale with no picture of the ACTUAL machine, worked down on a phone:
+Photograph -> Take photo (repeatable) / Choose from phone -> Save -> it leaves the list.
+- **"Has a photo" = our own `unit_photos` OR RS Ops's inspection set** (`photos` / `rsopsPhotos`), the two things the product
+  page shows after the stock picture. The stock picture does NOT count. A unit RS Ops already shot is not asked for again.
+- **Built from `getAvailable()` without `{ marketplace: true }`**, so sellers' and Vesta units never appear (we can't photograph them).
+- Two buttons, no `capture` on the multi-select input (iOS makes `capture` camera-only). Photos are shrunk on the phone
+  (`photo-pick.compressPhotos`). **A failed upload keeps the shots on screen** — never costs the rep the pictures.
+- The spot (`currentLocations`) is shown when known and soft-fails to nothing.
+- **The unit is CHOSEN, never typed in full** (the "Find a unit" tab searches as you type; `?find=` -> `findUnits`). The upload
+  route runs the SKU through `resolveUnitSku` and REFUSES anything that is not on the AVAILABLE inventory list (active, not sold, not held by an
+  order or checkout — the shop's own `unavailableSkus` test; the chooser offers only those too): on 2026-11-04 Roushi typed the
+  MODEL number (PRFS2883AF) into the old free-text box, and two photos saved, loaded, and belonged to nothing. A model number now
+  gets "pick the exact unit: <its SKUs>"; the SKU is stored as `products` spells it (case/space-insensitive). A unit booked in but
+  not yet synced is refused until Sync inventory runs.
+- **One photo per request** (`components/unit-photo-upload.js`). A serverless function takes ~4.5MB of body; two raw phone photos
+  (2.8MB + 3.0MB) exceeded it, the platform answered with an HTML "Request Entity Too Large" page, and the screen tried to parse it as
+  JSON. Photos are also shrunk on the phone first. Never go back to one multi-file request.
+
 - `lib/reservations.js` — race-safe 30-min SKU holds in Postgres. `unavailableSkus()`, `isUnavailable()`.
 - `lib/stripe.js` — Stripe Checkout (+ `app/api/stripe-webhook`). `lib/sheets.js` — read + writeSold via Google service account.
 - `lib/auth.js` — bcryptjs + jose JWT cookie `bb_session`. `lib/db.js` — lazy `pg` pool (build never needs `POSTGRES_URL`).
@@ -865,6 +885,15 @@ thin margin — it is our own money covering the vendor's cost.
   sees the line before quoting. **The floor is the one cost-derived figure a
   sales screen is shown** — it is a price, not a cost, and blocking somebody
   without telling them the number is not a workable rule.
+- **Abi is LISTED at a share of RETAIL by condition (owner, 2026-11-04), replacing the +20% uplift.** His cost is ~65% of
+  retail, tax included. New in Box 90%, New Open Box and Scratch & Dent 85%, Refurbished 60% (`VENDOR_LIST_RULES` /
+  `vendorListPrice` in `lib/constants.js`, applied in `lib/csv.js`). A condition the table does not name, or a row with no
+  retail, keeps the tracker price untouched. The old `upliftedPrice` ran uncapped when a row's retail read blank
+  (VD-MW2ILKUM54B listed $1,078.92 on $999 retail) and nothing compared a price to its retail; the sync report now lists
+  any unit priced above retail (`report.aboveRetail`). **The same table is written into the tracker's Suggested Sale Price
+  formula** (`applyVendorListRuleToTracker`, `POST /api/admin/tracker-writeback` `{ vendorListRule: { dryRun, revert,
+  fixTyped } }`), wrapping the original formula so `revert` restores it exactly; it replaces the earlier x1.2 wrapper
+  (`applyVendorUpliftToTracker`, legacy). Typed prices on Abi rows are listed by the dry run, never overwritten without `fixTyped`.
 - **Every check degrades OPEN**: an unreadable `consignment_units` table means
   "nothing is consigned". Losing a real sale to a failed lookup is worse than a
   thin one.
@@ -1090,6 +1119,29 @@ treats the retained fee as refundable and gives 80% of it away).
 Refunds are **not** exposed to Sarah with a fee — `refund_invoice` still calls
 both functions with the default 0%. Keeping a fifth of a customer's money is the
 owner's call, not the phone agent's.
+
+## Store credit (added 2026-11-04)
+`lib/store-credit.js`, migration `0050_store_credit` (**run Run schema migration after deploy**), `/admin/store-credit` (ADMIN; on the
+Reports hub), `/api/store-credit` (public balance check, balance only), `test/store-credit.test.mjs`. Owner's rules: a cancelled order's
+deposit is non-refundable, 20% is kept as the restocking fee, the rest is issued as store credit; **no expiry; transferable (a code, anyone
+holding it can spend it)**; usable at checkout AND on a staff invoice.
+
+- **A credit is a CODE** (`SC-XXXX-XXXX`, no 0/O/1/I/L). Its balance is never stored: `SUM(store_credit_entries.amount)`, append-only (a
+  trigger refuses UPDATE/DELETE). A restore after a failed sale is a new `adjustment` row. Spending takes a per-credit advisory lock.
+- **Issuing** = the existing refund paths with `asCredit` (`refundInvoice`, `refundInvoiceItems`, `refundInvoiceAmount`; checkbox on the
+  refund screen, plus "Cancellation: 80% as store credit" on the amount tab). `settleRefund` writes the refund row with `to_credit = true`,
+  issues the code and emails it. **If the credit cannot be issued it THROWS, saying the refund was recorded and the customer is owed the
+  money** - the invoice is already marked refunded by then.
+- **Spending is a TENDER, not a discount**: an `invoice_payments` row with method `Store credit` (internal key `credit`, deliberately NOT in
+  `PAYMENT_METHODS`, so no dropdown or phone agent can pick it). HST is therefore charged on the full new sale; it was reversed when the
+  credit was issued. `applyStoreCreditToInvoice` (staff: "Use credit" on the invoice's payment control). A credit payment cannot be voided.
+- **At checkout** the code is validated server-side, spent INSIDE the order transaction (like a coupon), and recorded as a payment on the
+  web invoice; a credit covering the whole total settles the invoice and confirms the order. `orders.store_credit` holds the amount;
+  the e-transfer amount shown on the order page and email is `total - store_credit`. Not offered with card payment (refused).
+- **Books:** account **2170 Owed to customers (store credit)**. Refund-to-credit credits 2170 instead of the bank; a credit payment debits
+  2170 instead of the bank. Invariant (tested): 2170 equals the sum of every credit's balance. Ask the accountant to confirm.
+- **Not built:** staff cannot issue a credit that did not come from a refund; credit is not offered on the member portal; a partial-invoice
+  cancellation still needs the amount tab (the invoice stays open, nothing cancels the order for you).
 
 ## Packages — washer/dryer pairs and whole-kitchen bundles (added 2026-10-28)
 `lib/bundles.js`, migration `0043_bundles` (run **Run schema migration** after deploy), `/bundles` (storefront,
@@ -1671,6 +1723,58 @@ env vars are set, both idempotent via `expenses.ext_id`.
   production keys are DIFFERENT keys: switching worlds means replacing both
   secrets, not just flipping `QBO_ENV`.
 
+### Bank balances, and splitting one bank line (added 2026-11-04)
+`plaidBalances` (lib/plaid.js, `POST /api/admin/plaid` action `balances`), shown in `PlaidPanel`; `splitExpense` / `unsplitExpense`
+(lib/finance.js, `PATCH /api/admin/expenses` actions `split` / `unsplit`), **Split** / **Undo split** on each row of Operating expenses,
+`test/expense-split.test.mjs`.
+- **Balances use `/accounts/get`** (the balance Plaid last saw, refreshed with each transactions update, no per-call charge), NOT
+  `/accounts/balance/get` (asks the bank live, billed per call). The panel prints "as of" and says it can run hours behind the banking app.
+  A credit card's balance is what is OWED and is kept out of the "total in bank accounts" line.
+- **A split is checked in whole cents against the bank's charge** (amount + tax) and nothing is written if it is off. The parent row stays and keeps
+  part 1; the other parts are new rows with ext_id `<parent>#s2`... Each part picks its own category and HST mode (13% inside / none / decide later).
+- **The record of a split lives in the `expense_splits` setting** (`{ parentId: { extId, orig, children } }`), because the bank feed re-sends a changed
+  transaction and `syncPlaidTransactions` would otherwise write the full amount back over part 1 and count the charge twice. The sync loads
+  `splitExtIds()` once and skips those lines; a bank-retracted charge, or deleting the parent, deletes the whole family. **Undo** restores the line
+  exactly as the bank sent it (from `orig`). A part cannot be split again.
+- The Operating expenses table now loads 1,000 lines (it was 100, whatever the period tab said), with a search box and "show 100 more".
+
+### Categorizing the bank feed at scale (added 2026-11-05)
+`/admin/categorize` (admin + granted accountant), `components/CategorizeWorkspace.jsx`, `/api/admin/categorize`, `lib/payee.js` (NO imports),
+`listForCategorize` / `payeeGroups` / `bulkCategorize` / `restoreCategorized` / `annotateExpenses` in `lib/finance.js`, migration `0052_expense_categorize`,
+`test/categorize.test.mjs`. Linked from the Financial page (once a bank is connected) and the Reports hub.
+- **The unit of work is the PAYEE, not the line.** `payeeKey` strips what is unique to one transaction (`*nMU` reference codes, `#7045` store numbers, long
+  merchant ids) so every "Home Depot" is one group and TD's `SEND E-TFR *nMU EXP` / `*Vav EXP` fold into one "send e tfr exp" group. A thousand lines become a few
+  dozen decisions. The same code runs on the server and in the browser (no imports), so a group on screen is the group applied.
+- **TD e-transfers carry NO recipient name.** The descriptor is a per-transfer reference code plus the memo the owner typed (EXP, SUPP). So "who was it sent to"
+  is a field a person types (`payee_override`, "Who is this?"): it wins over the bank's name, is written to `vendor`, and the sync never overwrites it. Name a whole group at once.
+- **The queue is `reviewed_at IS NULL`, not "category is blank"**: the bank's guess fills a category on arrival, so a blank test finds nothing. `cat_source`: `rule` (the
+  owner's own rule, counts as decided), `guess` (Plaid's category or "Other", needs a person), `manual` / `bulk` (a person decided), `qbo`. Non-bank rows are reviewed on creation.
+- **A person's decision is never undone by the bank re-sending the line** (`upsertExpense`): `manual`/`bulk` category and status are kept, and when the charge's total
+  is unchanged the cost/HST split someone worked out is kept too. This also fixed an older bug: a re-sent line wrote the gross back over a pre-tax amount that still carried
+  its tax, counting the HST twice. A changed charge takes the bank's figure and goes back to "HST not set".
+- **What the bank said is kept** (`expenses.bank` jsonb + `payee`, `bank_desc`, `memo`, `account_label`): counterparties, payment_meta (reason, reference), original description,
+  its category guess and confidence, location. The Sync asks for `include_original_description`. **Existing lines are filled in by a one-off re-read** (`DETAILS_V` on the item in
+  `plaid_items`): the cursor restarts, and while it runs `fillExpenseDetails` only UPDATES lines we already hold, so a line somebody deleted does not come back and nothing a person decided changes.
+- **Bulk apply sets category and HST in one statement** (`taxMode` hst / none / review / leave), mirroring `splitGross`. "Remember this payee" saves a rule only from
+  `rulePrefix` (text literally in the descriptor, before any code or number) and never for a bare transfer ("send e-tfr" would sweep up every transfer). The response carries what
+  each line was, and **Undo** restores it (rules the action saved stay; remove them under Sorting rules). Every bulk action and undo is in the audit log.
+- **One category list** (`EXPENSE_CATEGORIES`) = the Costs section's wording plus Fuel / delivery, Wages, Tools / supplies, Other, Loan repayment, Owner draw. Marketing and Fees were
+  merged into Advertising and Card & bank fees (migration + the schema's runtime pass rename saved rows and rules). **Interest is "Interest charges", not "Loan interest"**: the ledger
+  routes any category matching /loan|repayment/ to the loan liability, and interest is a cost.
+- **`saveExpenseRule` had never worked**: its `ON CONFLICT (match_text)` did not match the unique index on `lower(match_text)`, so adding a rule, or accepting a suggested one, threw.
+- Not built: money-IN lines (e-transfers received are matched to orders on Payments in, not categorized here), per-payee keyboard shortcuts, and a receipt/attachment per line.
+
+### Who an e-transfer went to — from Interac's own email (added 2026-11-05)
+`lib/interac-names.js`, `/api/cron/interac-names` (hourly, heartbeat + `EXPECTED`), `listSubjects` in `lib/gmail.js`, **Find e-transfer recipients** on `/admin/categorize`,
+`test/interac-names.test.mjs`. TD's feed carries no recipient on `SEND E-TFR *nMU EXP`; the confirmation Interac emails the sender does
+("Your $1,356.00 transfer to OURR HOME & APPLIANCES has been successfully deposited", from `catch@payments.interac.ca`).
+- **Setup (owner):** those emails land in `rssolutionsincc@gmail.com`, a personal Gmail the app cannot read. Add a Gmail filter forwarding mail from `payments.interac.ca` to
+  `INTERAC_INBOX` (default `Service@rssolutions.ca`), and make sure that mailbox is on `SARAH_EMAIL_INBOXES` or `GMAIL_EXTRA_INBOXES` and covered by domain-wide delegation. Unreadable = a throttled (24h) email to Service@, and a 500 on the cron.
+- **IT NEVER GUESSES.** A line is named only when exactly ONE email has its amount within the date window (email from 1.5 days before to 8 days after the debit) AND exactly one line fits that email.
+  A dozen $500 transfers in a month stay blank. A name a person typed (`payee_override`) is never overwritten; each email is used once (`interac_used_emails` setting).
+- Only `source = 'plaid'` lines that look like an e-transfer SENT and have no payee are considered, from the last 75 days. The note on a named line says where the name came from.
+- Only the "has been successfully deposited" subject is parsed. A different wording from the bank would need another pattern in `parseInteracSent`.
+
 ## HST remittance — the Sales dashboard panel (added 2026-08-27)
 `hstOwed()` in `lib/analytics.js`, rendered by `components/TaxOwed.jsx` on
 `/admin/dashboard` directly under the revenue KPIs. Owner-only (`!salesOnly`),
@@ -2250,6 +2354,37 @@ be reading row 4 while whoever uploaded it has already walked away.
   through on the RS host.** Narrowing that allow-list kills the call mid-
   conversation, with the batch half-answered.
 
+## The Voice Manager rings the owner (added 2026-11-04)
+`lib/manager-issues.js` (one read-only scan), `lib/manager-rules.js` (no imports: when it may ring, what it says),
+`lib/manager-call.js` (the call, its tools, the confirm rule), `POST /api/manager/call` (Twilio's webhook),
+`/api/cron/manager-call` (13:00, 17:00, 21:00 UTC), `/admin/manager` + `/api/admin/manager-call` (ADMIN; "Call me now",
+snooze, notes, recent calls; on the Reports hub and the nav), migration `0051_voice_manager` (`manager_calls`,
+`manager_notes`; also created at runtime), `test/manager.test.mjs`. Owner's instruction: an agent that reports on any issue,
+discrepancy or thing to work on, takes instructions by voice and fixes what it safely can.
+
+- **Built on the import-review call, not beside it.** Twilio places the call, `<Gather input="speech">` loops it, ElevenLabs
+  speaks, a Claude tool loop decides what to say. `twilioSignatureOk`, `sayTwiml` and `callBaseUrl` are IMPORTED from
+  `lib/import-call.js`: one definition of "really from Twilio". The webhook has the same two locks (Twilio signature + an HMAC
+  token for the call id) and must keep both.
+- **It rings ONE number: the owner's, (647) 643-3035** (`managerTarget`: env `MANAGER_CALL_TO`, setting `manager_call_to`, else
+  that default). Never a number from a request or a browser. `outbound('voice')` refuses outside production.
+- **The scan is the single list** (phone, page and email agree). Checks: scheduled jobs/config (the same `evaluateHealth` as the
+  daily email), models with no stock photo, /shop and /feed up and /feed vs the database, inventory sync age, prices at zero or
+  above retail, stock gaps, loose dispatch stops, unconfirmed door cash, pending reseller applications, the owner's notes.
+  **A check that throws becomes an issue ("Could not check X")** instead of vanishing — a scanner that reports all-clear because
+  half of it threw is the silent-failure bug this exists to end. Add a check to `CHECKS`; keep it read-only.
+- **Only high and medium issues earn a call** (`shouldCallNow`): inside 8am-8pm Toronto, not again once he has answered that day,
+  retries spaced 90 minutes, three attempts a day, none for a list of only small things. Voicemail is hung up on (the page has it).
+  Snoozed issues are hidden AND counted, never silent. The opening line is arithmetic off the scan, not the model.
+- **What it can do is a short list:** read the scan, copy one model's stock photo to another (`setModelPhoto`), refresh stock from the
+  tracker (same as Sync), snooze, keep a note, email the list. **It has no tool for money, invoices, orders, customers, prices, drivers
+  or stops**, and a test fails if one is added. Anything needing a typed link is emailed.
+- **EVERY WRITE NEEDS A SECOND YES, ENFORCED IN CODE.** A write tool only proposes (stored on `manager_calls.pending`, with the turn
+  number) and runs only when the SAME tool is called with the SAME arguments on a LATER turn, i.e. after he has spoken again. The model
+  cannot confirm its own proposal. What was done is in `manager_calls.actions`.
+- **Not built:** it cannot be called BY the owner (inbound), has no per-issue "fix it" beyond the tools above, and sends no text message.
+  Run Run schema migration after deploy (the tables are also created on first use).
+
 - **Everything dispatch does happens on `/admin/dispatch`.** Board, service-call
   queue, and clients/drivers are TABS on that one page, not separate screens, and
   a client can be added from inside the new-job form itself. Do not move any of
@@ -2316,6 +2451,16 @@ be reading row 4 while whoever uploaded it has already walked away.
   the phone has to be able to put the job on the board. Adding a **client** is
   staff too (it's a company name). Adding a **driver** stays `isAdmin` — that one
   is a real access grant.
+
+### It can FIX things now (added 2026-11-04)
+`lib/manager-fixes.js`. Tools: `stale_stops_preview` / `close_stale_stops` (two-turn yes), `run_backup_now`
+(two-turn yes), `cda_status`, `request_code_change` (writes `DEV: ...` to `manager_notes`). The Manager page has the
+same fixes as buttons ("Close them", "Run backup now").
+- **Old stops:** evidence (signature, photos or clock-in) -> `done` with NO invented finish time; no trace -> `cancelled`.
+  A stop with money reported against it or a balance owing is ALWAYS left alone and named. Each closure is in the stop's history.
+- **`summariseBackupFailure`:** the backup cron used to return 500 with the reason nested and no top-level `error`, so the
+  heartbeat stored an empty reason (625 failures, no cause). It now names it.
+- **Still cannot:** touch money, invoices, orders, prices, customers or drivers, or change code or secrets.
 
 ## Partial deliveries (added 2026-11-02)
 INV-1251 was a fridge and a stove; only the fridge went. The driver's close-out form has always had a per-item
@@ -4838,6 +4983,26 @@ SKUs are `VS-<shopify id>`; they are NOT one-of-a-kind so reservations skip them
   in-stock items are orderable. We hold no cost for these, so no member price, clearance or promo applies.
 - A feed that returns under half of what we hold retires nothing (a partial read must not delist the range).
 
+## Facebook Marketplace listing kit (added 2026-11-05)
+`/admin/fb-listings` (staff, nav tab "Facebook"), `lib/fb-kit.js` (title, caption, photo list; pure), `components/FbListings.jsx`,
+`GET /api/admin/fb-listings/zip?sku=` (photos as a zip, `lib/zip-lite.js`), `test/fb-kit.test.mjs`. The owner posts to his personal
+Marketplace BY HAND from the phone; this only prepares title / caption / price / photos. **Nothing logs into or calls Facebook**
+(Meta forbids scripting it), no table, no migration. The caption always ends with "Check out my profile ... other listings" and
+"Message me for more info". Same prices as the site (`decorate`), own stock only, no cost anywhere. The zip is built server-side
+because manufacturer CDNs send no CORS headers; a photo a CDN refuses is reported, not silently dropped. "Posted" ticks live in
+the browser's localStorage only. A unit that sells must be taken down on Facebook by hand. The bigger design (per-account queue,
+AI copy, retail screenshots, Mac Mini) was deliberately NOT built.
+Caption rules (owner, 2026-11-05): a description + features block comes BEFORE the condition (`fbDescription`: `data/fb-features.json`
+by model, hand-checked facts only, then `data/specs.json`, then only what the title states); a Refurbished unit says a 3-MONTH warranty
+here (`fbWarrantyMonths`, Facebook captions only, the site is unchanged); no pickup address in the caption.
+
+## Refurbished = 3-month warranty (added 2026-11-05, owner)
+`REFURBISHED_WARRANTY_MONTHS` in `lib/constants.js`. `decorate()` (lib/pricing.js) and `applyClearance` (lib/clearance.js) cap a unit whose
+condition is `Refurbished` at 3 months, whatever the clearance row says; the product page, `withWarranty`, the Meta feed and the Facebook kit all
+follow. Every other condition keeps its own (default 12). Policy text updated on /policies/returns, /policies/terms, /refurbished and the footer.
+**Not changed:** the home/layout meta descriptions, order emails and the marketplace/affiliate pages still say "one-year" generically; the
+marketplace sellers' own warranty rules are untouched.
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
 
@@ -4850,3 +5015,22 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## The Agent village (added 2026-11-02)
+`/admin/agent-floor` (admin; its own **Village** tab in `AdminNav`), `lib/agent-floor.js`, `lib/agent-levels.js`, `lib/agent-wake.js`,
+`components/AgentFloor.jsx` + `components/agent-village-scene.js` (three.js, lazy-loaded), migration `0049_cron_daily`
+(**run Run schema migration after deploy**), `/api/admin/agent-floor`, `test/agent-floor.test.mjs`.
+
+A Clash-of-Clans style village: a castle (the tracker + database), four buildings (Call tower, Garage, Market, Treasury), a minion
+per scheduled job or assistant. **Nothing is simulated.**
+- **State** comes from `cron_heartbeats` judged against `EXPECTED` in `lib/health.js`, so the village and the daily health email cannot
+  disagree. Sarah and RS Manager are awake while a message was stored in the last 3 min. Christina and the import caller leave no record
+  here and show as UNKNOWN, never healthy. A job with no heartbeat wrapper (`abandoned-carts`) is unknown too. Angela is paused by decision.
+- **Wake** runs the job's own cron route once (same code, same heartbeat). Only the jobs in `WAKEABLE` can be woken. Deliberately NOT:
+  `shift-nudge` (texts drivers), the reports, `health`, `inventory-gaps`, `affiliate-payouts` (emails), `vendor-orders` (strikes sellers).
+  A wake of `health` or a report would also record a success heartbeat that masks a real failure. A new cron is NOT wakeable until it is
+  added to `WAKEABLE` and `LOADERS` (a test keeps the two in step). 60 s cooldown; every wake is in the change log (`agent.wake`).
+- **Levels.** Buildings level from RELIABILITY (minion XP = 10 per successful run + 5 per clean day in a row, from `cron_daily`, written by
+  `recordHeartbeat`; history starts the day 0049 is applied, and until then the lifetime run count stands in). The castle levels from BUSINESS
+  RESULTS (10 per order placed, stop delivered and invoice paid, 1 per customer message). Each building also shows its own business figure.
+  Level n needs base * n * (n - 1) / 2 XP. A streak counts days since the last failure, so weekly jobs keep theirs.

@@ -9,7 +9,7 @@ export default function ReturnsPage() {
         prices. Every unit is bench-tested before it&apos;s listed, and its condition — including any cosmetic
         imperfections — is described on the product page. Because these are discounted liquidation items, our
         return terms differ from a full-price retailer. That said, we stand behind everything we sell with a{' '}
-        <b>one-year functional warranty</b> and the protections below.
+        <b>one-year functional warranty</b> (3 months on refurbished units) and the protections below.
       </p>
 
       <h2>Inspect your item right away</h2>
@@ -33,6 +33,27 @@ export default function ReturnsPage() {
         reasonable return transport.
       </p>
 
+      <h2>Deposits and cancellations</h2>
+      <p>
+        <b>Deposits are non-refundable.</b> If you cancel an order before delivery or pickup, we deduct a{' '}
+        <b>20% restocking fee</b> and issue the balance as <b>store credit</b>.
+      </p>
+
+      <h2>Open-box and scratch &amp; dent units</h2>
+      <p>
+        Existing cosmetic defects (scratches, dents, minor missing pieces) are described on the listing and noted
+        when you inspect the unit at purchase, and are not grounds for a return. Any cost for missing parts is the
+        customer&apos;s responsibility.
+      </p>
+
+      <h2>Appliance care</h2>
+      <ul>
+        <li>Gas (LP/NG) appliances must be installed and leak-tested by a licensed gas fitter.</li>
+        <li>Refrigeration must stand upright for 12 hours after delivery before being plugged in.</li>
+        <li>Products that use water must not be exposed to sub-zero temperatures.</li>
+      </ul>
+      <p>We will never ask for your credit card details by email or phone.</p>
+
       <h2>Change of mind</h2>
       <p>Appliances may be returned for a change of mind within <b>14 days of receipt</b>, provided the unit is:</p>
       <ul>
@@ -50,6 +71,10 @@ export default function ReturnsPage() {
         Every covered appliance includes a <b>one-year warranty</b>: if it stops working under normal household
         use within one year of purchase, we will repair or replace it. The warranty covers functional failure —
         not cosmetic wear, customer damage, or improper installation.
+      </p>
+      <p>
+        <b>Refurbished units carry a 3-month warranty</b> on the same terms: if one stops working under normal
+        household use within three months of purchase, we will repair or replace it.
       </p>
 
       <h2>Items sold by marketplace sellers</h2>

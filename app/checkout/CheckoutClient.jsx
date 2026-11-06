@@ -32,6 +32,12 @@ export default function CheckoutClient({ catalog, session, prefill }) {
   const [applied, setApplied] = useState(null);
   const [promoMsg, setPromoMsg] = useState('');
   const [promoBusy, setPromoBusy] = useState(false);
+  // Store credit: a transferable code worth a dollar balance. Like the promo it is only a
+  // preview here; /api/checkout takes the real amount off the code itself.
+  const [credit, setCredit] = useState('');
+  const [creditApplied, setCreditApplied] = useState(null);
+  const [creditMsg, setCreditMsg] = useState('');
+  const [creditBusy, setCreditBusy] = useState(false);
   const acDone = useRef(false);
   // An automatic promotion the cart qualifies for (no code typed). Only a
   // preview: /api/checkout works the real figure out again.
@@ -147,7 +153,20 @@ export default function CheckoutClient({ catalog, session, prefill }) {
   const discount = shown ? Math.min(shown.discount, subtotal) : 0;
   const hst = round2((subtotal - discount + delivery) * HST_RATE);
   const total = round2(subtotal - discount + delivery + hst);
+  const creditUsed = creditApplied ? round2(Math.min(creditApplied.balance, total)) : 0;
+  const dueNow = round2(total - creditUsed);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function applyCredit() {
+    setCreditBusy(true); setCreditMsg('');
+    try {
+      const res = await fetch('/api/store-credit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: credit }) });
+      const d = await res.json();
+      if (res.ok && d.ok) { setCreditApplied({ code: d.code, balance: Number(d.balance) || 0 }); setCredit(''); }
+      else setCreditMsg(d.error || 'That code didn’t work.');
+    } catch { setCreditMsg('Couldn’t check that code. Please try again.'); }
+    finally { setCreditBusy(false); }
+  }
 
   async function applyPromo() {
     const code = promo.trim();
@@ -184,6 +203,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
         body: JSON.stringify({
           skus, ...form, deliveryMethod: method,
           couponCode: applied ? applied.code : '',
+          storeCreditCode: creditApplied ? creditApplied.code : '',
           // The sentence they were actually shown travels with the tick. That
           // wording is what makes the consent record proof of anything.
           marketingOptInText: form.marketingOptIn ? CONSENT_TEXT : ''
@@ -379,6 +399,33 @@ export default function CheckoutClient({ catalog, session, prefill }) {
             </div>
             <div className="summary-row"><span>HST (13%)</span><span>{money(hst)}</span></div>
             <div className="summary-row total"><span>Total (CAD)</span><span>{money(total)}</span></div>
+            <div style={{ margin: '10px 0 4px' }}>
+              {creditApplied ? (
+                <div className="hint" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <span>Store credit <b>{creditApplied.code}</b> — {money(creditApplied.balance)} available</span>
+                  <button type="button" className="linkish" onClick={() => setCreditApplied(null)}>Remove</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input aria-label="Store credit code" placeholder="Store credit code" value={credit}
+                      onChange={(e) => setCredit(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyCredit(); } }}
+                      style={{ flex: 1, minWidth: 0, fontSize: 16, textTransform: 'uppercase' }} />
+                    <button type="button" className="btn" disabled={creditBusy || !credit.trim()} onClick={applyCredit}>
+                      {creditBusy ? '…' : 'Apply'}
+                    </button>
+                  </div>
+                  {creditMsg && <div className="hint" style={{ color: 'var(--danger, #c0392b)', marginTop: 6 }}>{creditMsg}</div>}
+                </>
+              )}
+            </div>
+            {creditUsed > 0 && (
+              <>
+                <div className="summary-row"><span>Store credit applied</span><span>−{money(creditUsed)}</span></div>
+                <div className="summary-row total"><span>{dueNow > 0 ? 'Left to pay' : 'Left to pay (nothing)'}</span><span>{money(dueNow)}</span></div>
+              </>
+            )}
             {error && <div className="error-box">{error}</div>}
             {sellerShips.length > 0 && (
               <div className="hint" style={{ marginTop: 12, padding: 10, border: '1px solid var(--line, #ddd)', borderRadius: 8 }}>

@@ -66,7 +66,7 @@ test('the portal is scoped to the client the token proves', async () => {
     const jobs = await listClientJobs(a.id);
     equal(jobs.length, 1);
     equal(jobs[0].minutesOnSite, 45);
-    assert(!('payAmount' in jobs[0]) && !JSON.stringify(jobs[0]).includes('55'), 'driver pay never leaves');
+    assert(!/"[a-z_]*pay[a-z_]*"\s*:/i.test(JSON.stringify(jobs[0])), 'driver pay never leaves (no pay field of any name)');
     equal(await getClientJob(a.id, jb.id), null, "cannot open B's stop through A");
     equal(await clientPhotoPath(a.id, pb.id), null, "cannot read B's photo through A");
     equal(await clientPhotoPath(a.id, pa.id), 'photos/a1.jpg');

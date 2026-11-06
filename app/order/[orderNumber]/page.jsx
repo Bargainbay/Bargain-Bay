@@ -121,14 +121,15 @@ export default async function OrderPage({ params, searchParams }) {
           {order.payment_method === 'in_person' ? (
             <>
               <b>Payment due {order.delivery_method === 'delivery' ? 'on delivery' : 'on pickup'}.</b><br />
-              Pay <b>{money(order.total)}</b> by cash, debit, or credit card in person
+              Pay <b>{money(Math.max(0, Number(order.total) - (Number(order.store_credit) || 0)))}</b> by cash, debit, or credit card in person
               {order.delivery_method === 'delivery' ? ' when we deliver' : ' when you pick up'}.
               Your {order.items.length === 1 ? 'unit is' : 'units are'} held for you — we&apos;ll email {order.email} to arrange a time.
             </>
           ) : (
             <>
               <b>Payment due — Interac e-Transfer.</b><br />
-              Send <b>{money(order.total)}</b> to <b>{ETRANSFER_EMAIL}</b> (auto-deposit — no security question).
+              Send <b>{money(Math.max(0, Number(order.total) - (Number(order.store_credit) || 0)))}</b> to <b>{ETRANSFER_EMAIL}</b> (auto-deposit — no security question).
+              {Number(order.store_credit) > 0 && <> Store credit applied: <b>−{money(order.store_credit)}</b>.</>}
               Put your order number <b>{order.order_number}</b> in the message. We&apos;ll hold your
               {order.items.length === 1 ? ' unit' : ' units'} for 24 hours and confirm as soon as payment is applied.
               Orders with non payment will automatically be cancelled after 24 hours.

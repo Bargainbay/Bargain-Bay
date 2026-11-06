@@ -74,7 +74,8 @@ export default async function EditInvoicePage({ params }) {
     // Where the sale came from. Blank on an invoice raised before this existed,
     // which is the honest answer — nobody has said yet.
     leadSource: invoice.lead_source || '',
-    leadBy: invoice.lead_by || ''
+    leadBy: invoice.lead_by || '',
+    brand: invoice.brand || 'bargain_bay'
   };
   const senders = await listLeadSenders().catch(() => []);
 

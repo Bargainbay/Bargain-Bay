@@ -18,6 +18,7 @@ export default function MarkPaidControl({ invoiceId, balance, payments = [] }) {
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [creditCode, setCreditCode] = useState('');
 
   const bal = Number(balance) || 0;
   const amt = Number(amount);
@@ -33,6 +34,27 @@ export default function MarkPaidControl({ invoiceId, balance, payments = [] }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'void_payment', invoiceId, paymentId: p.id })
+      });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Failed'); return; }
+      window.location.reload();
+    } catch {
+      setErr('Network error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Pay with a store credit code: takes what the credit has (up to the amount typed, or the balance).
+  async function payWithCredit() {
+    if (!creditCode.trim()) { setErr('Enter the store credit code'); return; }
+    if (amount !== '' && (!Number.isFinite(amt) || amt <= 0)) { setErr('Amount must be a positive number'); return; }
+    setBusy(true); setErr('');
+    try {
+      const res = await fetch('/api/admin/invoices', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'apply_credit', invoiceId, code: creditCode, amount: amount === '' ? null : amt })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Failed'); return; }
@@ -87,6 +109,11 @@ export default function MarkPaidControl({ invoiceId, balance, payments = [] }) {
       <button className="btn" style={{ padding: '4px 10px', fontSize: 12.5 }} disabled={busy || !method} onClick={mark}>
         {busy ? '…' : isPartial ? `Record ${fmt(amt)}` : 'Mark paid'}
       </button>
+      <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+        <input value={creditCode} onChange={(e) => { setCreditCode(e.target.value.toUpperCase()); setErr(''); }} placeholder="Store credit code"
+          title="Pay (all or the amount typed) with a store credit code" style={{ padding: '3px 5px', fontSize: 12.5, width: 130 }} />
+        <button className="btn" style={{ padding: '4px 10px', fontSize: 12.5 }} disabled={busy || !creditCode.trim()} onClick={payWithCredit}>Use credit</button>
+      </span>
       {err && <span style={{ color: 'var(--danger)', fontSize: 12 }}>{err}</span>}
       {payments.length > 0 && (
         <span style={{ display: 'block', width: '100%', fontSize: 11.5, color: 'var(--muted)' }}>

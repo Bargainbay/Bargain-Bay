@@ -60,6 +60,7 @@ export default function Header({ promo = null }) {
           {COLLECTIONS.map((c) => (
             <a key={c.slug} href={`/shop?collection=${c.slug}`}>{c.label}</a>
           ))}
+          <a href="/bundles">Washer &amp; Dryer Sets</a>
         </div>
       </div>
     </header>

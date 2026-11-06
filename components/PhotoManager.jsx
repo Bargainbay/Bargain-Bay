@@ -1,6 +1,9 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import DownloadPhoto from './DownloadPhoto';
+import PhotoQueue from './PhotoQueue';
+import { compressPhotos } from './photo-pick';
+import { postUnitPhotos } from './unit-photo-upload';
 
 // The pictures the storefront shows, in one place.
 //
@@ -140,35 +143,57 @@ function StockPhotos() {
 }
 
 function UnitPhotos() {
-  const [sku, setSku] = useState('');
-  const [loaded, setLoaded] = useState('');
+  // The unit is CHOSEN from matches, never typed in full: a SKU typed by hand is how
+  // two photos ended up filed under a model number and belonging to nothing.
+  const [text, setText] = useState('');
+  const [matches, setMatches] = useState(null);   // null = not searched yet
+  const [unit, setUnit] = useState(null);         // the unit picked
   const [photos, setPhotos] = useState([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
-  const fetchFor = async (s) => {
-    const r = await fetch('/api/admin/unit-photos?sku=' + encodeURIComponent(s), { cache: 'no-store' });
+  const seq = useRef(0);
+
+  // Search as they type (debounced); the newest answer wins.
+  useEffect(() => {
+    const t = text.trim();
+    if (unit || t.length < 2) { setMatches(null); return; }
+    const n = ++seq.current;
+    const h = setTimeout(async () => {
+      try {
+        const r = await fetch('/api/admin/unit-photos?find=' + encodeURIComponent(t), { cache: 'no-store' });
+        const d = await r.json();
+        if (n === seq.current) setMatches(r.ok ? d.units || [] : []);
+      } catch { if (n === seq.current) setMatches([]); }
+    }, 250);
+    return () => clearTimeout(h);
+  }, [text, unit]);
+
+  const fetchFor = async (sku) => {
+    const r = await fetch('/api/admin/unit-photos?sku=' + encodeURIComponent(sku), { cache: 'no-store' });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Could not load.');
-    setPhotos(d.photos || []); setLoaded(s);
+    setPhotos(d.photos || []);
   };
-  const load = async () => {
-    const s = sku.trim(); if (!s) return;
-    setBusy(true); setErr(''); setMsg('');
-    try { await fetchFor(s); } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  const choose = async (u) => {
+    setUnit(u); setText(''); setMatches(null); setErr(''); setMsg(''); setPhotos([]);
+    setBusy(true);
+    try { await fetchFor(u.sku); } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
+  const change = () => { setUnit(null); setPhotos([]); setErr(''); setMsg(''); };
+
   const add = async (e) => {
     const files = [...(e.target.files || [])]; e.target.value = '';
-    if (!files.length) return;
+    if (!files.length || !unit) return;
     setBusy(true); setErr(''); setMsg('');
     try {
-      const fd = new FormData(); fd.set('sku', loaded);
-      files.forEach((f) => fd.append('photos', f));
-      const r = await fetch('/api/admin/unit-photos', { method: 'POST', body: fd });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Could not save.');
-      setMsg(d.failed ? `${d.photos.length} added, ${d.failed} failed (too big or not an image).` : `${d.photos.length} added.`);
-      await fetchFor(loaded);
+      const { ok, failed: unreadable } = await compressPhotos(files);
+      const { saved, failed, error } = await postUnitPhotos(unit.sku, ok.map((p) => p.blob));
+      ok.forEach((p) => URL.revokeObjectURL(p.url));
+      const bad = failed + unreadable;
+      if (!saved) throw new Error(error || "Those photos couldn't be read. Try taking them again.");
+      setMsg(bad ? `${saved} added, ${bad} couldn't be (${error || "couldn't be read"}).` : `${saved} added.`);
+      await fetchFor(unit.sku);
     } catch (e2) { setErr(e2.message); } finally { setBusy(false); }
   };
   const del = async (id) => {
@@ -176,41 +201,69 @@ function UnitPhotos() {
     setBusy(true); setErr(''); setMsg('');
     try {
       const r = await fetch('/api/admin/unit-photos?id=' + id, { method: 'DELETE' });
-      if (!r.ok) throw new Error((await r.json()).error || 'Could not delete.');
-      await fetchFor(loaded);
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Could not delete.');
+      await fetchFor(unit.sku);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
+
   return (
     <div>
       <p className="hint" style={{ marginTop: 0 }}>
         Our own pictures of one exact appliance. They show on its product page after the stock picture, labelled as the actual unit.
         Up to 8 per unit.
       </p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-        <input value={sku} onChange={(e) => setSku(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && load()}
-          placeholder="Unit SKU, e.g. VD-MUN7G8GW7MA" style={{ padding: '7px 10px', minWidth: 260 }} />
-        <button className="btn primary" disabled={busy || !sku.trim()} onClick={load}>Find</button>
-      </div>
-      {err && <div className="error-box">{err}</div>}
-      {msg && <div className="hint">{msg}</div>}
-      {loaded && (
+      {!unit && (
         <div>
+          <input className="pq-search" type="search" inputMode="search" autoComplete="off" value={text}
+            onChange={(e) => setText(e.target.value)} placeholder="Type a brand, model or SKU, then tap the unit" />
+          {matches && !matches.length && <p className="hint">No unit on the site matches that. Try fewer words.</p>}
+          {matches && matches.length > 0 && (
+            <ul className="pq-list pq-pick">
+              {matches.map((u) => (
+                <li key={u.sku}>
+                  <button type="button" className="pq-pick-btn" onClick={() => choose(u)}>
+                    <b>{[u.make, u.model].filter(Boolean).join(' ') || u.sku}</b>
+                    <span><code>{u.sku}</code> · {[u.category, u.condition].filter(Boolean).join(' · ')}</span>
+                    <span className={u.photos ? 'pq-has' : 'pq-none'}>{u.photos ? `${u.photos} photo${u.photos === 1 ? '' : 's'}` : 'no photos yet'}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {err && <div className="error-box">{err}</div>}
+      {msg && <div className="hint" role="status">{msg}</div>}
+      {unit && (
+        <div>
+          <div className="pq-chosen">
+            <div><b>{[unit.make, unit.model].filter(Boolean).join(' ') || unit.sku}</b><br /><code>{unit.sku}</code></div>
+            <button type="button" className="pq-btn" style={{ flex: 'none', minHeight: 44 }} disabled={busy} onClick={change}>Change unit</button>
+          </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             {photos.map((p) => (
               <div key={p.id} style={{ textAlign: 'center' }}>
                 <Thumb src={p.url} size={130} />
                 <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginTop: 4 }}>
-                  <DownloadPhoto url={p.url} name={`${loaded}-${p.position + 1}`} style={{ padding: '2px 10px', fontSize: 12 }}>⤓ Save</DownloadPhoto>
+                  <DownloadPhoto url={p.url} name={`${unit.sku}-${p.position + 1}`} style={{ padding: '2px 10px', fontSize: 12 }}>⤓ Save</DownloadPhoto>
                   <button className="btn" style={{ padding: '2px 10px', fontSize: 12 }} disabled={busy} onClick={() => del(p.id)}>Delete</button>
                 </div>
               </div>
             ))}
-            {!photos.length && <p className="hint">No photos of {loaded} yet.</p>}
+            {!photos.length && !busy && <p className="hint">No photos of {unit.sku} yet.</p>}
           </div>
-          <label className="btn" style={{ padding: '7px 12px', cursor: 'pointer', display: 'inline-block', marginTop: 10 }}>
-            Add photos<input type="file" accept="image/*" multiple hidden disabled={busy} onChange={add} />
-          </label>
-          <a className="btn" style={{ padding: '7px 12px', marginLeft: 8 }} target="_blank" rel="noopener noreferrer" href={'/product/' + encodeURIComponent(loaded)}>View product page</a>
+          <div className="pq-btns">
+            <label className={'pq-btn pq-btn-main' + (busy ? ' pq-disabled' : '')}>
+              📷 Take photo
+              <input className="pq-file" type="file" accept="image/*" capture="environment" disabled={busy} onChange={add} />
+            </label>
+            <label className={'pq-btn' + (busy ? ' pq-disabled' : '')}>
+              🖼 Choose from phone
+              <input className="pq-file" type="file" accept="image/*" multiple disabled={busy} onChange={add} />
+            </label>
+            <a className="pq-btn" target="_blank" rel="noopener noreferrer" href={'/product/' + encodeURIComponent(unit.sku)}>View product page</a>
+          </div>
+          {busy && <p className="hint">Working…</p>}
         </div>
       )}
     </div>
@@ -218,18 +271,24 @@ function UnitPhotos() {
 }
 
 export default function PhotoManager() {
-  const [tab, setTab] = useState('model');
+  // Opens on the list sales works down; the other two tabs are for looking up one thing.
+  const [tab, setTab] = useState('queue');
+  const [left, setLeft] = useState(null);
   const tabBtn = (k, label) => (
     <button className={'btn' + (tab === k ? ' primary' : '')} style={{ padding: '7px 14px' }} onClick={() => setTab(k)}>{label}</button>
   );
   return (
-    <div className="panel" style={{ marginTop: 18 }}>
+    <div className="panel pq-panel" style={{ marginTop: 18 }}>
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Photos</h1>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      <div className="pq-tabs">
+        {tabBtn('queue', left == null ? 'To photograph' : `To photograph (${left})`)}
+        {tabBtn('unit', 'Find a unit')}
         {tabBtn('model', 'Stock photos by model')}
-        {tabBtn('unit', 'Photos of a unit')}
       </div>
-      {tab === 'model' ? <StockPhotos /> : <UnitPhotos />}
+      {/* Kept mounted so the list and what was done this visit survive a look at another tab. */}
+      <div hidden={tab !== 'queue'}><PhotoQueue onCount={setLeft} /></div>
+      {tab === 'model' && <StockPhotos />}
+      {tab === 'unit' && <UnitPhotos />}
     </div>
   );
 }
