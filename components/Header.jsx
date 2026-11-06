@@ -61,9 +61,6 @@ export default function Header({ promo = null }) {
             <a key={c.slug} href={`/shop?collection=${c.slug}`}>{c.label}</a>
           ))}
           <a href="/bundles">Washer &amp; Dryer Sets</a>
-          <a href="/clearance" className="cats-clearance">Clearance</a>
-          <a href="/refurbished" className="cats-refurb">Refurbished</a>
-          <a href="/premium" className="cats-premium">Premium Brands</a>
         </div>
       </div>
     </header>
