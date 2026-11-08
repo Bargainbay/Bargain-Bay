@@ -102,6 +102,26 @@ export default function PlaidPanel({ status }) {
     } catch (e) { setErr(e.message); } finally { setBusy(''); }
   }
 
+  // Pull now: ask the bank itself, read what comes back, take the live balance — and say what happened.
+  async function pull() {
+    setBusy('sync'); setErr(''); setMsg('');
+    try {
+      const d = await post({ action: 'pull' });
+      const moved = (d.added || 0) + (d.updated || 0) + (d.removed || 0);
+      const live = d.balances && d.balances.accounts && d.balances.accounts.length;
+      if (live) setBal({ accounts: d.balances.accounts, errors: d.balances.errors || [] });
+      const parts = [
+        moved ? `${d.added || 0} new, ${d.updated || 0} updated, ${d.removed || 0} removed.` : 'No new transactions yet.',
+        live ? 'Balances are live from the bank.' : 'Could not get a live balance.'
+      ];
+      const notes = [...(d.notes || []), ...((d.balances && d.balances.errors) || []), ...(d.errors || [])];
+      if (!moved) parts.push('Plaid re-reads TD a few times a day; we have asked it to now, and new lines arrive by themselves when it has them.');
+      setMsg(parts.join(' '));
+      if (notes.length) setErr(notes.join(' · '));
+      router.refresh();
+    } catch (e) { setErr(e.message); } finally { setBusy(''); }
+  }
+
   if (!configured) {
     return (
       <div>
@@ -173,7 +193,7 @@ export default function PlaidPanel({ status }) {
           {busy === 'link' || busy === 'exchange' ? 'Opening…' : (connected ? '+ Add another bank' : 'Connect a bank account')}
         </button>
         {connected && (
-          <button className="btn" disabled={!!busy} onClick={() => act({ action: 'sync' }, 'sync')}>
+          <button className="btn" disabled={!!busy} onClick={pull}>
             {busy === 'sync' ? 'Pulling…' : 'Pull now'}
           </button>
         )}
@@ -210,7 +230,7 @@ function Balances({ bal }) {
                     {cad(a.current, a.currency)}{a.type === 'credit' && <span className="hint" style={{ fontSize: 11 }}> owed</span>}
                   </td>
                   <td style={{ textAlign: 'right' }}>{a.type === 'credit' ? '—' : cad(a.available, a.currency)}</td>
-                  <td style={{ fontSize: 12, color: 'var(--muted)' }}>{a.asOf ? new Date(a.asOf).toLocaleString('en-CA') : 'recent'}</td>
+                  <td style={{ fontSize: 12, color: 'var(--muted)' }}>{a.asOf ? new Date(a.asOf).toLocaleString('en-CA') : 'not stamped by the bank'}</td>
                 </tr>
               ))}
               {cash.length > 1 && (
@@ -221,7 +241,7 @@ function Balances({ bal }) {
         </div>
       )}
       <p className="hint" style={{ margin: '6px 0 0' }}>
-        The bank&apos;s balance as of its last update, refreshed with each new batch of transactions — it can run a few hours behind your banking app.
+        Shown as the bank last reported it. If the time on a row is old or missing, press Pull now: that asks the bank for the balance this minute.
       </p>
       {errors.length > 0 && <div className="error-box" style={{ marginTop: 8 }}>{errors.join(' · ')}</div>}
     </div>

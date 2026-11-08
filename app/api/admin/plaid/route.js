@@ -2,7 +2,7 @@
 // account is an access grant, not a selling-surface action.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { createLinkToken, exchangePublicToken, syncPlaidTransactions, plaidDisconnect, plaidStatus, plaidBalances } from '../../../../lib/plaid';
+import { createLinkToken, exchangePublicToken, syncPlaidTransactions, plaidDisconnect, plaidStatus, plaidBalances, refreshFromBank, liveBalances } from '../../../../lib/plaid';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -32,6 +32,14 @@ export async function POST(req) {
     if (b.action === 'sync') {
       const r = await syncPlaidTransactions();
       return NextResponse.json({ ok: true, ...r });
+    }
+    // "Pull now": ask the bank itself, THEN read what Plaid has, THEN take the live balance, and
+    // say what each step did. Plain sync alone only re-reads Plaid's cached copy.
+    if (b.action === 'pull') {
+      const notes = await refreshFromBank();
+      const r = await syncPlaidTransactions();
+      const bal = await liveBalances();
+      return NextResponse.json({ ok: true, ...r, notes, balances: bal });
     }
     if (b.action === 'disconnect') {
       await plaidDisconnect(b.itemId);
