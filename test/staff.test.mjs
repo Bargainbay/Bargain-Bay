@@ -114,8 +114,9 @@ test('the migration creates the table with the rules it needs', async () => {
   assert(badRole, 'an unknown role must be refused by the CHECK constraint');
 });
 
-test('only the two roles exist', () => {
-  equal(ROLES, ['admin', 'sales'], 'adding a role is a decision, not a diff');
+test('only these roles exist', () => {
+  // sales_rep (the Sales Hub's business-development rep) was added deliberately, 2026-11-08.
+  equal(ROLES, ['admin', 'sales', 'sales_rep'], 'adding a role is a decision, not a diff');
 });
 
 suite('staff roles — the cache');

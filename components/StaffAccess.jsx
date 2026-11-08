@@ -61,6 +61,7 @@ export default function StaffAccess() {
           <label htmlFor="sa-role">Role</label>
           <select id="sa-role" value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="sales">Sales</option>
+            <option value="sales_rep">Business development rep (Sales Hub)</option>
             <option value="admin">Admin</option>
           </select>
         </div>

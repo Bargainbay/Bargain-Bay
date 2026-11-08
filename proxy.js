@@ -36,6 +36,7 @@ const ALLOWED = [
   /^\/admin(\/|$)/,
   /^\/driver(\/|$)/,
   /^\/clock$/,
+  /^\/sales(\/|$)/,
   /^\/d\/[^/]+$/,
   /^\/api(\/|$)/,
   /^\/invoice(\/|$)/,

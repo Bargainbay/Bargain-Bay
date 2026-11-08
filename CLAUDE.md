@@ -5034,3 +5034,21 @@ per scheduled job or assistant. **Nothing is simulated.**
   `recordHeartbeat`; history starts the day 0049 is applied, and until then the lifetime run count stands in). The castle levels from BUSINESS
   RESULTS (10 per order placed, stop delivered and invoice paid, 1 per customer message). Each building also shows its own business figure.
   Level n needs base * n * (n - 1) / 2 XP. A streak counts days since the last failure, so weekly jobs keep theirs.
+
+## The Sales Hub (/sales) — PR 1 (added 2026-11-08)
+For John Tobias (Business Development Manager, starts 2026-11-09). Plan: three PRs; this is the first.
+`app/sales/*` (Home, Leads, Catalog, Resources), `app/api/sales/leads`, `lib/leads.js`, `lib/lead-rules.js` (no imports),
+`lib/sales-access.js` (`hubViewer`: a rep or an admin, built from the SESSION), `lib/sales-page.js`, `lib/sales-content.js`
+(the Drive toolkit as data), migrations `0053_sales_rep_role` + `0054_leads` (**run Run schema migration after deploy**),
+`test/sales-role.test.mjs`, `test/leads.test.mjs`.
+- **`sales_rep` is its own role** (`SALES_REP_EMAILS` or a `staff_access` grant, "Business development rep" on Staff access).
+  A rep is also `isSales` (shared selling pages open) but never admin. **`canSeeCost(session)` = admin or rep** is the ONE
+  place cost visibility is decided; a plain `sales` associate stays cost-blind. PR 1 shows no cost anywhere yet.
+- **A rep sees only their own leads**; the pool and everyone else's are admin's. A duplicate (email / phone / folded company name)
+  is blocked and names the owner. First real touch (not a note) stops the 24h clock; 60 days from the last activity returns
+  the lead to the pool (nightly, `returnStaleLeads`). **Won is never set by hand** — it will come from a recorded payment (PR 3).
+- The Bargain Bay | RS Solutions | All toggle is a cookie (`bb_hub_side`) and a FILTER, not a permission.
+- `/sales` is in `proxy.js`'s allow-list and in the admin-MFA protected paths (affects only ADMIN_EMAILS admins). `/admin` sends a
+  rep to `/sales`. The quota card needs the rep's name on the team list (`lib/reps.js`) to match their invoices.
+- NOT yet built (PR 2/3, see the plan): live profit on quotes, services catalog, rep holds, In-house/Mobile day, accounts, pipeline
+  board, payment attribution and the 1% / 1.5% / 2% daily commission. Lead auto-reply/parsers (Addendum 2) need decisions first.
