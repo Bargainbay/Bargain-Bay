@@ -2,14 +2,17 @@
 import { useEffect, useState, useRef } from 'react';
 import { getCart, removeFromCart, clearCart, onCartChange } from '../../lib/cart';
 import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS, CARD_PAYMENTS_ENABLED, ETRANSFER_EMAIL } from '../../lib/constants';
+import { priceAddons } from '../../lib/addons';
+import CheckoutAddOns from '../../components/CheckoutAddOns';
 import { shipmentCount, notPickable } from '../../lib/marketplace-rules';
 import { loadGoogleMaps, placesReady, mapsKey } from '../../lib/maps';
 import HoneypotField from '../../components/HoneypotField';
 import MarketingOptIn, { CONSENT_TEXT } from '../../components/MarketingOptIn';
 import { initiateCheckout, purchase, newEventId } from '../../lib/fpixel';
 
-export default function CheckoutClient({ catalog, session, prefill }) {
+export default function CheckoutClient({ catalog, session, prefill, addonOverrides = {} }) {
   const [skus, setSkus] = useState(null);
+  const [addonSel, setAddonSel] = useState({});
   const [form, setForm] = useState({
     name: session?.name || prefill?.name || '',
     email: session?.email || '',
@@ -151,8 +154,10 @@ export default function CheckoutClient({ catalog, session, prefill }) {
   // better one, exactly as the server will decide.
   const shown = applied && (!auto || applied.discount >= auto.discount) ? applied : auto;
   const discount = shown ? Math.min(shown.discount, subtotal) : 0;
-  const hst = round2((subtotal - discount + delivery) * HST_RATE);
-  const total = round2(subtotal - discount + delivery + hst);
+  // Installation / haul-away add-ons: only on a delivery order; the server prices them again.
+  const addons = priceAddons(addonSel, items, { deliveryMethod: method, priceOverrides: addonOverrides });
+  const hst = round2((subtotal - discount + addons.total + delivery) * HST_RATE);
+  const total = round2(subtotal - discount + addons.total + delivery + hst);
   const creditUsed = creditApplied ? round2(Math.min(creditApplied.balance, total)) : 0;
   const dueNow = round2(total - creditUsed);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -202,6 +207,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           skus, ...form, deliveryMethod: method,
+          addons: addons.lines.map((l) => ({ sku: l.sku, key: l.key })),
           couponCode: applied ? applied.code : '',
           storeCreditCode: creditApplied ? creditApplied.code : '',
           // The sentence they were actually shown travels with the tick. That
@@ -305,6 +311,7 @@ export default function CheckoutClient({ catalog, session, prefill }) {
                   <span className="sub" style={{ display: 'block' }}>Pickering &amp; area (within ~50 km of Pickering). To your door / ground floor. Farther out? Email us for a freight quote.</span>
                 </span>
               </label>
+              {method === 'delivery' && <CheckoutAddOns items={items} selection={addonSel} onChange={setAddonSel} priceOverrides={addonOverrides} />}
               {method === 'delivery' && (
                 <div style={{ marginTop: 12 }}>
                   <div className="field">
@@ -375,6 +382,11 @@ export default function CheckoutClient({ catalog, session, prefill }) {
                 <span>{shown.auto ? 'Automatic discount' : `Promo ${shown.code}`}{shown.label ? ` (${shown.label})` : ''}</span><span>−{money(discount)}</span>
               </div>
             )}
+            {addons.lines.map((l) => (
+              <div className="summary-row" key={`${l.sku}-${l.key}`}>
+                <span style={{ paddingRight: 10 }}>{l.description.replace(/ \([^)]*\)$/, '')}</span><span>{money(l.amount)}</span>
+              </div>
+            ))}
             <div className="summary-row"><span>{method === 'delivery' ? 'Local delivery' : 'Warehouse pickup'}</span><span>{delivery ? money(delivery) : 'Free'}</span></div>
             <div style={{ margin: '10px 0 4px' }}>
               {applied ? (

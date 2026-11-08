@@ -5100,3 +5100,27 @@ tests `quote-profit`, `sales-phase2`, `sales-api-access`.
   releases only their own, an admin any, and an ORDER's reservation is never touched by this code.
 - Pipeline board moves cards with arrows or drag; **Won is not a column you can drop on** (payment-driven, PR 3); Lost asks why.
 - Known gap: a CHARGED service is an untied line on the quote, so at conversion it is counted as a line with no unit.
+
+## Online-order add-ons: installation and haul-away (added 2026-11-08)
+`lib/addons.js` (PURE, no imports: the rate-sheet definitions, eligibility, `priceAddons`), `lib/addon-prices.js` (reads the owner's
+overrides from the `services` catalog), `components/CheckoutAddOns.jsx`, wired into `app/api/checkout/route.js`,
+`app/checkout/{page,CheckoutClient}.jsx`, `test/addons.test.mjs`. Prices are the "RS Solutions Delivery Rate Sheet 2026": haul-away
+$20, laundry install $40, stacking/pedestal $75, dishwasher $120, electric wall oven $175, fridge waterline existing $25 / new $150,
+gas dryer or range $250, OTR microwave or range hood $125.
+- **The server prices them; the browser's figure is never used.** A selection that does not hold (unknown add-on, unit not in the
+  cart, wrong kind of appliance, two alternatives from one group, a pickup order) is DROPPED, never charged, and the sale still goes
+  through. Only on DELIVERY orders and only on OUR units (not a marketplace seller's, not Vesta's).
+- **They ride INSIDE `orders.subtotal` as `order_items` of kind `service`.** The delivery fee is inferred everywhere as
+  total − subtotal − hst; add-ons left outside the subtotal would become an inflated "delivery fee". HST applies to them; a promo
+  never discounts them; they are on the web invoice and the Stripe line items.
+- **Dispatch reads them with no new code**: every add-on name says "installation" or "Haul-away", which is what
+  `isInstallLine` / `isHaulAwayLine` look for, so the stop is tagged `install` / `haul_away` and the packing slip lists them
+  (a test pins that every add-on name is recognised).
+- **The price catalog (`/admin/sales-services`) is the owner's control**: a service with the add-on's NAME overrides its price, and
+  switching it off (not active) removes it from checkout. No row, or a failed read = the rate-sheet price. Do not rename those
+  services without changing `ADDONS` in `lib/addons.js`.
+- The starting list is now the whole rate sheet (delivery zones $95/$140/$225 at $75 internal cost, accessorials, installs, haul-away at
+  $20 internal cost). "Add the starting list" fills a still-blank price on a row that exists, never overwrites an edit, and switches off
+  the two names the earlier list used. Not loaded: the completion-status percentages and the $2/km charge past Zone C (billing rules,
+  no per-km unit in the catalog).
+- **Heads-up for the owner:** haul-away sells online at $20 and our internal cost for it is $20, so it earns nothing.

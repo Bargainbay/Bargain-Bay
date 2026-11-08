@@ -9,6 +9,8 @@ import {
   sessionCookieOptions, SESSION_COOKIE, normalizeEmail, validEmail
 } from '../../../lib/auth';
 import { round2, money, HST_RATE, DELIVERY_FEE, CARD_PAYMENTS_ENABLED, SERVICE_EMAIL } from '../../../lib/constants';
+import { priceAddons } from '../../../lib/addons';
+import { loadAddonOverrides } from '../../../lib/addon-prices';
 import { shipmentCount, planVendorOrders } from '../../../lib/marketplace-rules';
 import { createVendorOrdersTx } from '../../../lib/vendor-orders';
 import { resolvePrices } from '../../../lib/pricing';
@@ -221,8 +223,24 @@ export async function POST(req) {
   const shipments = Math.max(1, shipmentCount(items));
   const deliveryFee = deliveryMethod === 'delivery' ? round2(DELIVERY_FEE * shipments) : 0;
   const discounted = round2(Math.max(0, subtotal - discount));
-  const hst = round2((discounted + deliveryFee) * HST_RATE);
-  const total = round2(discounted + deliveryFee + hst);
+  // Installation and haul-away add-ons: priced HERE from the cart and the catalog, never from
+  // the browser. Delivery orders and our own units only; anything that doesn't hold is dropped.
+  // They are services, so they carry HST, are not discounted by a promo, and ride INSIDE the
+  // order's subtotal (as order_items of kind 'service') — the delivery fee is inferred everywhere
+  // as total − subtotal − hst, so leaving them out of the subtotal would turn every add-on into
+  // an inflated "delivery fee".
+  let addonLines = [];
+  if (deliveryMethod === 'delivery' && Array.isArray(body.addons) && body.addons.length) {
+    try {
+      addonLines = priceAddons(body.addons, items, { deliveryMethod, priceOverrides: await loadAddonOverrides() }).lines;
+    } catch (e) {
+      console.error('add-on pricing failed (continuing without add-ons)', e.message);
+    }
+  }
+  const addonsTotal = round2(addonLines.reduce((a, l) => a + l.amount, 0));
+  const orderSubtotal = round2(subtotal + addonsTotal);
+  const hst = round2((discounted + addonsTotal + deliveryFee) * HST_RATE);
+  const total = round2(discounted + addonsTotal + deliveryFee + hst);
 
   // ---- store credit (authoritative; the browser's figure is never used) ----
   // A transferable code, no expiry. Unlike a promo it is REFUSED rather than
@@ -299,7 +317,7 @@ export async function POST(req) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending_payment',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,'website')
          RETURNING id`,
         [userId, email, name, phone || null, deliveryMethod,
-         address || null, city || null, postal || null, subtotal, hst, total,
+         address || null, city || null, postal || null, orderSubtotal, hst, total,
          cardOnline ? null : paymentMethod, attr.source, attr.campaign, attr.referrer,
          appliedCode, discount,
          ip, userAgent(req), verifyToken, preVerified ? new Date() : null]
@@ -316,6 +334,14 @@ export async function POST(req) {
         await client.query(
           "INSERT INTO order_items (order_id, sku, title, price, kind) VALUES ($1,$2,$3,$4,'unit')",
           [orderId, u.id, u.title || `${u.make} ${u.model}`, priceOf(u)]
+        );
+      }
+      // The add-ons a customer chose, as service lines on the order: that is what puts an
+      // installation / haul-away on the dispatch stop and on the packing slip.
+      for (const l of addonLines) {
+        await client.query(
+          "INSERT INTO order_items (order_id, sku, title, price, kind) VALUES ($1,NULL,$2,$3,'service')",
+          [orderId, l.description, l.amount]
         );
       }
       // Book the redemption in the same transaction as the order it belongs to —
@@ -379,6 +405,7 @@ export async function POST(req) {
       items: [
         ...items.map((u) => ({ description: u.title || `${u.make} ${u.model}`, amount: priceOf(u), sku: u.id })),
         ...(deliveryFee ? [{ description: shipments > 1 ? `Delivery (${shipments} shipments)` : 'Local delivery (Pickering & area)', amount: deliveryFee, kind: 'service' }] : []),
+        ...addonLines.map((l) => ({ description: l.description, amount: l.amount, kind: 'service' })),
         // The discount rides as a negative service line, so the invoice totals
         // what the customer actually pays and the code is on the paperwork.
         ...(discount ? [{ description: promoLabel, amount: -discount, kind: 'discount' }] : [])
@@ -422,6 +449,7 @@ export async function POST(req) {
           priceCents: Math.round(priceOf(u) * 100)
         })),
         ...(deliveryFee ? [{ name: 'Local delivery (Pickering & area)', priceCents: Math.round(deliveryFee * 100) }] : []),
+        ...addonLines.map((l) => ({ name: l.description, priceCents: Math.round(l.amount * 100) })),
         ...(discount ? [{ name: promoLabel, priceCents: -Math.round(discount * 100) }] : []),
         { name: 'HST 13% (Ontario)', priceCents: Math.round(hst * 100) }
       ];
@@ -452,8 +480,9 @@ export async function POST(req) {
     // Customer receipt + owner alert (fire-and-forget; never blocks the order).
     sendOrderEmails(
       { orderNumber: order.orderNumber, name, email, deliveryMethod, address, city, postal,
-        subtotal, hst, total, paymentMethod, discount, couponCode: appliedCode, storeCredit: creditToUse },
-      items.map((u) => ({ title: u.title || `${u.make} ${u.model}`, price: priceOf(u) }))
+        subtotal: orderSubtotal, unitCount: items.length, hst, total, paymentMethod, discount, couponCode: appliedCode, storeCredit: creditToUse },
+      [...items.map((u) => ({ title: u.title || `${u.make} ${u.model}`, price: priceOf(u) })),
+       ...addonLines.map((l) => ({ title: l.description, price: l.amount }))]
     ).catch((e) => console.error('order emails failed', e.message));
     // Confirm-it's-really-you link. The unit is ALREADY held at this point, so a
     // genuine buyer never races anyone while they go find the email; not clicking
