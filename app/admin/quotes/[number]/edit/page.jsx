@@ -1,5 +1,8 @@
 import { redirect, notFound } from 'next/navigation';
-import { getSession, isAdmin, isStaff } from '../../../../../lib/auth';
+import { getSession, isAdmin, isStaff, canSeeCost } from '../../../../../lib/auth';
+import { listServices } from '../../../../../lib/sales-services';
+import { getSetting } from '../../../../../lib/settings';
+import { LOW_PROFIT_DEFAULT } from '../../../../../lib/quote-profit';
 import { hasDb } from '../../../../../lib/db';
 import { getQuoteByNumber } from '../../../../../lib/quotes';
 import { listLeadSenders } from '../../../../../lib/invoices';
@@ -87,6 +90,12 @@ export default async function EditQuotePage({ params }) {
   };
   const senders = await listLeadSenders().catch(() => []);
 
+  let profit = null;
+  if (canSeeCost(session)) {
+    const th = Number(await getSetting('low_profit_threshold', LOW_PROFIT_DEFAULT));
+    profit = { services: await listServices().catch(() => []), threshold: Number.isFinite(th) ? th : LOW_PROFIT_DEFAULT };
+  }
+
   return (
     <div>
       <AdminNav active="quotes" salesOnly={!isAdmin(session)} />
@@ -99,7 +108,7 @@ export default async function EditQuotePage({ params }) {
           Same quote number, updated numbers — the customer gets the revised quote by email and their existing
           link shows the new version. Validity restarts from today.
         </p>
-        <QuoteBuilder inventory={inventory} customers={customers} initial={initial} editQuote={editQuote} senders={senders} />
+        <QuoteBuilder inventory={inventory} customers={customers} initial={initial} editQuote={editQuote} senders={senders} profit={profit} />
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import LeadSource, { whatsWrongWithLead } from './LeadSource';
 import { searchStockUnits } from '../lib/stock-match';
+import ProfitPanel from './ProfitPanel';
 
 const blankItem = () => ({ description: '', retail: '', amount: '', sku: '' });
 
@@ -46,7 +47,9 @@ const fmt = (n) => '$' + (Number(n) || 0).toLocaleString('en-CA', { minimumFract
 
 // editQuote = { quoteId, number, bundlePct, cashDeal, freeDelivery, addHst, daysValid, memo, leadSource, leadBy }
 // switches the builder into edit-in-place mode: same Q- number, PATCH instead of create.
-export default function QuoteBuilder({ inventory = [], customers = [], initial = null, editQuote = null, senders = [] }) {
+// `profit` = { services, threshold } turns on the live profit panel; the page passes it ONLY to a
+// login that may see cost (admin or the business-development rep), and the cost route refuses anyone else.
+export default function QuoteBuilder({ inventory = [], customers = [], initial = null, editQuote = null, senders = [], profit = null }) {
   const [name, setName] = useState(initial?.name || '');
   const [email, setEmail] = useState(initial?.email || '');
   const [items, setItems] = useState(
@@ -75,6 +78,14 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
 
   const setItem = (i, k, v) => setItems((xs) => xs.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
   const addRow = () => setItems((xs) => [...xs, blankItem()]);
+  // A CHARGED service is a real line on the quote (the customer pays it); an INCLUDED one is not a line at all.
+  const setServiceLine = (serviceId, line) => setItems((xs) => {
+    const rest = xs.filter((it) => it.serviceId !== serviceId);
+    if (!line) return rest.length ? rest : [blankItem()];
+    const empty = rest.findIndex((it) => !it.description && !it.amount && !it.sku);
+    const row = { description: line.description, retail: '', amount: line.amount, sku: '', serviceId };
+    return empty >= 0 ? rest.map((it, j) => (j === empty ? row : it)) : [...rest, row];
+  });
   const removeRow = (i) => setItems((xs) => (xs.length > 1 ? xs.filter((_, j) => j !== i) : xs));
 
   // Tokenize: every word in the query must appear somewhere in the unit's
@@ -128,7 +139,7 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
     // A line with no unit is allowed — a quote is often for something that
     // hasn't arrived — but it is never the DEFAULT. Say which lines they are,
     // because at conversion they become invoice lines that mark nothing sold.
-    const untied = items.filter((it) => !it.sku && it.description.trim() && Number(it.amount) > 0);
+    const untied = items.filter((it) => !it.sku && !it.serviceId && it.description.trim() && Number(it.amount) > 0);
     if (untied.length && !window.confirm(
       `${untied.length} line${untied.length === 1 ? " isn't" : "s aren't"} tied to a unit in stock:\n\n`
       + untied.map((it) => `  • ${it.description.trim()}`).join('\n')
@@ -287,6 +298,8 @@ export default function QuoteBuilder({ inventory = [], customers = [], initial =
       </div>
 
       <div className="panel" style={{ background: 'var(--tint)', borderColor: 'var(--line-soft)' }}>
+        {profit && <ProfitPanel items={items} bundlePct={pct} cashDeal={cashDeal} addHst={addHst} freeDelivery={freeDelivery}
+          services={profit.services} threshold={profit.threshold} setServiceLine={setServiceLine} />}
         <div className="summary-row"><span>Retail value</span><span style={{ textDecoration: 'line-through', color: 'var(--muted)' }}>{fmt(retailSubtotal)}</span></div>
         <div className="summary-row"><span>Our price subtotal</span><span>{fmt(subtotal)}</span></div>
         {pct > 0 && <div className="summary-row"><span>Bundle discount ({pct}%)</span><span>−{fmt(subtotal - bundlePrice)}</span></div>}

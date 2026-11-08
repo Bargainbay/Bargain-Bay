@@ -5,6 +5,8 @@ import { SITE_URL } from '../../../lib/site';
 import { money } from '../../../lib/constants';
 import SalesNav from '../../../components/SalesNav';
 import CopyButton from '../../../components/CopyButton';
+import { HoldButton, MyHolds } from '../../../components/HoldControls';
+import { listRepHolds } from '../../../lib/rep-holds';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Catalog — Sales Hub' };
@@ -23,6 +25,7 @@ export default async function CatalogPage({ searchParams }) {
   let units = await getAvailable().catch(() => []);
   if (q) units = units.filter((u) => `${u.make} ${u.model} ${u.title} ${u.id} ${u.category}`.toLowerCase().includes(q));
   const code = repCode(viewer.name, viewer.email);
+  const holds = await listRepHolds(viewer);
   const shown = units.slice(0, 120);
 
   return (
@@ -33,9 +36,10 @@ export default async function CatalogPage({ searchParams }) {
         <input name="q" defaultValue={sp?.q || ''} placeholder="Search model, brand, category, SKU" aria-label="Search the catalog" style={{ flex: 1 }} />
         <button className="btn" type="submit">Search</button>
       </form>
+      <MyHolds holds={holds} isAdmin={viewer.admin} />
       <div className="panel" style={{ overflowX: 'auto' }}>
         <table className="admin" style={{ minWidth: 640 }}>
-          <thead><tr><th>Unit</th><th>Condition</th><th>Retail</th><th>Price</th><th>Share</th></tr></thead>
+          <thead><tr><th>Unit</th><th>Condition</th><th>Retail</th><th>Price</th><th>Share / hold</th></tr></thead>
           <tbody>
             {shown.map((u) => {
               const link = `${SITE_URL}/product/${encodeURIComponent(u.id)}?rep=${code}`;
@@ -45,7 +49,7 @@ export default async function CatalogPage({ searchParams }) {
                   <td>{u.condition}</td>
                   <td>{u.compareAt ? money(u.compareAt) : '—'}</td>
                   <td><b>{money(u.price)}</b></td>
-                  <td><CopyButton text={link} label="Copy link" /></td>
+                  <td style={{ whiteSpace: 'nowrap' }}><CopyButton text={link} label="Copy link" /> <HoldButton sku={u.id} /></td>
                 </tr>
               );
             })}

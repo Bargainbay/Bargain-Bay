@@ -12,7 +12,9 @@ export const SIDE_COOKIE = 'bb_hub_side';
 const TABS = [
   ['/sales', 'Home'],
   ['/sales/leads', 'Leads'],
+  ['/sales/pipeline', 'Pipeline'],
   ['/sales/catalog', 'Catalog'],
+  ['/admin/quotes', 'Quotes'],
   ['/sales/resources', 'Resources']
 ];
 const SIDES = [['all', 'All'], ['bb', 'Bargain Bay'], ['rs', 'RS Solutions']];
