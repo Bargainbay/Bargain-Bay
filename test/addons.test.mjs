@@ -91,7 +91,7 @@ test('the starting list carries the rate sheet and a second press adds nothing a
   const list = await listServices();
   const get = (n) => list.find((s) => s.name === n);
   equal(get('Delivery – Zone B').defaultPrice, 140);
-  equal(get('Haul-away').defaultPrice, 20); equal(get('Haul-away').internalCost, 20);
+  equal(get('Haul-away').defaultPrice, 20); equal(get('Haul-away').internalCost, 0);
   equal(get('Dishwasher installation (basic, uninstall + install)').defaultPrice, 120);
   equal(get('Dishwasher installation (basic, uninstall + install)').internalCost, null, 'no invented cost');
   await saveService({ ...get('Haul-away'), defaultPrice: '25' });
@@ -103,7 +103,7 @@ test('the starting list carries the rate sheet and a second press adds nothing a
 test('an earlier starting list is tidied: a blank price is filled, the two retired names are switched off', async () => {
   await sharedCheckoutDb();
   await query('DELETE FROM services');
-  await saveService({ name: 'Haul-away', defaultPrice: '', internalCost: '20', costBasis: 'unit' });
+  await saveService({ name: 'Haul-away', defaultPrice: '', internalCost: '0', costBasis: 'unit' });
   await saveService({ name: 'Installation – standard', defaultPrice: '', costBasis: 'appliance' });
   await addStarterServices();
   const list = await listServices({ includeInactive: true });

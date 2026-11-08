@@ -5024,7 +5024,15 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
   the receipt; paying somebody back is not a second cost), recorded on the receipt, and such a receipt can no longer be voided; by cash writes a cash-out entry.
 - **Other money in or out** (the odd scrap-yard / invoice-less cash sale, cash taken out to deposit, a transfer not showing yet) is a collapsed form;
   `pending` entries count until cleared, with a looks-cleared HINT on an exact outgoing amount, never an automatic clear.
-- The day sheet shows bank out (all), e-transfers in (`bank_deposits`), cash sales, cash receipts and entries. Other bank deposits are not in the feed yet.
+- **Live transactions** (second section): one list of every movement (bank out, e-transfers in, cash sales, cash receipts and wages, entries, till counts),
+  Today / 7 / 30 days, newest first. A bank line can be re-categorised in place; **Wages / salary** takes no HST and offers "paid to…", which counts it as a
+  payment on that person's payroll balance.
+- **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
+  from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
+- **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the
+  payroll figure for a period) minus paid = balance. A **cash** payment books a Wages expense (source `cash`, no HST) and lowers the till; a **bank** payment
+  marks the existing e-transfer line as Wages, no HST, named for the person (no second cost) and, recorded before the bank shows it, links itself later when
+  exactly one same-amount line fits. Voided, never deleted. Paying a consignment vendor (Abi) is NOT wages: record it as other cash out ("Other money").
 - `DashboardFilters` stays on its own page (`usePathname`); it was hard-coded to the Sales dashboard.
 - **"Patterns worth a rule" reads vendor + bank description only, never the note** ("TD Canada Trust · account", identical on every row, made "trust" a
   pattern); bank and account words are also in `DESCRIPTOR_NOISE`.
@@ -5123,7 +5131,7 @@ gas dryer or range $250, OTR microwave or range hood $125.
   $20 internal cost). "Add the starting list" fills a still-blank price on a row that exists, never overwrites an edit, and switches off
   the two names the earlier list used. Not loaded: the completion-status percentages and the $2/km charge past Zone C (billing rules,
   no per-km unit in the catalog).
-- **Heads-up for the owner:** haul-away sells online at $20 and our internal cost for it is $20, so it earns nothing.
+- Haul-away internal cost is $0 (owner, 2026-11-08), so the $20 is all margin. The code default is 0 (a real zero, not blank); a row already in the live catalog keeps its saved cost until edited on /admin/sales-services.
 
 ### Sales Hub phase 3 (added 2026-11-08): Collected Sales and the rep's daily commission
 `lib/commission-tiers.js` (PURE), `lib/sales-commission.js`, migration `0056_sales_commission` (**run Run schema migration**),
