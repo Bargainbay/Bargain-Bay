@@ -5061,8 +5061,8 @@ tests `quote-profit`, `sales-phase2`, `sales-api-access`.
 - **Profit = price (ex-HST) − unit costs − internal cost of EVERY service included, charged or free.** CHARGED adds a real line to
   the quote (price in revenue, cost off); INCLUDED is not a line, only its cost comes off. Yellow under the low-profit setting
   (`low_profit_threshold`, default $100), red under $0, never blocks. A cost nobody entered is NULL, counted as $0 and REPORTED.
-- **THE SPEC'S WORKED EXAMPLE IS OFF BY $100**: "$2,000 sold, $1,550 cost -> $350" (it is $450). 255 and 355 only work with a $1,650
-  cost, so the test uses $1,650. Confirm with the owner which he meant.
+- **The spec's worked example prints the wrong profits** (Addendum 1 section B: "$2,000 sold, $1,550 cost -> $350"; it is $450). The owner confirmed the
+  cost is $1,550 (2026-11-08), so the correct figures are 450 -> 355 (delivery and haul-away included) -> 455 (delivery charged at $100). The test pins those.
 - **Cost is shown only to `canSeeCost`** (admin or rep): `/api/sales/profit` is the one route that returns a cost, and the quote pages
   pass `profit` to the builder only for those logins (services' internal costs are not even sent to anyone else). A plain sales
   associate sees the quote builder exactly as before.

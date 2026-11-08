@@ -1,29 +1,29 @@
 // lib/quote-profit.js — live profit on a quote.
 //
-// THE WORKED EXAMPLE IN THE SPEC IS OFF BY $100, and this test pins the corrected one.
-// The spec (Addendum 1 section B) says "$2,000 sold, $1,550 cost -> profit $350", but
-// 2,000 - 1,550 is 450. Every later figure in that example (255 and 355) only works if
-// the cost was $1,650, so that is the cost used here. If the owner meant $1,550, the
-// numbers in the spec are what is wrong, not this arithmetic.
+// THE WORKED EXAMPLE IN THE SPEC (Addendum 1 section B) PRINTS THE WRONG PROFITS, and this
+// test pins the correct ones. The spec: "$2,000 sold, $1,550 cost -> profit $350" — but
+// 2,000 - 1,550 is 450, and the owner confirmed (2026-11-08) that $1,550 is the cost. The
+// two figures after it carry the same $100 slip. Correct: 450, then 355 with delivery and
+// haul-away included (450 - 75 - 20), then 455 with delivery switched to charged at $100.
 import { suite, test, equal } from './_harness.mjs';
 import { quoteProfit, profitLabel, costUnits } from '../lib/quote-profit.js';
 
-const fridge = { amount: 2000, cost: 1650, isUnit: true };
+const fridge = { amount: 2000, cost: 1550, isUnit: true };
 const DELIVERY = { name: 'Delivery', internalCost: 75, costBasis: 'order', qty: 1 };
 const HAUL = { name: 'Haul-away', internalCost: 20, costBasis: 'unit', qty: 1 };
 
 suite('quote profit — the worked example');
 
-test('a bare unit: price less cost', () => equal(quoteProfit({ lines: [fridge] }).profit, 350));
+test('a bare unit: price less cost', () => equal(quoteProfit({ lines: [fridge] }).profit, 450));
 
 test('delivery and haul-away INCLUDED: only their internal cost comes off', () => {
   const p = quoteProfit({ lines: [fridge], services: [{ ...DELIVERY, mode: 'included' }, { ...HAUL, mode: 'included' }] });
-  equal(p.profit, 255); equal(p.serviceCost, 95); equal(p.revenue, 2000);
+  equal(p.profit, 355); equal(p.serviceCost, 95); equal(p.revenue, 2000);
 });
 
 test('delivery switched to CHARGED at $100: revenue +100, its cost still comes off', () => {
   const p = quoteProfit({ lines: [fridge], services: [{ ...DELIVERY, mode: 'charged', price: 100 }, { ...HAUL, mode: 'included' }] });
-  equal(p.profit, 355); equal(p.revenue, 2100);
+  equal(p.profit, 455); equal(p.revenue, 2100);
 });
 
 suite('quote profit — flags, units, holes');
@@ -52,6 +52,6 @@ test('a cost nobody entered is reported, not treated as free', () => {
 test('bundle discount and a cash deal change revenue; the cash deal comes back out of HST', () => {
   equal(quoteProfit({ lines: [fridge], bundlePct: 10 }).revenue, 1800);
   const cash = quoteProfit({ lines: [fridge], cashTotal: 2260, addHst: true });
-  equal(cash.revenue, 2000); equal(cash.profit, 350);
+  equal(cash.revenue, 2000); equal(cash.profit, 450);
   equal(quoteProfit({ lines: [fridge], cashTotal: 2000, addHst: false }).revenue, 2000);
 });
