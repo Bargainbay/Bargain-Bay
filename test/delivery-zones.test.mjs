@@ -2,7 +2,7 @@
 // What must hold: the rate-sheet zones and their edges, the owner's catalog overrides, an
 // unknown distance is Zone A AND flagged (never an invented distance), seller shipments stay flat.
 import { suite, test, assert, equal } from './_harness.mjs';
-import { deliveryFeeForKm, deliveryTotal, DELIVERY_ZONES } from '../lib/delivery-zones.js';
+import { deliveryFeeForKm, deliveryTotal, freeDeliveryApplies, DELIVERY_ZONES } from '../lib/delivery-zones.js';
 
 suite('delivery zones — the rate sheet');
 
@@ -49,4 +49,17 @@ test('our shipment is priced by distance; each self-shipping seller stays the fl
 
 test('the three zones are the owner\'s starting-list names', () => {
   equal(DELIVERY_ZONES.map((z) => z.name), ['Delivery – Zone A', 'Delivery – Zone B', 'Delivery – Zone C']);
+});
+
+suite('delivery zones — free over $5,000');
+
+test('free local delivery: strictly over $5,000, never past 150 km, our shipment only', () => {
+  const q = (km) => deliveryFeeForKm(km);
+  equal(freeDeliveryApplies(5000, q(30)), false, 'exactly $5,000 is not over');
+  equal(freeDeliveryApplies(5000.01, q(30)), true);
+  equal(freeDeliveryApplies(6000, q(140)), true, 'Zone C is local');
+  equal(freeDeliveryApplies(6000, q(170)), false, 'past 150 km is not local');
+  equal(freeDeliveryApplies(6000, q(null)), true, 'an unmeasured address is flagged elsewhere, not charged more');
+  equal(deliveryTotal([ours], 140, 79, { free: true }).total, 0);
+  equal(deliveryTotal([ours, seller(1)], 140, 79, { free: true }).total, 79, 'the seller ships their own');
 });

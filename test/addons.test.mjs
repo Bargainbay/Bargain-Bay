@@ -223,3 +223,18 @@ test('the owner\'s catalog price for a zone is what checkout charges', async () 
     equal(feeOf(await order((await res.json()).orderNumber)), 150);
   });
 });
+
+test('goods over $5,000 ship free within 150 km, and not beyond it', async () => {
+  await sharedCheckoutDb(); await query('DELETE FROM services');
+  await query(`INSERT INTO products (sku, make, model, category, title, condition, price, cost, active) VALUES ('BIG-1','Sub-Zero','BI48','Refrigerator','Sub-Zero fridge','Refurbished',5200,3000,true)`);
+  await query(`INSERT INTO products (sku, make, model, category, title, condition, price, cost, active) VALUES ('BIG-2','Wolf','R48','Range','Wolf range','Refurbished',5200,3000,true)`);
+  await withDistance(68000, async () => {
+    const res = await call({ skus: ['BIG-1'], deliveryMethod: 'delivery', address: '1 Free Way', city: 'Town', postal: 'L1V 1A1' });
+    equal(res.status, 200);
+    equal(feeOf(await order((await res.json()).orderNumber)), 0, 'free local delivery');
+  });
+  await withDistance(180000, async () => {
+    const res = await call({ skus: ['BIG-2'], deliveryMethod: 'delivery', address: '2 Far Way', city: 'Faraway', postal: 'L1V 1A1' });
+    equal(feeOf(await order((await res.json()).orderNumber)), 285, 'past 150 km is still charged');
+  });
+});

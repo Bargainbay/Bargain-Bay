@@ -12,7 +12,7 @@ import { round2, money, HST_RATE, DELIVERY_FEE, CARD_PAYMENTS_ENABLED, SERVICE_E
 import { priceAddons } from '../../../lib/addons';
 import { loadAddonOverrides } from '../../../lib/addon-prices';
 import { quoteDelivery } from '../../../lib/delivery-fee';
-import { deliveryTotal } from '../../../lib/delivery-zones';
+import { deliveryTotal, freeDeliveryApplies } from '../../../lib/delivery-zones';
 import { shipmentCount, planVendorOrders } from '../../../lib/marketplace-rules';
 import { createVendorOrdersTx } from '../../../lib/vendor-orders';
 import { resolvePrices } from '../../../lib/pricing';
@@ -230,7 +230,7 @@ export async function POST(req) {
   let deliveryFee = 0;
   if (deliveryMethod === 'delivery') {
     deliveryQuote = await quoteDelivery({ address, city, postal });
-    deliveryFee = deliveryTotal(items, deliveryQuote.fee, DELIVERY_FEE).total;
+    deliveryFee = deliveryTotal(items, deliveryQuote.fee, DELIVERY_FEE, { free: freeDeliveryApplies(round2(Math.max(0, subtotal - discount)), deliveryQuote) }).total;
   }
   const discounted = round2(Math.max(0, subtotal - discount));
   // Installation and haul-away add-ons: priced HERE from the cart and the catalog, never from

@@ -37,7 +37,7 @@ export default function ShippingPage() {
         </tbody>
       </table>
       <ul>
-        <li><b>Free local delivery on orders over $5,000.</b></li>
+        <li><b>Free local delivery on orders over $5,000</b> (goods, after any discount, before tax) to addresses within 150 km of Pickering. Beyond 150 km the per-km charge still applies.</li>
         <li>Delivery is to your door/ground floor. We are not responsible for installation, hookup (water/gas/electrical), or removal of old units unless arranged in advance.</li>
       </ul>
 

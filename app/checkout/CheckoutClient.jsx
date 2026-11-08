@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { getCart, removeFromCart, clearCart, onCartChange } from '../../lib/cart';
 import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS, CARD_PAYMENTS_ENABLED, ETRANSFER_EMAIL } from '../../lib/constants';
 import { priceAddons } from '../../lib/addons';
-import { deliveryTotal, DELIVERY_ZONES } from '../../lib/delivery-zones';
+import { deliveryTotal, freeDeliveryApplies, DELIVERY_ZONES, FREE_DELIVERY_OVER } from '../../lib/delivery-zones';
 import CheckoutAddOns from '../../components/CheckoutAddOns';
 import { shipmentCount, notPickable } from '../../lib/marketplace-rules';
 import { loadGoogleMaps, placesReady, mapsKey } from '../../lib/maps';
@@ -173,12 +173,13 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
   const sellerShips = [...new Set(items.filter((u) => u.marketplace && u.lane === 'C').map((u) => u.vendor?.name).filter(Boolean))];
   // Until the address is measured, show the lowest zone fee; the line says so.
   const zoneFee = zone ? zone.fee : DELIVERY_ZONES[0].fee;
-  const delivery = method === 'delivery' ? deliveryTotal(items, zoneFee, DELIVERY_FEE).total : 0;
   const subtotal = round2(items.reduce((a, u) => a + Number(u.price), 0));
   // A typed code and an automatic promotion never stack; the shopper gets the
   // better one, exactly as the server will decide.
   const shown = applied && (!auto || applied.discount >= auto.discount) ? applied : auto;
   const discount = shown ? Math.min(shown.discount, subtotal) : 0;
+  const freeShip = method === 'delivery' && freeDeliveryApplies(round2(Math.max(0, subtotal - discount)), zone || { zone: 'A' });
+  const delivery = method === 'delivery' ? deliveryTotal(items, zoneFee, DELIVERY_FEE, { free: freeShip }).total : 0;
   // Installation / haul-away add-ons: only on a delivery order; the server prices them again.
   const addons = priceAddons(addonSel, items, { deliveryMethod: method, priceOverrides: addonOverrides });
   const hst = round2((subtotal - discount + addons.total + delivery) * HST_RATE);
@@ -332,7 +333,7 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
               <label className={'radio-card' + (method === 'delivery' ? ' active' : '')}>
                 <input type="radio" name="deliveryMethod" value="delivery" checked={method === 'delivery'} onChange={() => setForm((f) => ({ ...f, deliveryMethod: 'delivery', paymentMethod: 'etransfer' }))} />
                 <span>
-                  <b>Delivery — {zone ? `${money(zone.fee)} · ${zone.label}` : zoneBusy ? 'pricing your address…' : `from ${money(DELIVERY_ZONES[0].fee)}, priced by distance`}{shipments > 1 ? ` (+ ${money(DELIVERY_FEE)} per seller shipment)` : ''}</b>
+                  <b>Delivery — {freeShip ? `FREE over ${money(FREE_DELIVERY_OVER)}` : zone ? `${money(zone.fee)} · ${zone.label}` : zoneBusy ? 'pricing your address…' : `from ${money(DELIVERY_ZONES[0].fee)}, priced by distance`}{shipments > 1 ? ` (+ ${money(DELIVERY_FEE)} per seller shipment)` : ''}</b>
                   <span className="sub" style={{ display: 'block' }}>Priced by driving distance from our Pickering warehouse once you enter your address. To your door / ground floor.</span>
                 </span>
               </label>
@@ -412,7 +413,7 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
                 <span style={{ paddingRight: 10 }}>{l.description.replace(/ \([^)]*\)$/, '')}</span><span>{money(l.amount)}</span>
               </div>
             ))}
-            <div className="summary-row"><span>{method === 'delivery' ? (zone && shipments === 1 ? `Delivery — ${zone.label}` : 'Delivery') : 'Warehouse pickup'}</span><span>{delivery ? money(delivery) : 'Free'}</span></div>
+            <div className="summary-row"><span>{method === 'delivery' ? (zone && shipments === 1 ? `Delivery — ${zone.label}${freeShip ? ' — free over $5,000' : ''}` : 'Delivery') : 'Warehouse pickup'}</span><span>{delivery ? money(delivery) : 'Free'}</span></div>
             <div style={{ margin: '10px 0 4px' }}>
               {applied ? (
                 <div className="hint" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>

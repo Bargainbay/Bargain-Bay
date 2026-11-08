@@ -5125,7 +5125,10 @@ tests `quote-profit`, `sales-phase2`, `sales-api-access`.
 - **Our shipment is distance-priced; a marketplace seller's own shipment (lane C) stays the flat `DELIVERY_FEE` ($79)** — it does not ship
   from Pickering. `createVendorOrdersTx` still receives the flat fee in `feeCents`.
 - `/policies/shipping` reads the same `DELIVERY_ZONES`, so it shows the standard rate sheet; checkout shows the live (catalog) price.
-  The "free over $5,000" line on that page has never been applied by checkout.
+- **Free local delivery over $5,000 is APPLIED now** (`FREE_DELIVERY_OVER`, `freeDeliveryApplies`): goods after any discount, before tax and
+  add-ons, strictly over $5,000, to an address within 150 km (or one we could not measure, which is flagged anyway). It waives OUR shipment's
+  zone fee only; past 150 km the per-km charge stays and a seller's own shipment stays the flat fee. A free order has no delivery line on the
+  invoice. The browser's "free" is display only; the server decides.
 
 ## Online-order add-ons: installation and haul-away (added 2026-11-08)
 `lib/addons.js` (PURE, no imports: the rate-sheet definitions, eligibility, `priceAddons`), `lib/addon-prices.js` (reads the owner's
