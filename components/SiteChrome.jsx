@@ -30,7 +30,7 @@ export default function SiteChrome({ children, promo = null }) {
   // The workshop page is RS Solutions' own landing page: it draws its own header
   // and footer, and the storefront's cart, chat and cart-capture have no business on it.
   if (path === '/workshop') return <>{children}</>;
-  const isPortal = path.startsWith('/admin') || path.startsWith('/driver') || path.startsWith('/clock');
+  const isPortal = path.startsWith('/admin') || path.startsWith('/driver') || path.startsWith('/clock') || path.startsWith('/sales');
   if (isPortal) return <><main className="wrap">{children}</main>{crew}</>;
   return (
     <>

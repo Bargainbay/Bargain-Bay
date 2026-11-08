@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { dispatchAccess } from '../../lib/dispatch-access';
+import { getSession, isAdmin, isSalesRep } from '../../lib/auth';
 
 // The owner portal's home base is the dashboard; /admin just lands there.
 //
@@ -11,5 +12,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminIndex() {
   const { coordinator } = await dispatchAccess();
+  // The business-development rep's home is the Sales Hub, not the owner's dashboard.
+  const session = await getSession();
+  if (session && isSalesRep(session) && !isAdmin(session)) redirect('/sales');
   redirect(coordinator ? '/admin/dispatch' : '/admin/dashboard');
 }
