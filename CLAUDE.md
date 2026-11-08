@@ -5003,26 +5003,31 @@ follow. Every other condition keeps its own (default 12). Policy text updated on
 **Not changed:** the home/layout meta descriptions, order emails and the marketplace/affiliate pages still say "one-year" generically; the
 marketplace sellers' own warranty rules are untouched.
 
-## The live bankroll, and Pull now that actually asks the bank (added 2026-11-08)
-`lib/bankroll.js`, migration `0053_bankroll` (**run Run schema migration after deploy**), `/admin/bankroll` (admin or a granted
-accountant; on the Reports hub and linked from Financial), `/api/admin/bankroll`, `components/Bankroll.jsx`, `test/bankroll.test.mjs`.
-The WhatsApp ledger, kept here: **bankroll = what the bank says is available + cash on hand + money moved but not at the bank yet.**
-- **The bank figure is only as fresh as the last time we asked, so it carries its time** (`bank_balance_snapshot` setting, written by
-  `liveBalances()`); older than `STALE_MINUTES` (120) it is shown as old, never as "now". Cached `/accounts/get` has no timestamp and was
-  $3,900 out when the real balance was $45: that is why the panel now says "not stamped by the bank".
-- **Pull now / "Get live balance" call `refreshFromBank()` (`/transactions/refresh`) then sync then `liveBalances()` (`/accounts/balance/get`,
-  billed per call).** Plain `/transactions/sync` only re-reads Plaid's own copy, which Plaid refreshes from TD about daily, so the old
-  button said "already up to date" while the account had moved. Every step reports in words; a refused refresh is shown, not swallowed.
-- **Entries a person adds** (`bankroll_entries`, append-only, voided never deleted): `cash` counts until the opposite entry is made;
-  `pending` (through the bank, not showing yet) counts until cleared. Looks-cleared is a HINT on an exact outgoing amount from its date
-  on, with a button; nothing clears itself, or a coincidence would drop real money out of the total.
-- **The day sheet shows bank money OUT (all of it), e-transfers IN (`bank_deposits`), and entries.** Other deposits (cash deposited,
-  card payouts) are not in the feed, and the page says so. Not built: capturing every money-in line from Plaid.
-- **`DashboardFilters` stays on the page it is on** (`usePathname`); it was hard-coded to `/admin/dashboard`, so the period buttons on
-  Financial, Fulfilment, Customers and Marketing all jumped to Sales.
-- **"Patterns worth a rule" reads what a line says (vendor + bank description), never its note.** A bank line's note is
-  "TD Canada Trust · <account>", identical on every row, so "trust" was a pattern joining a hot-pot lunch to the bank's statement fee.
-  The bank and account words are also in `DESCRIPTOR_NOISE`.
+## The live bankroll, receipts, and Pull now that actually asks the bank (added 2026-11-08)
+`lib/bankroll.js`, `lib/receipts.js`, `lib/receipt-read.js`, `lib/bankroll-load.js`, migrations `0053_bankroll` + `0054_receipts` (**run Run schema migration
+after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/admin/{bankroll,receipts,receipts/photo,receipts/read}`, tests
+`test/bankroll.test.mjs` + `test/receipts.test.mjs`. **The bankroll is the FIRST section of `/admin/financial`** (admin or a granted accountant);
+`/admin/bankroll` only redirects there. The WhatsApp ledger, kept here: **bankroll = bank available + cash in the till + money on its way.**
+- **The bank figure carries its age** (`bank_balance_snapshot`, written by `liveBalances()`); older than `STALE_MINUTES` (120) it is shown as old.
+  Cached `/accounts/get` has no timestamp and was $3,900 out when the real balance was $45. **Pull now / Get live balance** call
+  `refreshFromBank()` (`/transactions/refresh`), sync, then `liveBalances()` (`/accounts/balance/get`, billed per call) and say what each did.
+- **CASH is a count plus what moved since, never typed sales.** `cashOnHand` = last `count` entry + cash payments on invoices since (`invoice_payments`
+  method `cash`, already in the system) + other cash entries − cash receipts (`expenses.source = 'cash'`). No count = UNKNOWN, not zero. "Since" is
+  compared INSIDE the database against the count row (a JS Date round-trip lost microseconds and flipped the answer in tests).
+- **Adding an expense = snapping a receipt** (`receipts`, photo private in Blob via `/api/admin/receipts/photo`, optional). `readReceipt` (Claude vision,
+  `INTAKE_MODEL`) pre-fills the form and a person ALWAYS confirms. **The cost is booked exactly once, by how it was paid:**
+  `cash` creates an expense (source `cash`) and lowers the till; `personal` creates an expense (source `personal`), no bank/cash movement, owed back
+  until reimbursed; `bank` creates NOTHING (the bank feed already has the cost) and LINKS to the matching Plaid line, handing it the category and HST
+  (`cat_source` manual). Linking is automatic only on exactly ONE same-amount line within -3/+10 days; two or more are a person's pick. Receipts are typed
+  by a person, so their expense is already reviewed and never lands in the bank's To-review queue. Voided, never deleted.
+- **Paying back a personal receipt**: by bank picks the e-transfer line of the exact amount and REMOVES it from expenses (the cost is already booked from
+  the receipt; paying somebody back is not a second cost), recorded on the receipt, and such a receipt can no longer be voided; by cash writes a cash-out entry.
+- **Other money in or out** (the odd scrap-yard / invoice-less cash sale, cash taken out to deposit, a transfer not showing yet) is a collapsed form;
+  `pending` entries count until cleared, with a looks-cleared HINT on an exact outgoing amount, never an automatic clear.
+- The day sheet shows bank out (all), e-transfers in (`bank_deposits`), cash sales, cash receipts and entries. Other bank deposits are not in the feed yet.
+- `DashboardFilters` stays on its own page (`usePathname`); it was hard-coded to the Sales dashboard.
+- **"Patterns worth a rule" reads vendor + bank description only, never the note** ("TD Canada Trust · account", identical on every row, made "trust" a
+  pattern); bank and account words are also in `DESCRIPTOR_NOISE`.
 
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.

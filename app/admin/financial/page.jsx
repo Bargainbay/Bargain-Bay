@@ -11,6 +11,8 @@ import DashboardFilters from '../../../components/DashboardFilters';
 import ExpenseEditor from '../../../components/ExpenseEditor';
 import QboPanel from '../../../components/QboPanel';
 import PlaidPanel from '../../../components/PlaidPanel';
+import Bankroll from '../../../components/Bankroll';
+import { loadBankroll } from '../../../lib/bankroll-load';
 import TaxReview from '../../../components/TaxReview';
 import ExpenseRules from '../../../components/ExpenseRules';
 import RuleSuggestions from '../../../components/RuleSuggestions';
@@ -46,6 +48,9 @@ export default async function FinancialDashboardPage({ searchParams }) {
       suggestExpenseRules().catch(() => [])
     ]);
   } catch (e) { console.error('financial load failed', e.message); error = 'Could not load financial data.'; }
+  // The bankroll leads the page. If it cannot load (say the migration has not been run), the rest still renders.
+  let bankroll = null;
+  try { bankroll = await loadBankroll(); } catch (e) { console.error('bankroll load failed', e.message); }
   let qbo = { configured: false, connected: false };
   try { qbo = await qboStatus(); } catch { /* panel shows setup state */ }
   let plaid = { configured: false, connected: false, institutions: [] };
@@ -56,12 +61,15 @@ export default async function FinancialDashboardPage({ searchParams }) {
   const ag = d.aging;
   return (
     <DashboardShell active="financial">
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, margin: '0 0 14px' }}>
+      {bankroll
+        ? <Bankroll initial={bankroll} />
+        : <div className="panel"><b>Bankroll</b> could not load. If this is the first time, press <b>Run schema migration</b> on the admin page, then reload.</div>}
+
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, margin: '18px 0 14px' }}>
         <h1 style={{ margin: 0 }}>Financial health</h1>
         <span className="hint" style={{ margin: 0 }}>P&amp;L for <strong>{periodLabel(period)}</strong></span>
       </div>
       <DashboardFilters periods={DASH_PERIODS} active={period} />
-      <p className="hint" style={{ margin: '0 0 12px' }}><a href="/admin/bankroll" style={{ textDecoration: 'underline' }}>Live bankroll →</a> bank + cash + money on its way, with the day&apos;s ledger.</p>
 
       <div className="dash-kpis">
         <Kpi label="Revenue" value={money(k.revenue)} />
