@@ -1,5 +1,5 @@
 'use client';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTransition } from 'react';
 
 // Period selector for the revenue dashboard. Drives the URL (?period=…) so the
@@ -7,11 +7,14 @@ import { useTransition } from 'react';
 // new data loads.
 export default function DashboardFilters({ periods, active }) {
   const router = useRouter();
+  // Every dashboard shares this selector, so it stays on the page it is on. It used to
+  // hard-code the Sales page, which is why picking a period on Financial landed on Sales.
+  const pathname = usePathname();
   const [pending, startTransition] = useTransition();
 
   const pick = (key) => {
     if (key === active) return;
-    startTransition(() => router.push(`/admin/dashboard?period=${key}`));
+    startTransition(() => router.push(`${pathname}?period=${key}`));
   };
 
   return (

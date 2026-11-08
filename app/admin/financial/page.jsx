@@ -61,6 +61,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
         <span className="hint" style={{ margin: 0 }}>P&amp;L for <strong>{periodLabel(period)}</strong></span>
       </div>
       <DashboardFilters periods={DASH_PERIODS} active={period} />
+      <p className="hint" style={{ margin: '0 0 12px' }}><a href="/admin/bankroll" style={{ textDecoration: 'underline' }}>Live bankroll →</a> bank + cash + money on its way, with the day&apos;s ledger.</p>
 
       <div className="dash-kpis">
         <Kpi label="Revenue" value={money(k.revenue)} />
