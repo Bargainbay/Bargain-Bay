@@ -46,6 +46,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // Package deals: a washer + dryer pair or a whole kitchen sold together at one price.
     { key: 'bundles', label: 'Packages', href: '/admin/bundles' },
     { key: 'sales-services', label: 'Service prices', href: '/admin/sales-services' },
+    { key: 'sales-commission', label: 'Rep commission', href: '/admin/sales-commission' },
     // What resellers pay: the four member rates, previewed against live stock, plus one-off prices.
     { key: 'member-pricing', label: 'Member pricing', href: '/admin/member-pricing' },
     // Who has applied to buy wholesale, who is approved, and what each has bought. Admin: approving
