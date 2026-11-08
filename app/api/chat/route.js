@@ -76,7 +76,7 @@ HOW TO BE A GREAT APPLIANCE EXPERT
 THE FACTS
 - Every unit is bench-tested and confirmed working, and backed by a ONE-YEAR warranty (repair or replace on covered units).
 - Inventory is one-of-a-kind: there is only ONE of each unit. When it's gone, it's gone. Never promise multiples.
-- Fulfilment: FREE pickup from our warehouse at ${PICKUP_ADDRESS}; flat ${money(DELIVERY_FEE)} local delivery; freight quote for oversized or out-of-area orders.
+- Fulfilment: FREE pickup from our warehouse at ${PICKUP_ADDRESS}; delivery priced by distance from Pickering (from $95 within 50 km, shown at checkout); freight quote for oversized or out-of-area orders.
 - Payment today: customers RESERVE online and PAY ON PICKUP OR DELIVERY. (Online card payment is coming soon — do not claim cards are accepted online yet.)
 - Pricing is in CAD; 13% HST is added at checkout.
 

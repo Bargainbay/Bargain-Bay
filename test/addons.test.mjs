@@ -4,7 +4,7 @@
 // What must hold: prices are the rate sheet; an add-on is only offered on a delivery order, on
 // our own units, on the kind of appliance it is defined for; the SERVER prices it (a tampered
 // price or an add-on that does not belong is dropped, never charged); add-ons carry HST, ride
-// inside the order subtotal (so the inferred delivery fee stays $79), and reach dispatch as
+// inside the order subtotal (so the inferred delivery fee is untouched by them), and reach dispatch as
 // service lines that say "install" / "haul-away".
 import { suite, test, assert, equal } from './_harness.mjs';
 import { sharedCheckoutDb } from './shared-checkout-db.mjs';
@@ -127,18 +127,18 @@ async function seedUnits(tag) {
 }
 const order = async (num) => (await query('SELECT * FROM orders WHERE order_number = $1', [num])).rows[0];
 
-test('delivery order: add-ons are service lines inside the subtotal, HST applies, the delivery fee stays $79, the invoice matches', async () => {
+test('delivery order: add-ons are service lines inside the subtotal, HST applies, the delivery fee is untouched, the invoice matches', async () => {
   await sharedCheckoutDb(); await query('DELETE FROM services');
   const { dwSku, frSku } = await seedUnits('A');
   const res = await call({ skus: [dwSku, frSku], deliveryMethod: 'delivery', addons: [
     { sku: dwSku, key: 'dishwasher_install' }, { sku: dwSku, key: 'haul_away' }, { sku: frSku, key: 'fridge_waterline_new' }] });
   equal(res.status, 200);
   const o = await order((await res.json()).orderNumber);
-  // goods 1300 + add-ons (120 + 20 + 150) = 1590; delivery 79; HST on 1669
+  // goods 1300 + add-ons (120 + 20 + 150) = 1590; delivery 95 (no distance key in tests: Zone A, unverified); HST on 1685
   equal(Number(o.subtotal), 1590);
   const fee = Number(o.total) - Number(o.subtotal) - Number(o.hst);
-  equal(Math.round(fee * 100), 7900, 'delivery fee, as every reader infers it, is untouched');
-  equal(Number(o.hst), Math.round(1669 * 0.13 * 100) / 100);
+  equal(Math.round(fee * 100), 9500, 'delivery fee, as every reader infers it, is untouched');
+  equal(Number(o.hst), Math.round(1685 * 0.13 * 100) / 100);
   const lines = (await query(`SELECT sku, title, price, kind FROM order_items WHERE order_id = $1 ORDER BY id`, [o.id])).rows;
   equal(lines.filter((l) => l.kind === 'service').length, 3);
   assert(lines.filter((l) => l.kind === 'service').every((l) => l.sku === null));
@@ -171,4 +171,55 @@ test('a bad add-on is dropped, the sale still goes through, and a catalog price 
   await query(`UPDATE services SET active = false WHERE name = 'Haul-away'`);
   const res2 = await call({ skus: [(await seedUnits('D')).dwSku], deliveryMethod: 'delivery', addons: [{ sku: 'ADW-D', key: 'haul_away' }] });
   equal(Number((await order((await res2.json()).orderNumber)).subtotal), 500);
+});
+
+suite('delivery priced by distance — the real /api/checkout');
+
+// Google's Routes API is stubbed: drivingKm() reads routes[0].distanceMeters.
+async function withDistance(meters, fn) {
+  const realFetch = globalThis.fetch; const realKey = process.env.GOOGLE_MAPS_SERVER_KEY;
+  process.env.GOOGLE_MAPS_SERVER_KEY = 'test-key';
+  globalThis.fetch = async (url, init) => String(url).includes('routes.googleapis.com')
+    ? new Response(JSON.stringify(meters == null ? {} : { routes: [{ distanceMeters: meters }] }), { status: 200 })
+    : realFetch(url, init);
+  try { return await fn(); } finally {
+    globalThis.fetch = realFetch;
+    if (realKey === undefined) delete process.env.GOOGLE_MAPS_SERVER_KEY; else process.env.GOOGLE_MAPS_SERVER_KEY = realKey;
+  }
+}
+const feeOf = (o) => Math.round((Number(o.total) - Number(o.subtotal) - Number(o.hst)) * 100) / 100;
+
+test('delivery is charged by zone: 30 km $95, 68 km $140, 120 km $225, 180 km $285', async () => {
+  await sharedCheckoutDb(); await query('DELETE FROM services');
+  for (const [i, [km, fee]] of [[30, 95], [68, 140], [120, 225], [180, 285]].entries()) {
+    const { dwSku } = await seedUnits(`Z${i}`);
+    await withDistance(km * 1000, async () => {   // the lookup cache is keyed by address, so each loop uses its own
+      const res = await call({ skus: [dwSku], deliveryMethod: 'delivery', address: `${100 + i} Zone Rd`, city: 'Town', postal: 'L1V 1A1' });
+      equal(res.status, 200);
+      equal(feeOf(await order((await res.json()).orderNumber)), fee, `${km} km`);
+    });
+  }
+});
+
+test('an unmeasurable address is Zone A and the invoice says to check it', async () => {
+  await sharedCheckoutDb(); await query('DELETE FROM services');
+  const { dwSku } = await seedUnits('ZU');
+  await withDistance(null, async () => {
+    const res = await call({ skus: [dwSku], deliveryMethod: 'delivery', address: '9 Nowhere Ln', city: 'Nowhere' });
+    equal(res.status, 200);
+    const o = await order((await res.json()).orderNumber);
+    equal(feeOf(o), 95);
+    const inv = (await query('SELECT memo FROM invoices WHERE order_id = $1', [o.id])).rows[0];
+    assert(/NOT VERIFIED/.test(inv.memo), 'flagged for staff');
+  });
+});
+
+test('the owner\'s catalog price for a zone is what checkout charges', async () => {
+  await sharedCheckoutDb(); await query('DELETE FROM services');
+  await saveService({ name: 'Delivery – Zone B', defaultPrice: '150', costBasis: 'order' });
+  const { dwSku } = await seedUnits('ZC');
+  await withDistance(70000, async () => {
+    const res = await call({ skus: [dwSku], deliveryMethod: 'delivery', address: '7 Catalog Ct', city: 'Town', postal: 'L1V 1A1' });
+    equal(feeOf(await order((await res.json()).orderNumber)), 150);
+  });
 });

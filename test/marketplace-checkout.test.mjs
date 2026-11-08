@@ -63,9 +63,9 @@ test('with ordering OPEN: one order, one fee per shipment, vendor orders written
       const r = await json(await call({ skus: [s.own, s.a, s.c], deliveryMethod: 'delivery', address: '1 Main St', city: 'Pickering', postal: 'L1V 1A1' }));
       equal(r.status, 200);
       const o = (await query('SELECT * FROM orders WHERE order_number = $1', [r.orderNumber])).rows[0];
-      // goods 600 + 1000 + 1000; delivery = 2 shipments (ours + the Lane C seller) at the flat fee
+      // goods 600 + 1000 + 1000; delivery = our shipment (Zone A in tests: no distance key) + the Lane C seller's flat fee
       const fee = Number(o.total) - Number(o.subtotal) - Number(o.hst);
-      equal(Number(o.subtotal), 2600); equal(Math.round(fee * 100), 2 * 7900);
+      equal(Number(o.subtotal), 2600); equal(Math.round(fee * 100), 9500 + 7900);
       equal(o.status, 'pending_payment');
       const vos = (await query('SELECT lane, status, item_cents, lane_c_delivery_cents FROM vendor_orders WHERE order_id = $1 ORDER BY lane', [o.id])).rows;
       equal(vos.map((x) => x.lane).join(), 'A,C'); assert(vos.every((x) => x.status === 'awaiting_payment'), 'clocks not started');

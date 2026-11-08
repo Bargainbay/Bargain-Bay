@@ -1,4 +1,4 @@
-import { DELIVERY_FEE } from '../../../lib/constants';
+import { DELIVERY_ZONES, PER_KM_BEYOND } from '../../../lib/delivery-zones';
 
 export const metadata = { title: 'Shipping & Delivery Policy — Bargain Bay' };
 
@@ -21,20 +21,19 @@ export default function ShippingPage() {
 
       <h2>Local delivery</h2>
       <p>
-        We deliver throughout Durham Region, the GTA, and surrounding areas. Online checkout offers flat-rate{' '}
-        <b>${DELIVERY_FEE} local delivery</b> for addresses within roughly 50 km of our Pickering warehouse. Farther
-        out is priced by distance:
+        We deliver throughout Durham Region, the GTA, and surrounding areas. Online checkout prices delivery by the
+        driving distance from our Pickering warehouse to your address, and shows the fee before you pay:
       </p>
-      {/* The local rate is read from DELIVERY_FEE, the same constant app/api/checkout charges — it is
-          NOT typed in here. This page advertised $75 for months while checkout took $79, which is the
-          kind of gap a customer finds at the worst possible moment: after they have already agreed to
-          the price. The by-arrangement rows below are quoted by hand and have no constant to track. */}
+      {/* These come from DELIVERY_ZONES (lib/delivery-zones.js), the same rate-sheet zones app/api/checkout
+          charges — they are NOT typed in here. The owner can change a zone's price in the service price
+          catalog, so this table shows the standard rate sheet and the checkout shows the live figure. */}
       <table>
         <thead><tr><th>Distance from Pickering</th><th>Delivery fee</th></tr></thead>
         <tbody>
-          <tr><td>0–50 km</td><td><b>${DELIVERY_FEE}</b></td></tr>
-          <tr><td>51–100 km</td><td><b>$125</b> (by arrangement — email us)</td></tr>
-          <tr><td>101–150 km</td><td><b>$175</b> (by arrangement — email us)</td></tr>
+          {DELIVERY_ZONES.map((z) => (
+            <tr key={z.zone}><td>{z.label.replace(/^Zone \w \(|\)$/g, '')}</td><td><b>${z.fee}</b></td></tr>
+          ))}
+          <tr><td>Beyond 150 km</td><td>Zone C plus ${PER_KM_BEYOND} per km past 150</td></tr>
         </tbody>
       </table>
       <ul>

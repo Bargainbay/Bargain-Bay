@@ -11,6 +11,8 @@ import {
 import { round2, money, HST_RATE, DELIVERY_FEE, CARD_PAYMENTS_ENABLED, SERVICE_EMAIL } from '../../../lib/constants';
 import { priceAddons } from '../../../lib/addons';
 import { loadAddonOverrides } from '../../../lib/addon-prices';
+import { quoteDelivery } from '../../../lib/delivery-fee';
+import { deliveryTotal } from '../../../lib/delivery-zones';
 import { shipmentCount, planVendorOrders } from '../../../lib/marketplace-rules';
 import { createVendorOrdersTx } from '../../../lib/vendor-orders';
 import { resolvePrices } from '../../../lib/pricing';
@@ -221,7 +223,15 @@ export async function POST(req) {
   const subtotal = round2(items.reduce((a, u) => a + priceOf(u), 0));
   // One fee per shipment: everything we move is one delivery, and each self-shipping seller is another.
   const shipments = Math.max(1, shipmentCount(items));
-  const deliveryFee = deliveryMethod === 'delivery' ? round2(DELIVERY_FEE * shipments) : 0;
+  // Our shipment is priced by driving distance from Pickering (the zone fees in the service price
+  // catalog); a seller's own shipment stays the flat fee. Recomputed here from the address — the
+  // browser's preview is never used. An address we cannot measure is charged Zone A and flagged.
+  let deliveryQuote = null;
+  let deliveryFee = 0;
+  if (deliveryMethod === 'delivery') {
+    deliveryQuote = await quoteDelivery({ address, city, postal });
+    deliveryFee = deliveryTotal(items, deliveryQuote.fee, DELIVERY_FEE).total;
+  }
   const discounted = round2(Math.max(0, subtotal - discount));
   // Installation and haul-away add-ons: priced HERE from the cart and the catalog, never from
   // the browser. Delivery orders and our own units only; anything that doesn't hold is dropped.
@@ -404,7 +414,7 @@ export async function POST(req) {
       name, email, phone,
       items: [
         ...items.map((u) => ({ description: u.title || `${u.make} ${u.model}`, amount: priceOf(u), sku: u.id })),
-        ...(deliveryFee ? [{ description: shipments > 1 ? `Delivery (${shipments} shipments)` : 'Local delivery (Pickering & area)', amount: deliveryFee, kind: 'service' }] : []),
+        ...(deliveryFee ? [{ description: shipments > 1 ? `Delivery (${shipments} shipments)` : `Delivery — ${deliveryQuote.label}`, amount: deliveryFee, kind: 'service' }] : []),
         ...addonLines.map((l) => ({ description: l.description, amount: l.amount, kind: 'service' })),
         // The discount rides as a negative service line, so the invoice totals
         // what the customer actually pays and the code is on the paperwork.
@@ -416,7 +426,7 @@ export async function POST(req) {
       // COALESCE on an attach, so this can never overwrite the order's own answer.
       leadSource: 'website',
       deliveryMethod, address, city, postal,
-      memo: `Online order ${order.orderNumber}.`,
+      memo: `Online order ${order.orderNumber}.${deliveryQuote && !deliveryQuote.verified ? ' DELIVERY DISTANCE NOT VERIFIED — charged Zone A; check the address and correct the fee if it is farther.' : ''}`,
       sendEmail: false,
       channel: 'web',
       attachToOrderId: order.id,
@@ -448,7 +458,7 @@ export async function POST(req) {
           name: `${u.make} ${u.model}`,
           priceCents: Math.round(priceOf(u) * 100)
         })),
-        ...(deliveryFee ? [{ name: 'Local delivery (Pickering & area)', priceCents: Math.round(deliveryFee * 100) }] : []),
+        ...(deliveryFee ? [{ name: shipments > 1 ? `Delivery (${shipments} shipments)` : `Delivery — ${deliveryQuote.label}`, priceCents: Math.round(deliveryFee * 100) }] : []),
         ...addonLines.map((l) => ({ name: l.description, priceCents: Math.round(l.amount * 100) })),
         ...(discount ? [{ name: promoLabel, priceCents: -Math.round(discount * 100) }] : []),
         { name: 'HST 13% (Ontario)', priceCents: Math.round(hst * 100) }

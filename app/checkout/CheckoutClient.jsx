@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { getCart, removeFromCart, clearCart, onCartChange } from '../../lib/cart';
 import { money, round2, HST_RATE, DELIVERY_FEE, PICKUP_ADDRESS, CARD_PAYMENTS_ENABLED, ETRANSFER_EMAIL } from '../../lib/constants';
 import { priceAddons } from '../../lib/addons';
+import { deliveryTotal, DELIVERY_ZONES } from '../../lib/delivery-zones';
 import CheckoutAddOns from '../../components/CheckoutAddOns';
 import { shipmentCount, notPickable } from '../../lib/marketplace-rules';
 import { loadGoogleMaps, placesReady, mapsKey } from '../../lib/maps';
@@ -13,6 +14,10 @@ import { initiateCheckout, purchase, newEventId } from '../../lib/fpixel';
 export default function CheckoutClient({ catalog, session, prefill, addonOverrides = {} }) {
   const [skus, setSkus] = useState(null);
   const [addonSel, setAddonSel] = useState({});
+  // Delivery priced by distance from Pickering: asked of the server once the address is filled in.
+  // Display only — /api/checkout prices it again from the address.
+  const [zone, setZone] = useState(null);       // { fee, label, verified } for the address now typed
+  const [zoneBusy, setZoneBusy] = useState(false);
   const [form, setForm] = useState({
     name: session?.name || prefill?.name || '',
     email: session?.email || '',
@@ -127,6 +132,24 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
     } catch { acDone.current = false; }
   }
 
+  const wantsDelivery = form.deliveryMethod === 'delivery' || (skus || []).some((sku) => notPickable(catalog.find((u) => u.id === sku)));
+  useEffect(() => {
+    if (!wantsDelivery || !form.address.trim() || !form.city.trim()) { setZone(null); return undefined; }
+    let live = true;
+    setZoneBusy(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/delivery-quote', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ address: form.address, city: form.city, postal: form.postal })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (live) setZone(res.ok && j.ok ? { fee: j.fee, label: j.label, verified: j.verified } : null);
+      } catch { if (live) setZone(null); } finally { if (live) setZoneBusy(false); }
+    }, 600);
+    return () => { live = false; clearTimeout(t); };
+  }, [wantsDelivery, form.address, form.city, form.postal]);
+
   if (skus === null) return <p>Loading checkout…</p>;
 
   const items = skus.map((sku) => catalog.find((u) => u.id === sku)).filter(Boolean);
@@ -148,7 +171,9 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
   // Sellers who ship their own unit are given the customer's contact details (Marketplace Terms), so the
   // customer is told here, at the moment they agree to buy — not only on a policy page.
   const sellerShips = [...new Set(items.filter((u) => u.marketplace && u.lane === 'C').map((u) => u.vendor?.name).filter(Boolean))];
-  const delivery = method === 'delivery' ? round2(DELIVERY_FEE * shipments) : 0;
+  // Until the address is measured, show the lowest zone fee; the line says so.
+  const zoneFee = zone ? zone.fee : DELIVERY_ZONES[0].fee;
+  const delivery = method === 'delivery' ? deliveryTotal(items, zoneFee, DELIVERY_FEE).total : 0;
   const subtotal = round2(items.reduce((a, u) => a + Number(u.price), 0));
   // A typed code and an automatic promotion never stack; the shopper gets the
   // better one, exactly as the server will decide.
@@ -307,8 +332,8 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
               <label className={'radio-card' + (method === 'delivery' ? ' active' : '')}>
                 <input type="radio" name="deliveryMethod" value="delivery" checked={method === 'delivery'} onChange={() => setForm((f) => ({ ...f, deliveryMethod: 'delivery', paymentMethod: 'etransfer' }))} />
                 <span>
-                  <b>Local delivery — {shipments > 1 ? `${money(DELIVERY_FEE)} × ${shipments} shipments` : `${money(DELIVERY_FEE)} flat`}</b>
-                  <span className="sub" style={{ display: 'block' }}>Pickering &amp; area (within ~50 km of Pickering). To your door / ground floor. Farther out? Email us for a freight quote.</span>
+                  <b>Delivery — {zone ? `${money(zone.fee)} · ${zone.label}` : zoneBusy ? 'pricing your address…' : `from ${money(DELIVERY_ZONES[0].fee)}, priced by distance`}{shipments > 1 ? ` (+ ${money(DELIVERY_FEE)} per seller shipment)` : ''}</b>
+                  <span className="sub" style={{ display: 'block' }}>Priced by driving distance from our Pickering warehouse once you enter your address. To your door / ground floor.</span>
                 </span>
               </label>
               {method === 'delivery' && <CheckoutAddOns items={items} selection={addonSel} onChange={setAddonSel} priceOverrides={addonOverrides} />}
@@ -387,7 +412,7 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
                 <span style={{ paddingRight: 10 }}>{l.description.replace(/ \([^)]*\)$/, '')}</span><span>{money(l.amount)}</span>
               </div>
             ))}
-            <div className="summary-row"><span>{method === 'delivery' ? 'Local delivery' : 'Warehouse pickup'}</span><span>{delivery ? money(delivery) : 'Free'}</span></div>
+            <div className="summary-row"><span>{method === 'delivery' ? (zone && shipments === 1 ? `Delivery — ${zone.label}` : 'Delivery') : 'Warehouse pickup'}</span><span>{delivery ? money(delivery) : 'Free'}</span></div>
             <div style={{ margin: '10px 0 4px' }}>
               {applied ? (
                 <div className="hint" style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>

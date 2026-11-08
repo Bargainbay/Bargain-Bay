@@ -95,7 +95,7 @@ export async function POST(req) {
           address: PICKUP_ADDRESS,
           hours: BUSINESS_HOURS,
           pickup: 'Free pickup at the Pickering warehouse, by appointment.',
-          delivery: `Flat ${money(DELIVERY_FEE)} local delivery; freight quoted farther out.`,
+          delivery: `Priced by distance from Pickering: $95 within 50 km, $140 to 100 km, $225 to 150 km; farther is $2 per km extra.`,
           warranty: 'Every unit is tested, working, and carries a one-year warranty.',
           email: SALES_EMAIL,
           staffed_now: isStaffedNow()
