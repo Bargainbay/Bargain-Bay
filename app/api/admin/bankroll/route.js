@@ -3,7 +3,8 @@
 import { NextResponse } from 'next/server';
 import { getSession, canKeepBooks } from '../../../../lib/auth';
 import { audit } from '../../../../lib/audit';
-import { bankrollSummary, addEntry, clearEntry, voidEntry } from '../../../../lib/bankroll';
+import { addEntry, clearEntry, voidEntry } from '../../../../lib/bankroll';
+import { loadBankroll } from '../../../../lib/bankroll-load';
 import { liveBalances, refreshFromBank, syncPlaidTransactions } from '../../../../lib/plaid';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ async function who() {
 export async function GET(req) {
   if (!(await who())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   const date = new URL(req.url).searchParams.get('date') || undefined;
-  try { return NextResponse.json({ ok: true, ...(await bankrollSummary(date)) }); }
+  try { return NextResponse.json({ ok: true, ...(await loadBankroll(date)) }); }
   catch (e) { return NextResponse.json({ error: e?.message || 'Could not read the bankroll.' }, { status: 500 }); }
 }
 
@@ -30,9 +31,9 @@ export async function POST(req) {
   try {
     if (b.action === 'add') {
       const amt = Math.abs(Number(b.amount));
-      const signed = b.direction === 'out' ? -amt : amt;
+      const signed = b.direction === 'out' && b.kind !== 'count' ? -amt : amt;
       const id = await addEntry({ date: b.date, kind: b.kind, amount: signed, note: b.note, by });
-      await audit(session, { action: 'bankroll.add', entity: 'bankroll', entityId: String(id), summary: `${b.kind === 'cash' ? 'Cash' : 'Not at the bank yet'}: ${signed} ${b.note || ''}`.trim() });
+      await audit(session, { action: 'bankroll.add', entity: 'bankroll', entityId: String(id), summary: `${{ cash: 'Cash', count: 'Cash count', pending: 'Not at the bank yet' }[b.kind] || b.kind}: ${signed} ${b.note || ''}`.trim() });
     } else if (b.action === 'clear') {
       await clearEntry(b.id, by);
     } else if (b.action === 'void') {
@@ -43,12 +44,12 @@ export async function POST(req) {
       const notes = await refreshFromBank();
       const sync = await syncPlaidTransactions().catch((e) => ({ error: e.message }));
       const bal = await liveBalances();
-      const out = await bankrollSummary(b.date);
+      const out = await loadBankroll(b.date);
       return NextResponse.json({ ok: true, ...out, notes: [...notes, ...(bal.errors || [])], sync });
     } else {
       return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
     }
-    return NextResponse.json({ ok: true, ...(await bankrollSummary(b.date)) });
+    return NextResponse.json({ ok: true, ...(await loadBankroll(b.date)) });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'That failed.' }, { status: 400 });
   }

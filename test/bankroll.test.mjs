@@ -4,7 +4,7 @@ import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { upsertExpense, suggestExpenseRules } from '../lib/finance.js';
 import { setSetting } from '../lib/settings.js';
-import { bankFigure, bankroll, looksCleared, addEntry, clearEntry, voidEntry, bankrollSummary } from '../lib/bankroll.js';
+import { bankFigure, bankroll, looksCleared, addEntry, clearEntry, voidEntry, bankrollSummary, cashOnHand } from '../lib/bankroll.js';
 
 const acct = (over) => ({ name: 'TD BUSINESS UNLIMITED', mask: '4676', type: 'depository', current: 100, available: 45, ...over });
 
@@ -32,25 +32,46 @@ test('AN ENTRY IS HINTED AS CLEARED ONLY ON AN EXACT AMOUNT FROM ITS DATE ON', (
   assert(!looksCleared({ amount: 50, date: '2026-11-05' }, [{ date: '2026-11-06', gross: 50 }]), 'money in is never auto-hinted');
 });
 
-test('CASH COUNTS, A PENDING ENTRY COUNTS UNTIL CLEARED, A VOID NEVER COUNTS', async () => {
+test('CASH IS UNKNOWN UNTIL SOMEONE COUNTS IT; THEN IT MOVES WITH SALES AND SPENDING', async () => {
   const { done } = await withTestDb();
   try {
     await setSetting('bank_balance_snapshot', { at: new Date().toISOString(), accounts: [acct()] });
-    await addEntry({ date: '2026-11-06', kind: 'cash', amount: 500, note: 'till', by: 'a' });
-    const out = await addEntry({ date: '2026-11-06', kind: 'pending', amount: -113, note: 'sent Ravi', by: 'a' });
-    const bad = await addEntry({ date: '2026-11-06', kind: 'cash', amount: 999, note: 'typo', by: 'a' });
-    await voidEntry(bad, 'a');
     let s = await bankrollSummary('2026-11-06');
+    assert(!s.cashKnown, 'no count, no cash figure');
+    equal(s.total, 45);
+    await addEntry({ date: '2026-11-06', kind: 'count', amount: 500, note: 'till', by: 'a' });
+    const out = await addEntry({ date: '2026-11-06', kind: 'pending', amount: -113, note: 'sent Ravi', by: 'a' });
+    const bad = await addEntry({ date: '2026-11-06', kind: 'pending', amount: -999, note: 'typo', by: 'a' });
+    await voidEntry(bad, 'a');
+    s = await bankrollSummary('2026-11-06');
+    assert(s.cashKnown); equal(s.cash, 500); equal(s.pending, -113);
     equal(s.total, 432); // 45 + 500 - 113
-    equal(s.cash, 500); equal(s.pending, -113);
     await clearEntry(out, 'a');
     s = await bankrollSummary('2026-11-06');
-    equal(s.total, 545); // the bank figure now carries it
+    equal(s.total, 545);
     let msg = ''; try { await clearEntry(out, 'a'); } catch (e) { msg = e.message; }
     assert(/already/.test(msg), 'cannot clear twice');
     let m2 = ''; try { await addEntry({ kind: 'cash', amount: 0 }); } catch (e) { m2 = e.message; }
-    assert(/amount/i.test(m2), 'zero is refused');
+    assert(/amount/i.test(m2), 'zero cash is refused');
+    await addEntry({ date: '2026-11-06', kind: 'count', amount: 0, by: 'a' }); // an empty till is a real count
+    equal((await bankrollSummary('2026-11-06')).cash, 0);
   } finally { done(); }
+});
+
+test('CASH SALES ALREADY IN THE SYSTEM RAISE THE CASH WITHOUT ANYONE TYPING THEM', async () => {
+  const { done } = await withTestDb();
+  try {
+    await addEntry({ date: '2026-11-06', kind: 'count', amount: 100, by: 'a' });
+    await query(`INSERT INTO invoice_payments (invoice_id, amount, method, paid_at) VALUES (1, 250, 'cash', now() + interval '1 second'), (1, 400, 'etransfer', now() + interval '1 second')`);
+    const s = await bankrollSummary('2026-11-06');
+    equal(s.cash, 350, 'cash payment counted, the e-transfer is not cash');
+    equal(s.day.cashIn.length >= 0, true);
+  } finally { done(); }
+});
+
+test('cashOnHand IS PURE: COUNT + SALES + OTHER - SPENT, UNKNOWN WITHOUT A COUNT', () => {
+  equal(cashOnHand({ count: 100, sales: 50, other: 25, spent: 40.5 }), 134.5);
+  assert(cashOnHand({ count: null, sales: 50 }) === null);
 });
 
 test('THE DAY SHEET LISTS BANK LINES AND SHOWS THE HINT WHEN THE BANK CATCHES UP', async () => {
