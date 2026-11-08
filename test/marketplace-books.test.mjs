@@ -68,8 +68,8 @@ test('checkout remembers the seller\'s share of the order and the HST on it', as
     equal(r.status, 200);
     const o = await orderRow(r.orderNumber);
     equal(dollars(o.subtotal), 1600); equal(dollars(o.vendor_subtotal), 1000); equal(dollars(o.vendor_hst), 130);
-    // 1600 + 79 delivery = 1679; HST 218.27; total 1897.27
-    equal(dollars(o.total), 1897.27); equal(dollars(o.hst), 218.27);
+    // 1600 + 95 delivery (Zone A, no distance key in tests) = 1695; HST 220.35; total 1915.35
+    equal(dollars(o.total), 1915.35); equal(dollars(o.hst), 220.35);
     equal(Number((await vo(o.id)).hst_cents), 13000);
   });
 });
@@ -83,11 +83,11 @@ test('REVENUE: our dashboards count our own sales only; the seller\'s 1,000 and 
     const o = await orderRow(r.orderNumber);
     await updateOrderStatus(o.id, 'confirmed');
     const after = await dashboardData();
-    // ours: 600 + 79 delivery = 679, plus our HST 88.27 (the dashboard KPI is tax-inclusive)
-    equal(dollars(after.kpis.revenue - before.kpis.revenue), 767.27);
+    // ours: 600 + 95 delivery = 695, plus our HST 90.35 (the dashboard KPI is tax-inclusive)
+    equal(dollars(after.kpis.revenue - before.kpis.revenue), 785.35);
     equal(after.kpis.unitsSold - before.kpis.unitsSold, 1);                 // one of OUR units, not two
     const pnl = await profitAndLoss('year');
-    assert(pnl.current.ownRevenue >= 679, 'our own revenue is in the P&L');
+    assert(pnl.current.ownRevenue >= 695, 'our own revenue is in the P&L');
   });
 });
 
@@ -99,8 +99,8 @@ test('THE LEDGER: the invoice credits Sales and HST only for our part, and holds
     const before = await tbNow();
     const r = await checkout([w.own, w.sku]);
     const after = await tbNow();
-    equal(dollars(acct(after, '4000') - acct(before, '4000')), 679);       // 600 + 79 delivery
-    equal(dollars(acct(after, '2000') - acct(before, '2000')), 88.27);     // 13% of 679 — not of 1,679
+    equal(dollars(acct(after, '4000') - acct(before, '4000')), 695);       // 600 + 95 delivery
+    equal(dollars(acct(after, '2000') - acct(before, '2000')), 90.35);     // 13% of 695 — not of 1,679
     equal(dollars(acct(after, '2160') - acct(before, '2160')), 1130);      // 1,000 + 130 HST held for the seller
     equal(after.outOfBalance, 0);
     void r;
@@ -266,7 +266,7 @@ test('HST: the seller\'s HST is never ours; the HST on our own fees is', async (
     const o = await orderRow(r.orderNumber);
     await updateOrderStatus(o.id, 'confirmed');
     const mid = (await hstRemittance('year')).current.charged;
-    equal(dollars(mid - before), 88.27);                      // 13% of OUR 679 — not the 218.27 the customer paid
+    equal(dollars(mid - before), 90.35);                      // 13% of OUR 695 — not the 220.35 the customer paid
     const id = (await vo(o.id)).id;
     await acceptVendorOrder(w.v.id, id, { insurance: 'declined' }); await markVendorOrderReady(w.v.id, id, {});
     await updateOrderStatus(o.id, 'delivered');

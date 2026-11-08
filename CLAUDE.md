@@ -5109,6 +5109,27 @@ tests `quote-profit`, `sales-phase2`, `sales-api-access`.
 - Pipeline board moves cards with arrows or drag; **Won is not a column you can drop on** (payment-driven, PR 3); Lost asks why.
 - Known gap: a CHARGED service is an untied line on the quote, so at conversion it is counted as a line with no unit.
 
+## Delivery is priced by distance (added 2026-11-08)
+`lib/delivery-zones.js` (PURE: zones, `deliveryFeeForKm`, `deliveryTotal`), `lib/delivery-fee.js` (catalog prices + cached distance lookup),
+`POST /api/delivery-quote` (the checkout preview), wired into `app/api/checkout/route.js` and `app/checkout/CheckoutClient.jsx`,
+`test/delivery-zones.test.mjs` and the "delivery priced by distance" tests in `test/addons.test.mjs`. It replaced the flat $79.
+- **Zones are the 2026 rate sheet**: A 0-50 km $95, B 51-100 km $140, C 101-150 km $225, and past 150 km Zone C plus $2 per km begun beyond 150.
+  Edges: 50.0 is Zone A. The owner changes a price by editing the service named "Delivery – Zone A/B/C" in `/admin/sales-services`; a blank
+  price keeps the sheet's, and switching a zone off does NOT make delivery free (it still charges the sheet price).
+- **The server measures, never the browser.** `/api/checkout` calls `quoteDelivery` for the typed address (driving km from Pickering through
+  `drivingKm`, Google Routes, needs `GOOGLE_MAPS_SERVER_KEY` — the SERVER key, not the browser one). The page's figure comes from
+  `/api/delivery-quote` and is only shown. Lookups are cached 10 minutes per address; failures are never cached.
+- **An address that cannot be measured is charged Zone A and FLAGGED**, never given an invented distance: the web invoice memo says
+  "DELIVERY DISTANCE NOT VERIFIED — charged Zone A; check the address". **With no `GOOGLE_MAPS_SERVER_KEY` every order is in that state**, which
+  is why the key matters. Staff correct the fee by hand if the address is farther.
+- **Our shipment is distance-priced; a marketplace seller's own shipment (lane C) stays the flat `DELIVERY_FEE` ($79)** — it does not ship
+  from Pickering. `createVendorOrdersTx` still receives the flat fee in `feeCents`.
+- `/policies/shipping` reads the same `DELIVERY_ZONES`, so it shows the standard rate sheet; checkout shows the live (catalog) price.
+- **Free local delivery over $5,000 is APPLIED now** (`FREE_DELIVERY_OVER`, `freeDeliveryApplies`): goods after any discount, before tax and
+  add-ons, strictly over $5,000, to an address within 150 km (or one we could not measure, which is flagged anyway). It waives OUR shipment's
+  zone fee only; past 150 km the per-km charge stays and a seller's own shipment stays the flat fee. A free order has no delivery line on the
+  invoice. The browser's "free" is display only; the server decides.
+
 ## Online-order add-ons: installation and haul-away (added 2026-11-08)
 `lib/addons.js` (PURE, no imports: the rate-sheet definitions, eligibility, `priceAddons`), `lib/addon-prices.js` (reads the owner's
 overrides from the `services` catalog), `components/CheckoutAddOns.jsx`, wired into `app/api/checkout/route.js`,

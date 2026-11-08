@@ -80,7 +80,7 @@ export default function CartClient({ catalog, member }) {
           {member && <div className="hint" style={{ marginTop: 8, color: '#0B6B3A', fontWeight: 600 }}>✓ Member pricing applied</div>}
           <a href="/checkout" className="btn primary block" style={{ marginTop: 14 }}>Checkout</a>
           <div className="hint" style={{ marginTop: 10 }}>
-            Free warehouse pickup, or flat {money(DELIVERY_FEE)} local delivery (added at checkout, plus HST).
+            Free warehouse pickup, or delivery priced by distance from Pickering (free over $5,000; shown at checkout, plus HST).
           </div>
         </div>
       </div>
