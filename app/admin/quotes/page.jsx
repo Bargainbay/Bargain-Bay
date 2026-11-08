@@ -1,5 +1,8 @@
 import { redirect } from 'next/navigation';
-import { getSession, isAdmin, isStaff } from '../../../lib/auth';
+import { getSession, isAdmin, isStaff, canSeeCost, isSalesRep } from '../../../lib/auth';
+import { listServices } from '../../../lib/sales-services';
+import { getSetting } from '../../../lib/settings';
+import { LOW_PROFIT_DEFAULT } from '../../../lib/quote-profit';
 import { money } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
 import { listQuotes, getQuoteForBuilder } from '../../../lib/quotes';
@@ -66,9 +69,17 @@ export default async function QuotesPage({ searchParams }) {
       .map((u) => ({ ...u, retail: retailOf.get(String(u.id).toUpperCase()) || 0 }));
   } catch { inventory = []; }
 
+  // Live profit is for the owner and the business-development rep only. Nobody else is even sent the services' internal costs.
+  let profit = null;
+  if (canSeeCost(session)) {
+    const th = Number(await getSetting('low_profit_threshold', LOW_PROFIT_DEFAULT));
+    profit = { services: await listServices().catch(() => []), threshold: Number.isFinite(th) ? th : LOW_PROFIT_DEFAULT };
+  }
+
   return (
     <div>
       <AdminNav active="quotes" salesOnly={!isAdmin(session)} />
+      {isSalesRep(session) && <p style={{ margin: '4px 0' }}><a href="/sales">← Sales Hub</a></p>}
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Quotes</h1>
 
       {/* Why deals are lost, which this list could never answer before. */}
@@ -84,7 +95,7 @@ export default async function QuotesPage({ searchParams }) {
           Build a bundle, apply a discount, and email the customer a shareable quote. Nothing is reserved —
           the units stay live until you convert the quote to an invoice.
         </p>
-        <QuoteBuilder inventory={inventory} customers={customers} initial={initial} senders={senders} />
+        <QuoteBuilder inventory={inventory} customers={customers} initial={initial} senders={senders} profit={profit} />
       </div>
 
       <div className="panel">

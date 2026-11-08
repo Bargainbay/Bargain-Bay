@@ -5073,3 +5073,25 @@ For John Tobias (Business Development Manager, starts 2026-11-09). Plan: three P
   rep to `/sales`. The quota card needs the rep's name on the team list (`lib/reps.js`) to match their invoices.
 - NOT yet built (PR 2/3, see the plan): live profit on quotes, services catalog, rep holds, In-house/Mobile day, accounts, pipeline
   board, payment attribution and the 1% / 1.5% / 2% daily commission. Lead auto-reply/parsers (Addendum 2) need decisions first.
+
+### Sales Hub phase 2 (added 2026-11-08): live profit, services, holds, pipeline
+`lib/quote-profit.js` (PURE, no imports), `lib/sales-services.js`, `lib/rep-holds.js`, `components/ProfitPanel.jsx`,
+`ServicesEditor.jsx`, `PipelineBoard.jsx`, `HoldControls.jsx`, `/admin/sales-services` (ADMIN), `/sales/pipeline`,
+`/api/sales/{profit,holds}`, `/api/admin/sales-services`, migration `0055_services_and_holds` (**run Run schema migration**),
+tests `quote-profit`, `sales-phase2`, `sales-api-access`.
+- **Profit = price (ex-HST) − unit costs − internal cost of EVERY service included, charged or free.** CHARGED adds a real line to
+  the quote (price in revenue, cost off); INCLUDED is not a line, only its cost comes off. Yellow under the low-profit setting
+  (`low_profit_threshold`, default $100), red under $0, never blocks. A cost nobody entered is NULL, counted as $0 and REPORTED.
+- **The spec's worked example prints the wrong profits** (Addendum 1 section B: "$2,000 sold, $1,550 cost -> $350"; it is $450). The owner confirmed the
+  cost is $1,550 (2026-11-08), so the correct figures are 450 -> 355 (delivery and haul-away included) -> 455 (delivery charged at $100). The test pins those.
+- **Cost is shown only to `canSeeCost`** (admin or rep): `/api/sales/profit` is the one route that returns a cost, and the quote pages
+  pass `profit` to the builder only for those logins (services' internal costs are not even sent to anyone else). A plain sales
+  associate sees the quote builder exactly as before.
+- **No services are seeded by the migration** (it would make a fresh database non-empty and break the restore tests): the editor has
+  "Add the starting list" (delivery zones $95/$140/$225 at $75 internal, haul-away $20/unit, gas range/dryer install $250; every
+  other cost blank until the owner enters it).
+- **A rep hold is a `reservations` row with no order** (`held_by`, `hold_note`): the storefront, checkout and invoices already honour
+  it, `expireReservations` already clears it. Max 48 hours; claimed with the same only-steal-if-expired upsert as checkout; a rep
+  releases only their own, an admin any, and an ORDER's reservation is never touched by this code.
+- Pipeline board moves cards with arrows or drag; **Won is not a column you can drop on** (payment-driven, PR 3); Lost asks why.
+- Known gap: a CHARGED service is an untied line on the quote, so at conversion it is counted as a line with no unit.
