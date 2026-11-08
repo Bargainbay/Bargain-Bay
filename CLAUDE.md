@@ -5131,4 +5131,4 @@ gas dryer or range $250, OTR microwave or range hood $125.
   $20 internal cost). "Add the starting list" fills a still-blank price on a row that exists, never overwrites an edit, and switches off
   the two names the earlier list used. Not loaded: the completion-status percentages and the $2/km charge past Zone C (billing rules,
   no per-km unit in the catalog).
-- **Heads-up for the owner:** haul-away sells online at $20 and our internal cost for it is $20, so it earns nothing.
+- Haul-away internal cost is $0 (owner, 2026-11-08), so the $20 is all margin. The code default is 0 (a real zero, not blank); a row already in the live catalog keeps its saved cost until edited on /admin/sales-services.

@@ -99,7 +99,7 @@ test('the starting list adds what is missing and never overwrites an edit', asyn
     equal((await addStarterServices()).added, 0);
     equal((await listServices()).find((s) => s.name === 'Delivery – Zone A').defaultPrice, 99);
     const haul = (await listServices()).find((s) => s.name === 'Haul-away');
-    equal(haul.internalCost, 20); equal(haul.costBasis, 'unit');
+    equal(haul.internalCost, 0); equal(haul.costBasis, 'unit');
   } finally { await done(); }
 });
 
