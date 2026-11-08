@@ -44,6 +44,8 @@ test('CASH IS UNKNOWN UNTIL SOMEONE COUNTS IT; THEN IT MOVES WITH SALES AND SPEN
     const bad = await addEntry({ date: '2026-11-06', kind: 'pending', amount: -999, note: 'typo', by: 'a' });
     await voidEntry(bad, 'a');
     s = await bankrollSummary('2026-11-06');
+    assert(s.bankInfo && s.bankInfo.at && s.bankInfo.stale === false, 'the bank figure carries its own time, apart from the dollar total');
+    equal(s.bank, 45);
     assert(s.cashKnown); equal(s.cash, 500); equal(s.pending, -113);
     equal(s.total, 432); // 45 + 500 - 113
     await clearEntry(out, 'a');
