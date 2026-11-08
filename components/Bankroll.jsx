@@ -1,6 +1,11 @@
 'use client';
 import { useState } from 'react';
 import Receipts from './Receipts';
+import Payroll from './Payroll';
+
+const CATS = ['Wages', 'Rent / storage', 'Utilities', 'Insurance', 'Software', 'Truck (lease, plates, upkeep)', 'Fuel / delivery',
+  'Tools / supplies', 'Advertising', 'Card & bank fees', 'Interest charges', 'Loan repayment', 'Owner draw', 'Other'];
+const catLabel = (c) => (c === 'Wages' ? 'Wages / salary' : c);
 
 // The first thing on the Financial page: what we have right now, then the way to add to it.
 // Cash SALES are never typed here (they are already in the system as cash payments); what is typed is
@@ -16,11 +21,13 @@ export default function Bankroll({ initial }) {
   const [msg, setMsg] = useState('');
   const [other, setOther] = useState({ kind: 'cash', direction: 'in', amount: '', note: '', date: initial.date });
   const [count, setCount] = useState('');
+  const [countDate, setCountDate] = useState(initial.date);
+  const [payTo, setPayTo] = useState({});
 
-  async function call(body, label) {
+  async function call(body, label, url = '/api/admin/bankroll') {
     setBusy(label); setErr(''); setMsg('');
     try {
-      const res = await fetch('/api/admin/bankroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ viewDate: d.date, date: d.date, ...body }) });
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ viewDate: d.date, date: d.date, days: d.days, ...body }) });
       const r = await res.json();
       if (!res.ok) throw new Error(r.error || 'That failed.');
       setD(r);
@@ -28,10 +35,27 @@ export default function Bankroll({ initial }) {
       return r;
     } catch (e) { setErr(e.message); } finally { setBusy(''); }
   }
-  async function goto(date) {
+  async function range(days) {
     setBusy('day'); setErr('');
-    try { const r = await (await fetch(`/api/admin/bankroll?date=${date}`)).json(); if (r.error) throw new Error(r.error); setD(r); }
+    try { const r = await (await fetch(`/api/admin/bankroll?days=${days}`)).json(); if (r.error) throw new Error(r.error); setD(r); }
     catch (e) { setErr(e.message); } finally { setBusy(''); }
+  }
+  // Re-categorise one bank line from the live list. Wages carry no HST.
+  async function setCategory(row, category) {
+    setBusy('cat'); setErr(''); setMsg('');
+    try {
+      const res = await fetch('/api/admin/categorize', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'categorize', ids: [row.expenseId], category, taxMode: category === 'Wages' ? 'none' : '' }) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || 'That failed.');
+      await range(d.days);
+    } catch (e) { setErr(e.message); } finally { setBusy(''); }
+  }
+  async function assignPay(row) {
+    const person = (payTo[row.expenseId] || '').trim();
+    if (!person) { setErr('Type who it was paid to.'); return; }
+    const r = await call({ action: 'pay', person, amount: Math.abs(row.amount), date: row.date, how: 'bank', expenseId: row.expenseId, days: d.days }, 'assign', '/api/admin/pay');
+    if (r) setMsg(`Counted as a payment to ${person}.`);
   }
   async function addOther(e) {
     e.preventDefault();
@@ -40,7 +64,7 @@ export default function Bankroll({ initial }) {
   }
   async function saveCount(e) {
     e.preventDefault();
-    const r = await call({ action: 'add', kind: 'count', amount: count, note: 'Cash counted' }, 'count');
+    const r = await call({ action: 'add', kind: 'count', amount: count, date: countDate, note: 'Cash counted' }, 'count');
     if (r) { setCount(''); setMsg('Cash count saved. From now on cash sales and cash spent move it.'); }
   }
 
@@ -58,7 +82,7 @@ export default function Bankroll({ initial }) {
         </div>
         {d.cashKnown && (
           <p className="hint" style={{ margin: '4px 0 0', fontSize: 12 }}>
-            Cash = {cad(cashParts.count)} counted {new Date(cashParts.countedAt).toLocaleDateString('en-CA')}
+            Cash = {cad(cashParts.count)} counted for {cashParts.countedOn}
             {' '}+ {cad(cashParts.sales)} cash sales{cashParts.other ? ` ${cashParts.other < 0 ? '−' : '+'} ${cad(Math.abs(cashParts.other))} other cash` : ''} − {cad(cashParts.spent)} spent on receipts
           </p>
         )}
@@ -74,6 +98,8 @@ export default function Bankroll({ initial }) {
         <form onSubmit={saveCount} style={{ marginTop: 10, display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
           <span className="hint" style={{ margin: 0 }}>{d.cashKnown ? 'Recount the till:' : 'Count the till and enter it:'}</span>
           <input type="number" step="0.01" min="0" value={count} onChange={(e) => setCount(e.target.value)} placeholder="$ in the till" required style={{ width: 130 }} />
+          <span className="hint" style={{ margin: 0 }}>at the end of</span>
+          <input type="date" value={countDate} onChange={(e) => setCountDate(e.target.value)} />
           <button className="btn" disabled={!!busy}>{busy === 'count' ? 'Saving…' : 'Save count'}</button>
         </form>
         {(d.owed.count > 0 || d.waitingForBank > 0) && (
@@ -87,7 +113,51 @@ export default function Bankroll({ initial }) {
       {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
       {msg && <div className="notice-box" style={{ marginTop: 10 }}>{msg}</div>}
 
+      <div className="panel" style={{ marginTop: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+          <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Live transactions</h2>
+          {[[1, 'Today'], [7, '7 days'], [30, '30 days']].map(([n, l]) => (
+            <button key={n} type="button" className={'dash-filter' + (d.days === n ? ' active' : '')} disabled={!!busy} onClick={() => range(n)}>{l}</button>))}
+          <span className="hint" style={{ margin: 0 }}>Everything in one list: bank, cash sales, cash paid out.</span>
+        </div>
+        <datalist id="live-names">{(d.pay?.names || []).map((n) => <option key={n} value={n} />)}</datalist>
+        <div className="table-wrap"><table className="admin">
+          <thead><tr><th>Date</th><th>Type</th><th>Who / what</th><th>Category</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
+          <tbody>
+            {d.live.map((l) => (
+              <tr key={l.key}>
+                <td>{l.date}</td>
+                <td style={{ fontSize: 12.5 }}>{l.tag}</td>
+                <td>{l.who || '—'}</td>
+                <td>
+                  {l.expenseId ? (
+                    <>
+                      <select value={l.category || ''} disabled={!!busy} onChange={(e) => e.target.value && setCategory(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }}>
+                        <option value="">Choose…</option>
+                        {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
+                      </select>
+                      {l.category === 'Wages' && !l.inPayroll && (
+                        <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
+                          <input list="live-names" placeholder="paid to…" value={payTo[l.expenseId] || ''} onChange={(e) => setPayTo((p) => ({ ...p, [l.expenseId]: e.target.value }))} style={{ width: 120, minHeight: 34, padding: '4px 8px', fontSize: 14 }} />
+                          <button type="button" className="dash-filter active" disabled={!!busy} onClick={() => assignPay(l)}>Count as pay</button>
+                        </span>
+                      )}
+                      {l.inPayroll && <span className="hint" style={{ marginLeft: 6 }}>in payroll</span>}
+                    </>
+                  ) : (l.category || '')}
+                </td>
+                <td style={{ textAlign: 'right', fontWeight: 700, color: l.noMoney ? 'var(--muted)' : undefined }}>{l.noMoney && l.tag === 'Till count' ? cad(l.amount) : signed(l.amount)}</td>
+              </tr>))}
+            {!d.live.length && <tr><td colSpan={5} className="hint">Nothing in this range.</td></tr>}
+          </tbody></table></div>
+        <p className="hint" style={{ margin: '8px 0 0' }}>
+          New bank lines show here after <b>Get live balance</b>. Pick a category on any bank line; choose <b>Wages / salary</b> and name who was paid to put it on that person&apos;s payroll balance.
+        </p>
+      </div>
+
       <Receipts d={d} setD={setD} />
+
+      <Payroll d={d} setD={setD} />
 
       <details className="panel" style={{ marginTop: 18 }}>
         <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Other money in or out — the odd one with no receipt</summary>
@@ -130,24 +200,6 @@ export default function Bankroll({ initial }) {
         </div>
       )}
 
-      <div className="panel" style={{ marginTop: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-          <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>The day</h2>
-          <input type="date" value={d.date} onChange={(e) => e.target.value && goto(e.target.value)} />
-          <span className="hint" style={{ margin: 0 }}>Net for the day: <b>{signed(d.day.net)}</b></span>
-        </div>
-        <div className="table-wrap"><table className="admin"><tbody>
-          {[...d.day.out.map((l) => ({ ...l, tag: 'Bank out' })), ...d.day.in.map((l) => ({ ...l, tag: 'Bank in' })),
-            ...d.day.cashOut.map((l) => ({ ...l, tag: 'Cash out' })), ...d.day.cashIn.map((l) => ({ ...l, tag: 'Cash sale' })),
-            ...d.day.mine.map((l) => ({ id: `e${l.id}`, who: l.note, amount: l.amount, tag: l.kind === 'cash' ? 'Cash' : 'Through the bank' }))]
-            .map((l) => (<tr key={`${l.tag}${l.id}`}><td style={{ fontSize: 12, color: 'var(--muted)' }}>{l.tag}</td><td>{l.who || '—'}</td><td style={{ textAlign: 'right', fontWeight: 700 }}>{signed(l.amount)}</td></tr>))}
-          {!d.day.out.length && !d.day.in.length && !d.day.cashOut.length && !d.day.cashIn.length && !d.day.mine.length && <tr><td colSpan={3} className="hint">Nothing recorded for this day.</td></tr>}
-        </tbody></table></div>
-        <p className="hint" style={{ margin: '8px 0 0' }}>
-          Bank out is every card and e-transfer payment the bank reported; Bank in shows e-transfers received; cash lines come from cash sales and cash receipts.
-          Other deposits (cash deposited, card payouts) are not in the bank feed yet — add them under &ldquo;Other money&rdquo; if they matter to today&apos;s number.
-        </p>
-      </div>
     </div>
   );
 }

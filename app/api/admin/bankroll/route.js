@@ -18,8 +18,10 @@ async function who() {
 
 export async function GET(req) {
   if (!(await who())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
-  const date = new URL(req.url).searchParams.get('date') || undefined;
-  try { return NextResponse.json({ ok: true, ...(await loadBankroll(date)) }); }
+  const sp = new URL(req.url).searchParams;
+  const date = sp.get('date') || undefined;
+  const days = sp.get('days') || undefined;
+  try { return NextResponse.json({ ok: true, ...(await loadBankroll(date, { days })) }); }
   catch (e) { return NextResponse.json({ error: e?.message || 'Could not read the bankroll.' }, { status: 500 }); }
 }
 
@@ -44,12 +46,12 @@ export async function POST(req) {
       const notes = await refreshFromBank();
       const sync = await syncPlaidTransactions().catch((e) => ({ error: e.message }));
       const bal = await liveBalances();
-      const out = await loadBankroll(b.date);
+      const out = await loadBankroll(b.viewDate || b.date, { days: b.days });
       return NextResponse.json({ ok: true, ...out, notes: [...notes, ...(bal.errors || [])], sync });
     } else {
       return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
     }
-    return NextResponse.json({ ok: true, ...(await loadBankroll(b.date)) });
+    return NextResponse.json({ ok: true, ...(await loadBankroll(b.viewDate || b.date, { days: b.days })) });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'That failed.' }, { status: 400 });
   }
