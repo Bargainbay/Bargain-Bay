@@ -1989,3 +1989,35 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .pq-pick-btn .pq-none { color: #b3261e; font-weight: 600; }
 .pq-chosen { display: flex; gap: 10px; align-items: center; justify-content: space-between; border: 1px solid #1e8a3c; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; overflow-wrap: anywhere; }
 a.pq-btn { text-decoration: none; }
+
+/* The bankroll section of the Financial page (inside the dark .dboard theme).
+   The shared .btn / form-control styles re-point to the dark tokens and came out as light-grey buttons with white
+   text and dim grey labels. Everything here is explicit: strong text on dark, labels you can read, buttons with
+   real contrast, inputs that look like inputs. */
+.dboard .bankroll { font-size: 15px; color: var(--charcoal); }
+.dboard .bankroll .panel { padding: 18px 20px; }
+.dboard .bankroll h2 { font-size: 15px; letter-spacing: .04em; color: var(--charcoal); }
+.dboard .bankroll .hint { color: #c3cad8; font-size: 13.5px; line-height: 1.5; }
+.dboard .bankroll b { color: var(--charcoal); }
+.dboard .bankroll label { color: #dfe4ee; font-size: 13px; font-weight: 600; line-height: 1.9; }
+.dboard .bankroll input,
+.dboard .bankroll select { background: #0f131b; color: var(--charcoal); border: 1px solid #4a5468; border-radius: 8px;
+  padding: 9px 11px; font-size: 15px; min-height: 40px; }
+.dboard .bankroll input::placeholder { color: #8d97aa; }
+.dboard .bankroll input:focus,
+.dboard .bankroll select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+.dboard .bankroll input[type="checkbox"] { min-height: 0; width: 18px; height: 18px; accent-color: var(--accent); }
+.dboard .bankroll .btn { background: #232a38; color: #f1f4f9; border: 1px solid #5a6479; border-radius: 8px;
+  font-size: 14px; font-weight: 700; letter-spacing: .02em; padding: 10px 16px; min-height: 40px; }
+.dboard .bankroll .btn:hover { background: #2c3546; }
+.dboard .bankroll .btn.accent { background: var(--accent); color: #04281d; border-color: var(--accent); }
+.dboard .bankroll .btn.accent:hover { background: #4be0ae; }
+.dboard .bankroll .btn:disabled { opacity: .55; cursor: not-allowed; }
+.dboard .bankroll .dash-filter { background: #232a38; color: #e6eaf2; border: 1px solid #5a6479; font-size: 13px; font-weight: 600; padding: 7px 12px; }
+.dboard .bankroll .dash-filter.active { background: var(--accent); color: #04281d; border-color: var(--accent); }
+.dboard .bankroll table.admin { font-size: 14.5px; }
+.dboard .bankroll table.admin th { color: #c3cad8; font-size: 12.5px; }
+.dboard .bankroll table.admin td { color: var(--charcoal); }
+.dboard .bankroll summary { color: var(--charcoal); font-size: 15px; }
+.dboard .bankroll .notice-box { background: rgba(52,211,153,.16); color: #e8fff6; border: 1px solid rgba(52,211,153,.45); border-radius: 10px; padding: 12px 14px; }
+.dboard .bankroll .error-box { color: #ffd0d0; background: rgba(248,113,113,.16); border: 1px solid rgba(248,113,113,.5); padding: 12px 14px; }

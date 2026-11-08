@@ -44,10 +44,12 @@ export default function Bankroll({ initial }) {
     if (r) { setCount(''); setMsg('Cash count saved. From now on cash sales and cash spent move it.'); }
   }
 
-  const { bank, cashParts } = d;
+  // `d.bank` is the dollar figure; the bank's own details (when it was read, how old) are `d.bankInfo`.
+  const bank = d.bankInfo;
+  const { cashParts } = d;
   const open = d.entries.filter((e) => e.kind === 'pending' && !e.cleared && !e.voided);
   return (
-    <div>
+    <div className="bankroll">
       <div className="panel" style={{ textAlign: 'center' }}>
         <div className="hint" style={{ margin: 0 }}>Bankroll — what we have right now</div>
         <div style={{ fontSize: 44, fontWeight: 800, margin: '4px 0' }}>{cad(d.total)}</div>
