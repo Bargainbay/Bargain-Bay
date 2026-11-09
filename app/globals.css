@@ -1721,6 +1721,11 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 /* 3D product stage in the promo hero (added 2026-11-04). See components/Hero3D.jsx.
    Everything is scoped under .hero-3d / .hero-scene-*; the plain promo hero is untouched. */
 .hero-scene-diwali { background-image: linear-gradient(90deg, rgba(38,8,14,.55) 0%, rgba(38,8,14,.15) 45%, rgba(38,8,14,0) 70%), radial-gradient(ellipse at 75% 55%, #b8321f 0%, #7a1226 45%, #2c0a14 100%); }
+/* Remembrance hero: sombre, one poppy, no motion. */
+.hero-scene-remembrance { background-image: radial-gradient(ellipse at 76% 45%, #2a2a2e 0%, #141416 60%, #08080a 100%); }
+.hero-scene-remembrance .hero-kicker { background: rgba(200,16,46,.28); }
+.poppy-art { flex: 0 0 auto; width: 260px; height: 300px; margin-right: 6%; align-self: center; filter: drop-shadow(0 10px 24px rgba(0,0,0,.5)); }
+@media (max-width: 760px) { .poppy-art { width: 150px; height: 175px; margin: 0 auto 8px; } }
 .hero-scene-blackfriday { background-image: radial-gradient(ellipse at 72% 40%, #2b2b33 0%, #101014 60%, #050507 100%); position: relative; }
 .hero-scene-blackfriday::before { content: ''; position: absolute; right: 12%; top: -40px; width: 420px; height: 560px; pointer-events: none;
   background: conic-gradient(from 195deg at 50% 0, transparent 0 10deg, rgba(255,255,255,.14) 14deg 24deg, transparent 28deg); filter: blur(10px); }

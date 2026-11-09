@@ -6,6 +6,7 @@ import { COLLECTIONS, collectionFilter, money } from '../lib/constants';
 import ProductCard from '../components/ProductCard';
 import HeroVideo from '../components/HeroVideo';
 import Hero3D from '../components/Hero3D';
+import PoppyArt from '../components/PoppyArt';
 import { dealsSnapshot } from '../lib/deals';
 import { heroFor, dayLabel } from '../lib/deals-config';
 
@@ -71,8 +72,9 @@ export default async function Home() {
               <a href={promo.cta.href} className="btn accent">{promo.cta.label}</a>
               <a href={promo.secondary.href} className="btn">{promo.secondary.label}</a>
             </div>
-            <span className="hero-ends">Ends {dayLabel(promo.ends)}</span>
+            {promo.showEnds !== false && <span className="hero-ends">Ends {dayLabel(promo.ends)}</span>}
           </div>
+          {promo.scene === 'remembrance' && <PoppyArt />}
           {promo.scene && promo.image && (
             <Hero3D scene={promo.scene} image={promo.image} alt={promo.imageAlt} badge={promo.badge} />
           )}
