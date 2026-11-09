@@ -23,7 +23,12 @@ export default function ReferralPartnersAdmin() {
   async function save(e) {
     e.preventDefault(); setMsg('');
     const r = await post({ action: 'save', ...f });
-    setMsg(r.ok ? 'Saved.' : r.error || 'Could not save.'); if (r.ok) { setF({ email: '', name: '', pct: '10' }); load(); }
+    setMsg(r.ok ? done(r, 'Saved.') : r.error || 'Could not save.'); if (r.ok) { setF({ email: '', name: '', pct: '10' }); load(); }
+  }
+  const done = (r, base) => (r.link ? `${base} ${r.emailed ? 'The sign-in email has been sent.' : 'The email did not send — pass this link on yourself:'} ${r.emailed ? '' : r.link}` : base);
+  async function invite(email) {
+    const r = await post({ action: 'invite', email });
+    setMsg(r.ok ? done(r, 'Sign-in link created.') : r.error || 'Could not send.');
   }
   async function assign(c, partner) {
     const reason = partner ? 'Partner referral client' : 'Removed from partner';
@@ -47,7 +52,7 @@ export default function ReferralPartnersAdmin() {
           <input placeholder="% of profit" value={f.pct} onChange={(e) => setF({ ...f, pct: e.target.value })} style={{ width: 110 }} />
           <button className="btn btn-primary" type="submit">Save</button>
         </form>
-        <p className="hint" style={{ marginBottom: 0 }}>They sign in with an ordinary account on that email (sign up at /signup, or use forgot password) and land on /partner.</p>
+        <p className="hint" style={{ marginBottom: 0 }}>The account is created for them and a link to choose a password is emailed (valid 7 days). Use “Send sign-in email” to send another.</p>
       </div>
       {partners.map((p) => (
         <div className="panel" key={p.email} style={{ marginBottom: 12, opacity: p.revoked_at ? 0.55 : 1 }}>
@@ -55,6 +60,7 @@ export default function ReferralPartnersAdmin() {
             <strong style={{ flex: 1 }}>{p.name || p.email} <span className="hint">{p.email} · {p.pct}% of profit · {p.clients} client{p.clients === 1 ? '' : 's'}{p.revoked_at ? ' · revoked' : ''}</span></strong>
             {!p.revoked_at && <>
               <a className="btn" href={`/partner?as=${encodeURIComponent(p.email)}`} target="_blank" rel="noreferrer">See their page</a>
+              <button className="btn" onClick={() => invite(p.email)}>Send sign-in email</button>
               <button className="btn" onClick={() => { setPick(pick === p.email ? '' : p.email); setQ(''); }}>Add clients</button>
               <button className="btn" onClick={() => revoke(p.email)}>Revoke</button>
             </>}
