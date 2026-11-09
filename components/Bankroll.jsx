@@ -3,7 +3,7 @@ import { Fragment, useEffect, useState } from 'react';
 import Receipts from './Receipts';
 
 const CATS = ['Wages', 'Rent / storage', 'Utilities', 'Insurance', 'Software', 'Truck (lease, plates, upkeep)', 'Fuel / delivery',
-  'Tools / supplies', 'Advertising', 'Card & bank fees', 'Interest charges', 'Loan repayment', 'Owner draw', 'Other'];
+  'Tools / supplies', 'Advertising', 'Card & bank fees', 'Interest charges', 'Loan repayment', 'Owner draw - Ravi', 'Owner draw - Sai', 'Other'];
 const NEW_CAT = '__new';
 const catLabel = (c) => (c === 'Wages' ? 'Wages / salary' : c);
 

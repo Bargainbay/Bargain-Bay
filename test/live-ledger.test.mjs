@@ -148,7 +148,7 @@ test('ONE TRANSFER SPLIT INTO TWO CATEGORIES: PARTS MUST ADD UP, EACH BECOMES AN
     const id = (await query(`SELECT id FROM bank_activity`)).rows[0].id;
     let threw = false; try { await splitActivity(id, { parts: [{ category: 'Interest charges', amount: 2000 }, { category: 'Owner draw', amount: 900 }] }); } catch { threw = true; }
     assert(threw, 'parts that do not add up are refused');
-    await splitActivity(id, { parts: [{ category: 'Interest charges', amount: 2000 }, { category: 'Owner draw', amount: 1000 }], by: 't' });
+    await splitActivity(id, { parts: [{ category: 'Interest charges', amount: 2000 }, { category: 'Owner draw - Ravi', amount: 1000 }], by: 't' });
     const ex = (await query(`SELECT category, amount FROM expenses ORDER BY ext_id`)).rows;
     equal(ex.length, 2); equal(ex[0].category, 'Interest charges'); equal(Number(ex[1].amount), 1000);
     equal((await query(`SELECT count(*)::int AS n FROM bank_activity`)).rows[0].n, 0, 'the transfer left the activity list');
