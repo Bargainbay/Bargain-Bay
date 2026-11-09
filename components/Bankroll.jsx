@@ -1,7 +1,6 @@
 'use client';
 import { Fragment, useEffect, useState } from 'react';
 import Receipts from './Receipts';
-import Payroll from './Payroll';
 
 const CATS = ['Wages', 'Rent / storage', 'Utilities', 'Insurance', 'Software', 'Truck (lease, plates, upkeep)', 'Fuel / delivery',
   'Tools / supplies', 'Advertising', 'Card & bank fees', 'Interest charges', 'Loan repayment', 'Owner draw', 'Other'];
@@ -229,7 +228,15 @@ export default function Bankroll({ initial }) {
 
       <Receipts d={d} setD={setD} />
 
-      <Payroll d={d} setD={setD} />
+      <div className="panel" style={{ marginTop: 18 }}>
+        <b>Payroll</b>{' '}
+        <span className="hint" style={{ margin: 0 }}>hours, what each person earned, owed and paid:</span>{' '}
+        <a href="/admin/payroll" style={{ textDecoration: 'underline' }}>open Payroll →</a>
+        {(d.pay?.people || []).filter((p) => p.balance > 0).length > 0 && (
+          <div className="hint" style={{ margin: '6px 0 0' }}>
+            Owed now: {(d.pay.people || []).filter((p) => p.balance > 0).map((p) => `${p.person} ${cad(p.balance)}`).join(' · ')}
+          </div>)}
+      </div>
 
       <details className="panel" style={{ marginTop: 18 }}>
         <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Other money in or out — the odd one with no receipt</summary>
