@@ -5081,6 +5081,10 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
   **To count it in a category's total** (Ravi's owner draw): **Count in the books** on that greyed row (`recordEntryAsExpense`, action `entry_to_books`) writes ONE expense
   (`ext_id` `bankroll-entry:<id>`, source `manual`) in its category, dated to the entry. Refused while the entry is still open (it would be counted twice) and never written
   twice. It moves the bankroll by nothing, because the bankroll is the bank + the till + open entries and never reads expenses.
+- **The Financial page folds like Operations** (owner, 2026-11-09): `OpsSection` takes a `scope` (default `ops`, so Operations' saved choices are untouched; Financial is `fin`,
+  stored as `fin-fold:<id>` in the browser), and `FinFoldBar` gives Open all / Close all. Folded: through-the-bank, Live transactions, Receipts, On its way, profit trend,
+  receivable + collections, patterns, sorting rules, bank feed, HST to confirm, QuickBooks, operating expenses. The Bankroll headline stays open. Everything starts OPEN (a page that
+  hides money on first load is worse); each fold remembers itself. **A new Financial section must be added to `IDS` in `FinFoldBar.jsx`** or Open all / Close all will not reach it.
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
   from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
 - **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the

@@ -14,6 +14,8 @@ import PlaidPanel from '../../../components/PlaidPanel';
 import Bankroll from '../../../components/Bankroll';
 import { loadBankroll } from '../../../lib/bankroll-load';
 import TaxReview from '../../../components/TaxReview';
+import OpsSection from '../../../components/OpsSection';
+import FinFoldBar from '../../../components/FinFoldBar';
 import ExpenseRules from '../../../components/ExpenseRules';
 import RuleSuggestions from '../../../components/RuleSuggestions';
 import { Kpi, HBars, TrendChart } from '../../../components/charts';
@@ -61,6 +63,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
   const ag = d.aging;
   return (
     <DashboardShell active="financial">
+      <FinFoldBar />
       {bankroll
         ? <Bankroll initial={bankroll} />
         : <div className="panel"><b>Bankroll</b> could not load. If this is the first time, press <b>Run schema migration</b> on the admin page, then reload.</div>}
@@ -80,11 +83,14 @@ export default async function FinancialDashboardPage({ searchParams }) {
         <Kpi label="Inventory capital" value={money(k.inventoryCost)} sub="COGS in stock" />
       </div>
 
+      <OpsSection scope="fin" id="trend" title="Gross profit trend" defaultOpen>
       <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Gross profit trend</h2>
         <TrendChart series={d.series} label="profit" accent="var(--c1)" />
       </div>
+      </OpsSection>
 
+      <OpsSection scope="fin" id="ar" title="Accounts receivable and collections" defaultOpen>
       <div className="dash-2col">
         <div className="panel">
           <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Accounts receivable <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 400 }}>(open invoices, now)</span></h2>
@@ -104,6 +110,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
           <p className="hint" style={{ marginTop: 10 }}>Total collected: <strong>{money(k.collected)}</strong></p>
         </div>
       </div>
+      </OpsSection>
 
       <div className="panel" style={{ marginTop: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <div>
@@ -124,31 +131,25 @@ export default async function FinancialDashboardPage({ searchParams }) {
       {/* Above the rules list: this is where a first bank import gets dealt
           with, and it's the answer to "why am I still doing this by hand". */}
       {suggestions.length > 0 && (
+        <OpsSection scope="fin" id="patterns" title="Patterns worth a rule" count={suggestions.length} defaultOpen>
         <div className="panel" style={{ marginTop: 18 }}>
-          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
-            Patterns worth a rule
-            <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>{suggestions.length}</span>
-          </h2>
           <RuleSuggestions initial={suggestions} categories={EXPENSE_CATEGORIES} />
         </div>
+        </OpsSection>
       )}
 
+      <OpsSection scope="fin" id="rules" title="Sorting rules" count={rules.length || null} defaultOpen>
       <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
-          Sorting rules
-          {rules.length > 0 && <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>{rules.length}</span>}
-        </h2>
         <ExpenseRules initial={rules} categories={EXPENSE_CATEGORIES} ledgerStart={ledgerStart} />
       </div>
+      </OpsSection>
 
       {admin && (
+        <OpsSection scope="fin" id="plaid" title={plaid.connected ? 'Bank feed — connected' : 'Bank feed — transactions straight from the account'} defaultOpen>
         <div className="panel" style={{ marginTop: 18 }}>
-          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
-            Bank feed — transactions straight from the account
-            {plaid.connected && <span className="pill ok" style={{ marginLeft: 8, fontSize: 11 }}>connected</span>}
-          </h2>
           <PlaidPanel status={plaid} />
         </div>
+        </OpsSection>
       )}
 
       {plaid.connected && (
@@ -165,27 +166,23 @@ export default async function FinancialDashboardPage({ searchParams }) {
           imported row claims no input tax credit until somebody says what tax
           was inside it, and this is where thousands of them get answered. */}
       {unreviewed.length > 0 && (
+        <OpsSection scope="fin" id="tax" title="HST to confirm" count={unreviewed.length} defaultOpen>
         <div className="panel" style={{ marginTop: 18 }}>
-          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
-            HST to confirm
-            <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>{unreviewed.length}</span>
-          </h2>
           <TaxReview initial={unreviewed} />
         </div>
+        </OpsSection>
       )}
 
       {admin && (
+        <OpsSection scope="fin" id="qbo" title={qbo.connected ? 'QuickBooks — connected' : 'QuickBooks — automatic expense tracking'} defaultOpen>
         <div className="panel" style={{ marginTop: 18 }}>
-          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>
-            QuickBooks — automatic expense tracking
-            {qbo.connected && <span className="pill ok" style={{ marginLeft: 8, fontSize: 11 }}>connected</span>}
-          </h2>
           <QboPanel status={qbo} />
         </div>
+        </OpsSection>
       )}
 
+      <OpsSection scope="fin" id="opex" title={`Operating expenses · ${periodLabel(period)}`} defaultOpen>
       <div className="panel" style={{ marginTop: 18 }}>
-        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Operating expenses · {periodLabel(period)}</h2>
         {d.expensesByCategory.length > 0 && (
           <div style={{ marginBottom: 14 }}>
             <HBars money rows={d.expensesByCategory.map((e, i) => ({ label: e.category, value: e.amount, color: ['var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)', 'var(--c6)'][i % 5] }))} />
@@ -196,6 +193,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
           <ExpenseEditor initial={expenses} recurringInitial={recurring} categories={EXPENSE_CATEGORIES} />
         </div>
       </div>
+      </OpsSection>
     </DashboardShell>
   );
 }
