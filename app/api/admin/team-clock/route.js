@@ -2,6 +2,7 @@
 // ADMIN only: an hourly rate is pay.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
+import { audit } from '../../../../lib/audit';
 import { saveEmployee, endEmployee, fixStaffShift, addStaffShift } from '../../../../lib/team-clock';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,11 @@ export async function POST(req) {
   if (!(s && isAdmin(s))) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   let b; try { b = await req.json(); } catch { b = {}; }
   try {
-    if (b.action === 'save_employee') return NextResponse.json({ ok: true, employee: await saveEmployee(b, s.email) });
+    if (b.action === 'save_employee') {
+      const employee = await saveEmployee(b, s.email);
+      if (employee.repriced) await audit(s, { action: 'payroll.reprice', entity: 'employee', entityId: String(employee.id), summary: `${employee.name || employee.email}: rate set to ${b.hourlyRate}, ${employee.repriced} shift(s) since ${b.backfillFrom} re-priced` });
+      return NextResponse.json({ ok: true, employee });
+    }
     if (b.action === 'save_many') {
       // One bad line must not lose the rest, and must say which line it was.
       const list = Array.isArray(b.people) ? b.people.slice(0, 50) : [];

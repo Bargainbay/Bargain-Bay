@@ -86,3 +86,19 @@ test('TWO EMPLOYEE ROWS FOR ONE NAME ARE ONE PERSON ON THE PAGE', async () => {
     equal(w.people.length, 1); equal(w.people[0].hours, 6); equal(w.people[0].total, 120);
   } finally { done(); }
 });
+
+test('A RATE ENTERED WRONG CAN BE CORRECTED FOR SHIFTS SINCE A DAY; THE USUAL CHANGE LEAVES THE PAST ALONE', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { saveEmployee } = await import('../lib/team-clock.js');
+    const g = await emp('Guri', 18, 'g@x.ca');
+    await shift(g, '2026-10-19', '10:00', '18:00', 18); await shift(g, '2026-10-12', '10:00', '18:00', 18);
+    const plain = await saveEmployee({ email: 'g@x.ca', name: 'Guri', hourlyRate: 16 }, 'a');
+    equal(plain.repriced, 0);
+    equal((await payrollWeek('2026-10-19')).people[0].total, 144, 'the usual change does not touch past shifts');
+    const fixed = await saveEmployee({ email: 'g@x.ca', name: 'Guri', hourlyRate: 16, backfillFrom: '2026-10-19' }, 'a');
+    equal(fixed.repriced, 1);
+    equal((await payrollWeek('2026-10-19')).people[0].total, 128, '8 h at the corrected $16');
+    equal((await payrollWeek('2026-10-12')).people[0].total, 144, 'a week before the date is left as it was');
+  } finally { done(); }
+});
