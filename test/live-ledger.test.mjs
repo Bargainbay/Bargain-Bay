@@ -170,3 +170,22 @@ test('A CATEGORY THE OFFICE ADDS IS KEPT, NOT DUPLICATED, AND A NAME THE BOOKS T
     assert(threw, 'a name with loan/owner/draw/wage is refused');
   } finally { await done(); }
 });
+
+test('A PAYMENT RECORDED AS CASH THAT WAS REALLY AN E-TRANSFER CAN BE RELABELLED, AND LEAVES THE CASH LIST WITHOUT TOUCHING THE INVOICE', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { changeInvoicePaymentMethod } = await import('../lib/invoices.js');
+    const inv = (await query(`INSERT INTO invoices (number, name, email, status, total, payment_method, paid_at) VALUES ('INV-9001','Test Buyer','t@x.ca','paid',1100,'Cash',now()) RETURNING id`)).rows[0].id;
+    const pay = (await query(`INSERT INTO invoice_payments (invoice_id, amount, method, paid_at) VALUES ($1,1100,'Cash',now()) RETURNING id`, [inv])).rows[0].id;
+    let live = (await bankrollSummary(today(), { days: 7 })).live;
+    assert(live.some((l) => l.paymentId === pay), 'listed as a cash sale first');
+    const r = await changeInvoicePaymentMethod(pay, 'etransfer');
+    equal(r.to, 'E-transfer');
+    live = (await bankrollSummary(today(), { days: 7 })).live;
+    assert(!live.some((l) => l.paymentId === pay), 'no longer a cash sale');
+    const i = (await query(`SELECT status, total, payment_method FROM invoices WHERE id = $1`, [inv])).rows[0];
+    equal(i.status, 'paid'); equal(Number(i.total), 1100); equal(i.payment_method, 'E-transfer');
+    let threw = false; try { await changeInvoicePaymentMethod(pay, 'bitcoin'); } catch { threw = true; }
+    assert(threw, 'an unknown method is refused');
+  } finally { await done(); }
+});

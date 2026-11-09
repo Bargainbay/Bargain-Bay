@@ -6,6 +6,7 @@ import { audit } from '../../../../lib/audit';
 import { addEntry, clearEntry, voidEntry } from '../../../../lib/bankroll';
 import { loadBankroll } from '../../../../lib/bankroll-load';
 import { promoteActivity, sortIncome, splitActivity } from '../../../../lib/bank-activity';
+import { changeInvoicePaymentMethod } from '../../../../lib/invoices';
 import { addCustomCategory } from '../../../../lib/finance';
 import { liveBalances, refreshFromBank, syncPlaidTransactions } from '../../../../lib/plaid';
 
@@ -46,6 +47,9 @@ export async function POST(req) {
     } else if (b.action === 'add_category') {
       const name = await addCustomCategory(b.name);
       await audit(session, { action: 'bank.category', entity: 'category', entityId: name, summary: `Added expense category ${name}` });
+    } else if (b.action === 'payment_method') {
+      const r = await changeInvoicePaymentMethod(b.paymentId, b.method);
+      await audit(session, { action: 'invoice.payment_method', entity: 'invoice', entityId: r.number, summary: `Payment on ${r.number} changed from ${r.from} to ${r.to}` });
     } else if (b.action === 'split') {
       const r = await splitActivity(b.activityId, { parts: b.parts, by });
       await audit(session, { action: 'bank.split', entity: 'bank_activity', entityId: String(b.activityId), summary: `Bank transfer $${r.gross} split into ${r.parts}: ${(b.parts || []).map((p) => `${p.category} ${p.amount}`).join(', ')}` });
