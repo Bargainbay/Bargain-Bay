@@ -9,6 +9,7 @@ import { addEntry, bankrollSummary } from '../lib/bankroll.js';
 
 const bankLine = (extId, amount, date = '2026-11-05', vendor = 'HOME DEPOT') =>
   upsertExpense({ incurredOn: date, category: 'Other', vendor, amount, tax: null, note: 'TD', extId, source: 'plaid' });
+const TODAY = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }); // movements are dated today: a movement dated before a till count is already in it
 const tick = () => new Promise((r) => setTimeout(r, 25)); // timestamps are compared in the database, so let the clock move
 const expensesOf = async (src) => (await query('SELECT * FROM expenses WHERE source = $1 ORDER BY id', [src])).rows;
 
@@ -23,7 +24,7 @@ test('A CASH RECEIPT BOOKS THE COST ONCE, IS ALREADY REVIEWED, AND LOWERS THE CA
   const { done } = await withTestDb();
   try {
     await addEntry({ date: '2026-11-06', kind: 'count', amount: 500, by: 'a' }); await tick();
-    const id = await createReceipt({ date: '2026-11-06', vendor: 'Canadian Tire', total: 113, tax: 13, category: 'Tools / supplies', paidWith: 'cash', by: 'a' });
+    const id = await createReceipt({ date: TODAY, vendor: 'Canadian Tire', total: 113, tax: 13, category: 'Tools / supplies', paidWith: 'cash', by: 'a' });
     const ex = await expensesOf('cash');
     equal(ex.length, 1); equal(Number(ex[0].amount), 100); equal(Number(ex[0].tax), 13); assert(ex[0].reviewed_at, 'typed by a person, so reviewed');
     equal((await listUnreviewedExpenses()).length, 0, 'not in the bank review queue');
@@ -87,7 +88,7 @@ test('PAYING BACK IN CASH TAKES IT OUT OF THE TILL', async () => {
     await addEntry({ date: '2026-11-06', kind: 'count', amount: 300, by: 'a' }); await tick();
     const id = await createReceipt({ date: '2026-11-06', vendor: 'Staples', total: 80, category: 'Other', paidWith: 'personal', paidBy: 'Ravi', by: 'a' });
     equal((await bankrollSummary('2026-11-06')).cash, 300, 'a personal receipt is not a cash movement');
-    await tick(); await markReimbursed(id, { how: 'cash', on: '2026-11-06', by: 'a' });
+    await tick(); await markReimbursed(id, { how: 'cash', on: TODAY, by: 'a' });
     equal((await bankrollSummary('2026-11-06')).cash, 220);
   } finally { done(); }
 });
