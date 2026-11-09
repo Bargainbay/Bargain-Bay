@@ -9,7 +9,7 @@ import { listLeadSenders } from '../../../../../lib/invoices';
 import { contactsForAutofill } from '../../../../../lib/customers';
 import { getAll } from '../../../../../lib/inventory';
 import { stockForInvoicing } from '../../../../../lib/stock-reconcile';
-import AdminNav from '../../../../../components/AdminNav';
+import PortalNav from '../../../../../components/PortalNav';
 import QuoteBuilder from '../../../../../components/QuoteBuilder';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +32,7 @@ export default async function EditQuotePage({ params }) {
   if (quote.status !== 'open') {
     return (
       <div>
-        <AdminNav active="quotes" salesOnly={!isAdmin(session)} />
+        <PortalNav active="quotes" session={session} />
         <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Edit {quote.number}</h1>
         <div className="error-box">
           This quote is <b>{quote.status}</b> and can&apos;t be edited.{' '}
@@ -98,7 +98,7 @@ export default async function EditQuotePage({ params }) {
 
   return (
     <div>
-      <AdminNav active="quotes" salesOnly={!isAdmin(session)} />
+      <PortalNav active="quotes" session={session} />
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Edit {quote.number}</h1>
         <a href="/admin/quotes" className="hint" style={{ textDecoration: 'underline' }}>← Back to quotes</a>

@@ -15,6 +15,7 @@ const TABS = [
   ['/sales/pipeline', 'Pipeline'],
   ['/sales/catalog', 'Catalog'],
   ['/admin/quotes', 'Quotes'],
+  ['/admin/invoices', 'Invoices'],
   ['/sales/performance', 'Performance'],
   ['/sales/resources', 'Resources']
 ];

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, isAdmin, isStaff } from '../../../lib/auth';
+import { getSession, isAdmin, isStaff, canSeeCost } from '../../../lib/auth';
 import { money, leadSourceLabel } from '../../../lib/constants';
 import { hasDb } from '../../../lib/db';
 import { listInvoices, listInvoiceAuthors, listLeadSenders, INVOICE_FILTERS } from '../../../lib/invoices';
@@ -7,7 +7,7 @@ import { pendingCollectionsForInvoices } from '../../../lib/door-money';
 import { contactsForAutofill } from '../../../lib/customers';
 import { getAll } from '../../../lib/inventory';
 import { stockForInvoicing } from '../../../lib/stock-reconcile';
-import AdminNav from '../../../components/AdminNav';
+import PortalNav from '../../../components/PortalNav';
 import InvoiceForm from '../../../components/InvoiceForm';
 import MarkPaidControl from '../../../components/MarkPaidControl';
 import ConfirmCollection from '../../../components/ConfirmCollection';
@@ -97,7 +97,7 @@ export default async function InvoicesPage({ searchParams }) {
 
   return (
     <div>
-      <AdminNav active="invoices" salesOnly={!isAdmin(session)} />
+      <PortalNav active="invoices" session={session} />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Invoices</h1>
 
       {!hasDb() && (
@@ -112,7 +112,7 @@ export default async function InvoicesPage({ searchParams }) {
           straight away</b>, dated to the invoice — take a deposit now and collect the balance on delivery.
           Mark it paid here when the rest of the money lands.
         </p>
-        <InvoiceForm inventory={inventory} customers={customers} senders={senders} hideCost={!isAdmin(session)} />
+        <InvoiceForm inventory={inventory} customers={customers} senders={senders} hideCost={!isAdmin(session)} repCost={canSeeCost(session)} />
       </div>
 
       <div className="panel">

@@ -5219,3 +5219,9 @@ collected today and the quota (reps on the commission plan), today against the 4
 activity of every rep. It covers BOTH businesses and ignores the side toggle. It is read-only; acting on a lead happens on the Leads page, which
 accepts `?owner=<email>` / `?owner=pool` (and Pipeline too) **for an admin only** — `listLeads` ignores `owner` for anyone else, so a rep asking for
 another rep's leads still gets only their own (tested).
+
+### The rep's header on the selling pages (2026-11-08)
+`components/PortalNav.jsx`: on `/admin/quotes`, the quote edit page and `/admin/invoices`, the business-development rep (a rep who is not admin) gets the SAME Sales Hub
+header (side toggle and tabs, with Quotes and Invoices tabs) instead of the full Sales Portal menu (orders, warehouse, dispatch, intake…), which is not theirs. Everyone
+else gets `AdminNav` exactly as before. On the invoice form a rep sees the per-line cost box (`repCost` = `canSeeCost`) but still NOT the admin-only below-cost-floor override
+(`hideCost` stays `!isAdmin`). A rep can still reach other `/admin/*` pages by typing the address — those gates are unchanged; this is menu hygiene, not a permission.

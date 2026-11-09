@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getSession, isAdmin, isStaff, canSeeCost, isSalesRep } from '../../../lib/auth';
+import { getSession, isAdmin, isStaff, canSeeCost } from '../../../lib/auth';
 import { listServices } from '../../../lib/sales-services';
 import { getSetting } from '../../../lib/settings';
 import { LOW_PROFIT_DEFAULT } from '../../../lib/quote-profit';
@@ -11,7 +11,7 @@ import { listLeadSenders } from '../../../lib/invoices';
 import { contactsForAutofill } from '../../../lib/customers';
 import { getAll } from '../../../lib/inventory';
 import { stockForInvoicing } from '../../../lib/stock-reconcile';
-import AdminNav from '../../../components/AdminNav';
+import PortalNav from '../../../components/PortalNav';
 import QuoteBuilder from '../../../components/QuoteBuilder';
 import QuoteActions from '../../../components/QuoteActions';
 
@@ -78,8 +78,7 @@ export default async function QuotesPage({ searchParams }) {
 
   return (
     <div>
-      <AdminNav active="quotes" salesOnly={!isAdmin(session)} />
-      {isSalesRep(session) && <p style={{ margin: '4px 0' }}><a href="/sales">← Sales Hub</a></p>}
+      <PortalNav active="quotes" session={session} />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Quotes</h1>
 
       {/* Why deals are lost, which this list could never answer before. */}
