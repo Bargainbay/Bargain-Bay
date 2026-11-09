@@ -9,7 +9,7 @@ import { STAGES, OPEN_STAGES, LOST_REASONS } from '../lib/lead-rules';
 const money = (n) => '$' + Math.round(Number(n) || 0).toLocaleString('en-CA');
 const label = (k) => (STAGES.find(([s]) => s === k) || [])[1] || k;
 
-export default function PipelineBoard({ initial }) {
+export default function PipelineBoard({ initial, showOwner = false }) {
   const [leads, setLeads] = useState(initial);
   const [err, setErr] = useState('');
   const [losing, setLosing] = useState(null); // lead id awaiting a reason
@@ -56,6 +56,7 @@ export default function PipelineBoard({ initial }) {
                   style={{ background: 'var(--card, #fff)', border: '1px solid var(--line, #ddd)', borderRadius: 8, padding: 8, marginTop: 8, fontSize: 13.5 }}>
                   <a href={`/sales/leads?open=${l.id}`} style={{ fontWeight: 700, color: 'var(--charcoal)' }}>{l.company || l.contact_name}</a>
                   <div className="hint">{l.temperature}{l.est_value != null ? ` · ${money(l.est_value)}` : ''}{l.next_step_at ? ` · next ${l.next_step_at}` : ''}</div>
+                  {showOwner && <div className="hint" style={{ fontSize: 11.5 }}>{l.owner_email ? l.owner_email.split('@')[0] : 'unassigned'}</div>}
                   <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                     <button className="btn" style={{ fontSize: 12 }} disabled={idx(stage) === 0} aria-label={`Move ${l.company || l.contact_name} back`} onClick={() => move(l.id, OPEN_STAGES[idx(stage) - 1])}>←</button>
                     <button className="btn" style={{ fontSize: 12 }} disabled={idx(stage) === OPEN_STAGES.length - 1} aria-label={`Move ${l.company || l.contact_name} forward`} onClick={() => move(l.id, OPEN_STAGES[idx(stage) + 1])}>→</button>

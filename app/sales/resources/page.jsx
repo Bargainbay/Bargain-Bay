@@ -16,7 +16,7 @@ export default async function ResourcesPage() {
   const vars = { rep_name: viewer.name || '{rep_name}', first_name: '{first_name}', company: '{company}', rep_phone: '{rep_phone}' };
   return (
     <div>
-      <SalesNav side={side} name={viewer.name} />
+      <SalesNav side={side} name={viewer.name} admin={viewer.admin} />
 
       <div className="panel">
         <h2 style={{ marginTop: 0, fontSize: 16 }}>The one-line pitch</h2>

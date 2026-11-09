@@ -5210,3 +5210,12 @@ choose; an import with no Side column defaults to the side being viewed); **Cata
 service price list (marked RS or Both), All shows both. **Collected Sales, commission, the daily counters and Performance are NEVER narrowed**:
 the 40/10/3/1 targets and John's statement are for the whole job, and a filtered figure beside the real one would only confuse. The chosen side
 tints the toggle, the active tab and a bar across the top, with a line saying what is being shown. A service's margin is only flagged when it is a loss.
+
+### The owner's Team view (`/sales/team`, 2026-11-08)
+Admin only (`teamOverview` in `lib/leads.js`, `components/TeamBoard.jsx`; a Team tab appears for an admin). Per rep: last activity, at the shop since,
+collected today and the quota (reps on the commission plan), today against the 40/10/3/1 targets, the lead funnel by stage with counts and value
+(each stage links to that rep's leads), and **"Needs a hand"**: open leads that are overdue (next step before today), stale (no activity for
+`STALE_DAYS` = 5), untouched (assigned over 24h ago, never contacted) or unaccepted, each with the reason. Plus the unassigned pool and the latest
+activity of every rep. It covers BOTH businesses and ignores the side toggle. It is read-only; acting on a lead happens on the Leads page, which
+accepts `?owner=<email>` / `?owner=pool` (and Pipeline too) **for an admin only** — `listLeads` ignores `owner` for anyone else, so a rep asking for
+another rep's leads still gets only their own (tested).

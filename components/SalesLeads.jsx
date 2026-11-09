@@ -197,13 +197,13 @@ function LeadDetail({ id, isAdmin, onChanged, onClose }) {
   );
 }
 
-export default function SalesLeads({ initial, isAdmin, openId, side = 'all' }) {
+export default function SalesLeads({ initial, isAdmin, openId, side = 'all', owner }) {
   const [leads, setLeads] = useState(initial);
   const [open, setOpen] = useState(openId);
   const [mode, setMode] = useState(null); // 'new' | 'import'
   const [q, setQ] = useState('');
   useEffect(() => setLeads(initial), [initial]);
-  const reload = () => fetch(`/api/sales/leads?side=${side}${q ? `&q=${encodeURIComponent(q)}` : ''}`).then((r) => r.json()).then((d) => setLeads(d.leads || []));
+  const reload = () => fetch(`/api/sales/leads?side=${side}${owner ? `&owner=${encodeURIComponent(owner)}` : ''}${q ? `&q=${encodeURIComponent(q)}` : ''}`).then((r) => r.json()).then((d) => setLeads(d.leads || []));
   const shown = leads;
   return (
     <div>

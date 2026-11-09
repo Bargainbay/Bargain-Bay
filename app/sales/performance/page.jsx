@@ -24,7 +24,7 @@ export default async function PerformancePage({ searchParams }) {
 
   return (
     <div>
-      <SalesNav side={side} name={viewer.name} />
+      <SalesNav side={side} name={viewer.name} admin={viewer.admin} />
       {!plan ? (
         <div className="panel">No commission plan has been set up for your account yet. Ask the owner.</div>
       ) : (
