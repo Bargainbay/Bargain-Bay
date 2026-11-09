@@ -239,3 +239,22 @@ test('A CLEARED ENTRY CAN BE COUNTED IN THE BOOKS ONCE, UNDER ITS CATEGORY, WITH
     assert(threw, 'never twice');
   } finally { await done(); }
 });
+
+test('A CASH DEPOSIT IS ONE ENTRY: THE TILL GOES DOWN, THE BANK SIDE IS COUNTED, AND THE BANKROLL TOTAL DOES NOT MOVE', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { addCashDeposit } = await import('../lib/bankroll.js');
+    await addEntry({ date: today(), kind: 'count', amount: 1000, note: 'count', by: 't' });
+    const before = await bankrollSummary(today(), { days: 7 });
+    const r = await addCashDeposit({ date: today(), amount: 700, by: 't' });
+    equal(r.amount, 700);
+    const after = await bankrollSummary(today(), { days: 7 });
+    equal(after.total, before.total, 'the bankroll total is unchanged');
+    equal(Math.round((before.cash - after.cash) * 100) / 100, 700, 'cash in hand is down by the deposit');
+    await clearEntry(r.inId, 't', null);
+    const cleared = await bankrollSummary(today(), { days: 7 });
+    equal(Math.round((before.total - cleared.total) * 100) / 100, 700, 'once the bank figure carries it, only the till side remains');
+    let threw = false; try { await addCashDeposit({ date: today(), amount: 0 }); } catch { threw = true; }
+    assert(threw, 'a zero deposit is refused');
+  } finally { await done(); }
+});
