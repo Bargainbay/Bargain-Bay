@@ -76,6 +76,7 @@ export default async function PartnerPage({ searchParams }) {
       <p className="hint" style={{ margin: '8px 2px 16px' }}>
         Commission is {r.partner.pct}% of the profit on each order your resellers place, and {r.partner.retailPct}% on sales made with your end-user code (that sale carries the {r.partner.customerPct}% customer discount). It becomes earned once the order is delivered and paid for.
         Cancelled and refunded orders drop off automatically.
+        <br /><b>How profit is worked out:</b> the order's sale price before tax, less any discount or promo code the customer used, less what the units cost Bargain Bay (what we paid, plus any parts and labour on that unit). Delivery fees and HST are not included. An order that lost money earns $0. Commission is the profit times the rate on that line. Ask us and we will walk you through any order.
         {t.missingCost > 0 ? ' Some units are still waiting for their cost to be entered, so those orders may show less commission until it is.' : ''}
       </p>
 
@@ -91,11 +92,11 @@ export default async function PartnerPage({ searchParams }) {
           </div>
           {c.orders.length === 0 ? <p className="hint" style={{ marginBottom: 0 }}>No orders yet.</p> : (
             <div className="table-wrap"><table className="admin" style={{ minWidth: 0 }}>
-              <thead><tr><th>Order</th><th>Date</th><th>Items</th><th>Total (pre-tax)</th><th>Status</th><th>Commission</th></tr></thead>
+              <thead><tr><th>Order</th><th>Date</th><th>Items</th><th>Total (pre-tax)</th><th>Discount</th><th>Profit</th><th>Rate</th><th>Status</th><th>Commission</th></tr></thead>
               <tbody>{c.orders.map((o) => (
                 <tr key={o.number}>
                   <td>{o.number}</td><td>{fmt(o.at)}</td><td>{o.items || '—'}</td>
-                  <td>{money(o.subtotal)}</td><td>{o.statusLabel}</td><td>{money(o.commission)} <span className="hint">{o.earned ? 'earned' : 'pending'}</span></td>
+                  <td>{money(o.subtotal)}</td><td>{o.discount > 0 ? money(o.discount) : '—'}</td><td>{money(o.profit)}</td><td>{o.ratePct}%</td><td>{o.statusLabel}</td><td>{money(o.commission)} <span className="hint">{o.earned ? 'earned' : 'pending'}</span></td>
                 </tr>))}</tbody>
             </table></div>
           )}

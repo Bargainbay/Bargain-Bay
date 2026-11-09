@@ -224,6 +224,11 @@ test('SecondShop: the end-user link carries a 5% code; ordering with it puts the
     await order('shopper@x.ca', { price: 1000, cost: 600 });                         // no code: the full 20% of 400
     const rr = await partnerReport(JAY);
     equal(rr.totals.commission, 132.5); equal(rr.partner.retailPct, 15);
+    const ords = rr.clients[0].orders;
+    const withCode = ords.find((o) => o.retail), full = ords.find((o) => !o.retail);
+    equal(withCode.profit, 350); equal(withCode.discount, 50); equal(withCode.ratePct, 15); equal(withCode.commission, 52.5);
+    equal(full.profit, 400); equal(full.ratePct, 20); equal(full.commission, 80);
+    assert(!('cost' in withCode) && !JSON.stringify(rr).includes('"cost"'), 'the unit cost is never sent');
     const again = await attachPartnerForOrder({ couponCode: 'SECONDSHOP5', email: 'shopper@x.ca' });
     assert(!again.attached, 'never moved or attached twice');
     // the percentage is editable; 0 switches the code off

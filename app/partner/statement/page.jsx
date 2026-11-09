@@ -36,11 +36,11 @@ export default async function StatementPage({ searchParams }) {
       <h1 style={{ color: 'var(--charcoal)', marginTop: 0 }}>Commission statement — {label}</h1>
       <p className="hint">{report.partner.name || report.partner.email} · {report.partner.pct}% of profit</p>
       <div className="table-wrap"><table className="admin" style={{ minWidth: 0 }}>
-        <thead><tr><th>Order</th><th>Date</th><th>Client</th><th>Items</th><th>Total (pre-tax)</th><th>Status</th><th>Commission</th></tr></thead>
+        <thead><tr><th>Order</th><th>Date</th><th>Client</th><th>Items</th><th>Total (pre-tax)</th><th>Discount</th><th>Profit</th><th>Rate</th><th>Status</th><th>Commission</th></tr></thead>
         <tbody>
-          {st.orders.length === 0 && <tr><td colSpan={7} className="hint">No orders this month.</td></tr>}
+          {st.orders.length === 0 && <tr><td colSpan={10} className="hint">No orders this month.</td></tr>}
           {st.orders.map((o) => (<tr key={o.number}><td>{o.number}</td><td>{String(o.at || '').slice(0, 10)}</td><td>{o.client}</td><td>{o.items || '—'}</td>
-            <td>{money(o.subtotal)}</td><td>{o.statusLabel}{o.earned ? '' : ' (pending)'}</td><td>{money(o.commission)}</td></tr>))}
+            <td>{money(o.subtotal)}</td><td>{o.discount > 0 ? money(o.discount) : '—'}</td><td>{money(o.profit)}</td><td>{o.ratePct}%</td><td>{o.statusLabel}{o.earned ? '' : ' (pending)'}</td><td>{money(o.commission)}</td></tr>))}
         </tbody>
       </table></div>
       <h2 style={{ fontSize: 17 }}>Payments to you</h2>
