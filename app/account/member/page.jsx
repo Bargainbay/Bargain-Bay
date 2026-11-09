@@ -11,6 +11,7 @@ import { linkToken } from '../../../lib/links';
 import { money, STATUS_LABELS } from '../../../lib/constants';
 import MemberPortal from '../../../components/MemberPortal';
 import { recordVisit } from '../../../lib/member-prefs';
+import { getPartner } from '../../../lib/referral-partners';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Member dashboard — Bargain Bay' };
@@ -25,6 +26,7 @@ export default async function MemberDashboard() {
   const session = await getSession();
   if (!session) redirect('/login?next=/account/member');
   const m = hasDb() ? await getMembership(session.userId) : null;
+  const partner = await getPartner(session.email);
   if (!(m?.role === 'member' && m?.member_status === 'approved')) redirect('/resellers');
 
   const [units, orders, invoices, quotes] = await Promise.all([
@@ -50,7 +52,7 @@ export default async function MemberDashboard() {
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
         <h1 style={{ color: 'var(--charcoal)', margin: '10px 0' }}>{m.business_name || 'Member dashboard'}</h1>
-        <span><a href="/account" style={{ textDecoration: 'underline', fontSize: 14 }}>Profile &amp; settings</a></span>
+        <span>{partner && <a href="/partner" style={{ textDecoration: 'underline', fontSize: 14, fontWeight: 700, marginRight: 14 }}>Referral partner portal →</a>}<a href="/account" style={{ textDecoration: 'underline', fontSize: 14 }}>Profile &amp; settings</a></span>
       </div>
       <p className="hint" style={{ marginTop: 0 }}>Signed in as {session.email}. Your wholesale price applies in the shop and at checkout automatically.</p>
 
