@@ -11,24 +11,26 @@ const post = (body) => fetch('/api/sales/leads', { method: 'POST', headers: { 'C
   .then(async (r) => ({ ok: r.ok, ...(await r.json().catch(() => ({}))) }));
 const when = (d) => (d ? new Date(d).toLocaleString('en-CA', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 
-const blank = { side: 'both', company: '', contactName: '', email: '', phone: '', address: '', segment: '', source: '', temperature: 'cold', estValue: '', interestTags: [], nextStep: '', nextStepAt: '', assignTo: '' };
+const blank = { side: '', company: '', contactName: '', email: '', phone: '', address: '', segment: '', source: '', temperature: 'cold', estValue: '', interestTags: [], nextStep: '', nextStepAt: '', assignTo: '' };
 
 function Field({ id, name, children }) {
   return <div className="field" style={{ margin: 0 }}><label htmlFor={id}>{name}</label>{children}</div>;
 }
 
-function NewLead({ isAdmin, onDone }) {
-  const [f, setF] = useState(blank);
+function NewLead({ isAdmin, onDone, side }) {
+  // A new lead starts on the side being looked at. Under All the rep has to choose, so a lead is never filed under both by accident.
+  const [f, setF] = useState({ ...blank, side: side === 'bb' || side === 'rs' ? side : '' });
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const toggle = (t) => setF({ ...f, interestTags: f.interestTags.includes(t) ? f.interestTags.filter((x) => x !== t) : [...f.interestTags, t] });
   async function save() {
+    if (!f.side) { setErr('Choose Bargain Bay or RS Solutions for this lead.'); return; }
     setBusy(true); setErr('');
     const r = await post({ action: 'create', lead: f });
     setBusy(false);
     if (!r.ok) { setErr(r.error || 'Could not save.'); return; }
-    setF(blank); onDone(r.id);
+    setF({ ...blank, side: f.side }); onDone(r.id);
   }
   return (
     <div className="panel">
@@ -38,7 +40,7 @@ function NewLead({ isAdmin, onDone }) {
         <Field id="nl-contact" name="Contact name"><input id="nl-contact" value={f.contactName} onChange={set('contactName')} /></Field>
         <Field id="nl-phone" name="Phone"><input id="nl-phone" type="tel" value={f.phone} onChange={set('phone')} /></Field>
         <Field id="nl-email" name="Email"><input id="nl-email" type="email" value={f.email} onChange={set('email')} /></Field>
-        <Field id="nl-side" name="Side"><select id="nl-side" value={f.side} onChange={set('side')}>{SIDES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></Field>
+        <Field id="nl-side" name="Side"><select id="nl-side" value={f.side} onChange={set('side')}><option value="">Choose…</option>{SIDES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</select></Field>
         <Field id="nl-seg" name="Segment"><select id="nl-seg" value={f.segment} onChange={set('segment')}><option value="">—</option>{SEGMENTS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
         <Field id="nl-src" name="Source"><select id="nl-src" value={f.source} onChange={set('source')}><option value="">Self-sourced</option>{LEAD_SOURCES_HUB.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
         <Field id="nl-temp" name="Temperature"><select id="nl-temp" value={f.temperature} onChange={set('temperature')}>{TEMPERATURES.map((t) => <option key={t}>{t}</option>)}</select></Field>
@@ -60,14 +62,14 @@ function NewLead({ isAdmin, onDone }) {
   );
 }
 
-function ImportLeads({ onDone }) {
+function ImportLeads({ onDone, side }) {
   const [text, setText] = useState('');
   const [res, setRes] = useState(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   async function run(commit) {
     setBusy(true); setErr('');
-    const r = await post({ action: commit ? 'import-commit' : 'import-preview', text });
+    const r = await post({ action: commit ? 'import-commit' : 'import-preview', text, side });
     setBusy(false);
     if (!r.ok) { setErr(r.error || 'Could not read that.'); return; }
     setRes({ ...r, committed: commit });
@@ -76,7 +78,7 @@ function ImportLeads({ onDone }) {
   return (
     <div className="panel">
       <h2 style={{ marginTop: 0, fontSize: 16 }}>Import leads</h2>
-      <p className="hint" style={{ marginTop: 0 }}>Paste rows from a spreadsheet, headings first (Company, Contact, Email, Phone, Segment, Side). Nothing is saved until you press Import.</p>
+      <p className="hint" style={{ marginTop: 0 }}>Paste rows from a spreadsheet, headings first (Company, Contact, Email, Phone, Segment, Side). Rows with no Side go to the side you are viewing{side === 'bb' || side === 'rs' ? '' : ' (under All: marked Both)'}. Nothing is saved until you press Import.</p>
       <textarea value={text} onChange={(e) => { setText(e.target.value); setRes(null); }} rows={6} style={{ width: '100%', fontFamily: 'monospace', fontSize: 12.5 }} aria-label="Pasted rows" />
       {err && <p style={{ color: 'var(--red, #c33)', fontSize: 14 }} role="alert">{err}</p>}
       <div style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
@@ -210,8 +212,8 @@ export default function SalesLeads({ initial, isAdmin, openId, side = 'all' }) {
         <button className="btn" onClick={() => setMode(mode === 'import' ? null : 'import')}>Import</button>
         <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && reload()} placeholder="Search company, name, phone, email" aria-label="Search leads" style={{ flex: '1 1 240px' }} />
       </div>
-      {mode === 'new' && <NewLead isAdmin={isAdmin} onDone={(id) => { setMode(null); setOpen(id); reload(); }} />}
-      {mode === 'import' && <ImportLeads onDone={reload} />}
+      {mode === 'new' && <NewLead side={side} isAdmin={isAdmin} onDone={(id) => { setMode(null); setOpen(id); reload(); }} />}
+      {mode === 'import' && <ImportLeads side={side} onDone={reload} />}
       {open && <LeadDetail id={open} isAdmin={isAdmin} onChanged={reload} onClose={() => setOpen(null)} />}
 
       <div className="panel" style={{ overflowX: 'auto' }}>

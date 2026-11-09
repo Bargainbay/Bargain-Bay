@@ -5199,7 +5199,8 @@ older gross-profit plan (`lib/commission-rules.js`, `MyProfit`); do not mix them
 
 ### The Sales Hub's Bargain Bay | RS Solutions | All toggle (2026-11-08)
 The side is the `bb_hub_side` cookie and a FILTER, never a permission. **Leads, Pipeline and Home's lead lists** narrow by `leads.side` (a lead
-marked Both is on each side); **Catalog**: Bargain Bay shows appliances plus the add-on services marked Bargain Bay or Both, RS Solutions shows the
+marked Both shows under All ONLY, so the two sides never repeat each other; a NEW lead starts on the side being viewed and under All the rep must
+choose; an import with no Side column defaults to the side being viewed); **Catalog**: Bargain Bay shows appliances plus the add-on services marked Bargain Bay or Both, RS Solutions shows the
 service price list (marked RS or Both), All shows both. **Collected Sales, commission, the daily counters and Performance are NEVER narrowed**:
 the 40/10/3/1 targets and John's statement are for the whole job, and a filtered figure beside the real one would only confuse. The chosen side
 tints the toggle, the active tab and a bar across the top, with a line saying what is being shown. A service's margin is only flagged when it is a loss.

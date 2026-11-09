@@ -60,14 +60,14 @@ test('a rep sees only their own leads; an admin sees the pool and everyone', asy
   } finally { await done(); }
 });
 
-test('the side filter includes "both"', async () => {
+test('a lead belongs to ONE side: Both shows under All only, so the two sides never repeat each other', async () => {
   const { done } = await fresh();
   try {
     await createLead({ company: 'BB', email: 'a@x.ca', side: 'bb' }, john);
     await createLead({ company: 'RS', email: 'b@x.ca', side: 'rs' }, john);
     await createLead({ company: 'Both', email: 'c@x.ca', side: 'both' }, john);
-    equal((await listLeads({ side: 'bb' }, john)).map((l) => l.company).sort().join(), 'BB,Both');
-    equal((await listLeads({ side: 'rs' }, john)).map((l) => l.company).sort().join(), 'Both,RS');
+    equal((await listLeads({ side: 'bb' }, john)).map((l) => l.company).sort().join(), 'BB');
+    equal((await listLeads({ side: 'rs' }, john)).map((l) => l.company).sort().join(), 'RS');
     equal((await listLeads({}, john)).length, 3);
   } finally { await done(); }
 });
@@ -179,7 +179,7 @@ test('preview writes nothing, flags duplicates; commit creates only the good row
 
 suite('leads — the Bargain Bay | RS Solutions toggle on Home');
 
-test('the toggle narrows the lead lists (Both is on each side) but never the daily counters', async () => {
+test('the toggle narrows the lead lists (Both shows under All only) but never the daily counters', async () => {
   const { done } = await fresh();
   try {
     const day = (await query(`SELECT (now() AT TIME ZONE 'America/Toronto')::date::text AS d`)).rows[0].d;
@@ -188,8 +188,20 @@ test('the toggle narrows the lead lists (Both is on each side) but never the dai
     await logLeadActivity(bb, { kind: 'call', outcome: 'conversation', nextStepAt: day }, john);
     const names = (h) => [...h.overdue, ...h.today].map((l) => l.company).sort().join();
     equal(names(await homeSummary(john)), 'BBCo,BothCo,RSCo');
-    equal(names(await homeSummary(john, { side: 'bb' })), 'BBCo,BothCo');
-    equal(names(await homeSummary(john, { side: 'rs' })), 'BothCo,RSCo');
+    equal(names(await homeSummary(john, { side: 'bb' })), 'BBCo');
+    equal(names(await homeSummary(john, { side: 'rs' })), 'RSCo');
     equal((await homeSummary(john, { side: 'rs' })).counters.touches, 1, 'a Bargain Bay call still counts toward the day when RS is on screen');
+  } finally { await done(); }
+});
+
+test('an import with no Side column goes to the side being viewed', async () => {
+  const { done } = await fresh();
+  try {
+    await importLeads('Company,Email\nOnly RS Co,a@rs.example.test', john, { commit: true, defaultSide: 'rs' });
+    equal((await listLeads({ side: 'rs' }, john)).length, 1);
+    equal((await listLeads({ side: 'bb' }, john)).length, 0);
+    await importLeads('Company,Email\nUnder All,b@all.example.test', john, { commit: true });
+    equal((await listLeads({ side: 'rs' }, john)).length, 1, 'under All a lead with no side is marked Both and stays out of each side');
+    equal((await listLeads({}, john)).length, 2);
   } finally { await done(); }
 });
