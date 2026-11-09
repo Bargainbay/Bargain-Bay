@@ -99,3 +99,21 @@ test('A DRY RUN SAYS WHAT IT WOULD DO AND WRITES NOTHING', async () => {
     equal((await row('t1')).payee_override, null);
   } finally { done(); }
 });
+
+test('"X HAS ACCEPTED YOUR TRANSFER OF $N" NAMES THE RECIPIENT TOO', () => {
+  const a = parseInteracSent({ subject: 'Interac e-Transfer: Gori has accepted your transfer of $568.00', internalDate: day('2026-11-08') });
+  equal(a.amountCents, 56800); equal(a.name, 'Gori');
+  equal(parseInteracSent({ subject: 'Interac e-Transfer: Sakthi Tech Service has accepted your transfer of $1,200.50' }).amountCents, 120050);
+});
+
+test('A SENT TRANSFER NOBODY HAS SORTED YET (STILL A BANK-ACTIVITY LINE) IS NAMED FROM THE EMAIL', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { recordActivity, mapActivity } = await import('../lib/bank-activity.js');
+    await recordActivity(mapActivity({ transaction_id: 'u1', date: '2026-11-09', amount: 388.66, name: 'SEND E-TFR ***cfu', original_description: 'SEND E-TFR ***cfu' }));
+    const r = await nameTransfersFromEmail({ emailsFn: async () => [mail('m1', '388.66', 'RAVINDER SINGH SAMRA', '2026-11-08')] });
+    equal(r.named.length, 1);
+    const a = (await query(`SELECT who_override FROM bank_activity`)).rows[0];
+    equal(a.who_override, 'RAVINDER SINGH SAMRA');
+  } finally { done(); }
+});

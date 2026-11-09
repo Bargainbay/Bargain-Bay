@@ -5061,6 +5061,10 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
   `/admin/categorize`, the rules screens or Sarah's tools.
 - **Owner draws are per owner** (owner, 2026-11-09): the dropdowns offer **Owner draw - Ravi** and **Owner draw - Sai** (the plain "Owner draw" stays valid for rows
   already saved). The ledger routes any category containing "owner"/"draw" to equity, so both go to 3000 with no ledger change.
+- **Sent transfers are named from Interac's emails BEFORE they are sorted** (fixed 2026-11-09): the naming pass only looked at `expenses` rows, but a sent e-transfer sits in
+  `bank_activity` until a person sorts it, so the Live list said "Not known" for exactly those lines. It now also names unsorted `bank_activity` money-out lines
+  (`who_override`), pairing them with the same emails and the same never-guess rule (one email, one line). It also reads the second Interac wording,
+  "NAME has accepted your transfer of $X" (recipient accepted by hand; NAME is the contact name as typed, often a first name).
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
   from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
 - **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the
