@@ -5254,3 +5254,14 @@ Employee Account on the tiered collected-sales plan) so one account never earns 
   set-your-password link (`invitePartner`, a reset token with `expires: '7d'`); "Send sign-in email" sends another, and the link is shown to the owner if the email fails.
 - Clients are put under a partner by an admin (search customers, reason required, audit-logged). **Not built:** auto-assigning a client who signs up online
   naming the partner (the signup "Referred by" box is not on main yet), and a payout/statement record (nothing records that commission was paid).
+
+### The pitches are written against the rate sheet (2026-11-09)
+`lib/sales-content.js` (all of John's scripts), `/sales/resources`, printable `/sales/resources/leave-behind/<segment>`, `test/sales-content.test.mjs`.
+- **Every price comes from `lib/addons.js` / `ZONES`**, and the test fails if a script quotes one that differs. **Every promise is one the
+  rate sheet allows**: orders in by 3 p.m. the day before, scheduling within 2-3 days, same-floor moves, photos + signed POD. The test fails on
+  "same day", "next day", "emergency", "24-hour". Insured is confirmed and may be claimed.
+- **Restoration is ON HOLD** (`hold` on its pitch; no leave-behind): it waits for the owner to confirm WSIB / compliance paperwork. WSIB is
+  never named in anything a rep says. Remove `hold` only when the owner confirms.
+- Three segments are marked start-here (property management, retailer, contractor); the Hub's lead `SEGMENTS` list carries all eight so a lead
+  can be filed under the segment its script is for (`segmentKey` in `lib/leads.js` maps free-text to them).
+- The leave-behind prints the COMPANY's contact details, never the rep's login address.
