@@ -27,6 +27,12 @@ export default function ClientBilling({ canBill }) {
   const [ok, setOk] = useState('');
   const [addHst, setAddHst] = useState(true);
   const [draft, setDraft] = useState({});   // jobId -> charge being typed
+  const [extras, setExtras] = useState({});  // clientId -> [{ description, amount }] lines with no stop behind them
+  const extrasOf = (id) => extras[id] || [];
+  const setExtra = (id, i, patch) => setExtras((e) => ({ ...e, [id]: extrasOf(id).map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
+  const addExtra = (id, x) => setExtras((e) => ({ ...e, [id]: [...extrasOf(id), x] }));
+  const dropExtra = (id, i) => setExtras((e) => ({ ...e, [id]: extrasOf(id).filter((_, j) => j !== i) }));
+  const extraTotal = (id) => extrasOf(id).reduce((a, x) => a + (Number(x.amount) > 0 ? Number(x.amount) : 0), 0);
 
   async function load(f = from, tt = to) {
     setLoading(true); setErr('');
@@ -56,17 +62,22 @@ export default function ClientBilling({ canBill }) {
   }
 
   async function invoice(c) {
+    const ex = extrasOf(c.clientId).filter((x) => String(x.description).trim() || x.amount !== '');
+    if (ex.some((x) => !String(x.description).trim() || !(Number(x.amount) > 0))) {
+      setErr('Every extra line needs a description and an amount above zero.'); return;
+    }
     if (!window.confirm(
-      `Invoice ${c.clientName} for ${c.jobs - c.unpriced} job(s), ${money(c.charged)}${addHst ? ' plus HST' : ''}?`
+      `Invoice ${c.clientName} for ${c.jobs - c.unpriced} job(s)${ex.length ? ` + ${ex.length} extra line(s)` : ''}, ${money(c.charged + extraTotal(c.clientId))}${addHst ? ' plus HST' : ''}?`
     )) return;
     setBusy(`i${c.clientId}`); setErr(''); setOk('');
     try {
       const res = await fetch('/api/admin/dispatch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'invoice_client', clientId: c.clientId, from: data.from, to: data.to, addHst })
+        body: JSON.stringify({ action: 'invoice_client', clientId: c.clientId, from: data.from, to: data.to, addHst, extraLines: ex.map((x) => ({ description: x.description, amount: Number(x.amount) })) })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not raise the invoice.'); return; }
+      setExtras((e) => ({ ...e, [c.clientId]: [] }));
       setOk(`${d.invoiceNumber} raised for ${d.client} — ${d.jobs} job(s), ${money(d.total)}. It's in Invoices, not sent yet.`);
       await load();
     } catch { setErr('Network error — no invoice was raised.'); }
@@ -152,6 +163,22 @@ export default function ClientBilling({ canBill }) {
           </table></div>
 
           {canBill && (
+            <div style={{ marginTop: 10 }}>
+              {extrasOf(c.clientId).map((x, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                  <input type="text" placeholder="What we did (e.g. Custom pickup)" style={{ flex: 1 }} value={x.description}
+                    onChange={(e) => setExtra(c.clientId, i, { description: e.target.value })} />
+                  <input type="number" min="0" step="0.01" inputMode="decimal" placeholder="$" style={{ width: 92 }} value={x.amount}
+                    onChange={(e) => setExtra(c.clientId, i, { amount: e.target.value })} />
+                  <button type="button" className="btn" style={{ padding: '4px 9px', fontSize: 12 }} onClick={() => dropExtra(c.clientId, i)}>Remove</button>
+                </div>
+              ))}
+              <button type="button" className="svc-chip" onClick={() => addExtra(c.clientId, { description: 'Custom pickup', amount: '100' })}>+ Custom pickup $100</button>{' '}
+              <button type="button" className="svc-chip" onClick={() => addExtra(c.clientId, { description: '', amount: '' })}>+ Other line</button>
+            </div>
+          )}
+
+          {canBill && (
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', marginTop: 10 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5 }}>
                 <input type="checkbox" style={{ width: 'auto' }} checked={addHst} onChange={(e) => setAddHst(e.target.checked)} />
@@ -160,9 +187,9 @@ export default function ClientBilling({ canBill }) {
               <span className="hint" style={{ margin: 0 }}>
                 {c.contactEmail || <b style={{ color: 'var(--danger)' }}>No contact email — add one first</b>}
               </span>
-              <button type="button" className="btn accent" disabled={busy === `i${c.clientId}` || !c.contactEmail || c.charged <= 0}
+              <button type="button" className="btn accent" disabled={busy === `i${c.clientId}` || !c.contactEmail || c.charged + extraTotal(c.clientId) <= 0 || (c.charged <= 0)}
                 onClick={() => invoice(c)}>
-                {busy === `i${c.clientId}` ? 'Raising…' : `Invoice ${money(c.charged)}`}
+                {busy === `i${c.clientId}` ? 'Raising…' : `Invoice ${money(c.charged + extraTotal(c.clientId))}`}
               </button>
             </div>
           )}
