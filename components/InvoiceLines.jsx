@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { isCreditLine, isUnitLine, isHaulAwayLine, INTAKE_CATEGORIES } from '../lib/constants';
+import { isCreditLine, isUnitLine, isHaulAwayLine, INTAKE_CATEGORIES, EXTENDED_WARRANTY_YEARS, extendedWarrantyText, extendedWarrantyYears } from '../lib/constants';
 import { searchStockUnits, OFF_STOCK_REASONS, OFF_STOCK_OTHER } from '../lib/stock-match';
 import { blankItem, serviceItem, creditItem, subtotalOf, goodsOf, toPayload, fromInvoice, stockLineProblem } from '../lib/invoice-lines';
 
@@ -84,6 +84,12 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
               <option value={6}>6-mo warranty</option>
               <option value={3}>3-mo warranty</option>
               <option value="">No warranty</option>
+            </select>
+          ) : extendedWarrantyYears(it.kind, it.description) ? (
+            <select className="inv-warr" value={extendedWarrantyYears(it.kind, it.description)}
+              onChange={(e) => setItem(i, 'description', extendedWarrantyText(Number(e.target.value)))}
+              title="Extended warranty term">
+              {EXTENDED_WARRANTY_YEARS.map((y) => <option key={y} value={y}>{y}-year extended</option>)}
             </select>
           ) : (
             <span className={'pill inv-tag' + (isCreditLine(it.kind) ? ' is-credit' : '')}>{TAG[it.kind]}</span>
@@ -186,6 +192,9 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
           <button key={sv} type="button" className="btn" style={{ fontSize: 12.5 }}
             onClick={() => push(serviceItem(sv))}>+ {sv}</button>
         ))}
+        <button type="button" className="btn" style={{ fontSize: 12.5 }}
+          title="Adds a service line you can switch between 2, 3 and 4 years"
+          onClick={() => push(serviceItem(extendedWarrantyText(2)))}>+ Extended warranty</button>
         <span className="hint" style={{ margin: '0 0 0 4px' }}>Take money off:</span>
         <button type="button" className="btn" style={{ fontSize: 12.5 }}
           onClick={() => push(creditItem('discount', 'Discount'))}>+ Discount</button>
