@@ -5031,6 +5031,13 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
 - **`bank_activity` (migration 0056) holds every bank line that is NOT an expense row**: pending lines (a pending line is never an expense — Plaid
   re-issues it as a new posted line and retracts the pending id, which deletes the row), money in of any kind, and money out that is not a cost. This is what
   makes today's activity visible. `DETAILS_V = 3` makes each linked bank re-send its history once to fill it. A line that is an expense is never also here.
+- **TD passes lines to Plaid one business day at a time** (checked 2026-11-08, a Sunday: the newest line was Friday's, and the live balance came back
+  identical every time, `asOf` empty). The page says so ("Newest line TD has sent us: …") and the fix for the gap is the **Sent or received through the bank — not
+  showing yet** form, which counts straight away and, when the bank shows the line, hands the entry's category and name to it ("Bank shows it").
+- **Every TD e-transfer SENT arrives as Plaid category TRANSFER_OUT, which is skipped from expenses** (and always was), so they sit in `bank_activity` as
+  "Bank out (transfer)". A person sorts each one from its dropdown (`promoteActivity`): that turns just that line into an expense (Wages: no HST). It is per line, by
+  a person, never in bulk, because an e-transfer may be a salary, a draw, or a supplier payment for stock that is already costed through its purchase invoice, and
+  there is no "stock purchase" category yet (counting those as expenses would double-count COGS). A line sorted this way is never deleted by the bank re-sending it.
 - **Incoming e-transfers are named too** (`parseInteracReceived`, same job as the outgoing ones, no guessing): Interac's "You've received $X from NAME and it has
   been automatically deposited" email names the `bank_activity` line (`who_override`) and `bank_deposits.sender`. Email window: 3 days before to 1.5 after the line.
 - **`/api/cron/bank-refresh` every 30 minutes, 08:00-21:00 Toronto** (heartbeat `bank-refresh`): `/transactions/refresh`, sync, `/accounts/balance/get`, then the
