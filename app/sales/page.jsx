@@ -34,7 +34,7 @@ export default async function SalesHome() {
   if (!hasDb()) return <div className="panel">Database not configured — set POSTGRES_URL.</div>;
 
   const [home, team, sla, today] = await Promise.all([
-    homeSummary(viewer),
+    homeSummary(viewer, { side }),
     // The month's quota card (reuses the scorecard). Absent when the login does not
     // resolve to a rep on the team list — somebody else's quota is worse than none.
     repScorecard('month', { name: viewer.name, email: viewer.email }).catch(() => null),

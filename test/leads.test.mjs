@@ -176,3 +176,20 @@ test('preview writes nothing, flags duplicates; commit creates only the good row
     equal(mine.length, 1); equal(mine[0].segment, 'property_management'); equal(mine[0].source, 'imported');
   } finally { await done(); }
 });
+
+suite('leads — the Bargain Bay | RS Solutions toggle on Home');
+
+test('the toggle narrows the lead lists (Both is on each side) but never the daily counters', async () => {
+  const { done } = await fresh();
+  try {
+    const day = (await query(`SELECT (now() AT TIME ZONE 'America/Toronto')::date::text AS d`)).rows[0].d;
+    const mk = async (company, side) => (await createLead({ company, email: `${company.toLowerCase()}@x.ca`, side, nextStep: 'call', nextStepAt: day }, john)).id;
+    const bb = await mk('BBCo', 'bb'); await mk('RSCo', 'rs'); await mk('BothCo', 'both');
+    await logLeadActivity(bb, { kind: 'call', outcome: 'conversation', nextStepAt: day }, john);
+    const names = (h) => [...h.overdue, ...h.today].map((l) => l.company).sort().join();
+    equal(names(await homeSummary(john)), 'BBCo,BothCo,RSCo');
+    equal(names(await homeSummary(john, { side: 'bb' })), 'BBCo,BothCo');
+    equal(names(await homeSummary(john, { side: 'rs' })), 'BothCo,RSCo');
+    equal((await homeSummary(john, { side: 'rs' })).counters.touches, 1, 'a Bargain Bay call still counts toward the day when RS is on screen');
+  } finally { await done(); }
+});
