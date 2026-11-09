@@ -5050,7 +5050,7 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
   folded away. **A shift longer than `REVIEW_HOURS` (14) is not paid until it is fixed** (a forgotten clock-out, e.g. 19h22m) and the row says so; a person still
   clocked in cannot be posted. Two employee rows with one name are one person. Pay figures stay admin-only.
 - **Money IN can be labelled too** (migration `0059_bank_income_category`, `sortIncome` in `lib/bank-activity.js`, action `sort_income`): a "What was it?" select on
-  every incoming bank line (Customer payment, Deposit on an order, Refund or credit received, Loan or owner money in, Scrap or other sale, Other). It is a LABEL on the
+  every incoming bank line (Product sale, Service sale, Deposit on an order, Refund or credit received, Loan or owner money in, Scrap or other sale, or "Other (write it in)" for any text up to 60 characters). It is a LABEL on the
   `bank_activity` row and never an expense; money out cannot take one. **Run Run schema migration after deploy.**
 - **A transfer can be SPLIT** (`splitActivity`, action `split`, "Split into several…" in the Sort this select): $3,000 sent as $2,000 interest + $1,000 owner
   dividend. Two or more parts, each a category and an amount, which must add up to the cent. Each part is its own expense (`ext_id` = `<bank id>#1`, `#2`...);
