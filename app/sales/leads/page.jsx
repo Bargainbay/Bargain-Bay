@@ -13,11 +13,14 @@ export default async function LeadsPage({ searchParams }) {
   if (g.denied) return <NotAuthorized email={g.email} />;
   const { viewer, side } = g;
   if (!hasDb()) return <div className="panel">Database not configured — set POSTGRES_URL.</div>;
-  const leads = await listLeads({ side, stage: sp?.stage, q: sp?.q }, viewer);
+  // The owner can look at one rep's leads (?owner=their email, or ?owner=pool): the Team page links here.
+  const owner = viewer.admin && sp?.owner ? String(sp.owner) : undefined;
+  const leads = await listLeads({ side, stage: sp?.stage, q: sp?.q, owner }, viewer);
   return (
     <div>
-      <SalesNav side={side} name={viewer.name} />
-      <SalesLeads initial={leads} isAdmin={viewer.admin} openId={sp?.open ? Number(sp.open) : null} side={side} />
+      <SalesNav side={side} name={viewer.name} admin={viewer.admin} />
+      {owner && <p className="hint" style={{ margin: '0 0 8px' }}>Showing {owner === 'pool' ? 'the unassigned pool' : owner}’s leads. <a href="/sales/leads">Show everyone</a> · <a href="/sales/team">Back to Team</a></p>}
+      <SalesLeads initial={leads} isAdmin={viewer.admin} openId={sp?.open ? Number(sp.open) : null} side={side} owner={owner} />
     </div>
   );
 }

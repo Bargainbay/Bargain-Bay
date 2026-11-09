@@ -27,7 +27,7 @@ const SHOWING = {
   rs: 'Showing RS Solutions: its leads and its service price list. Counters and commission always cover everything.'
 };
 
-export default function SalesNav({ side = 'all', name = '' }) {
+export default function SalesNav({ side = 'all', name = '', admin = false }) {
   const path = usePathname();
   const router = useRouter();
   const accent = ACCENT[side] || ACCENT.all;
@@ -50,7 +50,7 @@ export default function SalesNav({ side = 'all', name = '' }) {
         </div>
       </div>
       <nav style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }} aria-label="Sales Hub">
-        {TABS.map(([href, label]) => {
+        {(admin ? [...TABS, ['/sales/team', 'Team']] : TABS).map(([href, label]) => {
           const on = href === '/sales' ? path === '/sales' : path.startsWith(href);
           return (
             <a key={href} href={href} aria-current={on ? 'page' : undefined}

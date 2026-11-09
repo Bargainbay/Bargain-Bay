@@ -45,7 +45,7 @@ export default async function SalesHome() {
 
   return (
     <div>
-      <SalesNav side={side} name={viewer.name} />
+      <SalesNav side={side} name={viewer.name} admin={viewer.admin} />
 
       {viewer.admin && sla.length > 0 && (
         <div className="panel" style={{ borderLeft: '4px solid var(--red, #c33)' }}>

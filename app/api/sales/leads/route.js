@@ -37,7 +37,8 @@ export async function GET(req) {
     const leads = await listLeads({
       side: url.searchParams.get('side') || undefined,
       stage: url.searchParams.get('stage') || undefined,
-      q: url.searchParams.get('q') || undefined
+      q: url.searchParams.get('q') || undefined,
+      owner: url.searchParams.get('owner') || undefined      // honoured for an admin only, inside listLeads
     }, viewer);
     return NextResponse.json({ leads });
   } catch (e) { return fail(e); }

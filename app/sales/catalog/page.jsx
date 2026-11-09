@@ -43,7 +43,7 @@ export default async function CatalogPage({ searchParams }) {
 
   return (
     <div>
-      <SalesNav side={side} name={viewer.name} />
+      <SalesNav side={side} name={viewer.name} admin={viewer.admin} />
       <form method="get" style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
         <input name="q" defaultValue={sp?.q || ''} placeholder={side === 'rs' ? 'Search services' : 'Search model, brand, category, SKU, service'} aria-label="Search the catalog" style={{ flex: 1 }} />
         <button className="btn" type="submit">Search</button>

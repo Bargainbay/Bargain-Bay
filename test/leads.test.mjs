@@ -9,7 +9,7 @@ import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import {
   createLead, listLeads, getLead, logLeadActivity, setLeadStage, assignLead, acceptLead,
-  homeSummary, slaBreaches, returnStaleLeads, importLeads
+  homeSummary, slaBreaches, returnStaleLeads, importLeads, teamOverview
 } from '../lib/leads.js';
 
 const john = { email: 'john@rssolutions.ca', name: 'John Tobias', admin: false };
@@ -203,5 +203,50 @@ test('an import with no Side column goes to the side being viewed', async () => 
     await importLeads('Company,Email\nUnder All,b@all.example.test', john, { commit: true });
     equal((await listLeads({ side: 'rs' }, john)).length, 1, 'under All a lead with no side is marked Both and stays out of each side');
     equal((await listLeads({}, john)).length, 2);
+  } finally { await done(); }
+});
+
+suite('leads — the owner’s view of the team');
+
+test('teamOverview: each rep’s funnel, today’s work, and the leads that need a hand with why', async () => {
+  const { done } = await fresh();
+  try {
+    const day = (await query(`SELECT (now() AT TIME ZONE 'America/Toronto')::date::text AS d`)).rows[0].d;
+    const a = (await createLead({ company: 'Fresh', email: 'a@x.ca', side: 'bb', nextStepAt: day, estValue: 1000 }, john)).id;
+    const b = (await createLead({ company: 'Stale', email: 'b@x.ca', side: 'rs', estValue: 2000 }, john)).id;
+    const c = (await createLead({ company: 'Overdue', email: 'c@x.ca', side: 'bb', estValue: 500 }, john)).id;
+    await createLead({ company: 'Sams', email: 'd@x.ca', side: 'bb' }, sam);
+    await createLead({ company: 'Pool', email: 'e@x.ca', side: 'bb', estValue: 300 }, owner);
+    await logLeadActivity(a, { kind: 'call', outcome: 'conversation' }, john);
+    await logLeadActivity(b, { kind: 'call', outcome: 'no_answer' }, john);
+    await query(`UPDATE leads SET last_activity_at = now() - interval '9 days' WHERE id = $1`, [b]);
+    await query(`UPDATE leads SET next_step_at = (now() AT TIME ZONE 'America/Toronto')::date - 3 WHERE id = $1`, [c]);
+    await assignLead((await createLead({ company: 'Gifted', email: 'f@x.ca' }, owner)).id, john.email, owner.email);
+
+    const t = await teamOverview();
+    const j = t.reps.find((r) => r.owner === 'john@rssolutions.ca');
+    equal(j.stages.conversation.n, 1); equal(j.stages.contacted.n, 1); equal(j.stages.new.n, 2);
+    equal(j.openLeads, 4); equal(j.today.touches, 2); equal(j.today.conversations, 1); assert(j.lastActivityAt);
+    const why = Object.fromEntries(j.needsHelp.map((l) => [l.company, [l.overdue && 'overdue', l.stale && 'stale', l.unaccepted && 'unaccepted'].filter(Boolean).join('+')]));
+    equal(why.Stale, 'stale'); equal(why.Overdue, 'overdue'); equal(why.Gifted, 'unaccepted');
+    assert(!j.needsHelp.some((l) => l.company === 'Fresh'), 'a lead worked today is not stuck');
+    equal(t.pool.count, 1); equal(t.pool.value, 300);
+    assert(t.reps.some((r) => r.owner === 'sam@rssolutions.ca'));
+    assert(t.recent.length >= 2 && t.recent[0].company, 'the activity feed names the lead');
+  } finally { await done(); }
+});
+
+test('only an admin can look at another rep’s leads or the pool; a rep’s owner filter is ignored', async () => {
+  const { done } = await fresh();
+  try {
+    await createLead({ company: 'J', email: 'j@x.ca', side: 'bb' }, john);
+    await createLead({ company: 'S', email: 's@x.ca', side: 'bb' }, sam);
+    await createLead({ company: 'P', email: 'p@x.ca', side: 'bb' }, owner);
+    const names = (ls) => ls.map((l) => l.company).sort().join();
+    equal(names(await listLeads({ owner: 'john@rssolutions.ca' }, owner)), 'J');
+    equal(names(await listLeads({ owner: 'pool' }, owner)), 'P');
+    equal(names(await listLeads({}, owner)), 'J,P,S');
+    equal(names(await listLeads({ owner: 'sam@rssolutions.ca' }, john)), 'J', 'John asking for Sam’s leads still gets only his own');
+    equal(names(await listLeads({ owner: 'pool' }, john)), 'J');
   } finally { await done(); }
 });
