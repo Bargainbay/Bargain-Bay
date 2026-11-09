@@ -7,6 +7,7 @@ import SalesNav from '../../../components/SalesNav';
 import CopyButton from '../../../components/CopyButton';
 import { HoldButton, MyHolds } from '../../../components/HoldControls';
 import { listRepHolds } from '../../../lib/rep-holds';
+import { costsForSkus } from '../../../lib/sales-services';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Catalog — Sales Hub' };
@@ -26,6 +27,9 @@ export default async function CatalogPage({ searchParams }) {
   if (q) units = units.filter((u) => `${u.make} ${u.model} ${u.title} ${u.id} ${u.category}`.toLowerCase().includes(q));
   const code = repCode(viewer.name, viewer.email);
   const holds = await listRepHolds(viewer);
+  // Unit cost is for the owner and the business-development rep only (canSeeCost), and is read here on
+  // the server for the rows being shown; it is never sent to anyone else.
+  const costs = viewer.canSeeCost ? await costsForSkus(units.slice(0, 120).map((u) => u.id)) : null;
   const shown = units.slice(0, 120);
 
   return (
@@ -39,7 +43,7 @@ export default async function CatalogPage({ searchParams }) {
       <MyHolds holds={holds} isAdmin={viewer.admin} />
       <div className="panel" style={{ overflowX: 'auto' }}>
         <table className="admin" style={{ minWidth: 640 }}>
-          <thead><tr><th>Unit</th><th>Condition</th><th>Retail</th><th>Price</th><th>Share / hold</th></tr></thead>
+          <thead><tr><th>Unit</th><th>Condition</th><th>Retail</th><th>Price</th>{costs && <th>Cost</th>}{costs && <th>Margin</th>}<th>Share / hold</th></tr></thead>
           <tbody>
             {shown.map((u) => {
               const link = `${SITE_URL}/product/${encodeURIComponent(u.id)}?rep=${code}`;
@@ -49,11 +53,18 @@ export default async function CatalogPage({ searchParams }) {
                   <td>{u.condition}</td>
                   <td>{u.compareAt ? money(u.compareAt) : '—'}</td>
                   <td><b>{money(u.price)}</b></td>
+                  {costs && <td>{costs[String(u.id).toUpperCase()] == null ? <span className="hint">not on file</span> : money(costs[String(u.id).toUpperCase()])}</td>}
+                  {costs && (() => {
+                    const c = costs[String(u.id).toUpperCase()];
+                    if (c == null) return <td>—</td>;
+                    const m = Number(u.price) - c;
+                    return <td style={{ color: m < 0 ? 'var(--red, #c33)' : m < 100 ? '#b7791f' : 'inherit' }}>{money(m)}</td>;
+                  })()}
                   <td style={{ whiteSpace: 'nowrap' }}><CopyButton text={link} label="Copy link" /> <HoldButton sku={u.id} /></td>
                 </tr>
               );
             })}
-            {shown.length === 0 && <tr><td colSpan={5} className="hint">No units match.</td></tr>}
+            {shown.length === 0 && <tr><td colSpan={costs ? 7 : 5} className="hint">No units match.</td></tr>}
           </tbody>
         </table>
         {units.length > shown.length && <p className="hint">Showing {shown.length} of {units.length}. Narrow the search.</p>}
