@@ -5043,9 +5043,10 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
 - **`/api/cron/bank-refresh` every 30 minutes, 08:00-21:00 Toronto** (heartbeat `bank-refresh`): `/transactions/refresh`, sync, `/accounts/balance/get`, then the
   Interac naming. Plaid bills the refresh and the live balance per call, which is why it stays inside business hours; `?force=1` runs it outside them.
 - **ONE Payroll tab** (`/admin/payroll`, admin; `/admin/team-clock` redirects there; `lib/payroll-week.js`, migration `0058_pay_ledger_source`,
-  `components/PayrollHub.jsx`): the week (Monday to Sunday, Toronto) per person with hours, earned (each shift's hours x the rate it carried, plus any older
-  piece-rate pay) and **Post to owed**, which writes ONE `source = 'hours'` owed line per person and week and UPDATES it when the hours change (never doubles;
-  unique index). Below it: owed and paid with balances and payments, then People and hours (add someone, a missed shift, Fix times), then the older piece-rate log
+  `components/PayrollHub.jsx`): the top is one table, per person: **total hours since Oct 19, earned, paid, we owe**. There is no post button: loading the page runs
+  `syncOwedFromClock`, which writes ONE `source = 'hours'` owed line per person and week (Monday to Sunday, Toronto; hours x the rate each shift carried, plus any
+  older piece-rate pay) and UPDATES it when the hours change (never doubles; unique index). **A week that already has an owed line typed by hand is left alone**
+  (Roushi's Oct 19-25 $1,080), so the clock never doubles a figure the office entered; weeks before `PAY_TRACKING_START` are not touched. Below it: owed and paid with balances and payments, then People and hours (add someone, a missed shift, Fix times), then the older piece-rate log
   folded away. **A shift longer than `REVIEW_HOURS` (14) is not paid until it is fixed** (a forgotten clock-out, e.g. 19h22m) and the row says so; a person still
   clocked in cannot be posted. Two employee rows with one name are one person. Pay figures stay admin-only.
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
