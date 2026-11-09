@@ -5284,6 +5284,7 @@ anyone at SecondShop can sign in, send clients, and track the sales; 10% of marg
 - **"Member" is now "Reseller" in everything a customer or the owner reads** (application, agreement, emails, admin labels).
   Plain accounts need no approval; resellers are approved by hand. The agreement text changed, so `MEMBER_TERMS_VERSION` is
   2026-11-09 with a new pinned hash. Internal names (`role=member`, `/account/member`, `/admin/member-pricing`) are unchanged.
+- **Two commission rates (owner, 2026-11-09): 20% of profit on reseller sales, 15% on sales made with the end-user code.** The retail rate is DERIVED, `commission_pct - customer_pct`, because the customer's discount comes out of the partner's share. An order counts as retail when its `coupon_code` is the partner's end-user code (current or an old alias, e.g. SECONDSHOP5). Everything else, including manual invoices, earns the full rate. SecondShop is set to 20%.
 - **The link code can be changed** (`setPartnerCode`, "Link code" on `/admin/referral-partners`, migration 0064). The old code is kept in `partner_code_aliases` so links already sent still work; the end-user discount code follows (JAYSON5 -> SECONDSHOP5; the old discount code stops working). Refused if the new code, or its discount code, is taken.
 - Not built: visit counts per link (one count for both), commission paid to individual teammates.
 

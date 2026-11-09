@@ -74,7 +74,7 @@ export default async function PartnerPage({ searchParams }) {
         {stat('Balance owed to you', money(t.balance))}
       </div>
       <p className="hint" style={{ margin: '8px 2px 16px' }}>
-        Commission is {r.partner.pct}% of the profit on each order your clients place. It becomes earned once the order is delivered and paid for.
+        Commission is {r.partner.pct}% of the profit on each order your resellers place, and {r.partner.retailPct}% on sales made with your end-user code (that sale carries the {r.partner.customerPct}% customer discount). It becomes earned once the order is delivered and paid for.
         Cancelled and refunded orders drop off automatically.
         {t.missingCost > 0 ? ' Some units are still waiting for their cost to be entered, so those orders may show less commission until it is.' : ''}
       </p>
