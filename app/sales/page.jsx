@@ -58,7 +58,8 @@ export default async function SalesHome() {
 
       {today && <RepClock />}
       {today && <RepTodayCard t={today} />}
-      {team?.me && <div className="panel"><MyQuota data={team} /></div>}
+      {/* The older monthly-quota card is for reps without a commission plan; one on the plan has the card above. */}
+      {!today && team?.me && <div className="panel"><MyQuota data={team} /></div>}
 
       <div className="panel">
         <h2 style={{ marginTop: 0, fontSize: 16 }}>Today</h2>
