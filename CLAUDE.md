@@ -5277,6 +5277,7 @@ anyone at SecondShop can sign in, send clients, and track the sales; 10% of marg
 - **"Member" is now "Reseller" in everything a customer or the owner reads** (application, agreement, emails, admin labels).
   Plain accounts need no approval; resellers are approved by hand. The agreement text changed, so `MEMBER_TERMS_VERSION` is
   2026-11-09 with a new pinned hash. Internal names (`role=member`, `/account/member`, `/admin/member-pricing`) are unchanged.
+- **The link code can be changed** (`setPartnerCode`, "Link code" on `/admin/referral-partners`, migration 0064). The old code is kept in `partner_code_aliases` so links already sent still work; the end-user discount code follows (JAYSON5 -> SECONDSHOP5; the old discount code stops working). Refused if the new code, or its discount code, is taken.
 - Not built: visit counts per link (one count for both), commission paid to individual teammates.
 
 ## Referral partners (added 2026-11-09)

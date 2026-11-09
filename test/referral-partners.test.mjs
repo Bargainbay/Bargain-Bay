@@ -3,7 +3,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { upsertCustomer } from '../lib/customers.js';
-import { savePartner, invitePartner, ensureCode, attachPartnerByCode, recordPayment, voidPayment, statementFor, statementCsv, requestForClient, recordVisit, getPartner, addTeamMember, removeTeamMember, listTeam, attachPartnerForOrder, partnerByCouponCode, ensureCustomerCoupon, customerLink, setClientPartner, partnerReport, revokePartner } from '../lib/referral-partners.js';
+import { savePartner, invitePartner, ensureCode, attachPartnerByCode, recordPayment, voidPayment, statementFor, statementCsv, requestForClient, recordVisit, getPartner, addTeamMember, removeTeamMember, listTeam, attachPartnerForOrder, partnerByCouponCode, ensureCustomerCoupon, partnerByCode, customerLink, setPartnerCode, setClientPartner, partnerReport, revokePartner } from '../lib/referral-partners.js';
 
 const JAY = 'jdriver13@live.ca';
 const OWNER = 'owner@x.ca';
@@ -229,5 +229,24 @@ test('SecondShop: the end-user link carries a 5% code; ordering with it puts the
     equal((await query(`SELECT active FROM coupons WHERE upper(code) = 'SECONDSHOP5'`)).rows[0].active, false);
     await savePartner({ email: JAY, pct: 10, customerPct: 7 }, OWNER);
     equal(await ensureCustomerCoupon(JAY), 'SECONDSHOP7');
+  } finally { done(); }
+});
+
+test('changing the link code keeps the old links working and moves the discount code', async () => {
+  const { done } = await withTestDb();
+  try {
+    await savePartner({ email: JAY, name: 'Jayson', pct: 10 }, OWNER);
+    equal((await partnerReport(JAY)).partner.customerCode, 'JAYSON5');
+    await savePartner({ email: 'other@x.ca', name: 'Other', pct: 10 }, OWNER);
+    assert(await rejects(() => setPartnerCode(JAY, 'other', OWNER), 'taken'), 'another partner\'s code is refused');
+    assert(await rejects(() => setPartnerCode(JAY, 'x', OWNER), 'code'), 'too short');
+    await setPartnerCode(JAY, 'SecondShop', OWNER);
+    const r = await partnerReport(JAY);
+    equal(r.partner.code, 'secondshop'); equal(r.partner.customerCode, 'SECONDSHOP5');
+    equal((await partnerByCode('jayson')).email, JAY, 'the old link still works');
+    equal((await partnerByCode('jayson')).code, 'secondshop', 'and resolves to the current code');
+    assert(await rejects(() => setPartnerCode('other@x.ca', 'jayson', OWNER), 'taken'), 'an old code cannot be claimed by someone else');
+    await setPartnerCode(JAY, 'jayson', OWNER);                              // going back is allowed
+    equal((await partnerReport(JAY)).partner.code, 'jayson');
   } finally { done(); }
 });
