@@ -9,7 +9,7 @@ import { INVOICE_SERVICES } from '../lib/constants';
 // Business days run on Toronto time (same as the dashboard's buckets).
 const todayToronto = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
 
-export default function InvoiceForm({ inventory = [], customers = [], senders = [], hideCost = false }) {
+export default function InvoiceForm({ inventory = [], customers = [], senders = [], hideCost = false, repCost = false }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [items, setItems] = useState([blankItem()]);
@@ -321,7 +321,7 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
         </div>
       )}
 
-      <InvoiceLines items={items} setItems={setItems} services={INVOICE_SERVICES} showCost={!hideCost} stock={inventory}
+      <InvoiceLines items={items} setItems={setItems} services={INVOICE_SERVICES} showCost={!hideCost || repCost} stock={inventory}
         taxInclusive={taxMode === 'inclusive'} />
 
       <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0 12px' }}>
