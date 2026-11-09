@@ -22,6 +22,18 @@ export default function Receipts({ d, setD }) {
   const [back, setBack] = useState({ how: 'bank', on: d.date, bankExpenseId: '', note: '' });
   const camera = useRef(null), library = useRef(null);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
+  async function addOrSet(v) {
+    if (v !== '__new') return set('category', v);
+    const name = window.prompt('Name the new category (for example "Packaging")');
+    if (!name || !name.trim()) return;
+    try {
+      const res = await fetch('/api/admin/bankroll', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_category', name, viewDate: d.date, date: d.date, days: d.days }) });
+      const r = await res.json();
+      if (!res.ok) throw new Error(r.error || 'That failed.');
+      setD(r);
+      set('category', (r.customCategories || []).find((c) => c.toLowerCase() === name.trim().replace(/\s+/g, ' ').toLowerCase()) || name.trim());
+    } catch (e) { setErr(e.message); }
+  }
 
   async function pick(file) {
     if (!file) return;
@@ -100,7 +112,7 @@ export default function Receipts({ d, setD }) {
           <label>Total<br /><input type="number" step="0.01" min="0" value={f.total} onChange={(e) => set('total', e.target.value)} required style={{ width: 100 }} /></label>
           <label>HST inside<br /><input type="number" step="0.01" min="0" value={f.tax} onChange={(e) => set('tax', e.target.value)} placeholder="unknown" style={{ width: 100 }} /></label>
           <label>Category<br />
-            <select value={f.category} onChange={(e) => set('category', e.target.value)}>{CATS.map((c) => <option key={c}>{c}</option>)}</select></label>
+            <select value={f.category} onChange={(e) => addOrSet(e.target.value)}>{[...CATS, ...(d.customCategories || [])].map((c) => <option key={c}>{c}</option>)}<option value="__new">+ Add a category…</option></select></label>
           <label>How it was paid<br />
             <select value={f.paidWith} onChange={(e) => set('paidWith', e.target.value)}>
               {Object.entries(PAID).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
