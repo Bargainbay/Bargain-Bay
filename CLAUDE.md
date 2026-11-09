@@ -5250,5 +5250,7 @@ Employee Account on the tiered collected-sales plan) so one account never earns 
   Confirm with the owner if commission should wait for payment or delivery.
 - The partner sees client name, order number, date, items, pre-tax total, live status and commission. **Never a cost or a profit figure** (commission at 10%
   does imply profit). The partner is read from the SESSION; only an admin may preview with `?as=<email>`.
+- **The owner creates the partner's login** (2026-11-09): saving a partner makes the `users` row if there is none (password nobody knows) and emails a 7-day single-use
+  set-your-password link (`invitePartner`, a reset token with `expires: '7d'`); "Send sign-in email" sends another, and the link is shown to the owner if the email fails.
 - Clients are put under a partner by an admin (search customers, reason required, audit-logged). **Not built:** auto-assigning a client who signs up online
   naming the partner (the signup "Referred by" box is not on main yet), and a payout/statement record (nothing records that commission was paid).

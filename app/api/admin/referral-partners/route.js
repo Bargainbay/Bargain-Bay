@@ -2,7 +2,7 @@
 // under one all change who is paid commission.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { listPartners, savePartner, revokePartner, setClientPartner, searchCustomers, partnerReport, PartnerError } from '../../../../lib/referral-partners';
+import { listPartners, savePartner, invitePartner, revokePartner, setClientPartner, searchCustomers, partnerReport, PartnerError } from '../../../../lib/referral-partners';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,6 +29,7 @@ export async function POST(req) {
   try {
     switch (b.action) {
       case 'save': return NextResponse.json(await savePartner({ email: b.email, name: b.name, pct: b.pct }, s.email));
+      case 'invite': return NextResponse.json({ ok: true, ...(await invitePartner(b.email, s.email)) });
       case 'revoke': return NextResponse.json(await revokePartner(b.email, s.email));
       case 'assign': return NextResponse.json(await setClientPartner(b.customerId, b.partner, b.reason, s.email));
       default: return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

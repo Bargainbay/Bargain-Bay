@@ -3,7 +3,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { upsertCustomer } from '../lib/customers.js';
-import { savePartner, getPartner, setClientPartner, partnerReport, revokePartner } from '../lib/referral-partners.js';
+import { savePartner, invitePartner, getPartner, setClientPartner, partnerReport, revokePartner } from '../lib/referral-partners.js';
 
 const JAY = 'jdriver13@live.ca';
 const OWNER = 'owner@x.ca';
@@ -63,5 +63,23 @@ test('only an active partner can have clients; revoking removes access; a reason
     equal(await getPartner(JAY), null);
     equal((await partnerReport(JAY)).clients.length, 0);
     assert(await rejects(() => savePartner({ email: JAY, pct: 90 }, OWNER), 'pct'), 'pct capped');
+  } finally { done(); }
+});
+
+test('adding a partner creates their account (no password they know) and gives a single-use invite link; re-saving does not duplicate it', async () => {
+  const { done } = await withTestDb();
+  try {
+    process.env.AUTH_SECRET = process.env.AUTH_SECRET || 'test-secret-test-secret-test-secret-1234';
+    const first = await savePartner({ email: 'Jdriver13@Live.ca', name: 'Jayson', pct: 10 }, OWNER);
+    assert(first.accountCreated, 'account created');
+    assert(/reset-password\?token=/.test(first.link), 'invite link returned');
+    const u = await query(`SELECT name FROM users WHERE email = 'jdriver13@live.ca'`);
+    equal(u.rows.length, 1); equal(u.rows[0].name, 'Jayson');
+    const again = await savePartner({ email: JAY, pct: 12 }, OWNER);
+    assert(!again.accountCreated && !again.link, 'no second account, no second email');
+    equal((await query(`SELECT 1 FROM users WHERE email = $1`, [JAY])).rows.length, 1);
+    const resend = await invitePartner(JAY, OWNER);
+    assert(resend.link, 'can send another invite');
+    assert(await rejects(() => invitePartner('nobody@x.ca', OWNER), 'nopartner'), 'only partners');
   } finally { done(); }
 });
