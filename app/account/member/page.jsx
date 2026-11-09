@@ -13,7 +13,7 @@ import MemberPortal from '../../../components/MemberPortal';
 import { recordVisit } from '../../../lib/member-prefs';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Member dashboard — Bargain Bay' };
+export const metadata = { title: 'Reseller dashboard — Bargain Bay' };
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA') : '—');
 const DONE = new Set(['cancelled', 'refunded']);
@@ -49,7 +49,7 @@ export default async function MemberDashboard() {
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
-        <h1 style={{ color: 'var(--charcoal)', margin: '10px 0' }}>{m.business_name || 'Member dashboard'}</h1>
+        <h1 style={{ color: 'var(--charcoal)', margin: '10px 0' }}>{m.business_name || 'Reseller dashboard'}</h1>
         <span><a href="/account" style={{ textDecoration: 'underline', fontSize: 14 }}>Profile &amp; settings</a></span>
       </div>
       <p className="hint" style={{ marginTop: 0 }}>Signed in as {session.email}. Your wholesale price applies in the shop and at checkout automatically.</p>

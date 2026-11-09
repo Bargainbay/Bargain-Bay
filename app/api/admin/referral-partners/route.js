@@ -2,7 +2,7 @@
 // under one all change who is paid commission.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { listPartners, savePartner, invitePartner, revokePartner, recordPayment, voidPayment, listPayments, setClientPartner, searchCustomers, partnerReport, PartnerError } from '../../../../lib/referral-partners';
+import { listPartners, savePartner, invitePartner, revokePartner, recordPayment, voidPayment, listPayments, setClientPartner, searchCustomers, addTeamMember, removeTeamMember, listTeam, partnerReport, PartnerError } from '../../../../lib/referral-partners';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,6 +22,7 @@ export async function GET(req) {
       if (p.revoked_at) continue;
       const r = await partnerReport(p.email);
       p.totals = r.totals; p.payments = await listPayments(p.email);
+      p.team = r.team; p.customerCode = r.partner?.customerCode || null; p.link = r.partner?.link; p.customerLink = r.partner?.customerLink || null;
     }
     return NextResponse.json({ partners });
   } catch (e) { return fail(e); }
@@ -33,7 +34,9 @@ export async function POST(req) {
   let b; try { b = await req.json(); } catch { return NextResponse.json({ error: 'Bad request' }, { status: 400 }); }
   try {
     switch (b.action) {
-      case 'save': return NextResponse.json(await savePartner({ email: b.email, name: b.name, pct: b.pct }, s.email));
+      case 'save': return NextResponse.json(await savePartner({ email: b.email, name: b.name, pct: b.pct, customerPct: b.customerPct }, s.email));
+      case 'team_add': return NextResponse.json(await addTeamMember(b.partnerEmail, { email: b.email, name: b.name }, s.email));
+      case 'team_remove': return NextResponse.json(await removeTeamMember(b.partnerEmail, b.email, s.email));
       case 'invite': return NextResponse.json({ ok: true, ...(await invitePartner(b.email, s.email)) });
       case 'pay': return NextResponse.json(await recordPayment(b, s.email));
       case 'void_payment': return NextResponse.json(await voidPayment(b.id, s.email));

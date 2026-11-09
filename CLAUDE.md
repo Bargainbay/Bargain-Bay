@@ -5251,6 +5251,26 @@ header (side toggle and tabs, with Quotes and Invoices tabs) instead of the full
 else gets `AdminNav` exactly as before. On the invoice form a rep sees the per-line cost box (`repCost` = `canSeeCost`) but still NOT the admin-only below-cost-floor override
 (`hideCost` stays `!isAdmin`). A rep can still reach other `/admin/*` pages by typing the address — those gates are unchanged; this is menu hygiene, not a permission.
 
+## Referral partners are ORGANISATIONS with two links (SecondShop, added 2026-11-09)
+Migration `0063_partner_org` (**run Run schema migration after deploy**). Owner: "set up his portal as if it is a SecondShop portal":
+anyone at SecondShop can sign in, send clients, and track the sales; 10% of margin on every sale whichever link.
+- **Team logins** (`partner_members`): `getPartner(email)` resolves a teammate to the ORGANISATION's primary row, so everything
+  keyed by `partner.email` (clients, payments, statement) is shared. Admin: Team logins on `/admin/referral-partners`; any
+  teammate can add/remove logins on `/partner` (`/api/partner/team`, organisation read from the SESSION). Removal keeps the row.
+  A teammate cannot also be a partner, or on two teams. Revoke the organisation and every login loses access.
+- **Two links.** `/join/<code>` = RESELLER link (account + reseller application). `/join/<code>/shop` = END-USER link: sets the same
+  `bb_partner` cookie and opens `/shop?ref=<CODE5>` so RefCapture/checkout apply the code. Both put the buyer under the partner.
+- **The end-user code** (`ensureCustomerCoupon`, e.g. `SECONDSHOP5`) is a plain percent coupon, `commission_pct` 0 (the partner is
+  paid by `lib/referral-partners.js`, NOT the coupon/affiliate system), made lazily and kept in step with
+  `referral_partners.customer_pct` (default 5; 0 switches it off; max 30). Same checkout floors as any typed code.
+- **Attribution at checkout** (`attachPartnerForOrder`, after `upsertCustomer`): the applied code, or the partner cookie, puts the
+  buyer under the partner if they have none (`partner_set_by = 'order link'`). Never moves a customer already under a partner.
+  Commission is 10% of profit AFTER the 5%, because profit already subtracts the coupon.
+- **"Member" is now "Reseller" in everything a customer or the owner reads** (application, agreement, emails, admin labels).
+  Plain accounts need no approval; resellers are approved by hand. The agreement text changed, so `MEMBER_TERMS_VERSION` is
+  2026-11-09 with a new pinned hash. Internal names (`role=member`, `/account/member`, `/admin/member-pricing`) are unchanged.
+- Not built: visit counts per link (one count for both), commission paid to individual teammates.
+
 ## Referral partners (added 2026-11-09)
 `lib/referral-partners.js`, migration `0060_referral_partners` (**run Run schema migration after deploy**), `/partner` (the partner's own page),
 `/admin/referral-partners` (ADMIN; on the Reports hub), `/api/admin/referral-partners`, `test/referral-partners.test.mjs`. Owner's rule: **Jayson

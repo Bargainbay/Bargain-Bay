@@ -3,7 +3,7 @@ import { useState } from 'react';
 import AgreementScroll from '../../components/AgreementScroll';
 import { MEMBER_TERMS, MEMBER_TERMS_VERSION } from '../../lib/member-terms';
 
-// Ask for member access: the business, then the agreement. The Accept button stays dead until the agreement has been
+// Ask for reseller access: the business, then the agreement. The Accept button stays dead until the agreement has been
 // scrolled to the end (components/AgreementScroll.jsx); the version shown goes to the server and is recorded.
 export default function MemberRequest() {
   const [biz, setBiz] = useState('');
@@ -27,21 +27,21 @@ export default function MemberRequest() {
     } catch { setErr('Network error — please try again.'); } finally { setBusy(false); }
   }
 
-  if (sent) return <p style={{ fontSize: 14.5 }}>Thanks — your member application is <b>under review</b>. We'll email you once it's approved.</p>;
+  if (sent) return <p style={{ fontSize: 14.5 }}>Thanks — your reseller application is <b>under review</b>. We'll email you once it's approved.</p>;
 
   return (
     <form onSubmit={submit}>
       <p style={{ fontSize: 14.5, marginTop: 0 }}>
-        Buying for a business? Property managers, stores, and resellers get <b>member (wholesale) pricing</b> once approved. What is your business called?
+        Buying for a business? Property managers, stores, and resellers get <b>reseller (wholesale) pricing</b> once approved. What is your business called?
       </p>
       {err && <div className="error-box">{err}</div>}
       <input value={biz} onChange={(e) => setBiz(e.target.value)} placeholder="Business name" required
         style={{ display: 'block', width: '100%', maxWidth: 420, padding: '9px 11px', margin: '8px 0', border: '1px solid var(--line)', borderRadius: 8 }} />
-      <h3 style={{ margin: '14px 0 6px', fontSize: 15 }}>Member Agreement</h3>
+      <h3 style={{ margin: '14px 0 6px', fontSize: 15 }}>Reseller Agreement</h3>
       <div style={{ maxWidth: 560 }}>
-        <AgreementScroll sections={MEMBER_TERMS} label="Member Agreement" read={read} onRead={() => setRead(true)} maxHeight={260} />
+        <AgreementScroll sections={MEMBER_TERMS} label="Reseller Agreement" read={read} onRead={() => setRead(true)} maxHeight={260} />
       </div>
-      <button className="btn primary" disabled={busy || !read}>{busy ? 'Submitting…' : 'Accept and request member access'}</button>
+      <button className="btn primary" disabled={busy || !read}>{busy ? 'Submitting…' : 'Accept and request reseller access'}</button>
     </form>
   );
 }

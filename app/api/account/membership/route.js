@@ -17,15 +17,15 @@ export async function POST(req) {
   if (!businessName) return NextResponse.json({ error: 'Business name is required.' }, { status: 400 });
   const note = String(body.note || '').trim();
   // They must have accepted the CURRENT agreement. If it changed while their page was open they are asked to read it again.
-  if (!body.acceptTerms) return NextResponse.json({ error: 'Please read and accept the member agreement.' }, { status: 400 });
-  if (body.termsVersion !== MEMBER_TERMS_VERSION) return NextResponse.json({ error: 'The member agreement was just updated. Please reload the page, read it and accept again.' }, { status: 400 });
+  if (!body.acceptTerms) return NextResponse.json({ error: 'Please read and accept the reseller agreement.' }, { status: 400 });
+  if (body.termsVersion !== MEMBER_TERMS_VERSION) return NextResponse.json({ error: 'The reseller agreement was just updated. Please reload the page, read it and accept again.' }, { status: 400 });
   try {
     await requestMembership(session.userId, businessName, note, { termsVersion: MEMBER_TERMS_VERSION });
     // Already had an account and came in through a partner's link: put them under that partner.
     await attachPartnerFromCookie({ email: session.email, name: session.name });
     notifyOwner(
-      `New member application: ${businessName}`,
-      `<p>A business requested wholesale member access on Bargain Bay.</p>
+      `New reseller application: ${businessName}`,
+      `<p>A business requested wholesale reseller access on Bargain Bay.</p>
        <ul><li><b>Business:</b> ${esc(businessName)}</li><li><b>Contact:</b> ${esc(session.email)}</li><li><b>Note:</b> ${esc(note) || '—'}</li></ul>
        <p>Review &amp; approve on <a href="https://bargainbay.ca/admin/resellers">Admin &rarr; Resellers</a>.</p>`
     ).catch(() => {});

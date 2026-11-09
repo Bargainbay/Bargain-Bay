@@ -77,7 +77,7 @@ export default function CartClient({ catalog, member }) {
           <div className="summary-row"><span>HST (13%)</span><span>{money(hst)}</span></div>
           <div className="summary-row"><span>Pickup / delivery</span><span>chosen at checkout</span></div>
           <div className="summary-row total"><span>Total</span><span>{money(total)}</span></div>
-          {member && <div className="hint" style={{ marginTop: 8, color: '#0B6B3A', fontWeight: 600 }}>✓ Member pricing applied</div>}
+          {member && <div className="hint" style={{ marginTop: 8, color: '#0B6B3A', fontWeight: 600 }}>✓ Reseller pricing applied</div>}
           <a href="/checkout" className="btn primary block" style={{ marginTop: 14 }}>Checkout</a>
           <div className="hint" style={{ marginTop: 10 }}>
             Free warehouse pickup, or delivery priced by distance from Pickering (free over $5,000; shown at checkout, plus HST).

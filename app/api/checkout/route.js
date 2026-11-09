@@ -23,6 +23,7 @@ import { getStoreCredit, spendStoreCredit, normalizeCreditCode } from '../../../
 import { bestBundleDiscount } from '../../../lib/bundles';
 import { validateCoupon, bestAutoCoupon, typedCodeUnits, redeemCouponWithClient, releaseCouponForOrder, ensureCouponSchema } from '../../../lib/coupons';
 import { upsertCustomer } from '../../../lib/customers';
+import { attachPartnerForOrder } from '../../../lib/referral-partners';
 import { grantConsent } from '../../../lib/consent';
 import {
   clientIp, userAgent, honeypotTripped, isDisposableEmail, isBlocked,
@@ -385,7 +386,9 @@ export async function POST(req) {
 
   // Fold this buyer into the client database (guests included). Best-effort —
   // the CRM must never block a sale.
+  // A buyer who used a referral partner's code or link is put under that partner (never moved if already under one).
   upsertCustomer({ email, name, phone, address, city, postal, userId })
+    .then(() => attachPartnerForOrder({ couponCode: appliedCode, email, name, phone, userId }))
     .catch((e) => console.error('customer upsert failed', e.message));
 
   // Express consent, if they ticked the box. Best-effort and AFTER the order is

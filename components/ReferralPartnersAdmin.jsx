@@ -7,11 +7,12 @@ const post = (body) => fetch(api, { method: 'POST', headers: { 'Content-Type': '
 export default function ReferralPartnersAdmin() {
   const [partners, setPartners] = useState([]);
   const [msg, setMsg] = useState('');
-  const [f, setF] = useState({ email: '', name: '', pct: '10' });
+  const [f, setF] = useState({ email: '', name: '', pct: '10', customerPct: '5' });
   const [pick, setPick] = useState('');          // partner email whose clients are being added
   const [q, setQ] = useState('');
   const [found, setFound] = useState([]);
   const [payFor, setPayFor] = useState('');
+  const [tm, setTm] = useState({ for: '', email: '', name: '' });
   const [pay, setPay] = useState({ amount: '', paidOn: '', method: 'e-transfer', reference: '' });
   const money = (n) => `$${Number(n || 0).toFixed(2)}`;
 
@@ -26,7 +27,7 @@ export default function ReferralPartnersAdmin() {
   async function save(e) {
     e.preventDefault(); setMsg('');
     const r = await post({ action: 'save', ...f });
-    setMsg(r.ok ? done(r, 'Saved.') : r.error || 'Could not save.'); if (r.ok) { setF({ email: '', name: '', pct: '10' }); load(); }
+    setMsg(r.ok ? done(r, 'Saved.') : r.error || 'Could not save.'); if (r.ok) { setF({ email: '', name: '', pct: '10', customerPct: '5' }); load(); }
   }
   const done = (r, base) => (r.link ? `${base} ${r.emailed ? 'The sign-in email has been sent.' : 'The email did not send — pass this link on yourself:'} ${r.emailed ? '' : r.link}` : base);
   async function invite(email) {
@@ -48,6 +49,15 @@ export default function ReferralPartnersAdmin() {
     if (!confirm('Void this payment? It stays on record, struck out, and the balance goes back up.')) return;
     const r = await post({ action: 'void_payment', id }); setMsg(r.ok ? 'Voided.' : r.error || 'Could not void.'); load();
   }
+  async function addMember(partnerEmail) {
+    const r = await post({ action: 'team_add', partnerEmail, email: tm.email, name: tm.name });
+    setMsg(r.ok ? done(r, 'Login added.') : r.error || 'Could not add.');
+    if (r.ok) { setTm({ for: '', email: '', name: '' }); load(); }
+  }
+  async function removeMember(partnerEmail, email) {
+    if (!confirm(`Remove ${email} from this team?`)) return;
+    const r = await post({ action: 'team_remove', partnerEmail, email }); setMsg(r.ok ? 'Removed.' : r.error || 'Could not remove.'); load();
+  }
   async function revoke(email) {
     if (!confirm(`Stop ${email} being a referral partner? Their clients stay linked but they lose access.`)) return;
     const r = await post({ action: 'revoke', email }); setMsg(r.ok ? 'Revoked.' : r.error || 'Could not revoke.'); load();
@@ -62,6 +72,7 @@ export default function ReferralPartnersAdmin() {
           <input placeholder="Login email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required />
           <input placeholder="Name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
           <input placeholder="% of profit" value={f.pct} onChange={(e) => setF({ ...f, pct: e.target.value })} style={{ width: 110 }} />
+          <input placeholder="End-user % off" title="Discount the end-user link gives shoppers (0 = none)" value={f.customerPct} onChange={(e) => setF({ ...f, customerPct: e.target.value })} style={{ width: 130 }} />
           <button className="btn btn-primary" type="submit">Save</button>
         </form>
         <p className="hint" style={{ marginBottom: 0 }}>The account is created for them and a link to choose a password is emailed (valid 7 days). Use “Send sign-in email” to send another.</p>
@@ -69,10 +80,11 @@ export default function ReferralPartnersAdmin() {
       {partners.map((p) => (
         <div className="panel" key={p.email} style={{ marginBottom: 12, opacity: p.revoked_at ? 0.55 : 1 }}>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <strong style={{ flex: 1 }}>{p.name || p.email} <span className="hint">{p.email} · {p.pct}% of profit · {p.clients} client{p.clients === 1 ? '' : 's'}{p.revoked_at ? ' · revoked' : ''}</span></strong>
+            <strong style={{ flex: 1 }}>{p.name || p.email} <span className="hint">{p.email} · {p.pct}% of profit · {p.customerCode ? `end-user code ${p.customerCode}` : 'no end-user code'} · {p.clients} client{p.clients === 1 ? '' : 's'}{p.revoked_at ? ' · revoked' : ''}</span></strong>
             {!p.revoked_at && <>
               <a className="btn" href={`/partner?as=${encodeURIComponent(p.email)}`} target="_blank" rel="noreferrer">See their page</a>
               <button className="btn" onClick={() => invite(p.email)}>Send sign-in email</button>
+              <button className="btn" onClick={() => setTm(tm.for === p.email ? { for: '', email: '', name: '' } : { for: p.email, email: '', name: '' })}>Team logins</button>
               <button className="btn" onClick={() => { setPayFor(payFor === p.email ? '' : p.email); }}>Record a payment</button>
               <button className="btn" onClick={() => { setPick(pick === p.email ? '' : p.email); setQ(''); }}>Add clients</button>
               <button className="btn" onClick={() => revoke(p.email)}>Revoke</button>
@@ -81,6 +93,19 @@ export default function ReferralPartnersAdmin() {
           {p.totals && (
             <div className="hint" style={{ marginTop: 6 }}>
               Earned {money(p.totals.earned)} · pending {money(p.totals.pending)} · paid {money(p.totals.paid)} · <b>owed now {money(p.totals.balance)}</b>
+            </div>
+          )}
+          {tm.for === p.email && (
+            <div style={{ marginTop: 10 }}>
+              {(p.team || []).map((m) => (
+                <div key={m.email} style={{ fontSize: 13 }}>{m.name ? `${m.name} · ` : ''}{m.email}{m.primary ? ' (main login)' : <button className="btn" style={{ padding: '0 8px', marginLeft: 6 }} onClick={() => removeMember(p.email, m.email)}>Remove</button>}</div>
+              ))}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                <input placeholder="Teammate's email" value={tm.email} onChange={(e) => setTm({ ...tm, email: e.target.value })} />
+                <input placeholder="Name" value={tm.name} onChange={(e) => setTm({ ...tm, name: e.target.value })} />
+                <button className="btn btn-primary" onClick={() => addMember(p.email)}>Add login</button>
+              </div>
+              <p className="hint" style={{ marginBottom: 0 }}>They see everything this partner sees. Anyone already on the team can add more people from the partner page.</p>
             </div>
           )}
           {payFor === p.email && (
