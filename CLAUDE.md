@@ -5068,6 +5068,11 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
 - **A cash sale that was not cash** (`changeInvoicePaymentMethod`, action `payment_method`, the "Not cash?…" select on a Cash sale row): relabels one payment's
   METHOD only (e-transfer / card / cheque / other). Amount, date, invoice status and units are untouched, so it works on a settled invoice, which the payment-remove
   button cannot. It then leaves the cash list and the till total. Store-credit payments cannot be relabelled. Audited.
+- **Advertising, fuel and delivery are broken down** (owner, 2026-11-09): built-in categories Advertising - Google, Advertising - Facebook / Instagram, Advertising - Other,
+  **Fuel** (what we pay at the pump) and **Delivery (carriers we pay)** (paying somebody to move something). The old "Advertising" and "Fuel / delivery" stay valid for rows
+  already saved. **Fuel per truck:** `getVehicleFuelCategories` offers "Fuel - <vehicle name>" for every ACTIVE row of the dispatch `vehicles` list, so a truck added in
+  Dispatch -> People & access appears in the dropdowns with no second list. Only the Financial page, receipts and split box offer the per-truck ones; `/admin/categorize`
+  and the rules screens still show the built-in list (+ the new built-ins).
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
   from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
 - **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the
