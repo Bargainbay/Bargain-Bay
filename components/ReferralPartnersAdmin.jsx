@@ -58,6 +58,12 @@ export default function ReferralPartnersAdmin() {
     if (!confirm(`Remove ${email} from this team?`)) return;
     const r = await post({ action: 'team_remove', partnerEmail, email }); setMsg(r.ok ? 'Removed.' : r.error || 'Could not remove.'); load();
   }
+  async function changeCode(p) {
+    const code = prompt(`Link code for ${p.name || p.email}. Their links become bargainbay.ca/join/<code>. The old code keeps working.`, p.code || '');
+    if (!code || code === p.code) return;
+    const r = await post({ action: 'set_code', email: p.email, code });
+    setMsg(r.ok ? `Link code is now ${r.code}.` : r.error || 'Could not change.'); load();
+  }
   async function revoke(email) {
     if (!confirm(`Stop ${email} being a referral partner? Their clients stay linked but they lose access.`)) return;
     const r = await post({ action: 'revoke', email }); setMsg(r.ok ? 'Revoked.' : r.error || 'Could not revoke.'); load();
@@ -80,10 +86,11 @@ export default function ReferralPartnersAdmin() {
       {partners.map((p) => (
         <div className="panel" key={p.email} style={{ marginBottom: 12, opacity: p.revoked_at ? 0.55 : 1 }}>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <strong style={{ flex: 1 }}>{p.name || p.email} <span className="hint">{p.email} · {p.pct}% of profit · {p.customerCode ? `end-user code ${p.customerCode}` : 'no end-user code'} · {p.clients} client{p.clients === 1 ? '' : 's'}{p.revoked_at ? ' · revoked' : ''}</span></strong>
+            <strong style={{ flex: 1 }}>{p.name || p.email} <span className="hint">{p.email} · {p.pct}% of profit · link code {p.code || '—'} · {p.customerCode ? `end-user code ${p.customerCode}` : 'no end-user code'} · {p.clients} client{p.clients === 1 ? '' : 's'}{p.revoked_at ? ' · revoked' : ''}</span></strong>
             {!p.revoked_at && <>
               <a className="btn" href={`/partner?as=${encodeURIComponent(p.email)}`} target="_blank" rel="noreferrer">See their page</a>
               <button className="btn" onClick={() => invite(p.email)}>Send sign-in email</button>
+              <button className="btn" onClick={() => changeCode(p)}>Link code</button>
               <button className="btn" onClick={() => setTm(tm.for === p.email ? { for: '', email: '', name: '' } : { for: p.email, email: '', name: '' })}>Team logins</button>
               <button className="btn" onClick={() => { setPayFor(payFor === p.email ? '' : p.email); }}>Record a payment</button>
               <button className="btn" onClick={() => { setPick(pick === p.email ? '' : p.email); setQ(''); }}>Add clients</button>
