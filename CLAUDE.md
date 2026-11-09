@@ -5049,6 +5049,9 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
   (Roushi's Oct 19-25 $1,080), so the clock never doubles a figure the office entered; weeks before `PAY_TRACKING_START` are not touched. Below it: owed and paid with balances and payments, then People and hours (add someone, a missed shift, Fix times), then the older piece-rate log
   folded away. **A shift longer than `REVIEW_HOURS` (14) is not paid until it is fixed** (a forgotten clock-out, e.g. 19h22m) and the row says so; a person still
   clocked in cannot be posted. Two employee rows with one name are one person. Pay figures stay admin-only.
+- **Money IN can be labelled too** (migration `0059_bank_income_category`, `sortIncome` in `lib/bank-activity.js`, action `sort_income`): a "What was it?" select on
+  every incoming bank line (Customer payment, Deposit on an order, Refund or credit received, Loan or owner money in, Scrap or other sale, Other). It is a LABEL on the
+  `bank_activity` row and never an expense; money out cannot take one. **Run Run schema migration after deploy.**
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
   from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
 - **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the

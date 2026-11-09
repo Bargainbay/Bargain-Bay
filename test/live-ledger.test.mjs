@@ -3,7 +3,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { upsertExpense } from '../lib/finance.js';
-import { mapActivity, recordActivity, deleteActivity } from '../lib/bank-activity.js';
+import { mapActivity, recordActivity, deleteActivity, sortIncome } from '../lib/bank-activity.js';
 import { parseInteracReceived, nameTransfersFromEmail, matchTransfers } from '../lib/interac-names.js';
 import { bankrollSummary } from '../lib/bankroll.js';
 
@@ -121,4 +121,22 @@ test('THE PAGE KNOWS THE NEWEST LINE THE BANK HAS SENT, SO A WEEKEND GAP IS SAID
     await recordActivity(mapActivity({ transaction_id: 'n1', date: '2026-11-06', amount: -10, name: 'X' }));
     equal((await bankrollSummary('2026-11-08')).bankNewest, '2026-11-06');
   } finally { done(); }
+});
+
+test('MONEY IN CAN BE LABELLED, STAYS OUT OF EXPENSES, AND MONEY OUT CANNOT TAKE AN INCOME LABEL', async () => {
+  const { done } = await withTestDb();
+  try {
+    await recordActivity(mapActivity({ transaction_id: 'inc1', date: today(), amount: -630, name: 'E-TRANSFER ***zz' }));
+    await recordActivity(mapActivity({ transaction_id: 'out1', date: today(), amount: 50, name: 'SEND E-TFR *abc' }));
+    const inId = (await query(`SELECT id FROM bank_activity WHERE amount > 0`)).rows[0].id;
+    const outId = (await query(`SELECT id FROM bank_activity WHERE amount < 0`)).rows[0].id;
+    await sortIncome(inId, { category: 'Customer payment' });
+    const row = (await bankrollSummary(today(), { days: 7 })).live.find((l) => l.incomeId === inId);
+    equal(row.incomeCategory, 'Customer payment');
+    equal((await query(`SELECT count(*)::int AS n FROM expenses`)).rows[0].n, 0, 'income never becomes an expense');
+    let threw = false; try { await sortIncome(outId, { category: 'Customer payment' }); } catch { threw = true; }
+    assert(threw, 'money out is refused');
+    threw = false; try { await sortIncome(inId, { category: 'Nonsense' }); } catch { threw = true; }
+    assert(threw, 'unknown label refused');
+  } finally { await done(); }
 });

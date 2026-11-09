@@ -5,7 +5,7 @@ import { getSession, canKeepBooks } from '../../../../lib/auth';
 import { audit } from '../../../../lib/audit';
 import { addEntry, clearEntry, voidEntry } from '../../../../lib/bankroll';
 import { loadBankroll } from '../../../../lib/bankroll-load';
-import { promoteActivity } from '../../../../lib/bank-activity';
+import { promoteActivity, sortIncome } from '../../../../lib/bank-activity';
 import { liveBalances, refreshFromBank, syncPlaidTransactions } from '../../../../lib/plaid';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +42,9 @@ export async function POST(req) {
     } else if (b.action === 'promote') {
       const r = await promoteActivity(b.activityId, { category: b.category, by });
       await audit(session, { action: 'bank.promote', entity: 'expense', entityId: r.extId, summary: `Bank transfer $${r.gross} sorted as ${b.category}` });
+    } else if (b.action === 'sort_income') {
+      const r = await sortIncome(b.activityId, { category: b.category, who: b.who });
+      await audit(session, { action: 'bank.income', entity: 'bank_activity', entityId: String(r.id), summary: `Money in labelled ${r.category || 'none'}` });
     } else if (b.action === 'void') {
       await voidEntry(b.id, by);
       await audit(session, { action: 'bankroll.void', entity: 'bankroll', entityId: String(b.id), summary: 'Voided a bankroll entry' });

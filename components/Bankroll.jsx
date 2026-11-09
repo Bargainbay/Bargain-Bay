@@ -13,6 +13,8 @@ const cad = (v) => (v == null ? '—' : new Intl.NumberFormat('en-CA', { style: 
 const signed = (v) => `${v < 0 ? '−' : '+'}${cad(Math.abs(v))}`;
 const ago = (m) => (m == null ? 'never' : m < 2 ? 'just now' : m < 90 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`);
 
+const INCOME_CATS = ['Customer payment', 'Deposit on an order', 'Refund or credit received', 'Loan or owner money in', 'Scrap or other sale', 'Other'];
+
 export default function Bankroll({ initial }) {
   const [d, setD] = useState(initial);
   const [busy, setBusy] = useState('');
@@ -78,6 +80,10 @@ export default function Bankroll({ initial }) {
     const r = await call({ action: 'add', kind: 'pending', direction: thru.direction, amount: thru.amount, date: thru.date,
       note: thru.note || (thru.payee ? `${thru.direction === 'out' ? 'To' : 'From'} ${thru.payee}` : ''), category: thru.direction === 'out' ? thru.category : '', payee: thru.payee }, 'thru');
     if (r) { setThru((t) => ({ ...t, amount: '', payee: '', note: '' })); setMsg('Added. It counts in the bankroll now. When the bank shows it, press "Bank shows it" and it is sorted for you.'); }
+  }
+  async function sortIncomeLine(row, category) {
+    const r = await call({ action: 'sort_income', activityId: row.incomeId, category }, 'cat');
+    if (r) setMsg('Saved.');
   }
   async function promote(row, category) {
     const r = await call({ action: 'promote', activityId: row.activityId, category }, 'cat');
@@ -200,6 +206,11 @@ export default function Bankroll({ initial }) {
                       <select value="" disabled={!!busy} onChange={(e) => e.target.value && promote(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="The bank calls this a transfer. Pick what it was to count it as an expense.">
                         <option value="">Sort this…</option>
                         {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
+                      </select>
+                    ) : l.incomeId ? (
+                      <select value={l.incomeCategory || ''} disabled={!!busy} onChange={(e) => sortIncomeLine(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="What was this money for?">
+                        <option value="">What was it?</option>
+                        {INCOME_CATS.map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>
                     ) : (l.category || '')}
                   </td>
