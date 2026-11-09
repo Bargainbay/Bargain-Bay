@@ -5073,6 +5073,9 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
   already saved. **Fuel per truck:** `getVehicleFuelCategories` offers "Fuel - <vehicle name>" for every ACTIVE row of the dispatch `vehicles` list, so a truck added in
   Dispatch -> People & access appears in the dropdowns with no second list. Only the Financial page, receipts and split box offer the per-truck ones; `/admin/categorize`
   and the rules screens still show the built-in list (+ the new built-ins).
+- **An older "through the bank" entry that should not deduct**: press **Bank shows it** on it (Not at the bank yet list). With no bank line to match, that simply stops it
+  counting in the bankroll; the entry stays in the Live list greyed as "Through the bank (in the bank figure)" with its category and who it was paid to. (The list now shows the
+  entry's category and payee; before, a cleared entry showed neither.) It does NOT create an expense: only a matched bank line does.
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
   from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
 - **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the
