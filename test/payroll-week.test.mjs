@@ -102,3 +102,18 @@ test('A RATE ENTERED WRONG CAN BE CORRECTED FOR SHIFTS SINCE A DAY; THE USUAL CH
     equal((await payrollWeek('2026-10-12')).people[0].total, 144, 'a week before the date is left as it was');
   } finally { done(); }
 });
+
+test('A PAYMENT DATED BEFORE A TILL COUNT BUT TYPED IN AFTER IT IS NOT TAKEN OFF THE TILL AGAIN', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { addEntry, bankrollSummary } = await import('../lib/bankroll.js');
+    const { addPayment } = await import('../lib/pay-ledger.js');
+    await addEntry({ date: '2026-11-08', kind: 'count', amount: 0, by: 'a' }); // counted last night: nothing in the till
+    await new Promise((r) => setTimeout(r, 25));
+    await addPayment({ person: 'Roushi', amount: 580, date: '2026-11-07', how: 'cash', by: 'a' }); // happened the day before the count
+    await addEntry({ date: '2026-11-07', kind: 'cash', amount: -100, note: 'earlier', by: 'a' });
+    equal((await bankrollSummary('2026-11-09')).cash, 0, 'both happened before the count, so the count already has them');
+    await addPayment({ person: 'Roushi', amount: 50, date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }), how: 'cash', by: 'a' });
+    equal((await bankrollSummary('2026-11-09')).cash, -50, 'one dated today still comes off');
+  } finally { done(); }
+});
