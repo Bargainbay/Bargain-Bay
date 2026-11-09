@@ -89,6 +89,8 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
         <input style={{ ...input, width: 140 }} placeholder="Role (warehouse…)" value={emp.roleLabel} onChange={(e) => setEmp({ ...emp, roleLabel: e.target.value })} />
         <input style={{ ...input, width: 140 }} inputMode="tel" placeholder="WhatsApp (optional)" value={emp.phone} onChange={(e) => setEmp({ ...emp, phone: e.target.value })} />
         <input style={{ ...input, width: 100 }} type="number" min="0" step="0.25" inputMode="decimal" placeholder="$/hour" value={emp.hourlyRate} onChange={(e) => setEmp({ ...emp, hourlyRate: e.target.value })} />
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }} title="Leave empty for the usual: the new rate applies to shifts started from now on.">
+          also apply to shifts since <input style={{ ...input, width: 150 }} type="date" value={emp.backfillFrom || ''} onChange={(e) => setEmp({ ...emp, backfillFrom: e.target.value })} /></label>
         <button type="button" className="dash-filter active" disabled={busy} onClick={() => send({ action: 'save_employee', ...emp }, () => setEmp({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '', phone: '' }))}>Save employee</button>
       </div>
       <details style={{ margin: '10px 0' }}>
@@ -105,7 +107,7 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
           {msg && <span className="hint" style={{ marginLeft: 8 }}>{msg}</span>}
         </div>
       </details>
-      <p className="hint">A rate change applies to shifts started from now on; past shifts keep the rate they had.</p>
+      <p className="hint">A rate change applies to shifts started from now on; past shifts keep the rate they had unless you fill in &ldquo;also apply to shifts since&rdquo; (for a rate that was entered wrong).</p>
       {err && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</p>}
 
       <h2 style={{ color: 'var(--charcoal)' }}>Hours</h2>
