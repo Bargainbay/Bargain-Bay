@@ -63,9 +63,9 @@ export async function POST(req) {
         if (!viewer.admin) return deny();
         return NextResponse.json(await assignLead(body.id, body.ownerEmail, viewer.email));
       case 'import-preview':
-        return NextResponse.json(await importLeads(body.text, viewer, { commit: false }));
+        return NextResponse.json(await importLeads(body.text, viewer, { commit: false, defaultSide: body.side }));
       case 'import-commit':
-        return NextResponse.json(await importLeads(body.text, viewer, { commit: true }));
+        return NextResponse.json(await importLeads(body.text, viewer, { commit: true, defaultSide: body.side }));
       default:
         return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
     }
