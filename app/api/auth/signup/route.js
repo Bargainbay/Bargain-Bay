@@ -5,6 +5,7 @@ import {
   SESSION_COOKIE, normalizeEmail, validEmail
 } from '../../../../lib/auth';
 import { notifyOwner, esc } from '../../../../lib/email';
+import { attachPartnerFromCookie } from '../../../../lib/referral-partners';
 import { upsertCustomer } from '../../../../lib/customers';
 import { grantConsent } from '../../../../lib/consent';
 import {
@@ -68,7 +69,9 @@ export async function POST(req) {
     // Claim any guest orders previously placed with this email.
     await query('UPDATE orders SET user_id = $1 WHERE user_id IS NULL AND email = $2', [user.id, email]).catch(() => {});
     // Fold into the client database (links the record to this new account).
-    upsertCustomer({ email, name, phone, userId: user.id }).catch(() => {});
+    await upsertCustomer({ email, name, phone, userId: user.id }).catch(() => {});
+    // A visitor who arrived through a referral partner's link is put under that partner.
+    await attachPartnerFromCookie({ email, name, phone, userId: user.id });
 
     // Express consent, with the exact wording they were shown as the evidence.
     // Only when they actually ticked it: an untouched box is not a yes, and

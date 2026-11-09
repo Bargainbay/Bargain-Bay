@@ -3,7 +3,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { upsertCustomer } from '../lib/customers.js';
-import { savePartner, invitePartner, getPartner, setClientPartner, partnerReport, revokePartner } from '../lib/referral-partners.js';
+import { savePartner, invitePartner, ensureCode, attachPartnerByCode, getPartner, setClientPartner, partnerReport, revokePartner } from '../lib/referral-partners.js';
 
 const JAY = 'jdriver13@live.ca';
 const OWNER = 'owner@x.ca';
@@ -81,5 +81,31 @@ test('adding a partner creates their account (no password they know) and gives a
     const resend = await invitePartner(JAY, OWNER);
     assert(resend.link, 'can send another invite');
     assert(await rejects(() => invitePartner('nobody@x.ca', OWNER), 'nopartner'), 'only partners');
+  } finally { done(); }
+});
+
+test('the sign-up link: a code per partner, a new account lands under them, nobody already placed is moved, a revoked code does nothing', async () => {
+  const { done } = await withTestDb();
+  try {
+    process.env.AUTH_SECRET = process.env.AUTH_SECRET || 'test-secret-test-secret-test-secret-1234';
+    await savePartner({ email: JAY, name: 'Jayson Smith', pct: 10 }, OWNER);
+    await savePartner({ email: 'jayson2@x.ca', name: 'Jayson Other', pct: 10 }, OWNER);
+    const code = await ensureCode(JAY), code2 = await ensureCode('jayson2@x.ca');
+    equal(code, 'jayson'); equal(code2, 'jayson2'); equal(await ensureCode(JAY), 'jayson');
+    assert((await partnerReport(JAY)).partner.link.endsWith('/join/jayson'), 'link on the report');
+
+    const r = await attachPartnerByCode('JAYSON', { email: 'new@x.ca', name: 'New Client' });
+    assert(r.attached, 'attached'); equal(r.partner, JAY);
+    equal((await partnerReport(JAY)).clients.map((c) => c.email).join(), 'new@x.ca');
+
+    // someone already under another partner is not moved by a later link
+    const c = await upsertCustomer({ email: 'placed@x.ca', name: 'Placed' });
+    await setClientPartner(c, 'jayson2@x.ca', 'theirs', OWNER);
+    assert(!(await attachPartnerByCode('jayson', { email: 'placed@x.ca', name: 'Placed' })).attached, 'not moved');
+    equal((await query(`SELECT partner_email FROM customers WHERE id = $1`, [c])).rows[0].partner_email, 'jayson2@x.ca');
+
+    assert(!(await attachPartnerByCode('nope', { email: 'z@x.ca' })).attached, 'unknown code');
+    await revokePartner(JAY, OWNER);
+    assert(!(await attachPartnerByCode('jayson', { email: 'late@x.ca' })).attached, 'revoked code');
   } finally { done(); }
 });
