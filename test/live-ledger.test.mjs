@@ -130,14 +130,16 @@ test('MONEY IN CAN BE LABELLED, STAYS OUT OF EXPENSES, AND MONEY OUT CANNOT TAKE
     await recordActivity(mapActivity({ transaction_id: 'out1', date: today(), amount: 50, name: 'SEND E-TFR *abc' }));
     const inId = (await query(`SELECT id FROM bank_activity WHERE amount > 0`)).rows[0].id;
     const outId = (await query(`SELECT id FROM bank_activity WHERE amount < 0`)).rows[0].id;
-    await sortIncome(inId, { category: 'Customer payment' });
+    await sortIncome(inId, { category: 'Product sale' });
     const row = (await bankrollSummary(today(), { days: 7 })).live.find((l) => l.incomeId === inId);
-    equal(row.incomeCategory, 'Customer payment');
+    equal(row.incomeCategory, 'Product sale');
+    await sortIncome(inId, { category: 'Consulting fee' });
+    equal((await bankrollSummary(today(), { days: 7 })).live.find((l) => l.incomeId === inId).incomeCategory, 'Consulting fee', 'free text is kept');
     equal((await query(`SELECT count(*)::int AS n FROM expenses`)).rows[0].n, 0, 'income never becomes an expense');
     let threw = false; try { await sortIncome(outId, { category: 'Customer payment' }); } catch { threw = true; }
     assert(threw, 'money out is refused');
-    threw = false; try { await sortIncome(inId, { category: 'Nonsense' }); } catch { threw = true; }
-    assert(threw, 'unknown label refused');
+    threw = false; try { await sortIncome(inId, { category: 'x'.repeat(61) }); } catch { threw = true; }
+    assert(threw, 'an over-long label is refused');
   } finally { await done(); }
 });
 

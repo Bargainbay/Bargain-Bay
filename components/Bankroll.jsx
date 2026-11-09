@@ -14,7 +14,7 @@ const cad = (v) => (v == null ? '—' : new Intl.NumberFormat('en-CA', { style: 
 const signed = (v) => `${v < 0 ? '−' : '+'}${cad(Math.abs(v))}`;
 const ago = (m) => (m == null ? 'never' : m < 2 ? 'just now' : m < 90 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`);
 
-const INCOME_CATS = ['Customer payment', 'Deposit on an order', 'Refund or credit received', 'Loan or owner money in', 'Scrap or other sale', 'Other'];
+const INCOME_CATS = ['Product sale', 'Service sale', 'Deposit on an order', 'Refund or credit received', 'Loan or owner money in', 'Scrap or other sale'];
 
 export default function Bankroll({ initial }) {
   const [d, setD] = useState(initial);
@@ -228,9 +228,11 @@ export default function Bankroll({ initial }) {
                         {cats.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}<option value={NEW_CAT}>+ Add a category…</option>
                       </select>
                     ) : l.incomeId ? (
-                      <select value={l.incomeCategory || ''} disabled={!!busy} onChange={(e) => sortIncomeLine(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="What was this money for?">
+                      <select value={l.incomeCategory || ''} disabled={!!busy} onChange={(e) => { const v = e.target.value; if (v === '__other') { const t = window.prompt('What was it? (write the category)'); if (t && t.trim()) sortIncomeLine(l, t.trim()); } else sortIncomeLine(l, v); }} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="What was this money for?">
                         <option value="">What was it?</option>
                         {INCOME_CATS.map((c) => <option key={c} value={c}>{c}</option>)}
+                        {l.incomeCategory && !INCOME_CATS.includes(l.incomeCategory) && <option value={l.incomeCategory}>{l.incomeCategory}</option>}
+                        <option value="__other">Other (write it in)…</option>
                       </select>
                     ) : (l.category || '')}
                   </td>
