@@ -3,6 +3,7 @@ import { getSession } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { requestMembership } from '../../../../lib/members';
 import { MEMBER_TERMS_VERSION } from '../../../../lib/member-terms';
+import { attachPartnerFromCookie } from '../../../../lib/referral-partners';
 import { notifyOwner, esc } from '../../../../lib/email';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,8 @@ export async function POST(req) {
   if (body.termsVersion !== MEMBER_TERMS_VERSION) return NextResponse.json({ error: 'The member agreement was just updated. Please reload the page, read it and accept again.' }, { status: 400 });
   try {
     await requestMembership(session.userId, businessName, note, { termsVersion: MEMBER_TERMS_VERSION });
+    // Already had an account and came in through a partner's link: put them under that partner.
+    await attachPartnerFromCookie({ email: session.email, name: session.name });
     notifyOwner(
       `New member application: ${businessName}`,
       `<p>A business requested wholesale member access on Bargain Bay.</p>

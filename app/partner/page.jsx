@@ -3,6 +3,7 @@ import { getSession, isAdmin } from '../../lib/auth';
 import { hasDb } from '../../lib/db';
 import { getPartner, partnerReport } from '../../lib/referral-partners';
 import { money } from '../../lib/constants';
+import CopyLink from '../../components/CopyLink';
 import PartnerSignOut from '../../components/PartnerSignOut';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,13 @@ export default async function PartnerPage({ searchParams }) {
         <h1 style={{ color: 'var(--charcoal)', margin: 0, flex: 1 }}>My clients{r.partner?.name ? ` — ${r.partner.name}` : ''}</h1>
         <PartnerSignOut />
       </div>
+      {r.partner.link && (
+        <div className="panel" style={{ marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Your sign-up link</div>
+          <p className="hint" style={{ marginTop: 0 }}>Send this to your clients. When they use it to create an account and apply for member pricing, they are added to your clients automatically.</p>
+          <CopyLink link={r.partner.link} />
+        </div>
+      )}
       <div className="panel" style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
         <div><div className="hint">Clients</div><div style={{ fontSize: 24, fontWeight: 700 }}>{r.clients.length}</div></div>
         <div><div className="hint">Orders</div><div style={{ fontSize: 24, fontWeight: 700 }}>{r.totals.orders}</div></div>
