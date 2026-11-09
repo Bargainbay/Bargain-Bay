@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, canKeepBooks } from '../../../../lib/auth';
 import { audit } from '../../../../lib/audit';
-import { addEntry, clearEntry, voidEntry, recordEntryAsExpense } from '../../../../lib/bankroll';
+import { addEntry, clearEntry, voidEntry, recordEntryAsExpense, addCashDeposit } from '../../../../lib/bankroll';
 import { loadBankroll } from '../../../../lib/bankroll-load';
 import { promoteActivity, sortIncome, splitActivity } from '../../../../lib/bank-activity';
 import { changeInvoicePaymentMethod } from '../../../../lib/invoices';
@@ -50,6 +50,9 @@ export async function POST(req) {
     } else if (b.action === 'payment_method') {
       const r = await changeInvoicePaymentMethod(b.paymentId, b.method);
       await audit(session, { action: 'invoice.payment_method', entity: 'invoice', entityId: r.number, summary: `Payment on ${r.number} changed from ${r.from} to ${r.to}` });
+    } else if (b.action === 'cash_deposit') {
+      const r = await addCashDeposit({ date: b.date, amount: b.amount, note: b.note, by });
+      await audit(session, { action: 'bankroll.cash_deposit', entity: 'bankroll', entityId: String(r.outId), summary: `Cash deposit of $${r.amount} to the bank` });
     } else if (b.action === 'entry_to_books') {
       const r = await recordEntryAsExpense(b.id, by);
       await audit(session, { action: 'bankroll.entry_to_books', entity: 'expense', entityId: r.extId, summary: `Counted $${r.amount} as ${r.category} in the books` });

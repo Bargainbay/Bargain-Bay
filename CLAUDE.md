@@ -5085,6 +5085,9 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
   stored as `fin-fold:<id>` in the browser), and `FinFoldBar` gives Open all / Close all. Folded: through-the-bank, Live transactions, Receipts, On its way, profit trend,
   receivable + collections, patterns, sorting rules, bank feed, HST to confirm, QuickBooks, operating expenses. The Bankroll headline stays open. Everything starts OPEN (a page that
   hides money on first load is worse); each fold remembers itself. **A new Financial section must be added to `IDS` in `FinFoldBar.jsx`** or Open all / Close all will not reach it.
+- **Taking cash to the bank is ONE entry** ("Took cash to the bank: $ / date / Record deposit", under the till count; `addCashDeposit`, action `cash_deposit`): it writes the cash
+  OUT of the till and the same amount IN through the bank, so the bankroll total does not dip while TD catches up. When TD shows the deposit, press **Bank shows it** on the
+  "On its way" row. It is NOT matched to the bank line automatically.
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
   from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
 - **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the

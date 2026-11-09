@@ -26,6 +26,12 @@ export default function Bankroll({ initial }) {
   const [count, setCount] = useState('');
   const [thru, setThru] = useState({ direction: 'out', amount: '', payee: '', category: 'Wages', note: '', date: initial.date });
   const [countDate, setCountDate] = useState(initial.date);
+  const [dep, setDep] = useState({ amount: '', date: initial.date });
+  async function saveDeposit(e) {
+    e.preventDefault();
+    const r = await call({ action: 'cash_deposit', amount: dep.amount, date: dep.date }, 'dep');
+    if (r) { setDep((x) => ({ ...x, amount: '' })); setMsg('Deposit recorded. The till is down and the bank side is counted until TD shows it; then press "Bank shows it".'); }
+  }
   const [payTo, setPayTo] = useState({});
   const [openRow, setOpenRow] = useState(null);
   const cats = [...CATS, ...(d.customCategories || []).filter((c) => !CATS.includes(c))];
@@ -164,6 +170,12 @@ export default function Bankroll({ initial }) {
           <span className="hint" style={{ margin: 0 }}>at the end of</span>
           <input type="date" value={countDate} onChange={(e) => setCountDate(e.target.value)} />
           <button className="btn" disabled={!!busy}>{busy === 'count' ? 'Saving…' : 'Save count'}</button>
+        </form>
+        <form onSubmit={saveDeposit} style={{ marginTop: 8, display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <span className="hint" style={{ margin: 0 }}>Took cash to the bank:</span>
+          <input type="number" step="0.01" min="0" value={dep.amount} onChange={(e) => setDep((x) => ({ ...x, amount: e.target.value }))} placeholder="$ deposited" required style={{ width: 130 }} />
+          <input type="date" value={dep.date} onChange={(e) => setDep((x) => ({ ...x, date: e.target.value }))} />
+          <button className="btn" disabled={!!busy}>{busy === 'dep' ? 'Saving…' : 'Record deposit'}</button>
         </form>
         {(d.owed.count > 0 || d.waitingForBank > 0) && (
           <p className="hint" style={{ margin: '10px 0 0' }}>
