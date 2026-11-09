@@ -2,7 +2,7 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
-import { mondayOf, weekBounds, summarizeShifts, payrollWeek, postWeekOwed } from '../lib/payroll-week.js';
+import { mondayOf, weekBounds, summarizeShifts, payrollWeek, postWeekOwed, syncOwedFromClock } from '../lib/payroll-week.js';
 import { payBalances, addPayment } from '../lib/pay-ledger.js';
 
 const emp = async (name, rate, email = `${name.toLowerCase()}@x.ca`) =>
@@ -116,4 +116,21 @@ test('A PAYMENT DATED BEFORE A TILL COUNT BUT TYPED IN AFTER IT IS NOT TAKEN OFF
     await addPayment({ person: 'Roushi', amount: 50, date: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }), how: 'cash', by: 'a' });
     equal((await bankrollSummary('2026-11-09')).cash, -50, 'one dated today still comes off');
   } finally { done(); }
+});
+
+test('THE CLOCK POSTS TO OWED BY ITSELF, TWICE IS THE SAME, AND A WEEK THE OFFICE TYPED IS NEVER DOUBLED', async () => {
+  const { done } = await withTestDb();
+  try {
+    const r = await emp('Roushi', 20);
+    await shift(r, '2026-10-20', '10:00', '20:00', 20);   // Oct 19 week: owed already typed by hand
+    await shift(r, '2026-10-27', '10:00', '20:00', 20);   // Oct 26 week: the clock should post it
+    await query(`INSERT INTO pay_ledger (person, kind, amount, period_start, period_end, source) VALUES ('Roushi','owed',1080,'2026-10-19','2026-10-25','manual')`);
+    const a = await syncOwedFromClock('t');
+    const again = await syncOwedFromClock('t');
+    equal(a.find((x) => x.name === 'Roushi').hours, 20, 'both weeks counted in hours');
+    equal(again.find((x) => x.name === 'Roushi').hours, 20);
+    const owed = (await query(`SELECT amount, source FROM pay_ledger WHERE kind = 'owed' ORDER BY period_start`)).rows;
+    equal(owed.length, 2, 'the typed week is left alone, the other posted once');
+    equal(Number(owed[1].amount), 200); equal(owed[1].source, 'hours');
+  } finally { await done(); }
 });

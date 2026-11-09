@@ -3,7 +3,7 @@ import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { torontoToday } from '../../../lib/constants';
 import { listEmployees, staffShiftReport } from '../../../lib/team-clock';
-import { payrollWeek, weekBounds } from '../../../lib/payroll-week';
+import { weekBounds, syncOwedFromClock } from '../../../lib/payroll-week';
 import { payBalances } from '../../../lib/pay-ledger';
 import AdminNav from '../../../components/AdminNav';
 import PayrollHub from '../../../components/PayrollHub';
@@ -30,18 +30,17 @@ export default async function PayrollPage({ searchParams }) {
   const ok = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
   const from = ok(sp?.from) ? sp.from : w.start;
   const to = ok(sp?.to) ? sp.to : w.end;
-  let payroll = null, pay = { people: [], names: [] }, employees = [], shifts = [], error = '';
+  let hours = null, pay = { people: [], names: [] }, employees = [], shifts = [], error = '';
   try {
-    [payroll, pay, employees, shifts] = await Promise.all([
-      payrollWeek(w.start), payBalances(), listEmployees(), staffShiftReport(from, to)
-    ]);
+    hours = await syncOwedFromClock(session.email || session.name || null);
+    [pay, employees, shifts] = await Promise.all([payBalances(), listEmployees(), staffShiftReport(from, to)]);
   } catch (e) { console.error('payroll load failed', e.message); error = 'Could not load payroll.'; }
   return (
     <div>
       <AdminNav active="payroll" />
-      {error || !payroll ? <div className="error-box">{error || 'No data.'}</div> : (
+      {error || !hours ? <div className="error-box">{error || 'No data.'}</div> : (
         <>
-          <PayrollHub initial={{ payroll: JSON.parse(JSON.stringify(payroll)), pay: JSON.parse(JSON.stringify(pay)) }} today={today} />
+          <PayrollHub initial={{ hours, pay: JSON.parse(JSON.stringify(pay)) }} today={today} />
           <div style={{ marginTop: 18 }}>
             <TeamClockAdmin employees={employees} shifts={JSON.parse(JSON.stringify(shifts))} from={from} to={to} />
           </div>
