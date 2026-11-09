@@ -57,18 +57,25 @@ export default function ProfitPanel({ items, bundlePct, cashDeal, addHst, freeDe
   ];
   const cash = Number(cashDeal) > 0 ? Number(cashDeal) : null;
   const p = quoteProfit({ lines, services: svc, bundlePct, cashTotal: cash, addHst, threshold });
+  // Nothing priced yet: say so, rather than flag a $0.00 "low profit" on an empty quote.
+  const empty = !lines.some((l) => l.amount > 0);
+  // A missing cost makes the figure an UPPER bound, so it must not look like good news.
+  const holes = p.missing.units + p.missing.services > 0;
+  const tone = empty ? 'var(--muted, #888)' : holes && p.level === 'ok' ? '#b7791f' : TONE[p.level];
 
   return (
-    <div className="panel" style={{ borderLeft: `4px solid ${TONE[p.level]}`, background: 'var(--panel-alt, #fafafa)' }} aria-live="polite">
+    <div className="panel" style={{ borderLeft: `4px solid ${tone}`, background: 'var(--panel-alt, #fafafa)' }} aria-live="polite">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' }}>
         <b style={{ fontSize: 15 }}>Profit on this quote <span className="hint" style={{ fontWeight: 400 }}>(only you can see this)</span></b>
-        <span style={{ fontSize: 22, fontWeight: 800, color: TONE[p.level] }}>{profitLabel(p)}</span>
+        <span style={{ fontSize: 22, fontWeight: 800, color: tone }}>
+          {empty ? 'Add a unit to see profit' : holes && p.level === 'ok' ? `Profit up to ${fmt(p.profit)}` : profitLabel(p)}
+        </span>
       </div>
       <div style={{ fontSize: 13.5, margin: '6px 0' }}>
         Revenue {fmt(p.revenue)} − units {fmt(p.unitCost)} − services {fmt(p.serviceCost)}
         {p.marginPct != null && <> · margin {p.marginPct}%</>}
       </div>
-      {p.missing.units > 0 && <div className="hint" style={{ color: '#b7791f' }}>{p.missing.units} line{p.missing.units === 1 ? '' : 's'} with no cost on file — counted as $0, so the real profit is lower.</div>}
+      {!empty && p.missing.units > 0 && <div className="hint" style={{ color: '#b7791f' }}>{p.missing.units} line{p.missing.units === 1 ? '' : 's'} with no cost on file (a unit typed by hand has none — tie it to a unit in stock) — counted as $0, so the real profit is lower.</div>}
       {p.missing.services > 0 && <div className="hint" style={{ color: '#b7791f' }}>{p.missing.services} service{p.missing.services === 1 ? '' : 's'} with no internal cost set — counted as $0.</div>}
 
       <details style={{ marginTop: 8 }} open={chosen.length > 0}>
