@@ -3,7 +3,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { upsertCustomer } from '../lib/customers.js';
-import { savePartner, invitePartner, ensureCode, attachPartnerByCode, getPartner, setClientPartner, partnerReport, revokePartner } from '../lib/referral-partners.js';
+import { savePartner, invitePartner, ensureCode, attachPartnerByCode, recordPayment, voidPayment, statementFor, statementCsv, requestForClient, recordVisit, getPartner, setClientPartner, partnerReport, revokePartner } from '../lib/referral-partners.js';
 
 const JAY = 'jdriver13@live.ca';
 const OWNER = 'owner@x.ca';
@@ -107,5 +107,79 @@ test('the sign-up link: a code per partner, a new account lands under them, nobo
     assert(!(await attachPartnerByCode('nope', { email: 'z@x.ca' })).attached, 'unknown code');
     await revokePartner(JAY, OWNER);
     assert(!(await attachPartnerByCode('jayson', { email: 'late@x.ca' })).attached, 'revoked code');
+  } finally { done(); }
+});
+
+
+suite('referral partners — part 2');
+
+test('earned only once delivered and paid; payments reduce the balance; a void gives it back', async () => {
+  const { done } = await withTestDb();
+  try {
+    await savePartner({ email: JAY, name: 'Jayson', pct: 10 }, OWNER);
+    const c = await upsertCustomer({ email: 'roger@x.ca', name: 'Roger' });
+    await setClientPartner(c, JAY, 'client', OWNER);
+    await order('roger@x.ca', { price: 1000, cost: 600, status: 'delivered' });   // 40 earned
+    await order('roger@x.ca', { price: 1000, cost: 600, status: 'ready' });       // 40 pending
+    await order('roger@x.ca', { price: 1000, cost: 600, status: 'delivered' });   // delivered but still owing: pending
+    await query(`INSERT INTO invoices (number, email, status, subtotal, total, order_id) VALUES ('INV-O1','roger@x.ca','open',1000,1000,(SELECT max(id) FROM orders))`);
+    let r = await partnerReport(JAY);
+    equal(r.totals.commission, 120); equal(r.totals.earned, 40); equal(r.totals.pending, 80); equal(r.totals.balance, 40);
+    const pay = await recordPayment({ partnerEmail: JAY, amount: 25, paidOn: '2026-11-10', method: 'e-transfer', reference: 'R1' }, OWNER);
+    r = await partnerReport(JAY);
+    equal(r.totals.paid, 25); equal(r.totals.balance, 15); equal(r.payments.length, 1);
+    await voidPayment(pay.id, OWNER);
+    r = await partnerReport(JAY);
+    equal(r.totals.paid, 0); equal(r.totals.balance, 40); equal(r.payments.length, 0);
+    assert(await rejects(() => recordPayment({ partnerEmail: JAY, amount: 0 }, OWNER), 'amount'), 'amount required');
+    assert(await rejects(() => recordPayment({ partnerEmail: 'nobody@x.ca', amount: 5 }, OWNER), 'nopartner'), 'partners only');
+  } finally { done(); }
+});
+
+test('funnel, contact details and the monthly statement', async () => {
+  const { done } = await withTestDb();
+  try {
+    await savePartner({ email: JAY, name: 'Jayson', pct: 10 }, OWNER);
+    await attachPartnerByCode('jayson', { email: 'a@x.ca', name: 'A Client', phone: '4165550101' });
+    await attachPartnerByCode('jayson', { email: 'b@x.ca', name: 'B Client' });
+    await query(`INSERT INTO users (email, name, password_hash, member_status) VALUES ('a@x.ca','A','x','approved'), ('b@x.ca','B','x','pending')`);
+    await order('a@x.ca', { price: 1000, cost: 500, status: 'delivered' });
+    await recordPayment({ partnerEmail: JAY, amount: 50, paidOn: new Date().toISOString().slice(0, 10) }, OWNER);
+    const r = await partnerReport(JAY);
+    equal(r.funnel.signedUp, 2); equal(r.funnel.applied, 2); equal(r.funnel.approved, 1);
+    const a = r.clients.find((c) => c.email === 'a@x.ca');
+    equal(a.phone, '4165550101'); equal(a.membership, 'approved');
+    const st = statementFor(r, new Date().toISOString().slice(0, 7));
+    equal(st.orders.length, 1); equal(st.totals.commission, 50); equal(st.totals.paid, 50); equal(st.balance, 0);
+    const csv = statementCsv(r, st);
+    assert(csv.includes('BB-P') && csv.includes('Balance owed'), 'csv has the orders and the balance');
+    equal(statementFor(r, '2020-01').orders.length, 0);
+  } finally { done(); }
+});
+
+test('a client request becomes an unassigned follow-up, only for the partner\'s own clients', async () => {
+  const { done } = await withTestDb();
+  try {
+    await savePartner({ email: JAY, name: 'Jayson', pct: 10 }, OWNER);
+    const mine = await upsertCustomer({ email: 'mine@x.ca', name: 'Mine' });
+    const theirs = await upsertCustomer({ email: 'theirs@x.ca', name: 'Theirs' });
+    await setClientPartner(mine, JAY, 'client', OWNER);
+    await requestForClient(JAY, mine, 'Two fridges for a rental, by Friday');
+    const t = (await query(`SELECT title, owner_email, created_by FROM customer_tasks WHERE customer_id = $1`, [mine])).rows;
+    equal(t.length, 1); equal(t[0].owner_email, null); equal(t[0].created_by, JAY);
+    assert(await rejects(() => requestForClient(JAY, theirs, 'Something else entirely'), 'notfound'), 'not their client');
+    assert(await rejects(() => requestForClient(JAY, mine, 'x'), 'note'), 'needs a note');
+  } finally { done(); }
+});
+
+test('link visits count people, not page loads, and ignore bots', async () => {
+  const { done } = await withTestDb();
+  try {
+    await savePartner({ email: JAY, name: 'Jayson', pct: 10 }, OWNER);
+    await ensureCode(JAY);
+    await recordVisit('jayson', 'v1', 'Mozilla/5.0'); await recordVisit('jayson', 'v1', 'Mozilla/5.0'); await recordVisit('jayson', 'v2', 'Mozilla/5.0');
+    await recordVisit('jayson', 'v3', 'facebookexternalhit/1.1'); await recordVisit('nope', 'v4', 'Mozilla/5.0');
+    const r = await partnerReport(JAY);
+    equal(r.visits.total, 2); equal(r.visits.recent, 2);
   } finally { done(); }
 });
