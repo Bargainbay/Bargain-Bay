@@ -26,6 +26,13 @@ export default function Bankroll({ initial }) {
   const [countDate, setCountDate] = useState(initial.date);
   const [payTo, setPayTo] = useState({});
   const [openRow, setOpenRow] = useState(null);
+  const [split, setSplit] = useState(null); // { key, id, total, parts: [{ category, amount }] }
+  const startSplit = (l) => setSplit({ key: l.key, id: l.activityId, total: Math.round(Math.abs(l.amount) * 100) / 100, parts: [{ category: '', amount: '' }, { category: '', amount: '' }] });
+  const splitLeft = split ? Math.round((split.total - split.parts.reduce((t, p) => t + (Number(p.amount) || 0), 0)) * 100) / 100 : 0;
+  async function saveSplit() {
+    const r = await call({ action: 'split', activityId: split.id, parts: split.parts.map((p) => ({ category: p.category, amount: Number(p.amount) })) }, 'cat');
+    if (r) { setSplit(null); setMsg('Split. Each part is now its own expense in its category.'); }
+  }
 
   // The server refreshes the bank itself every 30 minutes; the page re-reads what it holds every 5 minutes while it is open
   // (no call to the bank, so no charge) so a tab left up keeps showing the latest.
@@ -203,8 +210,9 @@ export default function Bankroll({ initial }) {
                         {l.inPayroll && <span className="hint" style={{ marginLeft: 6 }}>in payroll</span>}
                       </>
                     ) : l.activityId ? (
-                      <select value="" disabled={!!busy} onChange={(e) => e.target.value && promote(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="The bank calls this a transfer. Pick what it was to count it as an expense.">
+                      <select value="" disabled={!!busy} onChange={(e) => { const v = e.target.value; if (v === '__split') startSplit(l); else if (v) promote(l, v); }} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="The bank calls this a transfer. Pick what it was to count it as an expense.">
                         <option value="">Sort this…</option>
+                        <option value="__split">Split into several…</option>
                         {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
                       </select>
                     ) : l.incomeId ? (
@@ -216,6 +224,27 @@ export default function Bankroll({ initial }) {
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 700, color: l.noMoney ? 'var(--muted)' : undefined }}>{l.noMoney && l.tag === 'Till count' ? cad(l.amount) : signed(l.amount)}</td>
                 </tr>
+                {split && split.key === l.key && (
+                  <tr>
+                    <td colSpan={5} style={{ background: 'var(--card-2)', padding: '10px 16px' }}>
+                      <b>Split {cad(split.total)} into parts</b>
+                      {split.parts.map((p, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                          <select value={p.category} onChange={(e) => setSplit((s) => ({ ...s, parts: s.parts.map((x, j) => (j === i ? { ...x, category: e.target.value } : x)) }))} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }}>
+                            <option value="">Category…</option>
+                            {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
+                          </select>
+                          <input type="number" step="0.01" placeholder="amount" value={p.amount} onChange={(e) => setSplit((s) => ({ ...s, parts: s.parts.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)) }))} style={{ width: 120, minHeight: 34, padding: '4px 8px', fontSize: 14 }} />
+                          {split.parts.length > 2 && <button type="button" className="dash-filter" onClick={() => setSplit((s) => ({ ...s, parts: s.parts.filter((_, j) => j !== i) }))}>Remove</button>}
+                        </div>))}
+                      <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button type="button" className="dash-filter" onClick={() => setSplit((s) => ({ ...s, parts: [...s.parts, { category: '', amount: splitLeft > 0 ? String(splitLeft) : '' }] }))}>+ Add a part</button>
+                        <span className="hint" style={{ margin: 0 }}>{splitLeft === 0 ? 'Adds up.' : `${cad(Math.abs(splitLeft))} ${splitLeft > 0 ? 'still to place' : 'too much'}`}</span>
+                        <button type="button" className="dash-filter active" disabled={!!busy || splitLeft !== 0 || split.parts.some((p) => !p.category || !(Number(p.amount) > 0))} onClick={saveSplit}>Save split</button>
+                        <button type="button" className="dash-filter" onClick={() => setSplit(null)}>Cancel</button>
+                      </div>
+                    </td>
+                  </tr>)}
                 {openRow === l.key && (
                   <tr>
                     <td colSpan={5} style={{ background: 'var(--card-2)', padding: '10px 16px' }}>

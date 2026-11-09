@@ -3,7 +3,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { upsertExpense } from '../lib/finance.js';
-import { mapActivity, recordActivity, deleteActivity, sortIncome } from '../lib/bank-activity.js';
+import { mapActivity, recordActivity, deleteActivity, sortIncome, splitActivity, hasExpense } from '../lib/bank-activity.js';
 import { parseInteracReceived, nameTransfersFromEmail, matchTransfers } from '../lib/interac-names.js';
 import { bankrollSummary } from '../lib/bankroll.js';
 
@@ -138,5 +138,20 @@ test('MONEY IN CAN BE LABELLED, STAYS OUT OF EXPENSES, AND MONEY OUT CANNOT TAKE
     assert(threw, 'money out is refused');
     threw = false; try { await sortIncome(inId, { category: 'Nonsense' }); } catch { threw = true; }
     assert(threw, 'unknown label refused');
+  } finally { await done(); }
+});
+
+test('ONE TRANSFER SPLIT INTO TWO CATEGORIES: PARTS MUST ADD UP, EACH BECOMES AN EXPENSE, AND THE BANK RE-SENDING IT ADDS NOTHING', async () => {
+  const { done } = await withTestDb();
+  try {
+    await recordActivity(mapActivity({ transaction_id: 'sp1', date: today(), amount: 3000, name: 'SEND E-TFR ***9Kr' }));
+    const id = (await query(`SELECT id FROM bank_activity`)).rows[0].id;
+    let threw = false; try { await splitActivity(id, { parts: [{ category: 'Interest charges', amount: 2000 }, { category: 'Owner draw', amount: 900 }] }); } catch { threw = true; }
+    assert(threw, 'parts that do not add up are refused');
+    await splitActivity(id, { parts: [{ category: 'Interest charges', amount: 2000 }, { category: 'Owner draw', amount: 1000 }], by: 't' });
+    const ex = (await query(`SELECT category, amount FROM expenses ORDER BY ext_id`)).rows;
+    equal(ex.length, 2); equal(ex[0].category, 'Interest charges'); equal(Number(ex[1].amount), 1000);
+    equal((await query(`SELECT count(*)::int AS n FROM bank_activity`)).rows[0].n, 0, 'the transfer left the activity list');
+    assert(await hasExpense('plaid:sp1'), 'the original bank id is recognised as already sorted');
   } finally { await done(); }
 });

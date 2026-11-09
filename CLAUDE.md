@@ -5052,6 +5052,9 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
 - **Money IN can be labelled too** (migration `0059_bank_income_category`, `sortIncome` in `lib/bank-activity.js`, action `sort_income`): a "What was it?" select on
   every incoming bank line (Customer payment, Deposit on an order, Refund or credit received, Loan or owner money in, Scrap or other sale, Other). It is a LABEL on the
   `bank_activity` row and never an expense; money out cannot take one. **Run Run schema migration after deploy.**
+- **A transfer can be SPLIT** (`splitActivity`, action `split`, "Split into several…" in the Sort this select): $3,000 sent as $2,000 interest + $1,000 owner
+  dividend. Two or more parts, each a category and an amount, which must add up to the cent. Each part is its own expense (`ext_id` = `<bank id>#1`, `#2`...);
+  `hasExpense` / `isDecidedExpense` match the `#` suffix so the bank re-sending the original adds nothing. Loan interest is "Interest charges", a dividend "Owner draw".
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
   from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
 - **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the
