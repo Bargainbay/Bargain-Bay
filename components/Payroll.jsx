@@ -6,7 +6,9 @@ import { Fragment, useState } from 'react';
 const cad = (v) => (v == null ? '—' : new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(v));
 const span = (l) => (l.periodStart ? `${l.periodStart} to ${l.periodEnd}` : '');
 
-export default function Payroll({ d, setD }) {
+// `extra` is merged into every request (the Payroll page passes { view: 'payroll', weekStart }); with none, the answer is the
+// bankroll data the Financial page holds.
+export default function Payroll({ d, setD, extra = {} }) {
   const people = d.pay?.people || [];
   const names = d.pay?.names || [];
   const [owed, setOwed] = useState({ person: '', periodStart: '', periodEnd: '', amount: '', note: '' });
@@ -20,7 +22,7 @@ export default function Payroll({ d, setD }) {
   async function call(body, label) {
     setBusy(label); setErr(''); setMsg('');
     try {
-      const res = await fetch('/api/admin/pay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ viewDate: d.date, days: d.days, ...body }) });
+      const res = await fetch('/api/admin/pay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ viewDate: d.date, days: d.days, ...extra, ...body }) });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'That failed.');
       if (j.candidates) return j;
@@ -47,7 +49,7 @@ export default function Payroll({ d, setD }) {
 
   return (
     <div className="panel" style={{ marginTop: 18 }}>
-      <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Payroll — owed and paid</h2>
+      <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Owed and paid</h2>
       <datalist id="pay-names">{names.map((n) => <option key={n} value={n} />)}</datalist>
 
       {people.length === 0 ? <p className="hint" style={{ margin: 0 }}>Nobody yet. Add what someone is owed for a pay period, then record each payment.</p> : (

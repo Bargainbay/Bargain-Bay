@@ -55,7 +55,7 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
   }).filter((r) => r.people || r.c);
   return (
     <div className="panel">
-      <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Team clock</h1>
+      <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>People and hours</h2>
       <p className="hint">
         Add someone by email. They sign up at <b>/signup</b> with that address (or already have an account),
         then open the clock page on their phone and tap Clock in / Clock out. Save it to their home screen.

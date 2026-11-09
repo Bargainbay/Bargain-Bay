@@ -55,10 +55,9 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // The people who promote our stock for a percentage: applications, their codes, what they are owed.
     { key: 'affiliates', label: 'Affiliates', href: '/admin/affiliates' },
     { key: 'giveaway', label: 'Giveaway', href: '/admin/giveaway' },
+    // ONE tab for pay: hours, what each person earned, what is owed and paid, the people and their rates, and where
+    // a forgotten clock-out is fixed. Everyone who isn't driving clocks in on /clock. (/admin/team-clock redirects here.)
     { key: 'payroll', label: 'Payroll', href: '/admin/payroll' },
-    // Everyone who isn't driving clocks in on /clock; this is where they are
-    // added, paid a rate, and where a forgotten clock-out is fixed.
-    { key: 'team-clock', label: 'Team clock', href: '/admin/team-clock' },
     { key: 'dispatch', label: 'Dispatch', href: '/admin/dispatch', sales: true },
     // ONE tab over every report. The P&L, the general ledger and the financial
     // dashboard were in the accountant's nav below and in nobody else's, so the
