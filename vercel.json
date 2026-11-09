@@ -25,6 +25,10 @@
       "schedule": "*/15 6-22 * * *"
     },
     {
+      "path": "/api/cron/bank-refresh",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/cron/interac-names",
       "schedule": "17 * * * *"
     },

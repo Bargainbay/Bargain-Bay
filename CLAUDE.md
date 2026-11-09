@@ -5024,9 +5024,17 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
   the receipt; paying somebody back is not a second cost), recorded on the receipt, and such a receipt can no longer be voided; by cash writes a cash-out entry.
 - **Other money in or out** (the odd scrap-yard / invoice-less cash sale, cash taken out to deposit, a transfer not showing yet) is a collapsed form;
   `pending` entries count until cleared, with a looks-cleared HINT on an exact outgoing amount, never an automatic clear.
-- **Live transactions** (second section): one list of every movement (bank out, e-transfers in, cash sales, cash receipts and wages, entries, till counts),
-  Today / 7 / 30 days, newest first. A bank line can be re-categorised in place; **Wages / salary** takes no HST and offers "paid to…", which counts it as a
-  payment on that person's payroll balance.
+- **Live transactions** (second section): one list of every movement, Today / 7 / 30 days, newest first, **every row opens to its detail**
+  (our note, the memo the bank carries, the bank description, who it was sent to or came from, account, category, HST, receipt photo). A cash sale reads
+  `INV-1359 · Joan Grant` with a link to open the invoice (`/invoice/<n>`) and to find it in Invoices. A bank line can be re-categorised in place; **Wages /
+  salary** takes no HST and offers "paid to…", which counts it as a payment on that person's payroll balance. The page re-reads itself every 5 minutes while open.
+- **`bank_activity` (migration 0056) holds every bank line that is NOT an expense row**: pending lines (a pending line is never an expense — Plaid
+  re-issues it as a new posted line and retracts the pending id, which deletes the row), money in of any kind, and money out that is not a cost. This is what
+  makes today's activity visible. `DETAILS_V = 3` makes each linked bank re-send its history once to fill it. A line that is an expense is never also here.
+- **Incoming e-transfers are named too** (`parseInteracReceived`, same job as the outgoing ones, no guessing): Interac's "You've received $X from NAME and it has
+  been automatically deposited" email names the `bank_activity` line (`who_override`) and `bank_deposits.sender`. Email window: 3 days before to 1.5 after the line.
+- **`/api/cron/bank-refresh` every 30 minutes, 08:00-21:00 Toronto** (heartbeat `bank-refresh`): `/transactions/refresh`, sync, `/accounts/balance/get`, then the
+  Interac naming. Plaid bills the refresh and the live balance per call, which is why it stays inside business hours; `?force=1` runs it outside them.
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
   from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
 - **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the

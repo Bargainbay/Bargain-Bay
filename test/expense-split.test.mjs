@@ -167,7 +167,7 @@ test('A CHANGED BANK LINE DOES NOT WRITE THE FULL AMOUNT BACK OVER A SPLIT', asy
     process.env.PLAID_CLIENT_ID = 'cid'; process.env.PLAID_SECRET = 'sec';
     const { setSetting } = await import('../lib/settings.js');
     const { syncPlaidTransactions } = await import('../lib/plaid.js');
-    await setSetting('plaid_items', [{ itemId: 'i1', accessToken: 'tok1', institution: 'TD', cursor: null, detailsV: 2 }]);
+    await setSetting('plaid_items', [{ itemId: 'i1', accessToken: 'tok1', institution: 'TD', cursor: null, detailsV: 3 }]);
     await setSetting('ledger_start', '2026-01-01');
     const tx = { transaction_id: 'abc', amount: 226, date: '2026-11-03', name: 'HOME DEPOT', pending: false,
       personal_finance_category: { primary: 'GENERAL_MERCHANDISE' } };
