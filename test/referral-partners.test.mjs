@@ -3,7 +3,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { upsertCustomer } from '../lib/customers.js';
-import { savePartner, invitePartner, ensureCode, attachPartnerByCode, recordPayment, voidPayment, statementFor, statementCsv, requestForClient, recordVisit, getPartner, setClientPartner, partnerReport, revokePartner } from '../lib/referral-partners.js';
+import { savePartner, invitePartner, ensureCode, attachPartnerByCode, recordPayment, voidPayment, statementFor, statementCsv, requestForClient, recordVisit, getPartner, addTeamMember, removeTeamMember, listTeam, attachPartnerForOrder, partnerByCouponCode, ensureCustomerCoupon, customerLink, setClientPartner, partnerReport, revokePartner } from '../lib/referral-partners.js';
 
 const JAY = 'jdriver13@live.ca';
 const OWNER = 'owner@x.ca';
@@ -181,5 +181,53 @@ test('link visits count people, not page loads, and ignore bots', async () => {
     await recordVisit('jayson', 'v3', 'facebookexternalhit/1.1'); await recordVisit('nope', 'v4', 'Mozilla/5.0');
     const r = await partnerReport(JAY);
     equal(r.visits.total, 2); equal(r.visits.recent, 2);
+  } finally { done(); }
+});
+
+test('SecondShop: team logins see the organisation, can be removed, and cannot clash', async () => {
+  const { done } = await withTestDb();
+  try {
+    await savePartner({ email: JAY, name: 'SecondShop', pct: 10 }, OWNER);
+    const c = await upsertCustomer({ email: 'roger@x.ca', name: 'Roger' });
+    await setClientPartner(c, JAY, 'client', OWNER);
+    const added = await addTeamMember(JAY, { email: 'Amy@SecondShop.ca', name: 'Amy' }, OWNER);
+    assert(added.ok && added.accountCreated, 'a new login is created for the teammate');
+    const amy = await getPartner('amy@secondshop.ca');
+    equal(amy.email, JAY, 'a teammate resolves to the organisation');
+    const r = await partnerReport('amy@secondshop.ca');
+    equal(r.clients.length, 1, 'the teammate sees the same clients');
+    equal((await listTeam(JAY)).length, 2);
+    assert(await rejects(() => addTeamMember(JAY, { email: JAY }, OWNER), 'primary'), 'the main login is not a teammate');
+    await savePartner({ email: 'other@x.ca', name: 'Other', pct: 10 }, OWNER);
+    assert(await rejects(() => addTeamMember('other@x.ca', { email: 'amy@secondshop.ca' }, OWNER), 'teammate'), 'one team per person');
+    assert(await rejects(() => savePartner({ email: 'amy@secondshop.ca', pct: 10 }, OWNER), 'teammate'), 'a teammate cannot also be a partner');
+    await removeTeamMember(JAY, 'amy@secondshop.ca', OWNER);
+    equal(await getPartner('amy@secondshop.ca'), null, 'a removed teammate is locked out');
+  } finally { done(); }
+});
+
+test('SecondShop: the end-user link carries a 5% code; ordering with it puts the buyer under the partner', async () => {
+  const { done } = await withTestDb();
+  try {
+    await savePartner({ email: JAY, name: 'SecondShop', pct: 10 }, OWNER);
+    const r = await partnerReport(JAY);
+    equal(r.partner.code, 'secondshop');
+    equal(r.partner.customerCode, 'SECONDSHOP5');
+    assert(r.partner.customerLink.endsWith('/join/secondshop/shop') && r.partner.link.endsWith('/join/secondshop'), 'two different links');
+    const { rows } = await query(`SELECT kind, value::float8 AS value, commission_pct::float8 AS pct, active FROM coupons WHERE upper(code) = 'SECONDSHOP5'`);
+    equal(rows[0].kind, 'percent'); equal(rows[0].value, 5); equal(rows[0].pct, 0); assert(rows[0].active);
+    equal((await partnerByCouponCode('secondshop5')).email, JAY);
+    const a = await attachPartnerForOrder({ couponCode: 'SECONDSHOP5', email: 'shopper@x.ca', name: 'Shopper' });
+    assert(a.attached, 'the buyer is put under the partner');
+    await order('shopper@x.ca', { price: 1000, cost: 600, discount: 50 });          // profit AFTER the 5% = 350 -> 35
+    equal((await partnerReport(JAY)).totals.commission, 35);
+    const again = await attachPartnerForOrder({ couponCode: 'SECONDSHOP5', email: 'shopper@x.ca' });
+    assert(!again.attached, 'never moved or attached twice');
+    // the percentage is editable; 0 switches the code off
+    await savePartner({ email: JAY, pct: 10, customerPct: 0 }, OWNER);
+    equal(await ensureCustomerCoupon(JAY), null);
+    equal((await query(`SELECT active FROM coupons WHERE upper(code) = 'SECONDSHOP5'`)).rows[0].active, false);
+    await savePartner({ email: JAY, pct: 10, customerPct: 7 }, OWNER);
+    equal(await ensureCustomerCoupon(JAY), 'SECONDSHOP7');
   } finally { done(); }
 });

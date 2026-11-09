@@ -7,7 +7,7 @@ import { MEMBER_TERMS, MEMBER_TERMS_VERSION, memberTermsText } from '../lib/memb
 import { requestMembership, getMembership } from '../lib/members.js';
 
 // version -> sha256 of memberTermsText(). CHANGING THE WORDING MEANS A NEW VERSION AND A NEW LINE HERE.
-const PINNED = { '2026-10-27': '1db4ec3a9336098e60d090d52b1fd0bfe16cfdee7b584eea2b720cc8e8287b1a' };
+const PINNED = { '2026-11-09': '430475b54d867faf0f4ab724460552ab57cb68c3940339acdd569fd86de2a689' };
 
 suite('member agreement');
 test('THE WORDING CANNOT CHANGE WITHOUT THE VERSION CHANGING', () => {

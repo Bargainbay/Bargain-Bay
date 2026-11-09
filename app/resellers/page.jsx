@@ -7,7 +7,7 @@ import MemberRequest from '../account/MemberRequest';
 export const dynamic = 'force-dynamic';
 export const metadata = {
   title: 'Resellers & Businesses — Wholesale Appliances',
-  description: 'Property managers, contractors and appliance resellers: apply for wholesale member pricing on tested open-box, scratch-and-dent and refurbished appliances in Durham Region and the GTA.'
+  description: 'Property managers, contractors and appliance resellers: apply for wholesale reseller pricing on tested open-box, scratch-and-dent and refurbished appliances in Durham Region and the GTA.'
 };
 
 const WHO = [
@@ -17,9 +17,9 @@ const WHO = [
 ];
 const HOW = [
   ['Create a free account', 'Takes a minute. Sign in with Google or Microsoft, or use your email.'],
-  ['Tell us about your business', 'A few details and a short member agreement. No fees, no minimum order to apply.'],
+  ['Tell us about your business', 'A few details and a short reseller agreement. No fees, no minimum order to apply.'],
   ['We review it', 'We approve applications quickly and email you the moment you are in.'],
-  ['See wholesale prices', 'Your member price shows beside every unit, in the shop and at checkout. Your dashboard lists all available stock with your price and your savings.']
+  ['See wholesale prices', 'Your reseller price shows beside every unit, in the shop and at checkout. Your dashboard lists all available stock with your price and your savings.']
 ];
 
 export default async function ResellersPage() {
@@ -37,7 +37,7 @@ export default async function ResellersPage() {
         <h1 style={{ margin: '4px 0 10px', color: 'var(--charcoal)' }}>Wholesale pricing for businesses that buy appliances</h1>
         <p style={{ fontSize: 16, margin: '0 0 14px' }}>
           Bargain Bay sells tested open-box, scratch-and-dent and refurbished appliances out of Pickering. Approved
-          business accounts get <b>member pricing</b> on the whole catalogue, a dashboard of everything in stock with
+          business accounts get <b>reseller pricing</b> on the whole catalogue, a dashboard of everything in stock with
           their price on it, and the same pickup and delivery as any customer.
         </p>
         {!session && (

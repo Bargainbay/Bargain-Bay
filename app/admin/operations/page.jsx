@@ -155,7 +155,7 @@ export default async function OperationsPage() {
         <AdminDrivers initialDrivers={drivers} />
       </OpsSection>
 
-      <OpsSection id="members" title="Member applications"
+      <OpsSection id="members" title="Reseller applications"
         count={members.filter((m) => m.member_status === 'pending').length}>
         <AdminMembers initialMembers={members} />
       </OpsSection>

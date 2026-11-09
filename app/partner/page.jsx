@@ -6,11 +6,12 @@ import { money } from '../../lib/constants';
 import CopyLink from '../../components/CopyLink';
 import PartnerRequest from '../../components/PartnerRequest';
 import PartnerSignOut from '../../components/PartnerSignOut';
+import PartnerTeam from '../../components/PartnerTeam';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'My clients — Bargain Bay', robots: { index: false } };
 
-const MEMBER = { approved: 'Member pricing approved', pending: 'Member application pending', none: 'No member application yet' };
+const MEMBER = { approved: 'Reseller pricing approved', pending: 'Reseller application pending', none: 'Retail customer' };
 
 // A referral partner's page: their clients, each client's orders and live status, and the commission owed.
 // The partner is read from the SESSION; an admin may preview one with ?as=<email>. Nothing in the request
@@ -44,17 +45,24 @@ export default async function PartnerPage({ searchParams }) {
 
       {r.partner.link && (
         <div className="panel" style={{ marginBottom: 12 }}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Your sign-up link</div>
-          <p className="hint" style={{ marginTop: 0 }}>Send this to your clients. When they use it to create an account and apply for member pricing, they are added to your clients automatically. Member pricing is switched on once Bargain Bay approves them.</p>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Link for resellers</div>
+          <p className="hint" style={{ marginTop: 0 }}>For businesses that buy to resell. When they use it to create an account and apply as a reseller, they are added to your clients automatically. Reseller pricing is switched on once Bargain Bay approves them.</p>
           <CopyLink link={r.partner.link} />
+          {r.partner.customerLink && (<>
+            <div style={{ fontWeight: 700, margin: '16px 0 4px' }}>Link for end users</div>
+            <p className="hint" style={{ marginTop: 0 }}>For shoppers buying for themselves. It opens the shop with the code <b>{r.partner.customerCode}</b> ready to apply, for {r.partner.customerPct}% off. Anyone who buys through it, or with the code, is added to your clients.</p>
+            <CopyLink link={r.partner.customerLink} />
+          </>)}
           <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginTop: 12 }}>
-            {stat('People who opened it', r.visits.total, `${r.visits.recent} in the last 30 days`)}
-            {stat('Signed up', r.funnel.signedUp)}
-            {stat('Applied for member pricing', r.funnel.applied)}
+            {stat('People who opened a link', r.visits.total, `${r.visits.recent} in the last 30 days`)}
+            {stat('Signed up or ordered', r.funnel.signedUp)}
+            {stat('Applied as resellers', r.funnel.applied)}
             {stat('Approved', r.funnel.approved)}
           </div>
         </div>
       )}
+
+      {!preview && <PartnerTeam team={r.team} me={session.email} />}
 
       <div className="panel" style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
         {stat('Clients', r.clients.length)}

@@ -144,7 +144,7 @@ export default async function CustomersDashboardPage({ searchParams }) {
         <div className="table-wrap"><table className="admin">
           <thead><tr><th>Business / Name</th><th>Contact</th><th>Status</th><th>Orders</th><th style={{ textAlign: 'right' }}>Spent</th></tr></thead>
           <tbody>
-            {members.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--muted)' }}>No member applications yet.</td></tr>}
+            {members.length === 0 && <tr><td colSpan={5} style={{ color: 'var(--muted)' }}>No reseller applications yet.</td></tr>}
             {members.map((m) => (
               <tr key={m.id}>
                 <td><a href={`/admin/customers/${m.id}`} style={{ textDecoration: 'underline' }}>{m.business || m.name || m.email}</a><div style={{ fontSize: 12, color: 'var(--muted)' }}>{m.name}</div></td>
