@@ -5,6 +5,7 @@ import { getOrdersForCustomer } from '../../lib/orders';
 import { invoicesForEmail } from '../../lib/invoices';
 import { quotesForEmail } from '../../lib/quotes';
 import { getMembership } from '../../lib/members';
+import { getPartner } from '../../lib/referral-partners';
 import { linkToken } from '../../lib/links';
 import MemberRequest from './MemberRequest';
 import AccountProfile from './AccountProfile';
@@ -27,6 +28,7 @@ export default async function AccountPage() {
   let quotes = [];
   let dbOk = hasDb();
   let membership = null;
+  let partner = null;
   if (dbOk) {
     try {
       const { rows } = await query('SELECT email, name, phone, created_at FROM users WHERE id = $1', [session.userId]);
@@ -34,6 +36,7 @@ export default async function AccountPage() {
       // Orders by account OR email — guest orders placed with this email show too.
       orders = await getOrdersForCustomer(session.userId, session.email);
       membership = await getMembership(session.userId);
+      partner = await getPartner(session.email);
     } catch (e) {
       console.error('account load failed', e);
       dbOk = false;
@@ -53,6 +56,13 @@ export default async function AccountPage() {
         <h2>Profile</h2>
         <AccountProfile profile={{ email: profile.email, name: profile.name, phone: profile.phone }} />
       </div>
+
+      {partner && (
+        <div className="panel">
+          <h2>Referral partner</h2>
+          <p style={{ fontSize: 14.5, margin: 0 }}>Your clients, their orders and your commission. <a href="/partner" style={{ textDecoration: 'underline', fontWeight: 700 }}>Open the partner portal →</a></p>
+        </div>
+      )}
 
       <div className="panel">
         <h2>Wholesale / Reseller access</h2>

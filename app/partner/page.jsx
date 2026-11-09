@@ -38,6 +38,7 @@ export default async function PartnerPage({ searchParams }) {
     <div className="narrow" style={{ maxWidth: 980 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', margin: '4px 0 16px' }}>
         <h1 style={{ color: 'var(--charcoal)', margin: 0, flex: 1 }}>My clients{r.partner?.name ? ` — ${r.partner.name}` : ''}</h1>
+        {!preview && <a href="/account/member" style={{ textDecoration: 'underline', fontSize: 14 }}>Member portal</a>}
         <a className="btn" href={`/partner/statement${preview ? `?as=${encodeURIComponent(asked)}` : ''}`}>Monthly statement</a>
         <PartnerSignOut />
       </div>
