@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import ProductCard from '../../components/ProductCard';
 import { COLLECTIONS, collectionFilter } from '../../lib/constants';
 import { matchesQuery } from '../../lib/search-terms';
-import { groupByModel } from '../../lib/group-units';
+import { groupByModel, vestaLast } from '../../lib/group-units';
 
 const PRICE_BANDS = [
   { id: '', label: 'Any price' },
@@ -68,7 +68,7 @@ export default function ShopClient({ units, cats, makes, initialCollection, init
     if (sort === 'lo') g.sort((a, b) => a.minPrice - b.minPrice);
     else if (sort === 'hi') g.sort((a, b) => b.maxPrice - a.maxPrice);
     else g.reverse(); // newest = most recently added models first
-    return g;
+    return vestaLast(g); // Vesta's range always below our own stock
   }, [units, q, collection, cat, style, cond, band, make, sort]);
 
   const totalUnits = groups.reduce((n, g) => n + g.count, 0);
