@@ -1,6 +1,7 @@
 'use client';
 import { Fragment, useEffect, useState } from 'react';
 import Receipts from './Receipts';
+import OpsSection from './OpsSection';
 
 const CATS = ['Wages', 'Rent / storage', 'Utilities', 'Insurance', 'Software', 'Truck (lease, plates, upkeep)', 'Fuel', 'Delivery (carriers we pay)',
   'Tools / supplies', 'Advertising - Google', 'Advertising - Facebook / Instagram', 'Advertising - Other', 'Card & bank fees', 'Interest charges', 'Loan repayment', 'Owner draw - Ravi', 'Owner draw - Sai', 'Other'];
@@ -175,6 +176,7 @@ export default function Bankroll({ initial }) {
       {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
       {msg && <div className="notice-box" style={{ marginTop: 10 }}>{msg}</div>}
 
+      <OpsSection scope="fin" id="thru" title="Sent or received through the bank — not showing yet" defaultOpen>
       <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Sent or received through the bank — not showing yet</h2>
         <form onSubmit={addThru} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'end' }}>
@@ -196,7 +198,9 @@ export default function Bankroll({ initial }) {
           When the bank shows the line, press <b>Bank shows it</b> and the category and name are put on it, so you do not type it twice.
         </p>
       </div>
+      </OpsSection>
 
+      <OpsSection scope="fin" id="live" title="Live transactions" defaultOpen>
       <div className="panel" style={{ marginTop: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
           <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Live transactions</h2>
@@ -310,8 +314,11 @@ export default function Bankroll({ initial }) {
           New bank lines show here after <b>Get live balance</b>. Pick a category on any bank line; choose <b>Wages / salary</b> and name who was paid to put it on that person&apos;s payroll balance.
         </p>
       </div>
+      </OpsSection>
 
-      <Receipts d={d} setD={setD} />
+      <OpsSection scope="fin" id="receipts" title="Receipts" defaultOpen>
+        <Receipts d={d} setD={setD} />
+      </OpsSection>
 
       <div className="panel" style={{ marginTop: 18 }}>
         <b>Payroll</b>{' '}
@@ -347,6 +354,7 @@ export default function Bankroll({ initial }) {
       </details>
 
       {open.length > 0 && (
+        <OpsSection scope="fin" id="onway" title="On its way through the bank" count={open.length} defaultOpen>
         <div className="panel" style={{ marginTop: 18 }}>
           <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>On its way through the bank ({open.length})</h2>
           <div className="table-wrap"><table className="admin"><tbody>
@@ -362,6 +370,7 @@ export default function Bankroll({ initial }) {
               </tr>))}
           </tbody></table></div>
         </div>
+        </OpsSection>
       )}
 
     </div>

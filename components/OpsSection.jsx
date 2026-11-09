@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 
-// One foldable section of the Operations page.
+// One foldable section. Built for the Operations page and used by the Financial page too.
 //
 // That page is nine tools stacked end to end — orders, intake, reconciliation,
 // salvage, drivers, members, clearance, reservations — and on most days you want
@@ -11,32 +11,35 @@ import { useEffect, useState } from 'react';
 // Each section remembers its own state per browser, so the shape somebody sets
 // up on Monday is still there on Tuesday.
 //
-// EVERYTHING starts shut, Orders included. Leaving orders open sounded helpful
+// On Operations EVERYTHING starts shut, Orders included. Leaving orders open sounded helpful
 // and wasn't: 139 rows of table pushed the other nine bars so far down the page
 // that the folds looked like they had never shipped. A page that opens as ten
 // bars is the point.
-const KEY = (id) => `ops-fold:${id}`;
+//
+// `scope` keeps one page's folds apart from another's: Operations is 'ops' (the default, so its saved choices
+// are untouched), the Financial page is 'fin'. Each scope has its own "open all / close all" broadcast.
+const KEY = (scope, id) => `${scope}-fold:${id}`;
 
-export default function OpsSection({ id, title, count, children, defaultOpen = false }) {
+export default function OpsSection({ id, title, count, children, defaultOpen = false, scope = 'ops' }) {
   // Server and first client render must agree, so the stored preference is
   // applied after mount rather than read during render.
   const [open, setOpen] = useState(defaultOpen);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(KEY(id));
+      const saved = localStorage.getItem(KEY(scope, id));
       if (saved === 'open' || saved === 'shut') setOpen(saved === 'open');
     } catch { /* private window — defaults are fine */ }
     // Open all / close all, broadcast from the bar at the top of the page.
     const all = (e) => setOpen(e.detail === 'open');
-    window.addEventListener('ops-fold-all', all);
-    return () => window.removeEventListener('ops-fold-all', all);
-  }, [id]);
+    window.addEventListener(`${scope}-fold-all`, all);
+    return () => window.removeEventListener(`${scope}-fold-all`, all);
+  }, [id, scope]);
 
   function toggle() {
     setOpen((v) => {
       const next = !v;
-      try { localStorage.setItem(KEY(id), next ? 'open' : 'shut'); } catch { /* noop */ }
+      try { localStorage.setItem(KEY(scope, id), next ? 'open' : 'shut'); } catch { /* noop */ }
       return next;
     });
   }
