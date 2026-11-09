@@ -100,6 +100,13 @@ export default function Bankroll({ initial }) {
       note: thru.note || (thru.payee ? `${thru.direction === 'out' ? 'To' : 'From'} ${thru.payee}` : ''), category: thru.direction === 'out' ? thru.category : '', payee: thru.payee }, 'thru');
     if (r) { setThru((t) => ({ ...t, amount: '', payee: '', note: '' })); setMsg('Added. It counts in the bankroll now. When the bank shows it, press "Bank shows it" and it is sorted for you.'); }
   }
+  // An entry the bank balance already carries: stop it deducting, and (optionally) count it in the books under its category.
+  async function alreadyInBank(row, alsoBooks) {
+    const r = await call({ action: 'clear', id: row.entryId, line: null }, 'row');
+    if (!r) return;
+    if (alsoBooks) { const r2 = await call({ action: 'entry_to_books', id: row.entryId }, 'row'); if (r2) setMsg('Done. It no longer deducts, and it is counted in the books.'); }
+    else setMsg('It no longer deducts from the bankroll.');
+  }
   async function changePaymentMethod(row, method) {
     if (!window.confirm(`Change this ${row.invoice?.number || ''} payment from cash to ${method === 'etransfer' ? 'an e-transfer' : method}? It comes out of the cash total. The invoice and the amount do not change.`)) return;
     const r = await call({ action: 'payment_method', paymentId: row.paymentId, method }, 'cat');
@@ -250,6 +257,11 @@ export default function Bankroll({ initial }) {
                       </select>
                     ) : l.entryId ? (
                       <span>{l.category || ''}
+                        {l.openEntry && (
+                          <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6, flexWrap: 'wrap' }}>
+                            {l.category && l.outgoing && <button type="button" className="dash-filter active" disabled={!!busy} onClick={(e) => { e.stopPropagation(); alreadyInBank(l, true); }} title="For a payment the bank balance already includes: stops it deducting from the bankroll and counts it in the books under its category.">Already in the bank: don&apos;t deduct, count in books</button>}
+                            <button type="button" className="dash-filter" disabled={!!busy} onClick={(e) => { e.stopPropagation(); alreadyInBank(l, false); }} title="Stops it deducting from the bankroll. Nothing is added to the books.">Stop deducting</button>
+                          </span>)}
                         {l.recordable && <button type="button" className="dash-filter active" style={{ marginLeft: 6 }} disabled={!!busy} onClick={(e) => { e.stopPropagation(); call({ action: 'entry_to_books', id: l.entryId }, 'cat'); }} title="Counts it in that category's total in the books. The bankroll does not change.">Count in the books</button>}
                         {l.inBooks && <span className="hint" style={{ marginLeft: 6 }}>in the books</span>}
                       </span>

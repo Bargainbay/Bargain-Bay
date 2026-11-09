@@ -5076,6 +5076,8 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
 - **An older "through the bank" entry that should not deduct**: press **Bank shows it** on it (Not at the bank yet list). With no bank line to match, that simply stops it
   counting in the bankroll; the entry stays in the Live list greyed as "Through the bank (in the bank figure)" with its category and who it was paid to. (The list now shows the
   entry's category and payee; before, a cleared entry showed neither.) It does NOT create an expense: only a matched bank line does.
+  **On the Live list itself** an open through-the-bank entry carries **Already in the bank: don't deduct, count in books** (clear + `entry_to_books` in one press) and
+  **Stop deducting** beside its category, so nobody has to find the separate "Not at the bank yet" panel.
   **To count it in a category's total** (Ravi's owner draw): **Count in the books** on that greyed row (`recordEntryAsExpense`, action `entry_to_books`) writes ONE expense
   (`ext_id` `bankroll-entry:<id>`, source `manual`) in its category, dated to the entry. Refused while the entry is still open (it would be counted twice) and never written
   twice. It moves the bankroll by nothing, because the bankroll is the bank + the till + open entries and never reads expenses.
