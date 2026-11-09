@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
-import { partnerReport, statementFor } from '../../../lib/referral-partners';
+import { partnerReport, statementFor, rateText } from '../../../lib/referral-partners';
 import { money, torontoToday } from '../../../lib/constants';
 import PrintButton from '../../../components/PrintButton';
 
@@ -40,7 +40,7 @@ export default async function StatementPage({ searchParams }) {
         <tbody>
           {st.orders.length === 0 && <tr><td colSpan={10} className="hint">No orders this month.</td></tr>}
           {st.orders.map((o) => (<tr key={o.number}><td>{o.number}</td><td>{String(o.at || '').slice(0, 10)}</td><td>{o.client}</td><td>{o.items || '—'}</td>
-            <td>{money(o.subtotal)}</td><td>{o.discount > 0 ? money(o.discount) : '—'}</td><td>{money(o.profit)}</td><td>{o.ratePct}%</td><td>{o.statusLabel}{o.earned ? '' : ' (pending)'}</td><td>{money(o.commission)}</td></tr>))}
+            <td>{money(o.subtotal)}</td><td>{o.discount > 0 ? money(o.discount) : '—'}</td><td>{money(o.profit)}</td><td>{rateText(o)}</td><td>{o.statusLabel}{o.earned ? '' : ' (pending)'}</td><td>{money(o.commission)}</td></tr>))}
         </tbody>
       </table></div>
       <h2 style={{ fontSize: 17 }}>Payments to you</h2>
