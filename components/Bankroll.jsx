@@ -248,6 +248,11 @@ export default function Bankroll({ initial }) {
                         <option value="cheque">It was a cheque</option>
                         <option value="other">Other</option>
                       </select>
+                    ) : l.entryId ? (
+                      <span>{l.category || ''}
+                        {l.recordable && <button type="button" className="dash-filter active" style={{ marginLeft: 6 }} disabled={!!busy} onClick={(e) => { e.stopPropagation(); call({ action: 'entry_to_books', id: l.entryId }, 'cat'); }} title="Counts it in that category's total in the books. The bankroll does not change.">Count in the books</button>}
+                        {l.inBooks && <span className="hint" style={{ marginLeft: 6 }}>in the books</span>}
+                      </span>
                     ) : (l.category || '')}
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 700, color: l.noMoney ? 'var(--muted)' : undefined }}>{l.noMoney && l.tag === 'Till count' ? cad(l.amount) : signed(l.amount)}</td>

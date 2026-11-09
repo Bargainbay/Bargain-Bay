@@ -5,7 +5,7 @@ import { query } from '../lib/db.js';
 import { upsertExpense } from '../lib/finance.js';
 import { mapActivity, recordActivity, deleteActivity, sortIncome, splitActivity, hasExpense } from '../lib/bank-activity.js';
 import { parseInteracReceived, nameTransfersFromEmail, matchTransfers } from '../lib/interac-names.js';
-import { bankrollSummary } from '../lib/bankroll.js';
+import { bankrollSummary, addEntry, clearEntry } from '../lib/bankroll.js';
 
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
 
@@ -202,5 +202,40 @@ test('EACH ACTIVE TRUCK GETS ITS OWN FUEL CATEGORY, AND A RETIRED ONE DOES NOT',
     const extra = await getExtraCategories();
     assert(extra.includes('Fuel - Green F150') && extra.includes('Packaging') && !extra.some((c) => /Old van/.test(c)));
     for (const c of ['Fuel', 'Delivery (carriers we pay)', 'Advertising - Google', 'Advertising - Facebook / Instagram']) assert(EXPENSE_CATEGORIES.includes(c), c);
+  } finally { await done(); }
+});
+
+test('A THROUGH-THE-BANK ENTRY MARKED AS ALREADY IN THE BANK FIGURE STOPS DEDUCTING BUT STAYS LISTED WITH ITS CATEGORY', async () => {
+  const { done } = await withTestDb();
+  try {
+    const id = await addEntry({ date: today(), kind: 'pending', amount: -500, note: 'Dividend', by: 't', category: 'Owner draw - Ravi', payee: 'Ravi' });
+    const before = await bankrollSummary(today(), { days: 7 });
+    equal(before.total, -500, 'counted while still open');
+    await clearEntry(id, 't', null);
+    const after = await bankrollSummary(today(), { days: 7 });
+    equal(after.total, 0, 'no longer deducted');
+    const row = after.live.find((l) => String(l.key) === `b${id}`);
+    assert(row && row.noMoney && row.category === 'Owner draw - Ravi', 'still listed, greyed, with its category');
+  } finally { await done(); }
+});
+
+test('A CLEARED ENTRY CAN BE COUNTED IN THE BOOKS ONCE, UNDER ITS CATEGORY, WITHOUT MOVING THE BANKROLL', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { recordEntryAsExpense } = await import('../lib/bankroll.js');
+    const id = await addEntry({ date: today(), kind: 'pending', amount: -500, note: 'Dividend', by: 't', category: 'Owner draw - Ravi', payee: 'Ravi' });
+    let threw = false; try { await recordEntryAsExpense(id, 't'); } catch { threw = true; }
+    assert(threw, 'refused while it is still open (it would count twice)');
+    await clearEntry(id, 't', null);
+    const total = (await bankrollSummary(today(), { days: 7 })).total;
+    const r = await recordEntryAsExpense(id, 't');
+    equal(r.amount, 500);
+    const ex = (await query(`SELECT category, amount FROM expenses`)).rows;
+    equal(ex.length, 1); equal(ex[0].category, 'Owner draw - Ravi'); equal(Number(ex[0].amount), 500);
+    const after = await bankrollSummary(today(), { days: 7 });
+    equal(after.total, total, 'the bankroll does not move');
+    assert(after.live.find((l) => l.entryId === id).inBooks, 'listed as in the books');
+    threw = false; try { await recordEntryAsExpense(id, 't'); } catch { threw = true; }
+    assert(threw, 'never twice');
   } finally { await done(); }
 });
