@@ -21,6 +21,7 @@ export default function Bankroll({ initial }) {
   const [msg, setMsg] = useState('');
   const [other, setOther] = useState({ kind: 'cash', direction: 'in', amount: '', note: '', date: initial.date });
   const [count, setCount] = useState('');
+  const [thru, setThru] = useState({ direction: 'out', amount: '', payee: '', category: 'Wages', note: '', date: initial.date });
   const [countDate, setCountDate] = useState(initial.date);
   const [payTo, setPayTo] = useState({});
   const [openRow, setOpenRow] = useState(null);
@@ -73,6 +74,16 @@ export default function Bankroll({ initial }) {
     const r = await call({ action: 'add', ...other }, 'other');
     if (r) { setOther((o) => ({ ...o, amount: '', note: '' })); setMsg('Added.'); }
   }
+  async function addThru(e) {
+    e.preventDefault();
+    const r = await call({ action: 'add', kind: 'pending', direction: thru.direction, amount: thru.amount, date: thru.date,
+      note: thru.note || (thru.payee ? `${thru.direction === 'out' ? 'To' : 'From'} ${thru.payee}` : ''), category: thru.direction === 'out' ? thru.category : '', payee: thru.payee }, 'thru');
+    if (r) { setThru((t) => ({ ...t, amount: '', payee: '', note: '' })); setMsg('Added. It counts in the bankroll now. When the bank shows it, press "Bank shows it" and it is sorted for you.'); }
+  }
+  async function promote(row, category) {
+    const r = await call({ action: 'promote', activityId: row.activityId, category }, 'cat');
+    if (r) setMsg('Sorted. It is now an expense in that category.');
+  }
   async function saveCount(e) {
     e.preventDefault();
     const r = await call({ action: 'add', kind: 'count', amount: count, date: countDate, note: 'Cash counted' }, 'count');
@@ -102,6 +113,10 @@ export default function Bankroll({ initial }) {
             ? <>Bank figure from <b>{ago(bank.minutesOld)}</b> ({new Date(bank.at).toLocaleString('en-CA')}).{bank.stale ? ' That is old — get the live balance before you trust the total.' : ''}</>
             : 'No bank balance has been read yet, so the total above leaves the bank out.'}
         </p>
+        {d.bankNewest && (
+          <p className="hint" style={{ margin: '6px 0 0' }}>
+            Newest line TD has sent us: <b>{d.bankNewest}</b>.{d.bankNewest < d.date ? <> Anything since is <b>not here yet</b>. TD passes lines on a business day at a time, so a weekend&apos;s e-transfers show up on Monday. Add them below so the bankroll is right now.</> : ''}
+          </p>)}
         <button className="btn accent" disabled={!!busy} onClick={() => call({ action: 'live' }, 'live')} style={{ marginTop: 8 }}>
           {busy === 'live' ? 'Asking the bank…' : 'Get live balance'}
         </button>
@@ -123,6 +138,28 @@ export default function Bankroll({ initial }) {
 
       {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
       {msg && <div className="notice-box" style={{ marginTop: 10 }}>{msg}</div>}
+
+      <div className="panel" style={{ marginTop: 18 }}>
+        <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Sent or received through the bank — not showing yet</h2>
+        <form onSubmit={addThru} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'end' }}>
+          <label>Which way<br />
+            <select value={thru.direction} onChange={(e) => setThru({ ...thru, direction: e.target.value })}>
+              <option value="out">I sent money</option><option value="in">I received money</option></select></label>
+          <label>Amount<br /><input type="number" step="0.01" min="0" value={thru.amount} onChange={(e) => setThru({ ...thru, amount: e.target.value })} required style={{ width: 110 }} /></label>
+          <label>{thru.direction === 'out' ? 'Paid to' : 'From'}<br /><input list="live-names" value={thru.payee} onChange={(e) => setThru({ ...thru, payee: e.target.value })} placeholder="name" style={{ width: 150 }} /></label>
+          {thru.direction === 'out' && (
+            <label>Category<br />
+              <select value={thru.category} onChange={(e) => setThru({ ...thru, category: e.target.value })}>
+                {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}</select></label>)}
+          <label>Date<br /><input type="date" value={thru.date} onChange={(e) => setThru({ ...thru, date: e.target.value })} /></label>
+          <label style={{ flex: '1 1 160px' }}>Note<br /><input value={thru.note} onChange={(e) => setThru({ ...thru, note: e.target.value })} style={{ width: '100%' }} /></label>
+          <button className="btn accent" disabled={!!busy}>{busy === 'thru' ? 'Adding…' : 'Add'}</button>
+        </form>
+        <p className="hint" style={{ margin: '8px 0 0' }}>
+          For what you did today that TD has not passed on yet (it lags by a business day). It counts in the bankroll straight away.
+          When the bank shows the line, press <b>Bank shows it</b> and the category and name are put on it, so you do not type it twice.
+        </p>
+      </div>
 
       <div className="panel" style={{ marginTop: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -160,6 +197,11 @@ export default function Bankroll({ initial }) {
                         )}
                         {l.inPayroll && <span className="hint" style={{ marginLeft: 6 }}>in payroll</span>}
                       </>
+                    ) : l.activityId ? (
+                      <select value="" disabled={!!busy} onChange={(e) => e.target.value && promote(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="The bank calls this a transfer. Pick what it was to count it as an expense.">
+                        <option value="">Sort this…</option>
+                        {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
+                      </select>
                     ) : (l.category || '')}
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 700, color: l.noMoney ? 'var(--muted)' : undefined }}>{l.noMoney && l.tag === 'Till count' ? cad(l.amount) : signed(l.amount)}</td>
@@ -218,11 +260,11 @@ export default function Bankroll({ initial }) {
           <div className="table-wrap"><table className="admin"><tbody>
             {open.map((e) => (
               <tr key={e.id}>
-                <td>{e.date}</td><td>{e.note || '—'}</td>
+                <td>{e.date}</td><td>{e.note || '—'}{e.category && <div className="hint" style={{ margin: 0, fontSize: 12 }}>will be sorted as {catLabel(e.category)}{e.payee ? ` · ${e.payee}` : ''}</div>}</td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>{signed(e.amount)}</td>
                 <td style={{ fontSize: 12 }}>{e.bankShows ? <b style={{ color: 'var(--c1)' }}>The bank now shows {cad(e.bankShows.gross)} to {e.bankShows.who} on {e.bankShows.date}</b> : ''}</td>
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <button className="dash-filter active" disabled={!!busy} onClick={() => call({ action: 'clear', id: e.id }, 'row')}>Bank shows it</button>{' '}
+                  <button className="dash-filter active" disabled={!!busy} onClick={() => call({ action: 'clear', id: e.id, line: e.bankShows ? { kind: e.bankShows.kind, id: e.bankShows.id } : null }, 'row')}>Bank shows it</button>{' '}
                   <button className="dash-filter" disabled={!!busy} onClick={() => window.confirm('Void this entry?') && call({ action: 'void', id: e.id }, 'row')}>Void</button>
                 </td>
               </tr>))}

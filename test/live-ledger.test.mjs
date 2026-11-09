@@ -79,3 +79,46 @@ test('THE LIVE LIST SHOWS PENDING AND INCOMING LINES, WHO FROM, AND A CASH SALE 
     equal((await bankrollSummary(d, { days: 1 })).live.filter((l) => l.tag === 'Pending out').length, 0, 'a retracted pending line goes away');
   } finally { done(); }
 });
+
+test('A TRANSFER THE BANK CALLS A TRANSFER BECOMES AN EXPENSE ONLY WHEN A PERSON SORTS IT, WAGES WITHOUT HST, AND THE BANK RE-SENDING IT CHANGES NOTHING', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { promoteActivity } = await import('../lib/bank-activity.js');
+    await recordActivity(mapActivity({ transaction_id: 'tr1', date: '2026-11-06', amount: 720, name: 'SEND E-TFR *tgn SALA', original_description: 'SEND E-TFR *tgn SALA' }));
+    await recordActivity(mapActivity({ transaction_id: 'tr2', date: today(), amount: 50, pending: true, name: 'SEND E-TFR *p' }));
+    const id = (await query(`SELECT id FROM bank_activity WHERE ext_id = 'plaid:tr1'`)).rows[0].id;
+    assert((await bankrollSummary(today(), { days: 30 })).live.some((l) => l.activityId === id), 'a settled transfer offers to be sorted');
+    const r = await promoteActivity(id, { category: 'Wages', by: 'a' });
+    equal(r.gross, 720);
+    const e = (await query(`SELECT * FROM expenses WHERE ext_id = 'plaid:tr1'`)).rows[0];
+    equal(e.category, 'Wages'); equal(Number(e.tax), 0); equal(Number(e.amount), 720); assert(e.reviewed_at); equal(e.cat_source, 'manual');
+    equal((await query(`SELECT 1 FROM bank_activity WHERE ext_id = 'plaid:tr1'`)).rowCount, 0, 'no longer an activity line');
+    const pendingId = (await query(`SELECT id FROM bank_activity WHERE ext_id = 'plaid:tr2'`)).rows[0].id;
+    let msg = ''; try { await promoteActivity(pendingId, { category: 'Wages' }); } catch (x) { msg = x.message; }
+    assert(/pending/.test(msg), 'a pending line cannot be sorted yet');
+  } finally { done(); }
+});
+
+test('"BANK SHOWS IT" HANDS THE ENTRY\'S CATEGORY AND NAME TO THE LINE, EVEN A TRANSFER LINE', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { addEntry, clearEntry } = await import('../lib/bankroll.js');
+    const eid = await addEntry({ date: '2026-11-08', kind: 'pending', amount: -720, note: 'To Ravi', category: 'Wages', payee: 'Ravi', by: 'a' });
+    await recordActivity(mapActivity({ transaction_id: 'tr9', date: '2026-11-09', amount: 720, name: 'SEND E-TFR *x' }));
+    const s = await bankrollSummary('2026-11-09');
+    const hint = s.entries.find((e) => e.id === eid).bankShows;
+    assert(hint && hint.kind === 'activity', 'the transfer line is offered as what the bank now shows');
+    await clearEntry(eid, 'a', { kind: hint.kind, id: hint.id });
+    const e = (await query(`SELECT * FROM expenses WHERE ext_id = 'plaid:tr9'`)).rows[0];
+    equal(e.category, 'Wages'); equal(e.payee_override, 'Ravi'); equal(Number(e.tax), 0);
+    equal((await bankrollSummary('2026-11-09')).pending, 0, 'and it stops counting twice');
+  } finally { done(); }
+});
+
+test('THE PAGE KNOWS THE NEWEST LINE THE BANK HAS SENT, SO A WEEKEND GAP IS SAID OUT LOUD', async () => {
+  const { done } = await withTestDb();
+  try {
+    await recordActivity(mapActivity({ transaction_id: 'n1', date: '2026-11-06', amount: -10, name: 'X' }));
+    equal((await bankrollSummary('2026-11-08')).bankNewest, '2026-11-06');
+  } finally { done(); }
+});

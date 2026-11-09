@@ -5,6 +5,7 @@ import { getSession, canKeepBooks } from '../../../../lib/auth';
 import { audit } from '../../../../lib/audit';
 import { addEntry, clearEntry, voidEntry } from '../../../../lib/bankroll';
 import { loadBankroll } from '../../../../lib/bankroll-load';
+import { promoteActivity } from '../../../../lib/bank-activity';
 import { liveBalances, refreshFromBank, syncPlaidTransactions } from '../../../../lib/plaid';
 
 export const dynamic = 'force-dynamic';
@@ -34,10 +35,13 @@ export async function POST(req) {
     if (b.action === 'add') {
       const amt = Math.abs(Number(b.amount));
       const signed = b.direction === 'out' && b.kind !== 'count' ? -amt : amt;
-      const id = await addEntry({ date: b.date, kind: b.kind, amount: signed, note: b.note, by });
+      const id = await addEntry({ date: b.date, kind: b.kind, amount: signed, note: b.note, by, category: b.category, payee: b.payee });
       await audit(session, { action: 'bankroll.add', entity: 'bankroll', entityId: String(id), summary: `${{ cash: 'Cash', count: 'Cash count', pending: 'Not at the bank yet' }[b.kind] || b.kind}: ${signed} ${b.note || ''}`.trim() });
     } else if (b.action === 'clear') {
-      await clearEntry(b.id, by);
+      await clearEntry(b.id, by, b.line || null);
+    } else if (b.action === 'promote') {
+      const r = await promoteActivity(b.activityId, { category: b.category, by });
+      await audit(session, { action: 'bank.promote', entity: 'expense', entityId: r.extId, summary: `Bank transfer $${r.gross} sorted as ${b.category}` });
     } else if (b.action === 'void') {
       await voidEntry(b.id, by);
       await audit(session, { action: 'bankroll.void', entity: 'bankroll', entityId: String(b.id), summary: 'Voided a bankroll entry' });
