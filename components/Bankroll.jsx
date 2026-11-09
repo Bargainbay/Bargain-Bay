@@ -4,6 +4,7 @@ import Receipts from './Receipts';
 
 const CATS = ['Wages', 'Rent / storage', 'Utilities', 'Insurance', 'Software', 'Truck (lease, plates, upkeep)', 'Fuel / delivery',
   'Tools / supplies', 'Advertising', 'Card & bank fees', 'Interest charges', 'Loan repayment', 'Owner draw', 'Other'];
+const NEW_CAT = '__new';
 const catLabel = (c) => (c === 'Wages' ? 'Wages / salary' : c);
 
 // The first thing on the Financial page: what we have right now, then the way to add to it.
@@ -26,6 +27,17 @@ export default function Bankroll({ initial }) {
   const [countDate, setCountDate] = useState(initial.date);
   const [payTo, setPayTo] = useState({});
   const [openRow, setOpenRow] = useState(null);
+  const cats = [...CATS, ...(d.customCategories || []).filter((c) => !CATS.includes(c))];
+  // Picking "+ Add a category…" asks for a name, saves it for everybody, then carries on with it as the choice.
+  async function withCategory(value, then) {
+    if (value !== NEW_CAT) return then(value);
+    const name = window.prompt('Name the new category (for example "Packaging")');
+    if (!name || !name.trim()) return null;
+    const r = await call({ action: 'add_category', name }, 'cat');
+    if (!r) return null;
+    const added = (r.customCategories || []).find((c) => c.toLowerCase() === name.trim().replace(/\s+/g, ' ').toLowerCase()) || name.trim();
+    return then(added);
+  }
   const [split, setSplit] = useState(null); // { key, id, total, parts: [{ category, amount }] }
   const startSplit = (l) => setSplit({ key: l.key, id: l.activityId, total: Math.round(Math.abs(l.amount) * 100) / 100, parts: [{ category: '', amount: '' }, { category: '', amount: '' }] });
   const splitLeft = split ? Math.round((split.total - split.parts.reduce((t, p) => t + (Number(p.amount) || 0), 0)) * 100) / 100 : 0;
@@ -161,8 +173,8 @@ export default function Bankroll({ initial }) {
           <label>{thru.direction === 'out' ? 'Paid to' : 'From'}<br /><input list="live-names" value={thru.payee} onChange={(e) => setThru({ ...thru, payee: e.target.value })} placeholder="name" style={{ width: 150 }} /></label>
           {thru.direction === 'out' && (
             <label>Category<br />
-              <select value={thru.category} onChange={(e) => setThru({ ...thru, category: e.target.value })}>
-                {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}</select></label>)}
+              <select value={thru.category} onChange={(e) => withCategory(e.target.value, (v) => setThru((t) => ({ ...t, category: v })))}>
+                {cats.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}<option value={NEW_CAT}>+ Add a category…</option></select></label>)}
           <label>Date<br /><input type="date" value={thru.date} onChange={(e) => setThru({ ...thru, date: e.target.value })} /></label>
           <label style={{ flex: '1 1 160px' }}>Note<br /><input value={thru.note} onChange={(e) => setThru({ ...thru, note: e.target.value })} style={{ width: '100%' }} /></label>
           <button className="btn accent" disabled={!!busy}>{busy === 'thru' ? 'Adding…' : 'Add'}</button>
@@ -197,9 +209,9 @@ export default function Bankroll({ initial }) {
                   <td onClick={(e) => e.stopPropagation()}>
                     {l.expenseId ? (
                       <>
-                        <select value={l.category || ''} disabled={!!busy} onChange={(e) => e.target.value && setCategory(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }}>
+                        <select value={l.category || ''} disabled={!!busy} onChange={(e) => e.target.value && withCategory(e.target.value, (v) => setCategory(l, v))} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }}>
                           <option value="">Choose…</option>
-                          {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
+                          {cats.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}<option value={NEW_CAT}>+ Add a category…</option>
                         </select>
                         {l.category === 'Wages' && !l.inPayroll && (
                           <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
@@ -210,10 +222,10 @@ export default function Bankroll({ initial }) {
                         {l.inPayroll && <span className="hint" style={{ marginLeft: 6 }}>in payroll</span>}
                       </>
                     ) : l.activityId ? (
-                      <select value="" disabled={!!busy} onChange={(e) => { const v = e.target.value; if (v === '__split') startSplit(l); else if (v) promote(l, v); }} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="The bank calls this a transfer. Pick what it was to count it as an expense.">
+                      <select value="" disabled={!!busy} onChange={(e) => { const v = e.target.value; if (v === '__split') startSplit(l); else if (v) withCategory(v, (c) => promote(l, c)); }} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="The bank calls this a transfer. Pick what it was to count it as an expense.">
                         <option value="">Sort this…</option>
                         <option value="__split">Split into several…</option>
-                        {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
+                        {cats.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}<option value={NEW_CAT}>+ Add a category…</option>
                       </select>
                     ) : l.incomeId ? (
                       <select value={l.incomeCategory || ''} disabled={!!busy} onChange={(e) => sortIncomeLine(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="What was this money for?">
@@ -230,9 +242,9 @@ export default function Bankroll({ initial }) {
                       <b>Split {cad(split.total)} into parts</b>
                       {split.parts.map((p, i) => (
                         <div key={i} style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                          <select value={p.category} onChange={(e) => setSplit((s) => ({ ...s, parts: s.parts.map((x, j) => (j === i ? { ...x, category: e.target.value } : x)) }))} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }}>
+                          <select value={p.category} onChange={(e) => withCategory(e.target.value, (v) => setSplit((s) => ({ ...s, parts: s.parts.map((x, j) => (j === i ? { ...x, category: v } : x)) })))} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }}>
                             <option value="">Category…</option>
-                            {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
+                            {cats.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}<option value={NEW_CAT}>+ Add a category…</option>
                           </select>
                           <input type="number" step="0.01" placeholder="amount" value={p.amount} onChange={(e) => setSplit((s) => ({ ...s, parts: s.parts.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)) }))} style={{ width: 120, minHeight: 34, padding: '4px 8px', fontSize: 14 }} />
                           {split.parts.length > 2 && <button type="button" className="dash-filter" onClick={() => setSplit((s) => ({ ...s, parts: s.parts.filter((_, j) => j !== i) }))}>Remove</button>}

@@ -155,3 +155,16 @@ test('ONE TRANSFER SPLIT INTO TWO CATEGORIES: PARTS MUST ADD UP, EACH BECOMES AN
     assert(await hasExpense('plaid:sp1'), 'the original bank id is recognised as already sorted');
   } finally { await done(); }
 });
+
+test('A CATEGORY THE OFFICE ADDS IS KEPT, NOT DUPLICATED, AND A NAME THE BOOKS TREAT SPECIALLY IS REFUSED', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { addCustomCategory, getCustomCategories } = await import('../lib/finance.js');
+    equal(await addCustomCategory('  Packaging '), 'Packaging');
+    equal(await addCustomCategory('packaging'), 'Packaging', 'same name is not added twice');
+    equal(await addCustomCategory('Utilities'), 'Utilities', 'a built-in is not added as a custom one');
+    equal((await getCustomCategories()).length, 1);
+    let threw = false; try { await addCustomCategory('Owner loan top-up'); } catch { threw = true; }
+    assert(threw, 'a name with loan/owner/draw/wage is refused');
+  } finally { await done(); }
+});

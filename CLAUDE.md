@@ -5055,6 +5055,10 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
 - **A transfer can be SPLIT** (`splitActivity`, action `split`, "Split into several…" in the Sort this select): $3,000 sent as $2,000 interest + $1,000 owner
   dividend. Two or more parts, each a category and an amount, which must add up to the cent. Each part is its own expense (`ext_id` = `<bank id>#1`, `#2`...);
   `hasExpense` / `isDecidedExpense` match the `#` suffix so the bank re-sending the original adds nothing. Loan interest is "Interest charges", a dividend "Owner draw".
+- **Categories can be added** (`addCustomCategory` / `getCustomCategories` in `lib/finance.js`, settings key `custom_expense_categories`, action `add_category`): every category
+  select on the Financial page ends with "+ Add a category…". Kept once, case-insensitive, shared by everybody. **A name containing loan / repayment / owner / draw / wage /
+  payroll / subcontract is refused**, because the ledger routes a category by those words and the new one would be booked somewhere unintended. Not yet offered on
+  `/admin/categorize`, the rules screens or Sarah's tools.
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
   from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
 - **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the
