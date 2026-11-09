@@ -5065,6 +5065,9 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
   `bank_activity` until a person sorts it, so the Live list said "Not known" for exactly those lines. It now also names unsorted `bank_activity` money-out lines
   (`who_override`), pairing them with the same emails and the same never-guess rule (one email, one line). It also reads the second Interac wording,
   "NAME has accepted your transfer of $X" (recipient accepted by hand; NAME is the contact name as typed, often a first name).
+- **A cash sale that was not cash** (`changeInvoicePaymentMethod`, action `payment_method`, the "Not cash?…" select on a Cash sale row): relabels one payment's
+  METHOD only (e-transfer / card / cheque / other). Amount, date, invoice status and units are untouched, so it works on a settled invoice, which the payment-remove
+  button cannot. It then leaves the cash list and the till total. Store-credit payments cannot be relabelled. Audited.
 - **A till count can be for a past day** ("yesterday's till was $1,970"): a count dated before the day it was entered is that day's CLOSING figure, so everything
   from the start of the next day (cash sales, receipts, entries) is added to it; a count made today is the till right now.
 - **Payroll — owed and paid** (`lib/pay-ledger.js`, migration `0055_pay_ledger`, `/api/admin/pay`, `components/Payroll.jsx`): per person, owed (typed from the

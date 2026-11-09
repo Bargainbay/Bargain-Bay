@@ -100,6 +100,11 @@ export default function Bankroll({ initial }) {
       note: thru.note || (thru.payee ? `${thru.direction === 'out' ? 'To' : 'From'} ${thru.payee}` : ''), category: thru.direction === 'out' ? thru.category : '', payee: thru.payee }, 'thru');
     if (r) { setThru((t) => ({ ...t, amount: '', payee: '', note: '' })); setMsg('Added. It counts in the bankroll now. When the bank shows it, press "Bank shows it" and it is sorted for you.'); }
   }
+  async function changePaymentMethod(row, method) {
+    if (!window.confirm(`Change this ${row.invoice?.number || ''} payment from cash to ${method === 'etransfer' ? 'an e-transfer' : method}? It comes out of the cash total. The invoice and the amount do not change.`)) return;
+    const r = await call({ action: 'payment_method', paymentId: row.paymentId, method }, 'cat');
+    if (r) setMsg('Changed. It no longer counts as cash.');
+  }
   async function sortIncomeLine(row, category) {
     const r = await call({ action: 'sort_income', activityId: row.incomeId, category }, 'cat');
     if (r) setMsg('Saved.');
@@ -233,6 +238,14 @@ export default function Bankroll({ initial }) {
                         {INCOME_CATS.map((c) => <option key={c} value={c}>{c}</option>)}
                         {l.incomeCategory && !INCOME_CATS.includes(l.incomeCategory) && <option value={l.incomeCategory}>{l.incomeCategory}</option>}
                         <option value="__other">Other (write it in)…</option>
+                      </select>
+                    ) : l.paymentId ? (
+                      <select value="" disabled={!!busy} onClick={(e) => e.stopPropagation()} onChange={(e) => e.target.value && changePaymentMethod(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }} title="Recorded as cash by mistake? Say how it was really paid. The invoice and the amount stay as they are.">
+                        <option value="">Not cash?…</option>
+                        <option value="etransfer">It was an e-transfer</option>
+                        <option value="card">It was a card</option>
+                        <option value="cheque">It was a cheque</option>
+                        <option value="other">Other</option>
                       </select>
                     ) : (l.category || '')}
                   </td>
