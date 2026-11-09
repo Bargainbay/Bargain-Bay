@@ -5258,6 +5258,14 @@ Employee Account on the tiered collected-sales plan) so one account never earns 
   shown with a Copy button on `/partner`. `/join/<code>` sets an httpOnly 30-day cookie `bb_partner` (active partners only) and redirects to `/resellers`. The account that then
   signs up (password or Google/Microsoft) or an existing signed-in one that applies for membership is put under the partner (`attachPartnerFromCookie`). **An account already
   under a partner is never moved**, and the attach never throws into signup. It links the CUSTOMER record on first sight; it does not approve membership.
+- **Part 2** (2026-11-09, migration `0062_partner_features`, **run Run schema migration**): (1) **Payments:** `partner_payments`, recorded by an admin on
+  `/admin/referral-partners` ("Record a payment" = money ALREADY sent; it moves nothing), voided never deleted; balance = EARNED less payments, can go negative
+  after a refund. (2) **Earned vs pending:** earned = order `delivered` AND no open/partial invoice; everything else counted is pending. (3) **Alerts:** a signup
+  through the link emails the owner and the partner (best effort, awaited, never throws into signup); the page shows opened / signed up / applied / approved.
+  (4) **Contact details** of his own clients (email, phone) on his page. (5) **Statement:** `/partner/statement?month=` (print) and
+  `/api/partner/statement` (CSV), cut from `partnerReport` so they cannot disagree; CSV cells are neutralised against formulas. (6) **Ask for a quote or order**
+  (`/api/partner/request`): an UNASSIGNED customer follow-up + email to the owner; only for the partner's own clients, 10/hour. (7) **Visits:** `/join` records one
+  row per random browser id (`bb_pv`) per day, bots ignored. Member pricing is NOT automatic: his clients still need approval on the Resellers page.
 - Clients are put under a partner by an admin (search customers, reason required, audit-logged). **Not built:** auto-assigning a client who signs up online
   naming the partner (the signup "Referred by" box is not on main yet), and a payout/statement record (nothing records that commission was paid).
 

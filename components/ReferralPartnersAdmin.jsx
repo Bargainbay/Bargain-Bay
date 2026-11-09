@@ -11,6 +11,9 @@ export default function ReferralPartnersAdmin() {
   const [pick, setPick] = useState('');          // partner email whose clients are being added
   const [q, setQ] = useState('');
   const [found, setFound] = useState([]);
+  const [payFor, setPayFor] = useState('');
+  const [pay, setPay] = useState({ amount: '', paidOn: '', method: 'e-transfer', reference: '' });
+  const money = (n) => `$${Number(n || 0).toFixed(2)}`;
 
   async function load() { const r = await fetch(api).then((x) => x.json()).catch(() => ({})); setPartners(r.partners || []); }
   useEffect(() => { load(); }, []);
@@ -35,6 +38,15 @@ export default function ReferralPartnersAdmin() {
     const r = await post({ action: 'assign', customerId: c.id, partner, reason });
     setMsg(r.ok ? (partner ? `${c.name || c.email} is now under ${partner}.` : 'Removed.') : r.error || 'Could not assign.');
     if (r.ok) { load(); setFound((x) => x.map((y) => (y.id === c.id ? { ...y, partner_email: partner || null } : y))); }
+  }
+  async function recordPay(email) {
+    const r = await post({ action: 'pay', partnerEmail: email, ...pay });
+    setMsg(r.ok ? 'Payment recorded.' : r.error || 'Could not record.');
+    if (r.ok) { setPay({ amount: '', paidOn: '', method: 'e-transfer', reference: '' }); setPayFor(''); load(); }
+  }
+  async function voidPay(id) {
+    if (!confirm('Void this payment? It stays on record, struck out, and the balance goes back up.')) return;
+    const r = await post({ action: 'void_payment', id }); setMsg(r.ok ? 'Voided.' : r.error || 'Could not void.'); load();
   }
   async function revoke(email) {
     if (!confirm(`Stop ${email} being a referral partner? Their clients stay linked but they lose access.`)) return;
@@ -61,10 +73,33 @@ export default function ReferralPartnersAdmin() {
             {!p.revoked_at && <>
               <a className="btn" href={`/partner?as=${encodeURIComponent(p.email)}`} target="_blank" rel="noreferrer">See their page</a>
               <button className="btn" onClick={() => invite(p.email)}>Send sign-in email</button>
+              <button className="btn" onClick={() => { setPayFor(payFor === p.email ? '' : p.email); }}>Record a payment</button>
               <button className="btn" onClick={() => { setPick(pick === p.email ? '' : p.email); setQ(''); }}>Add clients</button>
               <button className="btn" onClick={() => revoke(p.email)}>Revoke</button>
             </>}
           </div>
+          {p.totals && (
+            <div className="hint" style={{ marginTop: 6 }}>
+              Earned {money(p.totals.earned)} · pending {money(p.totals.pending)} · paid {money(p.totals.paid)} · <b>owed now {money(p.totals.balance)}</b>
+            </div>
+          )}
+          {payFor === p.email && (
+            <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input placeholder="Amount paid" value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} style={{ width: 120 }} />
+              <input type="date" value={pay.paidOn} onChange={(e) => setPay({ ...pay, paidOn: e.target.value })} />
+              <input placeholder="Method" value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })} style={{ width: 120 }} />
+              <input placeholder="Reference" value={pay.reference} onChange={(e) => setPay({ ...pay, reference: e.target.value })} style={{ width: 160 }} />
+              <button className="btn btn-primary" onClick={() => recordPay(p.email)}>Save</button>
+              <span className="hint" style={{ alignSelf: 'center' }}>Record money you have already sent. This does not send anything.</span>
+            </div>
+          )}
+          {(p.payments || []).length > 0 && (
+            <div style={{ marginTop: 8, fontSize: 13 }}>
+              {p.payments.slice(0, 6).map((x) => (
+                <div key={x.id}>{x.paid_on} · {money(x.amount)} · {x.method || '—'} {x.reference || ''} <button className="btn" style={{ padding: '0 8px', marginLeft: 6 }} onClick={() => voidPay(x.id)}>Void</button></div>
+              ))}
+            </div>
+          )}
           {pick === p.email && (
             <div style={{ marginTop: 10 }}>
               <input placeholder="Search customers by name, email or phone" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: '100%', maxWidth: 420 }} />
