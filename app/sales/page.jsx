@@ -2,6 +2,9 @@ import { hubPage, NotAuthorized } from '../../lib/sales-page';
 import { hasDb } from '../../lib/db';
 import { homeSummary, slaBreaches } from '../../lib/leads';
 import { repScorecard } from '../../lib/analytics';
+import { repToday } from '../../lib/sales-commission';
+import RepClock from '../../components/RepClock';
+import RepTodayCard from '../../components/RepTodayCard';
 import SalesNav from '../../components/SalesNav';
 import MyQuota from '../../components/MyQuota';
 import MyDay from '../../components/MyDay';
@@ -30,12 +33,14 @@ export default async function SalesHome() {
 
   if (!hasDb()) return <div className="panel">Database not configured — set POSTGRES_URL.</div>;
 
-  const [home, team, sla] = await Promise.all([
+  const [home, team, sla, today] = await Promise.all([
     homeSummary(viewer),
     // The month's quota card (reuses the scorecard). Absent when the login does not
     // resolve to a rep on the team list — somebody else's quota is worse than none.
     repScorecard('month', { name: viewer.name, email: viewer.email }).catch(() => null),
-    viewer.admin ? slaBreaches() : Promise.resolve([])
+    viewer.admin ? slaBreaches() : Promise.resolve([]),
+    // Only a rep with a commission plan has a tracker; everybody else gets null and no card.
+    repToday(viewer.email).catch(() => null)
   ]);
 
   return (
@@ -51,6 +56,8 @@ export default async function SalesHome() {
         </div>
       )}
 
+      {today && <RepClock />}
+      {today && <RepTodayCard t={today} />}
       {team?.me && <div className="panel"><MyQuota data={team} /></div>}
 
       <div className="panel">

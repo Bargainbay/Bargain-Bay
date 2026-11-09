@@ -5153,3 +5153,31 @@ gas dryer or range $250, OTR microwave or range hood $125.
   the two names the earlier list used. Not loaded: the completion-status percentages and the $2/km charge past Zone C (billing rules,
   no per-km unit in the catalog).
 - Haul-away internal cost is $0 (owner, 2026-11-08), so the $20 is all margin. The code default is 0 (a real zero, not blank); a row already in the live catalog keeps its saved cost until edited on /admin/sales-services.
+
+### Sales Hub phase 3 (added 2026-11-08): Collected Sales and the rep's daily commission
+`lib/commission-tiers.js` (PURE), `lib/sales-commission.js`, migration `0056_sales_commission` (**run Run schema migration**),
+`/sales/performance` (rep, read-only), `/admin/sales-commission` (ADMIN), `/api/sales/{clock,commission}`,
+`/api/admin/sales-commission`, `components/{RepClock,RepTodayCard,StatementView,SalesCommissionAdmin}.jsx`,
+tests `commission-tiers`, `sales-commission`. Set up per rep on the admin screen (email, start date, quota, quota days);
+**a person with no plan earns nothing and sees no tracker**, so the old reps are untouched. This is SEPARATE from the
+older gross-profit plan (`lib/commission-rules.js`, `MyProfit`); do not mix them.
+- **Nothing derivable is stored.** Collected Sales and commission are recomputed from `invoice_payments` / `invoice_refunds`
+  on every read. Only an APPROVED statement is stored (`commission_statements.snapshot`), so a signed-off week cannot move; the
+  owner sees `drift` if the live figures changed afterwards. A week can only be approved once it is OVER.
+- **What counts** (agreement 4.4, Addendum 1): a payment actually received, BEFORE HST (`amount × invoice.subtotal/total`), on the
+  Toronto day it arrived; parts and third-party costs are not deducted. (a) **Employee Account** = `customers.owner_email` is the rep,
+  any day, for life; (b) on an **In-house day** (a row in `rep_shifts` started that Toronto day) a deal the rep **personally closed
+  that day** (`invoices.created_by` is the rep AND the invoice was raised the same Toronto day as the payment); (c) a liquidation
+  partner's sale counts only RS's cut (`vendor_ledger` kind `commission`, partners with `vendors.sourced_by_email` = the rep).
+  (b) is the LITERAL reading of "closed that day": a balance paid weeks later on a Mobile Day for somebody else's customer does not count.
+- **`rep_shifts` is NOT `staff_shifts`.** `staff_shifts` is payroll labour cost (the daily P&L multiplies it by an hourly rate); a
+  salaried rep in it would be counted twice or raise "no rate" warnings.
+- **Ownership:** converting a lead makes the rep the owner ONLY if the customer is NEW. A lead whose email or phone is already a customer
+  is linked but not credited (Addendum 1 rule 4); the owner assigns it with a written reason (`setCustomerOwner`, audit-logged).
+- **Tiers** are a setting (`rep_commission_tiers`): over $10,000 → 1%, over $20,000 → 1.5%, over $30,000 → 2%, of the WHOLE day (a cliff),
+  in cents. **The agreement contradicts itself at exactly $30,000**: the rule says "over" ($450), the example says $600. The default
+  follows the rule; the `inclusive` flag on the last tier reproduces the example. Both are pinned in the tests. Owner/lawyer to decide.
+- **Refunds** land on the Toronto day of the invoice's latest eligible payment at or before the refund, and the change in that day's
+  commission (it is a cliff) is a negative ADJUSTMENT dated the refund's own day — never a rewrite of an earlier week.
+- Not built: tracking-code attribution at checkout (`?rep=` is only on catalog share links so far), commission on marketplace
+  refunds, a PDF (the screen has CSV and Print / Save as PDF).

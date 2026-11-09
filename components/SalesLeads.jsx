@@ -103,6 +103,7 @@ function LeadDetail({ id, isAdmin, onChanged, onClose }) {
   const [lost, setLost] = useState('');
   const [assign, setAssign] = useState('');
   const [err, setErr] = useState('');
+  const [note, setNote] = useState('');
   const load = () => fetch(`/api/sales/leads?id=${id}`).then((r) => r.json()).then((d) => setLead(d.lead || null));
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -130,9 +131,19 @@ function LeadDetail({ id, isAdmin, onChanged, onClose }) {
             {lead.est_value != null && ` · $${Number(lead.est_value).toLocaleString()}`}
           </div>
         </div>
-        <button className="btn" onClick={onClose}>Close</button>
+        <span style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+          {!lead.customer_id && <button className="btn" onClick={async () => {
+            const r = await post({ action: 'convert', id });
+            if (!r.ok) { setErr(r.error || 'Could not convert.'); return; }
+            setNote(r.existing ? (r.ownsIt ? 'Linked to an existing customer of yours.' : 'This is already a customer, so it was linked but not credited to you. The owner can assign it.') : 'Converted: this is now your account.');
+            await load(); onChanged();
+          }}>Convert to customer</button>}
+          <button className="btn" onClick={onClose}>Close</button>
+        </span>
       </div>
 
+      {note && <p role="status" style={{ fontSize: 14, margin: '8px 0' }}>{note}</p>}
+      {lead.customer_id && !note && <p className="hint" style={{ margin: '8px 0' }}>A customer ({'#'}{lead.customer_id}).</p>}
       <div style={{ margin: '12px 0', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <b style={{ fontSize: 14 }}>Stage</b>
         {STAGES.filter(([k]) => k !== 'won' && k !== 'lost').map(([k, l]) => (

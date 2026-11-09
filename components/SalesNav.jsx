@@ -15,6 +15,7 @@ const TABS = [
   ['/sales/pipeline', 'Pipeline'],
   ['/sales/catalog', 'Catalog'],
   ['/admin/quotes', 'Quotes'],
+  ['/sales/performance', 'Performance'],
   ['/sales/resources', 'Resources']
 ];
 const SIDES = [['all', 'All'], ['bb', 'Bargain Bay'], ['rs', 'RS Solutions']];

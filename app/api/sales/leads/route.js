@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { requireHub } from '../../../../lib/sales-access';
 import {
   listLeads, getLead, createLead, logLeadActivity, setLeadStage, assignLead, acceptLead,
-  homeSummary, slaBreaches, importLeads, LeadError
+  homeSummary, slaBreaches, importLeads, convertLead, LeadError
 } from '../../../../lib/leads';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +55,8 @@ export async function POST(req) {
         return NextResponse.json(await logLeadActivity(body.id, body.activity || {}, viewer));
       case 'stage':
         return NextResponse.json(await setLeadStage(body.id, body.stage, { lostReason: body.lostReason }, viewer));
+      case 'convert':
+        return NextResponse.json(await convertLead(body.id, viewer));
       case 'accept':
         return NextResponse.json(await acceptLead(body.id, viewer));
       case 'assign':
