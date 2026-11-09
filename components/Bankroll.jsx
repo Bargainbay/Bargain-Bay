@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Receipts from './Receipts';
 import Payroll from './Payroll';
 
@@ -23,6 +23,17 @@ export default function Bankroll({ initial }) {
   const [count, setCount] = useState('');
   const [countDate, setCountDate] = useState(initial.date);
   const [payTo, setPayTo] = useState({});
+  const [openRow, setOpenRow] = useState(null);
+
+  // The server refreshes the bank itself every 30 minutes; the page re-reads what it holds every 5 minutes while it is open
+  // (no call to the bank, so no charge) so a tab left up keeps showing the latest.
+  useEffect(() => {
+    const t = setInterval(async () => {
+      if (document.hidden) return;
+      try { const r = await (await fetch(`/api/admin/bankroll?days=${d.days}`)).json(); if (r && !r.error) setD(r); } catch { /* try again next time */ }
+    }, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [d.days]);
 
   async function call(body, label, url = '/api/admin/bankroll') {
     setBusy(label); setErr(''); setMsg('');
@@ -118,36 +129,55 @@ export default function Bankroll({ initial }) {
           <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Live transactions</h2>
           {[[1, 'Today'], [7, '7 days'], [30, '30 days']].map(([n, l]) => (
             <button key={n} type="button" className={'dash-filter' + (d.days === n ? ' active' : '')} disabled={!!busy} onClick={() => range(n)}>{l}</button>))}
-          <span className="hint" style={{ margin: 0 }}>Everything in one list: bank, cash sales, cash paid out.</span>
+          <span className="hint" style={{ margin: 0 }}>Everything in one list. Click a row for the details. Refreshes itself every 30 minutes.</span>
         </div>
         <datalist id="live-names">{(d.pay?.names || []).map((n) => <option key={n} value={n} />)}</datalist>
         <div className="table-wrap"><table className="admin">
           <thead><tr><th>Date</th><th>Type</th><th>Who / what</th><th>Category</th><th style={{ textAlign: 'right' }}>Amount</th></tr></thead>
           <tbody>
             {d.live.map((l) => (
-              <tr key={l.key}>
-                <td>{l.date}</td>
-                <td style={{ fontSize: 12.5 }}>{l.tag}</td>
-                <td>{l.who || '—'}</td>
-                <td>
-                  {l.expenseId ? (
-                    <>
-                      <select value={l.category || ''} disabled={!!busy} onChange={(e) => e.target.value && setCategory(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }}>
-                        <option value="">Choose…</option>
-                        {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
-                      </select>
-                      {l.category === 'Wages' && !l.inPayroll && (
-                        <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
-                          <input list="live-names" placeholder="paid to…" value={payTo[l.expenseId] || ''} onChange={(e) => setPayTo((p) => ({ ...p, [l.expenseId]: e.target.value }))} style={{ width: 120, minHeight: 34, padding: '4px 8px', fontSize: 14 }} />
-                          <button type="button" className="dash-filter active" disabled={!!busy} onClick={() => assignPay(l)}>Count as pay</button>
-                        </span>
-                      )}
-                      {l.inPayroll && <span className="hint" style={{ marginLeft: 6 }}>in payroll</span>}
-                    </>
-                  ) : (l.category || '')}
-                </td>
-                <td style={{ textAlign: 'right', fontWeight: 700, color: l.noMoney ? 'var(--muted)' : undefined }}>{l.noMoney && l.tag === 'Till count' ? cad(l.amount) : signed(l.amount)}</td>
-              </tr>))}
+              <Fragment key={l.key}>
+                <tr onClick={() => setOpenRow(openRow === l.key ? null : l.key)} style={{ cursor: 'pointer', opacity: l.pending ? 0.8 : 1 }}>
+                  <td style={{ whiteSpace: 'nowrap' }}><span aria-hidden="true">{openRow === l.key ? '▾' : '▸'}</span> {l.date}</td>
+                  <td style={{ fontSize: 12.5 }}>{l.tag}{l.pending && <span className="hint" style={{ marginLeft: 4 }}>(pending)</span>}</td>
+                  <td>
+                    {l.invoice
+                      ? <><a href={l.invoice.href} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><b>{l.invoice.number}</b></a> · {l.invoice.customer || 'no name on the invoice'}</>
+                      : (l.who || '—')}
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    {l.expenseId ? (
+                      <>
+                        <select value={l.category || ''} disabled={!!busy} onChange={(e) => e.target.value && setCategory(l, e.target.value)} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }}>
+                          <option value="">Choose…</option>
+                          {CATS.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}
+                        </select>
+                        {l.category === 'Wages' && !l.inPayroll && (
+                          <span style={{ display: 'inline-flex', gap: 4, marginLeft: 6 }}>
+                            <input list="live-names" placeholder="paid to…" value={payTo[l.expenseId] || ''} onChange={(e) => setPayTo((p) => ({ ...p, [l.expenseId]: e.target.value }))} style={{ width: 120, minHeight: 34, padding: '4px 8px', fontSize: 14 }} />
+                            <button type="button" className="dash-filter active" disabled={!!busy} onClick={() => assignPay(l)}>Count as pay</button>
+                          </span>
+                        )}
+                        {l.inPayroll && <span className="hint" style={{ marginLeft: 6 }}>in payroll</span>}
+                      </>
+                    ) : (l.category || '')}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 700, color: l.noMoney ? 'var(--muted)' : undefined }}>{l.noMoney && l.tag === 'Till count' ? cad(l.amount) : signed(l.amount)}</td>
+                </tr>
+                {openRow === l.key && (
+                  <tr>
+                    <td colSpan={5} style={{ background: 'var(--card-2)', padding: '10px 16px' }}>
+                      {(l.detail?.fields || []).length === 0 && !(l.detail?.links || []).length && <span className="hint">Nothing more recorded on this one.</span>}
+                      <dl style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '4px 14px', margin: 0, fontSize: 14 }}>
+                        {(l.detail?.fields || []).map(([k, v]) => (<Fragment key={k}><dt style={{ color: '#c3cad8', fontWeight: 600 }}>{k}</dt><dd style={{ margin: 0, wordBreak: 'break-word' }}>{v}</dd></Fragment>))}
+                      </dl>
+                      {(l.detail?.links || []).length > 0 && (
+                        <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {l.detail.links.map((x) => (<a key={x.href} className="dash-filter active" href={x.href} target="_blank" rel="noreferrer">{x.label} →</a>))}
+                        </div>)}
+                    </td>
+                  </tr>)}
+              </Fragment>))}
             {!d.live.length && <tr><td colSpan={5} className="hint">Nothing in this range.</td></tr>}
           </tbody></table></div>
         <p className="hint" style={{ margin: '8px 0 0' }}>

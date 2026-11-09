@@ -1,0 +1,81 @@
+// The live transaction list: pending and incoming bank lines, who money came from, and a descriptive cash sale.
+import { suite, test, assert, equal } from './_harness.mjs';
+import { withTestDb } from './db.mjs';
+import { query } from '../lib/db.js';
+import { upsertExpense } from '../lib/finance.js';
+import { mapActivity, recordActivity, deleteActivity } from '../lib/bank-activity.js';
+import { parseInteracReceived, nameTransfersFromEmail, matchTransfers } from '../lib/interac-names.js';
+import { bankrollSummary } from '../lib/bankroll.js';
+
+const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
+
+suite('live ledger');
+
+test('mapActivity FLIPS PLAID\'S SIGN SO MONEY IN IS POSITIVE AND KEEPS PENDING', () => {
+  const a = mapActivity({ transaction_id: 'p1', date: '2026-11-08', amount: -600, pending: true, name: 'E-TRANSFER ***hCA', original_description: 'E-TRANSFER ***hCA', payment_meta: { reason: 'INV 1359' } });
+  equal(a.amount, 600); assert(a.pending); equal(a.extId, 'plaid:p1'); equal(a.memo, 'INV 1359');
+  equal(mapActivity({ transaction_id: 'p2', date: '2026-11-08', amount: 80 }).amount, -80);
+  assert(mapActivity({ transaction_id: 'p3', date: '2026-11-08', amount: 0 }) === null);
+});
+
+test('parseInteracReceived READS WHO SENT IT AND HOW MUCH', () => {
+  const r = parseInteracReceived({ subject: "Interac e-Transfer: You've received $600.00 from JOAN GRANT and it has been automatically deposited.", internalDate: 1000 });
+  equal(r.amountCents, 60000); equal(r.name, 'JOAN GRANT');
+  assert(parseInteracReceived({ subject: 'Interac e-Transfer: Your $5.00 transfer to X has been successfully deposited.' }) === null);
+});
+
+test('INCOMING WINDOW: THE EMAIL IS THE SAME DAY OR A LITTLE BEFORE THE LINE POSTS', () => {
+  const t = Date.parse('2026-11-08T12:00:00Z');
+  const lines = [{ id: 1, grossCents: 60000, date: '2026-11-08' }];
+  equal(matchTransfers([{ id: 'e', amountCents: 60000, name: 'A', at: t - 86400e3 }], lines, { before: 3, after: 1.5 }).length, 1);
+  equal(matchTransfers([{ id: 'e', amountCents: 60000, name: 'A', at: t + 5 * 86400e3 }], lines, { before: 3, after: 1.5 }).length, 0);
+});
+
+test('AN INCOMING E-TRANSFER GETS THE SENDER\'S NAME FROM INTERAC AND NEVER ON AN AMBIGUOUS PAIR', async () => {
+  const { done } = await withTestDb();
+  try {
+    await recordActivity(mapActivity({ transaction_id: 'in1', date: today(), amount: -600, name: 'E-TRANSFER ***hCA', original_description: 'E-TRANSFER ***hCA' }));
+    await recordActivity(mapActivity({ transaction_id: 'in2', date: today(), amount: -75, name: 'E-TRANSFER ***aaa' }));
+    await recordActivity(mapActivity({ transaction_id: 'in3', date: today(), amount: -75, name: 'E-TRANSFER ***bbb' }));
+    const now = Date.now();
+    const r = await nameTransfersFromEmail({
+      emailsFn: async () => [], emailsInFn: async () => [
+        { id: 'm1', subject: "Interac e-Transfer: You've received $600.00 from JOAN GRANT and it has been automatically deposited.", internalDate: now },
+        { id: 'm2', subject: "Interac e-Transfer: You've received $75.00 from SOMEONE and it has been automatically deposited.", internalDate: now }] });
+    equal(r.namedIn, 1, 'the unique $600 is named; two $75 lines for one email are not guessed');
+    const rows = (await query(`SELECT ext_id, who_override FROM bank_activity ORDER BY ext_id`)).rows;
+    equal(rows.find((x) => x.ext_id === 'plaid:in1').who_override, 'JOAN GRANT');
+    assert(!rows.find((x) => x.ext_id === 'plaid:in2').who_override);
+  } finally { done(); }
+});
+
+test('THE LIVE LIST SHOWS PENDING AND INCOMING LINES, WHO FROM, AND A CASH SALE WITH ITS INVOICE AND CUSTOMER', async () => {
+  const { done } = await withTestDb();
+  try {
+    const d = today();
+    await recordActivity(mapActivity({ transaction_id: 'pe1', date: d, amount: 300, pending: true, name: 'SEND E-TFR *xyz', original_description: 'SEND E-TFR *xyz MEMO' }));
+    await recordActivity(mapActivity({ transaction_id: 'in9', date: d, amount: -450, name: 'E-TRANSFER ***q' }));
+    await query(`UPDATE bank_activity SET who_override = 'DITA RAJI CORPORATION' WHERE ext_id = 'plaid:in9'`);
+    await upsertExpense({ incurredOn: d, category: 'Other', vendor: 'SEND E-TFR', amount: 120, tax: null, note: 'TD', extId: 'plaid:x', source: 'plaid',
+      payee: null, bankDesc: 'SEND E-TFR *nMU EXP', memo: 'for fuel' });
+    await query(`UPDATE expenses SET user_note = 'Ravi, fuel run', payee_override = 'RAVI' WHERE ext_id = 'plaid:x'`);
+    const { rows: inv } = await query(`INSERT INTO invoices (email, name, status, subtotal, hst, total, memo, channel) VALUES ('j@x.ca','Joan Grant','paid',531.86,69.14,601,'Balance on fridge','manual') RETURNING id`);
+    await query(`UPDATE invoices SET number = 'INV-1359' WHERE id = $1`, [inv[0].id]);
+    await query(`INSERT INTO invoice_payments (invoice_id, amount, method) VALUES ($1, 601, 'cash')`, [inv[0].id]);
+
+    const s = await bankrollSummary(d, { days: 1 });
+    const by = (tag) => s.live.filter((l) => l.tag === tag);
+    assert(by('Pending out').length === 1 && by('Pending out')[0].pending, 'a pending line shows today');
+    const inc = by('Bank in')[0];
+    equal(inc.who, 'DITA RAJI CORPORATION'); assert(inc.detail.fields.some(([k, v]) => k === 'Came from' && v === 'DITA RAJI CORPORATION'));
+    const out = by('Bank out')[0];
+    equal(out.who, 'RAVI');
+    const f = Object.fromEntries(out.detail.fields);
+    equal(f['Sent to'], 'RAVI'); equal(f['Our note'], 'Ravi, fuel run'); equal(f['Memo the bank carries'], 'for fuel'); equal(f['Bank description'], 'SEND E-TFR *nMU EXP');
+    const sale = by('Cash sale')[0];
+    equal(sale.invoice.number, 'INV-1359'); equal(sale.invoice.customer, 'Joan Grant'); assert(/INV-1359 · Joan Grant/.test(sale.who));
+    assert(sale.detail.links.some((l) => l.href === '/invoice/INV-1359'), 'a link to open the invoice');
+    await deleteActivity('plaid:pe1');
+    equal((await bankrollSummary(d, { days: 1 })).live.filter((l) => l.tag === 'Pending out').length, 0, 'a retracted pending line goes away');
+  } finally { done(); }
+});

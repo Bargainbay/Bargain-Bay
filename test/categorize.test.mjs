@@ -261,7 +261,7 @@ test('RE-READING THE BANK FILLS IN DETAILS BUT NEITHER BRINGS BACK A DELETED LIN
     equal(k.category, 'Insurance'); equal(Number(k.amount), 100); equal(Number(k.tax), 13);
     equal(Number((await query('SELECT count(*) AS c FROM expenses WHERE ext_id = $1', ['plaid:deleted'])).rows[0].c), 0, 'a line that is not in the ledger stays out');
     const items = await (await import('../lib/settings.js')).getSetting('plaid_items', []);
-    equal(items[0].detailsV, 2, 'and it is not repeated next time');
+    equal(items[0].detailsV, 3, 'and it is not repeated next time');
   } finally {
     globalThis.fetch = realFetch;
     if (env.id === undefined) delete process.env.PLAID_CLIENT_ID; else process.env.PLAID_CLIENT_ID = env.id;
