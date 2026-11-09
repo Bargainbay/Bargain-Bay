@@ -2,8 +2,8 @@
 import { Fragment, useEffect, useState } from 'react';
 import Receipts from './Receipts';
 
-const CATS = ['Wages', 'Rent / storage', 'Utilities', 'Insurance', 'Software', 'Truck (lease, plates, upkeep)', 'Fuel / delivery',
-  'Tools / supplies', 'Advertising', 'Card & bank fees', 'Interest charges', 'Loan repayment', 'Owner draw - Ravi', 'Owner draw - Sai', 'Other'];
+const CATS = ['Wages', 'Rent / storage', 'Utilities', 'Insurance', 'Software', 'Truck (lease, plates, upkeep)', 'Fuel', 'Delivery (carriers we pay)',
+  'Tools / supplies', 'Advertising - Google', 'Advertising - Facebook / Instagram', 'Advertising - Other', 'Card & bank fees', 'Interest charges', 'Loan repayment', 'Owner draw - Ravi', 'Owner draw - Sai', 'Other'];
 const NEW_CAT = '__new';
 const catLabel = (c) => (c === 'Wages' ? 'Wages / salary' : c);
 
@@ -216,6 +216,7 @@ export default function Bankroll({ initial }) {
                       <>
                         <select value={l.category || ''} disabled={!!busy} onChange={(e) => e.target.value && withCategory(e.target.value, (v) => setCategory(l, v))} style={{ minHeight: 34, padding: '4px 8px', fontSize: 14 }}>
                           <option value="">Choose…</option>
+                          {l.category && !cats.includes(l.category) && <option value={l.category}>{l.category}</option>}
                           {cats.map((c) => <option key={c} value={c}>{catLabel(c)}</option>)}<option value={NEW_CAT}>+ Add a category…</option>
                         </select>
                         {l.category === 'Wages' && !l.inPayroll && (

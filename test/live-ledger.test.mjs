@@ -189,3 +189,18 @@ test('A PAYMENT RECORDED AS CASH THAT WAS REALLY AN E-TRANSFER CAN BE RELABELLED
     assert(threw, 'an unknown method is refused');
   } finally { await done(); }
 });
+
+test('EACH ACTIVE TRUCK GETS ITS OWN FUEL CATEGORY, AND A RETIRED ONE DOES NOT', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { getVehicleFuelCategories, getExtraCategories, addCustomCategory, EXPENSE_CATEGORIES } = await import('../lib/finance.js');
+    await query(`CREATE TABLE IF NOT EXISTS vehicles (id serial PRIMARY KEY, name text NOT NULL, plate text, active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now())`);
+    await query(`INSERT INTO vehicles (name, active) VALUES ('Green F150', true), ('2024 Chevy Suburban', true), ('Old van', false)`);
+    const t = await getVehicleFuelCategories();
+    equal(t.join('|'), 'Fuel - 2024 Chevy Suburban|Fuel - Green F150');
+    await addCustomCategory('Packaging');
+    const extra = await getExtraCategories();
+    assert(extra.includes('Fuel - Green F150') && extra.includes('Packaging') && !extra.some((c) => /Old van/.test(c)));
+    for (const c of ['Fuel', 'Delivery (carriers we pay)', 'Advertising - Google', 'Advertising - Facebook / Instagram']) assert(EXPENSE_CATEGORIES.includes(c), c);
+  } finally { await done(); }
+});

@@ -5,8 +5,8 @@ import { compress } from './photo-pick';
 // Snap a receipt, check what was read, say how it was paid. Then the tracker: has the bank shown it yet,
 // and if somebody paid out of their own pocket, have they been paid back.
 const cad = (v) => (v == null ? '—' : new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(v));
-const CATS = ['Rent / storage', 'Utilities', 'Insurance', 'Software', 'Truck (lease, plates, upkeep)', 'Fuel / delivery', 'Wages',
-  'Tools / supplies', 'Advertising', 'Card & bank fees', 'Interest charges', 'Other'];
+const CATS = ['Rent / storage', 'Utilities', 'Insurance', 'Software', 'Truck (lease, plates, upkeep)', 'Fuel', 'Delivery (carriers we pay)', 'Wages',
+  'Tools / supplies', 'Advertising - Google', 'Advertising - Facebook / Instagram', 'Advertising - Other', 'Card & bank fees', 'Interest charges', 'Other'];
 const PAID = { cash: 'Cash from the till', bank: 'Business card / bank', personal: 'My own pocket (pay me back)' };
 const blank = (date) => ({ vendor: '', date, total: '', tax: '', category: 'Tools / supplies', paidWith: 'cash', paidBy: '', reimburse: true, note: '' });
 
