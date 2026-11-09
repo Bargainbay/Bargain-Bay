@@ -5236,3 +5236,19 @@ another rep's leads still gets only their own (tested).
 header (side toggle and tabs, with Quotes and Invoices tabs) instead of the full Sales Portal menu (orders, warehouse, dispatch, intake…), which is not theirs. Everyone
 else gets `AdminNav` exactly as before. On the invoice form a rep sees the per-line cost box (`repCost` = `canSeeCost`) but still NOT the admin-only below-cost-floor override
 (`hideCost` stays `!isAdmin`). A rep can still reach other `/admin/*` pages by typing the address — those gates are unchanged; this is menu hygiene, not a permission.
+
+## Referral partners (added 2026-11-09)
+`lib/referral-partners.js`, migration `0060_referral_partners` (**run Run schema migration after deploy**), `/partner` (the partner's own page),
+`/admin/referral-partners` (ADMIN; on the Reports hub), `/api/admin/referral-partners`, `test/referral-partners.test.mjs`. Owner's rule: **Jayson
+(jdriver13@live.ca) earns 10% of the PROFIT on every order his clients place.** A partner is NOT a staff role and NOT a rep: no `isSales`/`isAdmin`
+path, so every other surface refuses them. Their clients live in `customers.partner_email`, deliberately separate from `owner_email` (the rep's
+Employee Account on the tiered collected-sales plan) so one account never earns on two plans.
+- **Nothing derivable is stored.** Orders, profit and commission are recomputed per read: the customer's orders via `ORDER_MATCH` (email, phone, merge
+  aliases), `SALE` predicate (cancelled/refunded drop out), profit as the Daily P&L's (unit price less cost, plus discount/trade-in lines, less coupon;
+  seller lines out). **Per order, floored at $0** (a loss earns nothing and claws nothing back). A unit with no cost counts as zero profit and is reported.
+- **Basis is the ORDER (accrual), not money collected**, and the owner did not specify otherwise; unpaid invoice-backed orders already count in `SALE`.
+  Confirm with the owner if commission should wait for payment or delivery.
+- The partner sees client name, order number, date, items, pre-tax total, live status and commission. **Never a cost or a profit figure** (commission at 10%
+  does imply profit). The partner is read from the SESSION; only an admin may preview with `?as=<email>`.
+- Clients are put under a partner by an admin (search customers, reason required, audit-logged). **Not built:** auto-assigning a client who signs up online
+  naming the partner (the signup "Referred by" box is not on main yet), and a payout/statement record (nothing records that commission was paid).
