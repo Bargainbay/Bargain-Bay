@@ -5235,9 +5235,7 @@ older gross-profit plan (`lib/commission-rules.js`, `MyProfit`); do not mix them
   salaried rep in it would be counted twice or raise "no rate" warnings.
 - **Ownership:** converting a lead makes the rep the owner ONLY if the customer is NEW. A lead whose email or phone is already a customer
   is linked but not credited (Addendum 1 rule 4); the owner assigns it with a written reason (`setCustomerOwner`, audit-logged).
-- **Tiers** are a setting (`rep_commission_tiers`): over $10,000 → 1%, over $20,000 → 1.5%, over $30,000 → 2%, of the WHOLE day (a cliff),
-  in cents. **The agreement contradicts itself at exactly $30,000**: the rule says "over" ($450), the example says $600. The default
-  follows the rule; the `inclusive` flag on the last tier reproduces the example. Both are pinned in the tests. Owner/lawyer to decide.
+- **Tiers** are a setting (`rep_commission_tiers`); the code DEFAULT (used until one is saved) is the owner's of 2026-11-10: over $5,000 → 1%, over $10,000 → 1.5%, over $20,000 → 2%, over $30,000 → 3%, of the WHOLE day (a cliff), in cents. "Over" is the reading of every line; the owner wrote "at $5,000", so if a day of exactly $5,000 should pay, tick "or more" on that tier on `/admin/sales-commission` (`inclusive`). The old agreement paid a $30,000 day 1.5% by its rule and 2% by its example; the agreement's example now uses a day clear of every line ($35,000 → $1,050). **A tier SAVED in the database beats the default**, so check `/admin/sales-commission` shows the four lines you expect.
 - **Refunds** land on the Toronto day of the invoice's latest eligible payment at or before the refund, and the change in that day's
   commission (it is a cliff) is a negative ADJUSTMENT dated the refund's own day — never a rewrite of an earlier week.
 - Not built: tracking-code attribution at checkout (`?rep=` is only on catalog share links so far), commission on marketplace
@@ -5330,3 +5328,21 @@ Employee Account on the tiered collected-sales plan) so one account never earns 
 - Three segments are marked start-here (property management, retailer, contractor); the Hub's lead `SEGMENTS` list carries all eight so a lead
   can be filed under the segment its script is for (`segmentKey` in `lib/leads.js` maps free-text to them).
 - The leave-behind prints the COMPANY's contact details, never the rep's login address.
+
+## The rep's agreements are signed in the Sales Hub (added 2026-11-10)
+`lib/employment-terms.js` (the text, PURE), `lib/rep-agreements.js`, migration `0065_rep_agreements` (**run Run schema migration**; the table is also created on
+first use), `/sales/agreement` (+ `/sales/agreement/copy`), `/api/sales/agreement`, `/api/admin/rep-agreement`, `components/RepAgreement.jsx` +
+`RepAgreementAdmin.jsx` (card on `/admin/sales-commission`), `test/rep-agreements.test.mjs`. Source: the Drive drafts "Employment Agreement – John Tobias
+(DRAFT v2)" and "Confidentiality & Non-Solicitation Agreement".
+- **Section 4.2 is BUILT from the tiers in force** (`getTiers()`), never typed, so what a rep signs can never promise a rate the system does not pay. Changing a tier
+  changes the text and the page's hash, so a page opened before the change refuses to sign ("reload and read it again").
+- **Signing = reads both to the end, types full legal name + home address, ticks the box, presses Sign.** Stored per document (`rep_agreements`): the exact text
+  (with name and address), its sha256, time, IP, browser. One signature per document per version (unique index); both documents or neither (one transaction).
+  Identity is the SESSION; only a rep signs (an admin may read). The signed copy is `/sales/agreement/copy` (Print / Save as PDF), a downloadable .html, and an
+  email to the rep and `SERVICE_EMAIL` (a mail failure never undoes a signature).
+- **SIGNING STAYS CLOSED until an admin opens it AND no [bracket] is left in the text.** The drafts carry decisions only the owner can make (company registered
+  address, normal hours, days commission is paid after employment, benefits, mileage): `FIELD_DEFS`, filled on `/admin/sales-commission`
+  (`rep_agreement_fields`). Both documents say in Drive that they are drafts for an Ontario employment lawyer; the "[Lawyer to confirm wording]" note on the
+  probation / no-notice clause is NOT in the signed text, so that review is still the owner's to get. Changing wording means a new `EMPLOYMENT_TERMS_VERSION`.
+- **The company countersignature is a separate admin act** (typed name, `countersign`); until then every copy says "Awaiting the company's countersignature".
+- Not built: a PDF generated server-side (the browser's Save as PDF is used), a drawn signature, signing by anyone but the rep.

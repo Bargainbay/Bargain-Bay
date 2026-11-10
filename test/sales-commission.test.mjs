@@ -118,8 +118,8 @@ test('the weekly total is the sum of each day’s commission; the cliff applies 
       await invoice({ email: 'mine@x.ca', createdDay: day, subtotal: amt, pays: [[day, amt]] });
     }
     const w = weekOf(await history(JOHN, '2026-10-11'), WEEK);
-    equal(w.days.map((d) => d.commission).slice(0, 3), [0, 150, 375]);
-    equal(w.commission, 525); equal(w.total, 525); equal(w.collected, 49000);
+    equal(w.days.map((d) => d.commission).slice(0, 3), [90, 225, 500]);
+    equal(w.commission, 815); equal(w.total, 815); equal(w.collected, 49000);
   } finally { await done(); }
 });
 
@@ -131,14 +131,14 @@ test('a refund after the fact is a negative adjustment in the week it happened, 
     await query(`INSERT INTO invoice_refunds (invoice_id, amount, kind, created_at) VALUES ($1, 6000, 'amount', $2)`, [inv, at('2026-10-14')]);   // the following week
     const hist = await history(JOHN, '2026-10-18');
     const w1 = weekOf(hist, WEEK); const w2 = weekOf(hist, '2026-10-12');
-    equal(w1.total, 150, 'the week it was earned still shows what was earned');
-    equal(w2.adjustments.length, 1); equal(w2.adjustments[0].amount, -150, 'the day fell from $15,000 to $9,000, under the line: the whole $150 comes back');
-    equal(w2.total, -150);
-    // a smaller refund that keeps the day over the line only takes 1% of itself back
+    equal(w1.total, 225, 'the week it was earned still shows what was earned');
+    equal(w2.adjustments.length, 1); equal(w2.adjustments[0].amount, -135, 'the day fell from $15,000 (1.5%) to $9,000 (1%): $225 becomes $90, so $135 comes back');
+    equal(w2.total, -135);
+    // a smaller refund that keeps the day in the same tier only takes that tier's % of itself back
     const inv2 = await invoice({ email: 'mine@x.ca', createdDay: '2026-10-20', subtotal: 15000, pays: [['2026-10-20', 15000]] });
     await query(`INSERT INTO invoice_refunds (invoice_id, amount, kind, created_at) VALUES ($1, 1000, 'amount', $2)`, [inv2, at('2026-10-21')]);
     const h2 = await history(JOHN, '2026-10-25');
-    equal(weekOf(h2, '2026-10-19').adjustments[0].amount, -10);
+    equal(weekOf(h2, '2026-10-19').adjustments[0].amount, -15);
   } finally { await done(); }
 });
 
@@ -161,12 +161,12 @@ test('approving: only once the week is over; once only; frozen against later cha
     assert(await rejects(() => approveStatement(JOHN, future, OWNER), 'open-week'), 'this week is not over');
     equal((await statementFor(JOHN, WEEK)).status, 'draft');
     const s = await approveStatement(JOHN, WEEK, OWNER);
-    equal(s.total, 150); equal((await statementFor(JOHN, WEEK)).status, 'approved');
+    equal(s.total, 225); equal((await statementFor(JOHN, WEEK)).status, 'approved');
     assert(await rejects(() => approveStatement(JOHN, WEEK, OWNER), 'exists'));
     // a payment arrives late and is back-dated into the approved week: the approved figure stands and the drift is shown
     await invoice({ email: 'mine@x.ca', createdDay: '2026-10-07', subtotal: 12000, pays: [['2026-10-07', 12000]] });
     const after = await statementFor(JOHN, WEEK);
-    equal(after.total, 150, 'frozen'); equal(after.drift, 120, 'and the drift is visible to the owner');
+    equal(after.total, 225, 'frozen'); equal(after.drift, 180, 'and the drift is visible to the owner');
     await markStatementPaid(JOHN, WEEK, OWNER);
     equal((await statementFor(JOHN, WEEK)).status, 'paid');
     assert(await rejects(() => markStatementPaid(JOHN, WEEK, OWNER), 'state'));
@@ -194,8 +194,8 @@ test('today: the tier reached, how far to the next, and the pace needed to hit t
     await customer('mine@x.ca', JOHN);
     await invoice({ email: 'mine@x.ca', createdDay: today, subtotal: 12000, pays: [[today, 12000]] });
     const t = await repToday(JOHN, today);
-    equal(t.todayNet, 12000); equal(t.todayPct, 1); equal(t.todayCommission, 120);
-    equal(t.next.pct, 1.5); equal(t.next.moreNeeded, 8000.01);
+    equal(t.todayNet, 12000); equal(t.todayPct, 1.5); equal(t.todayCommission, 180);
+    equal(t.next.pct, 2); equal(t.next.moreNeeded, 8000.01);
     equal(t.quota.collected, 12000); equal(t.quota.left, 138000);
     assert(t.quota.perDayNeeded > 0 && t.quota.workingDaysLeft > 0);
     equal(workingDaysBetween('2026-11-09', '2026-11-13'), 5); equal(workingDaysBetween('2026-11-14', '2026-11-15'), 0);
