@@ -872,6 +872,7 @@ thin margin — it is our own money covering the vendor's cost.
   his FULL cost. Comparing a tax-in selling price against it flatters every line
   by 13%, which on his LF25S6206S ($1,258.80 listed, $1,250 cost) is the
   difference between "thin" and "a loss".
+- **UPDATE 2026-11-10 (owner): the INVOICE check (`consignmentFloorProblem`, and the `minPrice` hint on the line) only refuses a line under the vendor's COST (pre-tax price vs full cost), not cost + 20%.** The +20% floor still governs the storefront, clearance and coupons.
 - `CONSIGNMENT_MIN_MARGIN_PCT` / `consignmentFloor(cost)` in `lib/constants.js` —
   one definition, `Math.ceil` because a floor that rounds down is not a floor.
   A cost of 0 floors nothing.
