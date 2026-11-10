@@ -4,6 +4,7 @@ import { hasDb } from '../../../lib/db';
 import AdminNav from '../../../components/AdminNav';
 import SalesCommissionAdmin from '../../../components/SalesCommissionAdmin';
 import TeamProfit from '../../../components/TeamProfit';
+import RepAgreementAdmin from '../../../components/RepAgreementAdmin';
 import { repProfit } from '../../../lib/analytics';
 import { getPlans } from '../../../lib/sales-commission';
 
@@ -37,6 +38,7 @@ export default async function SalesCommissionPage() {
         <>
           {older && <TeamProfit data={older} />}
           <SalesCommissionAdmin />
+          <RepAgreementAdmin />
         </>
       )}
     </div>

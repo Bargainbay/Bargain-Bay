@@ -17,7 +17,8 @@ const TABS = [
   ['/admin/quotes', 'Quotes'],
   ['/admin/invoices', 'Invoices'],
   ['/sales/performance', 'Performance'],
-  ['/sales/resources', 'Resources']
+  ['/sales/resources', 'Resources'],
+  ['/sales/agreement', 'My agreement']
 ];
 const SIDES = [['all', 'All'], ['bb', 'Bargain Bay'], ['rs', 'RS Solutions']];
 // The chosen side tints the toggle, the active tab and a bar across the top, so it is always
