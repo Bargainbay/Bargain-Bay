@@ -258,3 +258,25 @@ test('changing the link code keeps the old links working and moves the discount 
     equal((await partnerReport(JAY)).partner.code, 'jayson');
   } finally { done(); }
 });
+
+test('paid on price: a share of the sale price after discount, capped at a share of the profit', async () => {
+  const { done } = await withTestDb();
+  try {
+    await savePartner({ email: JAY, name: 'SecondShop', pct: 20, basis: 'price', pricePct: 8, pricePctRetail: 6, capPct: 35 }, OWNER);
+    const c = await upsertCustomer({ email: 'roger@x.ca', name: 'Roger' });
+    await setClientPartner(c, JAY, 'client', OWNER);
+    await order('roger@x.ca', { price: 1000, cost: 400 });                          // 8% of 1000 = 80; cap 35% of 600 = 210 -> 80
+    await order('roger@x.ca', { price: 1000, cost: 900 });                          // 8% = 80; cap 35% of 100 = 35 -> 35, capped
+    await order('roger@x.ca', { price: 1000, cost: 400, discount: 50, coupon: 'SECONDSHOP5' }); // retail: 6% of 950 = 57; cap 35% of 550 = 192.5 -> 57
+    const r = await partnerReport(JAY);
+    const o = r.clients[0].orders;
+    const [a, b, d] = [o.find((x) => x.profit === 600), o.find((x) => x.profit === 100), o.find((x) => x.retail)];
+    equal(a.commission, 80); equal(a.basis, 'price'); assert(!a.capped);
+    equal(b.commission, 35); assert(b.capped, 'the profit cap held it down');
+    equal(d.commission, 57); equal(d.ratePct, 6);
+    equal(r.partner.basis, 'price'); equal(r.partner.capPct, 35);
+    assert(await rejects(() => savePartner({ email: JAY, pct: 20, basis: 'nonsense' }, OWNER), 'basis'));
+    await savePartner({ email: JAY, pct: 20, basis: 'profit' }, OWNER);              // switching back
+    equal((await partnerReport(JAY)).clients[0].orders.find((x) => x.profit === 600).commission, 120);
+  } finally { done(); }
+});
