@@ -3826,6 +3826,13 @@ a redeploy"* — and never applied it back to the two roles that matter most.
   memory, the same caveat `lib/antifraud` documents for rate limits. Thirty
   seconds of residual access is not the threat this fixes; somebody who left in
   March still having admin in June is.
+- **THE CACHE IS LOADED, AWAITED, BEFORE ANY ROLE CHECK (fixed 2026-11-12).** The checks are synchronous and a serverless instance starts with an
+  EMPTY cache, so the first request on every cold instance refused anybody granted in the TABLE (a rep on `staff_access`, not in the env lists): "Not authorized",
+  a 404, a 403 on Mark paid, fine on the next click when a warm instance answered. The warm-up in `observe-node.js` is fire-and-forget (and may not even share the
+  routes' module instance), so it never closed the gap. Now `sessionFromToken` in `lib/auth.js` does `await refreshStaff()` after verifying the token, so every
+  session read (every page and route reads one before asking "is this person staff?") has current grants: one query per instance per `STAFF_TTL_MS`. A first load
+  that FAILS retries in 2s, not 30s. `test/staff-cold-cache.test.mjs`. **Any new code that calls `isAdmin` / `isSales` / `isSalesRep` on a session NOT from
+  `getSession` / `getRequestSession` must await `refreshStaff()` first.**
 - **A failed load does NOT clear the cache.** A blip must not sign everybody
   out. A sustained outage lets it go stale and table-granted access eventually
   stops, which is the right way round — and the environment lists keep working
