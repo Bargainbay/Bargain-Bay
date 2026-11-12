@@ -5156,6 +5156,20 @@ For John Tobias (Business Development Manager, starts 2026-11-09). Plan: three P
 - NOT yet built (PR 2/3, see the plan): live profit on quotes, services catalog, rep holds, In-house/Mobile day, accounts, pipeline
   board, payment attribution and the 1% / 1.5% / 2% daily commission. Lead auto-reply/parsers (Addendum 2) need decisions first.
 
+### RS Ops' leads moved into the Sales Hub (added 2026-11-12)
+`lib/rsops-lead-map.js` (PURE), `lib/rsops-leads.js`, `/api/admin/rsops-leads` (ADMIN), `components/RsopsLeadImport.jsx` on `/sales/team`,
+migration `0066_leads_rsops_id` (**run Run schema migration after deploy**), `test/rsops-leads.test.mjs`. RS Ops' half: `GET/POST /api/intake/leads`
+(RSOPS_INTAKE_KEY) and `lib/leads-moved.js` there. Owner's decisions: a ONE-TIME move, OPEN leads only, ALL assigned to the rep chosen (John).
+- Won / lost / archived / closed stay in RS Ops. Do not contact comes across `lost`, UNASSIGNED, so the duplicate rule blocks re-adding it.
+- The Hub's duplicate rule still applies (a firm the Hub has stays with its owner, and is reported). `leads.rsops_id` (partial unique) makes a re-run add nothing.
+- History becomes `lead_activities` with `by_email NULL` and `by_name '<person> (RS Ops)'`, so it never counts toward a rep's daily targets. Consent (CASL),
+  unsubscribes, no-solicitation notices, extra contacts, notes and open tasks go into one summary note: the Hub has no consent field.
+- `first_touch_at` is set from RS Ops' real touches (an already-worked lead is not an SLA breach); `last_activity_at` is NOT backdated, so the 60-day
+  ownership clock starts at the move rather than returning old leads to the pool the same night.
+- Committed in batches of `BATCH` (the screen loops). RS Ops is told to lock only after the last batch, and only if nothing failed; once locked, RS Ops'
+  lead write routes (incl. sending lead emails) answer 410. Unsubscribe links and reply checking still work there. "Unlock RS Ops lead screens" undoes the lock.
+- Known: the imported leads arrive assigned-but-not-accepted, so the rep's "assigned to you" list shows the newest 50 until they accept them.
+
 ### Sales Hub phase 2 (added 2026-11-08): live profit, services, holds, pipeline
 `lib/quote-profit.js` (PURE, no imports), `lib/sales-services.js`, `lib/rep-holds.js`, `components/ProfitPanel.jsx`,
 `ServicesEditor.jsx`, `PipelineBoard.jsx`, `HoldControls.jsx`, `/admin/sales-services` (ADMIN), `/sales/pipeline`,

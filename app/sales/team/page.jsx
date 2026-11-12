@@ -4,6 +4,7 @@ import { teamOverview } from '../../../lib/leads';
 import { repToday, getPlans, openShift } from '../../../lib/sales-commission';
 import SalesNav from '../../../components/SalesNav';
 import TeamBoard from '../../../components/TeamBoard';
+import RsopsLeadImport from '../../../components/RsopsLeadImport';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Team — Sales Hub' };
@@ -42,6 +43,7 @@ export default async function TeamPage() {
       {/* The Team page covers both businesses, so it ignores the Bargain Bay | RS Solutions toggle and shows All. */}
       <SalesNav side="all" name={viewer.name} admin />
       <TeamBoard reps={reps} pool={overview.pool} recent={overview.recent} />
+      <RsopsLeadImport reps={reps.map((r) => ({ owner: r.owner, name: r.name }))} />
     </div>
   );
 }
