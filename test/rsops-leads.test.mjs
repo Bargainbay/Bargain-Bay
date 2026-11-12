@@ -9,7 +9,7 @@ import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { mapRsopsLead, skipReason } from '../lib/rsops-lead-map.js';
-import { previewRsopsLeads, commitRsopsBatch } from '../lib/rsops-leads.js';
+import { previewRsopsLeads, commitRsopsBatch, dealRsopsLeads, rsopsPoolCounts } from '../lib/rsops-leads.js';
 import { createLead, slaBreaches, returnStaleLeads } from '../lib/leads.js';
 
 const JOHN = 'john@rssolutions.ca';
@@ -141,12 +141,46 @@ test('a failure in an earlier batch keeps RS Ops unlocked', async () => {
   } finally { rs.restore(); await done(); }
 });
 
-test('an owner must be given', async () => {
+test('a blank owner puts them in the pool; a bad email is refused', async () => {
   const { done } = await withTestDb();
-  const rs = stubRsops([lead(1)]);
+  const rs = stubRsops([lead(1), lead(2)]);
   try {
     let msg = '';
-    try { await commitRsopsBatch({ offset: 0, ownerEmail: '', by: OWNER }); } catch (e) { msg = e.message; }
+    try { await commitRsopsBatch({ offset: 0, ownerEmail: 'not-an-email', by: OWNER }); } catch (e) { msg = e.message; }
     assert(/Pick who/.test(msg), 'refused');
+    const r = await commitRsopsBatch({ offset: 0, ownerEmail: '', by: OWNER });
+    equal(r.counts.imported, 2);
+    const { rows } = await query(`SELECT count(*)::int AS n FROM leads WHERE owner_email IS NULL AND assigned_at IS NULL`);
+    equal(rows[0].n, 2, 'both unassigned');
+  } finally { rs.restore(); await done(); }
+});
+
+test('dealing gives a rep N per category, warmest first, capped in all, restoration left out', async () => {
+  const { done } = await withTestDb();
+  const many = [];
+  let n = 0;
+  for (const seg of ['property_management', 'contractor', 'storage']) for (let k = 0; k < 6; k++) {
+    n++; many.push(lead(n, { segment: seg, stage: k === 5 ? 'quoted' : 'new' }));
+  }
+  for (let k = 0; k < 3; k++) { n++; many.push(lead(n, { segment: 'restoration' })); }
+  const rs = stubRsops(many);
+  try {
+    await commitRsopsBatch({ offset: 0, ownerEmail: 'pool', by: OWNER });
+    const first = await dealRsopsLeads({ ownerEmail: JOHN, perSegment: 2, max: 5, by: OWNER });
+    equal(first.assigned, 5, 'capped in all');
+    for (const v of Object.values(first.bySegment)) assert(v <= 2, 'at most 2 per category');
+    assert(!first.bySegment.restoration, 'restoration left out');
+    equal(Object.keys(first.bySegment).length, 3, 'spread across every category, not the first ones');
+    const { rows: warm } = await query(`SELECT count(*)::int AS n FROM leads WHERE owner_email = $1 AND stage = 'proposal'`, [JOHN]);
+    assert(warm[0].n >= 2, 'the furthest-along leads go first');
+    const second = await dealRsopsLeads({ ownerEmail: JOHN, perSegment: 50, max: 200, by: OWNER });
+    equal(second.assigned, 13, 'the rest, still no restoration');
+    const third = await dealRsopsLeads({ ownerEmail: JOHN, perSegment: 50, max: 200, includeRestoration: true, by: OWNER });
+    equal(third.assigned, 3);
+    const c = await rsopsPoolCounts();
+    equal(c.segments.length, 0, 'pool empty');
+    equal(c.held.find((h) => h.owner === JOHN).open, 21);
+    const { rows } = await query(`SELECT count(*)::int AS n FROM leads WHERE owner_email = $1 AND assigned_at IS NOT NULL AND accepted_at IS NULL`, [JOHN]);
+    equal(rows[0].n, 21, 'assigned and waiting to be accepted');
   } finally { rs.restore(); await done(); }
 });

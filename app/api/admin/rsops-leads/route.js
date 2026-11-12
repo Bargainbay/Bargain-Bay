@@ -3,10 +3,12 @@
 //
 // GET                                         → preview (writes nothing)
 // POST { action: 'commit', offset, ownerEmail, failedSoFar } → one batch; repeat until done
+// GET ?view=pool                             → RS Ops leads waiting in the pool, by category
+// POST { action: 'deal', ownerEmail, perSegment, max, includeRestoration } → give a rep a slice
 // POST { action: 'reopen' }                   → unlock RS Ops' lead screens again
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { previewRsopsLeads, commitRsopsBatch, reopenRsopsLeads, RsopsLeadError } from '../../../../lib/rsops-leads';
+import { previewRsopsLeads, commitRsopsBatch, reopenRsopsLeads, rsopsPoolCounts, dealRsopsLeads, RsopsLeadError } from '../../../../lib/rsops-leads';
 import { audit } from '../../../../lib/audit';
 
 export const dynamic = 'force-dynamic';
@@ -23,9 +25,11 @@ const fail = (e) => NextResponse.json(
   { status: e instanceof RsopsLeadError ? 400 : 500 }
 );
 
-export async function GET() {
+export async function GET(req) {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
-  try { return NextResponse.json(await previewRsopsLeads()); } catch (e) { return fail(e); }
+  try {
+    if (new URL(req.url).searchParams.get('view') === 'pool') return NextResponse.json(await rsopsPoolCounts());
+    return NextResponse.json(await previewRsopsLeads()); } catch (e) { return fail(e); }
 }
 
 export async function POST(req) {
@@ -37,9 +41,14 @@ export async function POST(req) {
     if (body.action === 'commit') {
       const r = await commitRsopsBatch({ offset: body.offset, ownerEmail: body.ownerEmail, by: s.email, failedSoFar: Number(body.failedSoFar) || 0 });
       await audit(s, {
-        action: 'leads.rsops_import', entity: 'leads', summary: `RS Ops leads batch from ${Number(body.offset) || 0}: ${r.counts.imported} brought across to ${body.ownerEmail}`,
+        action: 'leads.rsops_import', entity: 'leads', summary: `RS Ops leads batch from ${Number(body.offset) || 0}: ${r.counts.imported} brought across to ${body.ownerEmail || 'the unassigned pool'}`,
         detail: { counts: r.counts, done: r.done, locked: Boolean(r.locked) }
       });
+      return NextResponse.json(r);
+    }
+    if (body.action === 'deal') {
+      const r = await dealRsopsLeads({ ownerEmail: body.ownerEmail, perSegment: body.perSegment, max: body.max, includeRestoration: Boolean(body.includeRestoration), by: s.email });
+      await audit(s, { action: 'leads.rsops_deal', entity: 'leads', summary: `Gave ${r.assigned} RS Ops leads to ${body.ownerEmail}`, detail: r });
       return NextResponse.json(r);
     }
     if (body.action === 'reopen') {

@@ -5169,6 +5169,11 @@ migration `0066_leads_rsops_id` (**run Run schema migration after deploy**), `te
 - Committed in batches of `BATCH` (the screen loops). RS Ops is told to lock only after the last batch, and only if nothing failed; once locked, RS Ops'
   lead write routes (incl. sending lead emails) answer 410. Unsubscribe links and reply checking still work there. "Unlock RS Ops lead screens" undoes the lock.
 - Known: the imported leads arrive assigned-but-not-accepted, so the rep's "assigned to you" list shows the newest 50 until they accept them.
+- **They go to the POOL first and are DEALT OUT** (owner, 2026-11-12: "100-200 at a time, 20-40 per category"). The import's default is the pool;
+  "Give a rep a batch" (`dealRsopsLeads`, POST `action: 'deal'`) assigns up to N per category (max 50) and at most 200 per press, round-robin across
+  categories, warmest first (stage, dated next step, already spoken to). Restoration is left out unless ticked (its pitch is on hold). Only RS Ops
+  leads still unowned are dealt; pressing again gives the next batch. Giving one rep all 3,000+ at once would flood the 24h and 5-day flags and
+  hand back most of them after 60 days.
 
 ### Sales Hub phase 2 (added 2026-11-08): live profit, services, holds, pipeline
 `lib/quote-profit.js` (PURE, no imports), `lib/sales-services.js`, `lib/rep-holds.js`, `components/ProfitPanel.jsx`,
