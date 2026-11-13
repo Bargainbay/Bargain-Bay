@@ -1,12 +1,13 @@
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin } from '../../lib/auth';
 import { hasDb } from '../../lib/db';
-import { getPartner, partnerReport, rateText } from '../../lib/referral-partners';
+import { getPartner, getPartnerSeat, partnerReport, rateText } from '../../lib/referral-partners';
 import { money } from '../../lib/constants';
 import CopyLink from '../../components/CopyLink';
 import PartnerRequest from '../../components/PartnerRequest';
 import PartnerSignOut from '../../components/PartnerSignOut';
 import PartnerTeam from '../../components/PartnerTeam';
+import PartnerLeadDesk from '../../components/PartnerLeadDesk';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'My clients — Bargain Bay', robots: { index: false } };
@@ -25,6 +26,19 @@ export default async function PartnerPage({ searchParams }) {
   const email = preview ? asked : session.email;
   const partner = hasDb() ? await getPartner(email) : null;
   if (!partner) {
+    // A lead generator is not a partner here (getPartner refuses them on purpose) and must never be shown the
+    // organisation's money. They get their own, much smaller page; an admin previewing with ?as= never reaches it.
+    const seat = !preview && hasDb() ? await getPartnerSeat(session.email) : null;
+    if (seat?.role === 'affiliate') {
+      return (<div className="narrow"><div className="panel">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h1 style={{ marginTop: 0, color: 'var(--charcoal)', flex: 1 }}>Welcome{seat.name ? `, ${seat.name.split(' ')[0]}` : ''}</h1>
+          <PartnerSignOut />
+        </div>
+        <p style={{ fontSize: 14 }}>You are signed in with {seat.orgName || 'your team'}. Send a lead below and see what happened to each one you sent.</p>
+      </div>
+      <PartnerLeadDesk role="affiliate" /></div>);
+    }
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not a referral partner</h1>
       <p style={{ fontSize: 14 }}>Your account ({session.email}) has not been set up as a referral partner. Contact Bargain Bay.</p>
@@ -62,7 +76,8 @@ export default async function PartnerPage({ searchParams }) {
         </div>
       )}
 
-      {!preview && <PartnerTeam team={r.team} me={session.email} />}
+      {!preview && <PartnerTeam team={r.team} me={session.email} generators={r.partner.generators} />}
+      {!preview && r.partner.generators && <div style={{ marginBottom: 12 }}><PartnerLeadDesk role="admin" /></div>}
 
       <div className="panel" style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
         {stat('Clients', r.clients.length)}

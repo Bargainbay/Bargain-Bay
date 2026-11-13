@@ -29,6 +29,10 @@
       "schedule": "*/30 * * * *"
     },
     {
+      "path": "/api/cron/partner-leads",
+      "schedule": "10 * * * *"
+    },
+    {
       "path": "/api/cron/interac-names",
       "schedule": "17 * * * *"
     },

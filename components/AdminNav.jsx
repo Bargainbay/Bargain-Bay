@@ -29,6 +29,8 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     { key: 'photos', label: 'Photos', href: '/admin/photos', sales: true },
     // Ready-to-post Facebook Marketplace listings (title, caption, photos) for every unit on sale.
     { key: 'fb-listings', label: 'Facebook', href: '/admin/fb-listings', sales: true },
+    // Warm leads sent by partners' lead generators: claim one, work it. Sales and reps (it is the customer's sale).
+    { key: 'partner-leads', label: 'Partner leads', href: '/admin/partner-leads', sales: true },
     // Where every unit is standing, and the stickers that say so. Staff: finding
     // the fridge for the customer at the counter is a selling job.
     { key: 'warehouse', label: 'Warehouse', href: '/admin/warehouse', sales: true },
@@ -54,6 +56,8 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     { key: 'resellers', label: 'Resellers', href: '/admin/resellers' },
     // The people who promote our stock for a percentage: applications, their codes, what they are owed.
     { key: 'affiliates', label: 'Affiliates', href: '/admin/affiliates' },
+    // Every partner organisation, its lead generators, what we owe it. Admin.
+    { key: 'partners', label: 'Partners', href: '/admin/partner-portfolio' },
     { key: 'giveaway', label: 'Giveaway', href: '/admin/giveaway' },
     // ONE tab for pay: hours, what each person earned, what is owed and paid, the people and their rates, and where
     // a forgotten clock-out is fixed. Everyone who isn't driving clocks in on /clock. (/admin/team-clock redirects here.)

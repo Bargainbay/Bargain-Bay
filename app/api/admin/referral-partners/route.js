@@ -34,9 +34,9 @@ export async function POST(req) {
   let b; try { b = await req.json(); } catch { return NextResponse.json({ error: 'Bad request' }, { status: 400 }); }
   try {
     switch (b.action) {
-      case 'save': return NextResponse.json(await savePartner({ email: b.email, name: b.name, pct: b.pct, customerPct: b.customerPct, basis: b.basis, pricePct: b.pricePct, pricePctRetail: b.pricePctRetail, capPct: b.capPct }, s.email));
+      case 'save': return NextResponse.json(await savePartner({ email: b.email, name: b.name, pct: b.pct, customerPct: b.customerPct, basis: b.basis, pricePct: b.pricePct, pricePctRetail: b.pricePctRetail, capPct: b.capPct, leadPct: b.leadPct, generators: b.generators }, s.email));
       case 'set_code': return NextResponse.json(await setPartnerCode(b.email, b.code, s.email));
-      case 'team_add': return NextResponse.json(await addTeamMember(b.partnerEmail, { email: b.email, name: b.name }, s.email));
+      case 'team_add': return NextResponse.json(await addTeamMember(b.partnerEmail, { email: b.email, name: b.name, role: b.role }, s.email));
       case 'team_remove': return NextResponse.json(await removeTeamMember(b.partnerEmail, b.email, s.email));
       case 'invite': return NextResponse.json({ ok: true, ...(await invitePartner(b.email, s.email)) });
       case 'pay': return NextResponse.json(await recordPayment(b, s.email));
