@@ -9,6 +9,7 @@ import { unitPrices } from '../../../../lib/pricing';
 import { getMemberRates, saveMemberRates, setOverride, removeOverride } from '../../../../lib/member-rates';
 import { DEFAULT_MEMBER_RATES, MEMBER_RATE_LIMITS, normalizeRates, toPercent } from '../../../../lib/member-rate-rules';
 import { money } from '../../../../lib/constants';
+import { getListOverrides, setListOverride, removeListOverride } from '../../../../lib/list-price-overrides';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,7 @@ async function previewFor(rates, overrides, { q = '', page = 1, pageSize = PAGE_
   const floors = await consignmentFloors(live.map((u) => u.id)).catch(() => new Map());
   const run = (u, r) => unitPrices(u, { cl: cmap.get(u.id), floor: floors.get(u.id)?.floor || 0, member: true, rates: r, overrides });
   const cur = await getMemberRates();
+  const listOv = await getListOverrides().catch(() => ({}));
 
   let discounted = 0, atPublic = 0, belowMinProfit = 0, discSum = 0, belowCost = 0;
   const rows = live.map((u) => {
@@ -66,7 +68,8 @@ async function previewFor(rates, overrides, { q = '', page = 1, pageSize = PAGE_
       memberNow: now.price, memberNext: next.price,
       marginNow: cost ? Math.round((now.price - cost) * 100) / 100 : null,
       marginNext: cost ? Math.round((next.price - cost) * 100) / 100 : null,
-      override: overrides[u.id] ?? null
+      override: overrides[u.id] ?? null,
+      listOverride: listOv[u.id] ? true : false, trackerPrice: listOv[u.id]?.tracker ?? u.price
     }))
   };
 }
@@ -143,13 +146,26 @@ export async function POST(req) {
       if (!u) return NextResponse.json({ error: `No product with SKU ${sku}.` }, { status: 404 });
       const done = [];
       if ('publicPrice' in body) {
+        const lo = await getListOverrides();
+        const trackerPrice = lo[sku]?.tracker ?? Number(u.price);
         if (body.publicPrice === null || body.publicPrice === '') {
+          const restored = await removeListOverride(sku);
+          if (restored != null) { await audit(session, { action: 'list_price.remove', entity: 'list_price', entityId: sku, summary: `List price put back to the tracker price ${money(restored)} (member pricing screen)` }); done.push('list price back to the tracker'); }
           const n = await removeClearance(sku);
           if (n) { await audit(session, { action: 'clearance.remove', entity: 'clearance', entityId: sku, summary: 'Public price put back to the tracker price (member pricing screen)' }); done.push('public price back to normal'); }
         } else {
           const price = Math.round(Number(body.publicPrice) * 100) / 100;
           if (!Number.isFinite(price) || price <= 0) return NextResponse.json({ error: 'Enter a public price greater than zero.' }, { status: 400 });
-          if (price > Number(u.price) + 0.005) return NextResponse.json({ error: `${sku} is listed at ${money(u.price)} on the tracker. A price here can only mark it down; to raise it, change its Retail or Condition on the tracker.` }, { status: 400 });
+          if (price > trackerPrice + 0.005) {
+            // ABOVE the tracker price: a list price that wins over the sheet's formula, not a clearance markdown.
+            const r = await setListOverride(sku, price, trackerPrice);
+            if (r.error) return NextResponse.json({ error: r.error }, { status: 400 });
+            await removeClearance(sku);
+            await audit(session, { action: 'list_price.set', entity: 'list_price', entityId: sku, summary: `List price for ${sku} set to ${money(price)} over the tracker's ${money(r.tracker)}${r.before != null ? ` (was ${money(r.before)})` : ''}`, detail: { price, tracker: r.tracker, before: r.before } });
+            done.push(`list price ${money(price)}`);
+            return NextResponse.json({ ok: true, done, preview: await previewFor((await getMemberRates()).rates, (await getMemberRates()).overrides, { q: body.q, page: body.page }) });
+          }
+          if (lo[sku]) await removeListOverride(sku); // typed at or under the tracker price: the override is no longer wanted
           // Consigned stock can't be marked down under cost + 20% (same rule as /api/admin/clearance).
           const floors = await consignmentFloors([sku]).catch(() => new Map());
           const f = floors.get(sku);

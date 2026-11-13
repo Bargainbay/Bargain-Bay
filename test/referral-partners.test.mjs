@@ -8,11 +8,11 @@ import { savePartner, invitePartner, ensureCode, attachPartnerByCode, recordPaym
 const JAY = 'jdriver13@live.ca';
 const OWNER = 'owner@x.ca';
 let n = 0;
-async function order(email, { price, cost, status = 'confirmed', discount = 0, kind = 'unit' }) {
+async function order(email, { price, cost, status = 'confirmed', discount = 0, kind = 'unit', coupon = null }) {
   n += 1;
   const { rows } = await query(
-    `INSERT INTO orders (order_number, email, name, status, subtotal, discount, total, hst) VALUES ($1,$2,'C',$3,$4,$5,$4,0) RETURNING id`,
-    [`BB-P${n}`, email, status, price, discount]);
+    `INSERT INTO orders (order_number, email, name, status, subtotal, discount, total, hst, coupon_code) VALUES ($1,$2,'C',$3,$4,$5,$4,0,$6) RETURNING id`,
+    [`BB-P${n}`, email, status, price, discount, coupon]);
   await query(`INSERT INTO order_items (order_id, sku, title, price, cost, kind) VALUES ($1,$2,'Range',$3,$4,$5)`, [rows[0].id, `P${n}`, price, cost, kind]);
 }
 const rejects = async (fn, code) => { try { await fn(); } catch (e) { return !code || e.code === code; } return false; };
@@ -209,7 +209,7 @@ test('SecondShop: team logins see the organisation, can be removed, and cannot c
 test('SecondShop: the end-user link carries a 5% code; ordering with it puts the buyer under the partner', async () => {
   const { done } = await withTestDb();
   try {
-    await savePartner({ email: JAY, name: 'SecondShop', pct: 10 }, OWNER);
+    await savePartner({ email: JAY, name: 'SecondShop', pct: 20 }, OWNER);
     const r = await partnerReport(JAY);
     equal(r.partner.code, 'secondshop');
     equal(r.partner.customerCode, 'SECONDSHOP5');
@@ -219,15 +219,23 @@ test('SecondShop: the end-user link carries a 5% code; ordering with it puts the
     equal((await partnerByCouponCode('secondshop5')).email, JAY);
     const a = await attachPartnerForOrder({ couponCode: 'SECONDSHOP5', email: 'shopper@x.ca', name: 'Shopper' });
     assert(a.attached, 'the buyer is put under the partner');
-    await order('shopper@x.ca', { price: 1000, cost: 600, discount: 50 });          // profit AFTER the 5% = 350 -> 35
-    equal((await partnerReport(JAY)).totals.commission, 35);
+    await order('shopper@x.ca', { price: 1000, cost: 600, discount: 50, coupon: 'SECONDSHOP5' });  // profit AFTER the 5% = 350; retail earns 20% - 5% = 15%
+    equal((await partnerReport(JAY)).totals.commission, 52.5);
+    await order('shopper@x.ca', { price: 1000, cost: 600 });                         // no code: the full 20% of 400
+    const rr = await partnerReport(JAY);
+    equal(rr.totals.commission, 132.5); equal(rr.partner.retailPct, 15);
+    const ords = rr.clients[0].orders;
+    const withCode = ords.find((o) => o.retail), full = ords.find((o) => !o.retail);
+    equal(withCode.profit, 350); equal(withCode.discount, 50); equal(withCode.ratePct, 15); equal(withCode.commission, 52.5);
+    equal(full.profit, 400); equal(full.ratePct, 20); equal(full.commission, 80);
+    assert(!('cost' in withCode) && !JSON.stringify(rr).includes('"cost"'), 'the unit cost is never sent');
     const again = await attachPartnerForOrder({ couponCode: 'SECONDSHOP5', email: 'shopper@x.ca' });
     assert(!again.attached, 'never moved or attached twice');
     // the percentage is editable; 0 switches the code off
-    await savePartner({ email: JAY, pct: 10, customerPct: 0 }, OWNER);
+    await savePartner({ email: JAY, pct: 20, customerPct: 0 }, OWNER);
     equal(await ensureCustomerCoupon(JAY), null);
     equal((await query(`SELECT active FROM coupons WHERE upper(code) = 'SECONDSHOP5'`)).rows[0].active, false);
-    await savePartner({ email: JAY, pct: 10, customerPct: 7 }, OWNER);
+    await savePartner({ email: JAY, pct: 20, customerPct: 7 }, OWNER);
     equal(await ensureCustomerCoupon(JAY), 'SECONDSHOP7');
   } finally { done(); }
 });
@@ -248,5 +256,27 @@ test('changing the link code keeps the old links working and moves the discount 
     assert(await rejects(() => setPartnerCode('other@x.ca', 'jayson', OWNER), 'taken'), 'an old code cannot be claimed by someone else');
     await setPartnerCode(JAY, 'jayson', OWNER);                              // going back is allowed
     equal((await partnerReport(JAY)).partner.code, 'jayson');
+  } finally { done(); }
+});
+
+test('paid on price: a share of the sale price after discount, capped at a share of the profit', async () => {
+  const { done } = await withTestDb();
+  try {
+    await savePartner({ email: JAY, name: 'SecondShop', pct: 20, basis: 'price', pricePct: 8, pricePctRetail: 6, capPct: 35 }, OWNER);
+    const c = await upsertCustomer({ email: 'roger@x.ca', name: 'Roger' });
+    await setClientPartner(c, JAY, 'client', OWNER);
+    await order('roger@x.ca', { price: 1000, cost: 400 });                          // 8% of 1000 = 80; cap 35% of 600 = 210 -> 80
+    await order('roger@x.ca', { price: 1000, cost: 900 });                          // 8% = 80; cap 35% of 100 = 35 -> 35, capped
+    await order('roger@x.ca', { price: 1000, cost: 400, discount: 50, coupon: 'SECONDSHOP5' }); // retail: 6% of 950 = 57; cap 35% of 550 = 192.5 -> 57
+    const r = await partnerReport(JAY);
+    const o = r.clients[0].orders;
+    const [a, b, d] = [o.find((x) => x.profit === 600), o.find((x) => x.profit === 100), o.find((x) => x.retail)];
+    equal(a.commission, 80); equal(a.basis, 'price'); assert(!a.capped);
+    equal(b.commission, 35); assert(b.capped, 'the profit cap held it down');
+    equal(d.commission, 57); equal(d.ratePct, 6);
+    equal(r.partner.basis, 'price'); equal(r.partner.capPct, 35);
+    assert(await rejects(() => savePartner({ email: JAY, pct: 20, basis: 'nonsense' }, OWNER), 'basis'));
+    await savePartner({ email: JAY, pct: 20, basis: 'profit' }, OWNER);              // switching back
+    equal((await partnerReport(JAY)).clients[0].orders.find((x) => x.profit === 600).commission, 120);
   } finally { done(); }
 });

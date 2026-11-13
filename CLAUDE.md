@@ -247,6 +247,18 @@ Photograph -> Take photo (repeatable) / Choose from phone -> Save -> it leaves t
   shopper. That also means a deliberate below-cost clearance markdown still stands
   for members; only the extra 10% underneath it is floored. A cost of 0 (haul-away)
   is a real answer and floors nothing.
+- **Minimum 10% off public for members (2026-11-12, owner).** `MEMBER_MIN_DISCOUNT` in `lib/pricing.js`: on the regular path the
+  member price is the LOWER of (55% of retail / the June table) and 90% of the public price, then the cost floor still applies,
+  then the public ceiling. Why: many units are listed near 50% of retail, so 55% of retail sat above the public price and 12 of
+  109 units gave members nothing. Typed prices are exempt. Units whose cost + 10% is near the public price still get under 10%.
+- **A TYPED member price is bound only by cost and the public price (2026-11-12, owner)** — `boundTypedPrice` in `lib/pricing.js`. The $200-clear
+  and cost + 10% floors apply to the percentage rates only; they were refusing a typed $250 on a $100-cost cooktop that was plainly profitable.
+  A typed price under cost is still lifted to cost.
+- **A list price above the tracker's is a LIST-PRICE OVERRIDE (2026-11-13, owner).** The importer prices a unit as Retail x Condition % and
+  IGNORES the sheet's Suggested Sale Price cell, so typing a price there does nothing. On `/admin/member-pricing` a public price ABOVE the
+  tracker price now saves `list_price_overrides` (`lib/list-price-overrides.js`, settings key, `{sku: {price, tracker}}`), updates
+  `products.price` immediately, and is re-applied on every sync (`syncInventoryFromTracker`), so it survives. A price at or under the tracker
+  price is still a clearance markdown. "Back to tracker price" removes either. Retail and Condition are never touched.
 - **The four member numbers are SETTINGS now, not constants (2026-10-28).** `/admin/member-pricing`
   (ADMIN; `lib/member-rates.js`, `lib/member-rate-rules.js`, settings keys `member_rates` and
   `member_price_overrides`) sets the 55% / 90% / cost + 10% / $200, and a typed member price for one SKU.
@@ -872,6 +884,7 @@ thin margin — it is our own money covering the vendor's cost.
   his FULL cost. Comparing a tax-in selling price against it flatters every line
   by 13%, which on his LF25S6206S ($1,258.80 listed, $1,250 cost) is the
   difference between "thin" and "a loss".
+- **UPDATE 2026-11-10 (owner): the INVOICE check (`consignmentFloorProblem`, and the `minPrice` hint on the line) only refuses a line under the vendor's COST (pre-tax price vs full cost), not cost + 20%.** The +20% floor still governs the storefront, clearance and coupons.
 - `CONSIGNMENT_MIN_MARGIN_PCT` / `consignmentFloor(cost)` in `lib/constants.js` —
   one definition, `Math.ceil` because a floor that rounds down is not a floor.
   A cost of 0 floors nothing.
@@ -3825,6 +3838,13 @@ a redeploy"* — and never applied it back to the two roles that matter most.
   memory, the same caveat `lib/antifraud` documents for rate limits. Thirty
   seconds of residual access is not the threat this fixes; somebody who left in
   March still having admin in June is.
+- **THE CACHE IS LOADED, AWAITED, BEFORE ANY ROLE CHECK (fixed 2026-11-12).** The checks are synchronous and a serverless instance starts with an
+  EMPTY cache, so the first request on every cold instance refused anybody granted in the TABLE (a rep on `staff_access`, not in the env lists): "Not authorized",
+  a 404, a 403 on Mark paid, fine on the next click when a warm instance answered. The warm-up in `observe-node.js` is fire-and-forget (and may not even share the
+  routes' module instance), so it never closed the gap. Now `sessionFromToken` in `lib/auth.js` does `await refreshStaff()` after verifying the token, so every
+  session read (every page and route reads one before asking "is this person staff?") has current grants: one query per instance per `STAFF_TTL_MS`. A first load
+  that FAILS retries in 2s, not 30s. `test/staff-cold-cache.test.mjs`. **Any new code that calls `isAdmin` / `isSales` / `isSalesRep` on a session NOT from
+  `getSession` / `getRequestSession` must await `refreshStaff()` first.**
 - **A failed load does NOT clear the cache.** A blip must not sign everybody
   out. A sustained outage lets it go stale and table-granted access eventually
   stops, which is the right way round — and the environment lists keep working
@@ -5148,6 +5168,25 @@ For John Tobias (Business Development Manager, starts 2026-11-09). Plan: three P
 - NOT yet built (PR 2/3, see the plan): live profit on quotes, services catalog, rep holds, In-house/Mobile day, accounts, pipeline
   board, payment attribution and the 1% / 1.5% / 2% daily commission. Lead auto-reply/parsers (Addendum 2) need decisions first.
 
+### RS Ops' leads moved into the Sales Hub (added 2026-11-12)
+`lib/rsops-lead-map.js` (PURE), `lib/rsops-leads.js`, `/api/admin/rsops-leads` (ADMIN), `components/RsopsLeadImport.jsx` on `/sales/team`,
+migration `0066_leads_rsops_id` (**run Run schema migration after deploy**), `test/rsops-leads.test.mjs`. RS Ops' half: `GET/POST /api/intake/leads`
+(RSOPS_INTAKE_KEY) and `lib/leads-moved.js` there. Owner's decisions: a ONE-TIME move, OPEN leads only, ALL assigned to the rep chosen (John).
+- Won / lost / archived / closed stay in RS Ops. Do not contact comes across `lost`, UNASSIGNED, so the duplicate rule blocks re-adding it.
+- The Hub's duplicate rule still applies (a firm the Hub has stays with its owner, and is reported). `leads.rsops_id` (partial unique) makes a re-run add nothing.
+- History becomes `lead_activities` with `by_email NULL` and `by_name '<person> (RS Ops)'`, so it never counts toward a rep's daily targets. Consent (CASL),
+  unsubscribes, no-solicitation notices, extra contacts, notes and open tasks go into one summary note: the Hub has no consent field.
+- `first_touch_at` is set from RS Ops' real touches (an already-worked lead is not an SLA breach); `last_activity_at` is NOT backdated, so the 60-day
+  ownership clock starts at the move rather than returning old leads to the pool the same night.
+- Committed in batches of `BATCH` (the screen loops). RS Ops is told to lock only after the last batch, and only if nothing failed; once locked, RS Ops'
+  lead write routes (incl. sending lead emails) answer 410. Unsubscribe links and reply checking still work there. "Unlock RS Ops lead screens" undoes the lock.
+- Known: the imported leads arrive assigned-but-not-accepted, so the rep's "assigned to you" list shows the newest 50 until they accept them.
+- **They go to the POOL first and are DEALT OUT** (owner, 2026-11-12: "100-200 at a time, 20-40 per category"). The import's default is the pool;
+  "Give a rep a batch" (`dealRsopsLeads`, POST `action: 'deal'`) assigns up to N per category (max 50) and at most 200 per press, round-robin across
+  categories, warmest first (stage, dated next step, already spoken to). Restoration is left out unless ticked (its pitch is on hold). Only RS Ops
+  leads still unowned are dealt; pressing again gives the next batch. Giving one rep all 3,000+ at once would flood the 24h and 5-day flags and
+  hand back most of them after 60 days.
+
 ### Sales Hub phase 2 (added 2026-11-08): live profit, services, holds, pipeline
 `lib/quote-profit.js` (PURE, no imports), `lib/sales-services.js`, `lib/rep-holds.js`, `components/ProfitPanel.jsx`,
 `ServicesEditor.jsx`, `PipelineBoard.jsx`, `HoldControls.jsx`, `/admin/sales-services` (ADMIN), `/sales/pipeline`,
@@ -5235,9 +5274,7 @@ older gross-profit plan (`lib/commission-rules.js`, `MyProfit`); do not mix them
   salaried rep in it would be counted twice or raise "no rate" warnings.
 - **Ownership:** converting a lead makes the rep the owner ONLY if the customer is NEW. A lead whose email or phone is already a customer
   is linked but not credited (Addendum 1 rule 4); the owner assigns it with a written reason (`setCustomerOwner`, audit-logged).
-- **Tiers** are a setting (`rep_commission_tiers`): over $10,000 → 1%, over $20,000 → 1.5%, over $30,000 → 2%, of the WHOLE day (a cliff),
-  in cents. **The agreement contradicts itself at exactly $30,000**: the rule says "over" ($450), the example says $600. The default
-  follows the rule; the `inclusive` flag on the last tier reproduces the example. Both are pinned in the tests. Owner/lawyer to decide.
+- **Tiers** are a setting (`rep_commission_tiers`); the code DEFAULT (used until one is saved) is the owner's of 2026-11-10: over $5,000 → 1%, over $10,000 → 2%, over $20,000 → 3% (the figures first told to the rep; an earlier 1.5% / 2% / 3% four-tier version lasted a few hours and was signed by nobody we know of), of the WHOLE day (a cliff), in cents. "Over" is the reading of every line; the owner wrote "at $5,000", so if a day of exactly $5,000 should pay, tick "or more" on that tier on `/admin/sales-commission` (`inclusive`). The old agreement paid a $30,000 day 1.5% by its rule and 2% by its example; the agreement's example now uses a day clear of every line ($25,000 → $750). **A tier SAVED in the database beats the default**, so check `/admin/sales-commission` shows the three lines you expect. The agreement version is `2026-11-10.2`; the unique index is per version, so a rep who signed the first text can sign this one.
 - **Refunds** land on the Toronto day of the invoice's latest eligible payment at or before the refund, and the change in that day's
   commission (it is a cliff) is a negative ADJUSTMENT dated the refund's own day — never a rewrite of an earlier week.
 - Not built: tracking-code attribution at checkout (`?rep=` is only on catalog share links so far), commission on marketplace
@@ -5284,6 +5321,9 @@ anyone at SecondShop can sign in, send clients, and track the sales; 10% of marg
 - **"Member" is now "Reseller" in everything a customer or the owner reads** (application, agreement, emails, admin labels).
   Plain accounts need no approval; resellers are approved by hand. The agreement text changed, so `MEMBER_TERMS_VERSION` is
   2026-11-09 with a new pinned hash. Internal names (`role=member`, `/account/member`, `/admin/member-pricing`) are unchanged.
+- **Two commission rates (owner, 2026-11-09): 20% of profit on reseller sales, 15% on sales made with the end-user code.** The retail rate is DERIVED, `commission_pct - customer_pct`, because the customer's discount comes out of the partner's share. An order counts as retail when its `coupon_code` is the partner's end-user code (current or an old alias, e.g. SECONDSHOP5). Everything else, including manual invoices, earns the full rate. SecondShop is set to 20%.
+- **Transparency (owner, 2026-11-09):** each order on `/partner`, the statement and its CSV shows sale price, discount, PROFIT, rate and commission, and the page spells out how profit is worked out. The unit cost is never sent, but on a one-unit order profit reveals it by subtraction, which was accepted. `docs/partner-program/` holds the overview PDF given to Jayson.
+- **A partner is paid on PROFIT (default) or on PRICE** (`referral_partners.commission_basis`, migration 0065, set on `/admin/referral-partners`). Price basis = `price_pct` (8) of the sale price on reseller orders, `price_pct_retail` (6) on end-user-code orders, price being `subtotal - vendor_subtotal - discount`, and capped per order at `price_cap_pct` (35) of that order's PROFIT, so a thin sale never pays more than it made. The overview PDF offers both as Option A / B; set the basis when SecondShop chooses.
 - **The link code can be changed** (`setPartnerCode`, "Link code" on `/admin/referral-partners`, migration 0064). The old code is kept in `partner_code_aliases` so links already sent still work; the end-user discount code follows (JAYSON5 -> SECONDSHOP5; the old discount code stops working). Refused if the new code, or its discount code, is taken.
 - Not built: visit counts per link (one count for both), commission paid to individual teammates.
 
@@ -5327,3 +5367,21 @@ Employee Account on the tiered collected-sales plan) so one account never earns 
 - Three segments are marked start-here (property management, retailer, contractor); the Hub's lead `SEGMENTS` list carries all eight so a lead
   can be filed under the segment its script is for (`segmentKey` in `lib/leads.js` maps free-text to them).
 - The leave-behind prints the COMPANY's contact details, never the rep's login address.
+
+## The rep's agreements are signed in the Sales Hub (added 2026-11-10)
+`lib/employment-terms.js` (the text, PURE), `lib/rep-agreements.js`, migration `0065_rep_agreements` (**run Run schema migration**; the table is also created on
+first use), `/sales/agreement` (+ `/sales/agreement/copy`), `/api/sales/agreement`, `/api/admin/rep-agreement`, `components/RepAgreement.jsx` +
+`RepAgreementAdmin.jsx` (card on `/admin/sales-commission`), `test/rep-agreements.test.mjs`. Source: the Drive drafts "Employment Agreement – John Tobias
+(DRAFT v2)" and "Confidentiality & Non-Solicitation Agreement".
+- **Section 4.2 is BUILT from the tiers in force** (`getTiers()`), never typed, so what a rep signs can never promise a rate the system does not pay. Changing a tier
+  changes the text and the page's hash, so a page opened before the change refuses to sign ("reload and read it again").
+- **Signing = reads both to the end, types full legal name + home address, ticks the box, presses Sign.** Stored per document (`rep_agreements`): the exact text
+  (with name and address), its sha256, time, IP, browser. One signature per document per version (unique index); both documents or neither (one transaction).
+  Identity is the SESSION; only a rep signs (an admin may read). The signed copy is `/sales/agreement/copy` (Print / Save as PDF), a downloadable .html, and an
+  email to the rep and `SERVICE_EMAIL` (a mail failure never undoes a signature).
+- **SIGNING STAYS CLOSED until an admin opens it AND no [bracket] is left in the text.** The drafts carry decisions only the owner can make (company registered
+  address, normal hours, days commission is paid after employment, benefits, mileage): `FIELD_DEFS`, filled on `/admin/sales-commission`
+  (`rep_agreement_fields`). Both documents say in Drive that they are drafts for an Ontario employment lawyer; the "[Lawyer to confirm wording]" note on the
+  probation / no-notice clause is NOT in the signed text, so that review is still the owner's to get. Changing wording means a new `EMPLOYMENT_TERMS_VERSION`.
+- **The company countersignature is a separate admin act** (typed name, `countersign`); until then every copy says "Awaiting the company's countersignature".
+- Not built: a PDF generated server-side (the browser's Save as PDF is used), a drawn signature, signing by anyone but the rep.

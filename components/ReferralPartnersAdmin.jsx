@@ -7,7 +7,7 @@ const post = (body) => fetch(api, { method: 'POST', headers: { 'Content-Type': '
 export default function ReferralPartnersAdmin() {
   const [partners, setPartners] = useState([]);
   const [msg, setMsg] = useState('');
-  const [f, setF] = useState({ email: '', name: '', pct: '10', customerPct: '5' });
+  const [f, setF] = useState({ email: '', name: '', pct: '10', customerPct: '5', basis: 'profit', pricePct: '8', pricePctRetail: '6', capPct: '35' });
   const [pick, setPick] = useState('');          // partner email whose clients are being added
   const [q, setQ] = useState('');
   const [found, setFound] = useState([]);
@@ -27,7 +27,7 @@ export default function ReferralPartnersAdmin() {
   async function save(e) {
     e.preventDefault(); setMsg('');
     const r = await post({ action: 'save', ...f });
-    setMsg(r.ok ? done(r, 'Saved.') : r.error || 'Could not save.'); if (r.ok) { setF({ email: '', name: '', pct: '10', customerPct: '5' }); load(); }
+    setMsg(r.ok ? done(r, 'Saved.') : r.error || 'Could not save.'); if (r.ok) { setF({ email: '', name: '', pct: '10', customerPct: '5', basis: 'profit', pricePct: '8', pricePctRetail: '6', capPct: '35' }); load(); }
   }
   const done = (r, base) => (r.link ? `${base} ${r.emailed ? 'The sign-in email has been sent.' : 'The email did not send — pass this link on yourself:'} ${r.emailed ? '' : r.link}` : base);
   async function invite(email) {
@@ -79,6 +79,15 @@ export default function ReferralPartnersAdmin() {
           <input placeholder="Name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
           <input placeholder="% of profit" value={f.pct} onChange={(e) => setF({ ...f, pct: e.target.value })} style={{ width: 110 }} />
           <input placeholder="End-user % off" title="Discount the end-user link gives shoppers (0 = none)" value={f.customerPct} onChange={(e) => setF({ ...f, customerPct: e.target.value })} style={{ width: 130 }} />
+          <select value={f.basis} onChange={(e) => setF({ ...f, basis: e.target.value })} title="How this partner is paid">
+            <option value="profit">Paid on profit</option>
+            <option value="price">Paid on sale price (capped)</option>
+          </select>
+          {f.basis === 'price' && <>
+            <input placeholder="% of price (resellers)" value={f.pricePct} onChange={(e) => setF({ ...f, pricePct: e.target.value })} style={{ width: 150 }} />
+            <input placeholder="% of price (end users)" value={f.pricePctRetail} onChange={(e) => setF({ ...f, pricePctRetail: e.target.value })} style={{ width: 150 }} />
+            <input placeholder="Cap: % of profit" value={f.capPct} onChange={(e) => setF({ ...f, capPct: e.target.value })} style={{ width: 130 }} />
+          </>}
           <button className="btn btn-primary" type="submit">Save</button>
         </form>
         <p className="hint" style={{ marginBottom: 0 }}>The account is created for them and a link to choose a password is emailed (valid 7 days). Use “Send sign-in email” to send another.</p>
@@ -86,7 +95,7 @@ export default function ReferralPartnersAdmin() {
       {partners.map((p) => (
         <div className="panel" key={p.email} style={{ marginBottom: 12, opacity: p.revoked_at ? 0.55 : 1 }}>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <strong style={{ flex: 1 }}>{p.name || p.email} <span className="hint">{p.email} · {p.pct}% of profit · link code {p.code || '—'} · {p.customerCode ? `end-user code ${p.customerCode}` : 'no end-user code'} · {p.clients} client{p.clients === 1 ? '' : 's'}{p.revoked_at ? ' · revoked' : ''}</span></strong>
+            <strong style={{ flex: 1 }}>{p.name || p.email} <span className="hint">{p.email} · {p.basis === 'price' ? `${p.price_pct}% / ${p.price_pct_retail}% of price, capped at ${p.price_cap_pct}% of profit` : `${p.pct}% of profit`} · link code {p.code || '—'} · {p.customerCode ? `end-user code ${p.customerCode}` : 'no end-user code'} · {p.clients} client{p.clients === 1 ? '' : 's'}{p.revoked_at ? ' · revoked' : ''}</span></strong>
             {!p.revoked_at && <>
               <a className="btn" href={`/partner?as=${encodeURIComponent(p.email)}`} target="_blank" rel="noreferrer">See their page</a>
               <button className="btn" onClick={() => invite(p.email)}>Send sign-in email</button>
