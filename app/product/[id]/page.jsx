@@ -1,3 +1,4 @@
+import { productPath, publicSku } from '../../../lib/constants';
 import { notFound } from 'next/navigation';
 import { getById, getSiblings } from '../../../lib/inventory';
 import { decorateOne, decorate } from '../../../lib/pricing';
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }) {
   return {
     title: `${u.make} ${u.model} ${u.category} (${u.condition})`,
     description: seoDescription(u),
-    alternates: { canonical: `${SITE_URL}/product/${encodeURIComponent(u.id)}` },
+    alternates: { canonical: `${SITE_URL}${productPath(u.id)}` },
     openGraph: {
       title: `${u.make} ${u.model} ${u.category} (${u.condition}) | Bargain Bay`,
       description: seoDescription(u),
@@ -103,7 +104,7 @@ export default async function Product({ params }) {
     description: `${leadSentence(u)} ${seoDescription(u)}`,
     brand: { '@type': 'Brand', name: u.make },
     mpn: u.model,
-    sku: u.id,
+    sku: publicSku(u.id),
     offers: {
       ...(u.vendor ? { seller: { '@type': 'Organization', name: u.vendor.name } } : {}),
       '@type': 'Offer',
@@ -111,7 +112,7 @@ export default async function Product({ params }) {
       priceCurrency: 'CAD',
       availability: sold || (u.vesta && !u.inStock) ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
       itemCondition: CONDITION_SCHEMA[u.condition] || 'https://schema.org/UsedCondition',
-      url: `${SITE_URL}/product/${encodeURIComponent(u.id)}`
+      url: `${SITE_URL}${productPath(u.id)}`
     }
   };
 

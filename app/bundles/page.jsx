@@ -2,7 +2,7 @@ import { getAvailable } from '../../lib/inventory';
 import { getSession } from '../../lib/auth';
 import { decorate } from '../../lib/pricing';
 import { liveBundles } from '../../lib/bundles';
-import { money } from '../../lib/constants';
+import { money, productPath } from '../../lib/constants';
 import AddBundleButton from '../../components/AddBundleButton';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +33,7 @@ export default async function BundlesPage() {
               {b.blurb && <div className="card-model">{b.blurb}</div>}
               <ul style={{ paddingLeft: 18, margin: '8px 0', fontSize: 14 }}>
                 {b.units.map((u) => (
-                  <li key={u.id}><a href={`/product/${encodeURIComponent(u.id)}`}>{u.title || `${u.make} ${u.model}`}</a> <span style={{ color: 'var(--muted)' }}>{u.condition}</span></li>
+                  <li key={u.id}><a href={productPath(u.id)}>{u.title || `${u.make} ${u.model}`}</a> <span style={{ color: 'var(--muted)' }}>{u.condition}</span></li>
                 ))}
               </ul>
               <div className="price-row">

@@ -3,7 +3,7 @@ import { hasDb } from '../../../lib/db';
 import { getOrderByNumber } from '../../../lib/orders';
 import { getSession } from '../../../lib/auth';
 import { linkToken, verifyLinkToken } from '../../../lib/links';
-import { money, STATUS_LABELS, PICKUP_ADDRESS, SALES_EMAIL, ETRANSFER_EMAIL } from '../../../lib/constants';
+import { publicSku, money, STATUS_LABELS, PICKUP_ADDRESS, SALES_EMAIL, ETRANSFER_EMAIL } from '../../../lib/constants';
 import { availableSlots, pickupLabel } from '../../../lib/pickup';
 import PixelPurchase from '../../../components/PixelPurchase';
 import PickupBooker from '../../../components/PickupBooker';
@@ -185,7 +185,7 @@ export default async function OrderPage({ params, searchParams }) {
               {it.title}
               {/* Service, discount and trade-in lines carry no SKU — an empty
                   pair of brackets after every one of them reads as a bug. */}
-              {it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({it.sku})</span> : null}
+              {it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({publicSku(it.sku)})</span> : null}
               {it.kind === 'trade_in' && (
                 <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>
                   We&apos;ll collect this at {order.delivery_method === 'delivery' ? 'delivery' : 'pickup'}.

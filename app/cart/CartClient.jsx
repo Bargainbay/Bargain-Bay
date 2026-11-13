@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { getCart, removeFromCart, onCartChange } from '../../lib/cart';
-import { money, round2, HST_RATE, DELIVERY_FEE } from '../../lib/constants';
+import { productPath, money, round2, HST_RATE, DELIVERY_FEE } from '../../lib/constants';
 import ConditionPill from '../../components/ConditionPill';
 
 export default function CartClient({ catalog, member }) {
@@ -50,11 +50,11 @@ export default function CartClient({ catalog, member }) {
         <div>
           {items.map((u) => (
             <div className="cart-line" key={u.id}>
-              <a href={`/product/${encodeURIComponent(u.id)}`} className="thumb">
+              <a href={productPath(u.id)} className="thumb">
                 <img src={u.image} alt={u.title} />
               </a>
               <div>
-                <a href={`/product/${encodeURIComponent(u.id)}`} style={{ fontWeight: 600 }}>
+                <a href={productPath(u.id)} style={{ fontWeight: 600 }}>
                   {u.title || `${u.make} ${u.model}`}
                 </a>
                 <div style={{ fontSize: 12.5, color: 'var(--muted)', margin: '2px 0 6px' }}>

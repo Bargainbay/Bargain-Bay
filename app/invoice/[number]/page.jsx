@@ -9,7 +9,7 @@ import { linkToken } from '../../../lib/links';
 import RsInvoiceDocument from '../../../components/RsInvoiceDocument';
 import { brandFor } from '../../../lib/brands';
 import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel,
-         BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY, DEPOSIT_NOTE, isQuickSaleEmail } from '../../../lib/constants';
+         publicSku, BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY, DEPOSIT_NOTE, isQuickSaleEmail } from '../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoice' };
@@ -179,7 +179,7 @@ export default async function InvoicePage({ params, searchParams }) {
           return (
             <div className="summary-row" key={it.id} style={{ alignItems: 'flex-start', opacity: lineRefunded ? 0.6 : 1 }}>
               <span style={{ textDecoration: lineRefunded ? 'line-through' : 'none' }}>
-                {it.description}{it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({it.sku})</span> : null}
+                {it.description}{it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({publicSku(it.sku)})</span> : null}
                 {lineRefunded && <span className="pill sold" style={{ fontSize: 11, marginLeft: 6 }}>Refunded</span>}
                 {w && !lineRefunded && <span style={{ display: 'block', fontSize: 12.5, color: 'var(--green, #0f6e56)' }}>✓ {w}</span>}
                 {it.kind === 'trade_in' && (

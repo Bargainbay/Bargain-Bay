@@ -1,3 +1,4 @@
+import { productPath } from '../../../lib/constants';
 // Google Merchant Center product feed (RSS 2.0 + Google Shopping namespace).
 // Connect in Merchant Center: Products → Feeds → Scheduled fetch →
 //   <SITE_URL>/api/merchant-feed  (daily). See README "Google Merchant Center".
@@ -46,7 +47,7 @@ export async function GET() {
       <g:id>${esc(u.id)}</g:id>
       <title>${esc(`${u.title || `${u.make} ${u.model}`} (${u.condition})`)}</title>
       <description>${esc(`${leadSentence(u)} ${seoDescription(u)}`)}</description>
-      <link>${esc(`${SITE_URL}/product/${encodeURIComponent(u.id)}`)}</link>
+      <link>${esc(`${SITE_URL}${productPath(u.id)}`)}</link>
       <g:image_link>${esc(img)}</g:image_link>
       <g:price>${Number(u.price).toFixed(2)} CAD</g:price>
       <g:shipping_weight>${feedShippingWeightKg(u)} kg</g:shipping_weight>

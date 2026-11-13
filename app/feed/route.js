@@ -1,3 +1,4 @@
+import { productPath } from '../../lib/constants';
 // app/feed/route.js — Meta product feed at /feed (CSV).
 // Point Commerce Manager at https://<your-domain>/feed as a SCHEDULED feed.
 // Reuses the SAME data the storefront renders: catalog + clearance markdowns,
@@ -71,7 +72,7 @@ export async function GET() {
         condition: CONDITION_MAP[u.condition] || 'used',
         price: fmt(regular),
         sale_price: onSale ? fmt(current) : '',
-        link: `${SITE_URL}/product/${encodeURIComponent(u.id)}`,
+        link: `${SITE_URL}${productPath(u.id)}`,
         image_link: imageAbs,
         brand: u.make || 'Bargain Bay',
         product_type: u.category || '',

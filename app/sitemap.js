@@ -1,3 +1,4 @@
+import { productPath } from '../lib/constants';
 import { getAll } from '../lib/inventory';
 import { SITE_URL } from '../lib/site';
 
@@ -16,7 +17,7 @@ export default async function sitemap() {
     priority: 0.7
   }));
   const products = (await getAll()).map((u) => ({
-    url: `${SITE_URL}/product/${encodeURIComponent(u.id)}`,
+    url: `${SITE_URL}${productPath(u.id)}`,
     lastModified: now,
     changeFrequency: 'weekly',
     priority: 0.8

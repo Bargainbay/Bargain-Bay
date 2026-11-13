@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { money, round2, HST_RATE } from '../lib/constants';
+import { productPath, money, round2, HST_RATE } from '../lib/constants';
 import { groupByModel } from '../lib/group-units';
 import { addToCart, removeFromCart, getCart, onCartChange } from '../lib/cart';
 import { addToCart as addToCartPixel } from '../lib/fpixel';
@@ -147,9 +147,9 @@ export default function MemberPortal({ units, newSkus = [], firstVisit = false, 
         const mixed = g.maxPrice > g.minPrice;
         return (
           <div className="mp-row" key={rep.id} data-in={k ? 1 : 0}>
-            <a className="mp-img" href={`/product/${encodeURIComponent(rep.id)}`}>{rep.image && <img src={rep.image} alt="" loading="lazy" />}</a>
+            <a className="mp-img" href={productPath(rep.id)}>{rep.image && <img src={rep.image} alt="" loading="lazy" />}</a>
             <div style={{ minWidth: 0 }}>
-              <a className="mp-title" href={`/product/${encodeURIComponent(rep.id)}`}>{rep.title}</a>
+              <a className="mp-title" href={productPath(rep.id)}>{rep.title}</a>
               <div className="mp-meta">{[rep.make, rep.model].filter(Boolean).join(' · ')} · {conds.length > 1 ? 'Mixed conditions' : conds[0] || '—'}</div>
               <div className="mp-pills">
                 {save > 0 && <span className="mp-pill save">Save {money(save)} ({Math.round((save / rep.publicPrice) * 100)}%)</span>}
@@ -180,7 +180,7 @@ export default function MemberPortal({ units, newSkus = [], firstVisit = false, 
                 <summary>See each unit{mixed ? ` (${money(g.minPrice)} to ${money(g.maxPrice)})` : ''}</summary>
                 {g.units.map((u) => (
                   <div className="mp-unit" key={u.id}>
-                    <span><a href={`/product/${encodeURIComponent(u.id)}`} style={{ textDecoration: 'underline' }}>{u.id}</a> · {u.condition || '—'}{isNew.has(u.id) ? ' · new' : ''}</span>
+                    <span><a href={productPath(u.id)} style={{ textDecoration: 'underline' }}>{u.id}</a> · {u.condition || '—'}{isNew.has(u.id) ? ' · new' : ''}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}><b>{money(u.price)}</b><AddToCartButton sku={u.id} small price={u.price} name={u.title} /></span>
                   </div>
                 ))}

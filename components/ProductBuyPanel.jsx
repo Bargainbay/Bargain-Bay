@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { money, pctOff, PICKUP_ADDRESS } from '../lib/constants';
+import { money, pctOff, PICKUP_ADDRESS, productPath, publicSku } from '../lib/constants';
 import { warrantyPhrase } from '../lib/specs';
 import ConditionPill from './ConditionPill';
 import AddToCartButton from './AddToCartButton';
@@ -21,7 +21,7 @@ export default function ProductBuyPanel({ units, initialId }) {
   function choose(u) {
     setId(u.id);
     if (typeof window !== 'undefined' && window.history?.replaceState) {
-      window.history.replaceState(null, '', `/product/${encodeURIComponent(u.id)}`);
+      window.history.replaceState(null, '', productPath(u.id));
     }
   }
 
@@ -71,7 +71,7 @@ export default function ProductBuyPanel({ units, initialId }) {
 
         <div className="meta-list">
           <div>Model #: <b style={{ color: 'var(--ink)' }}>{sel.model}</b></div>
-          <div>SKU: {sel.id}</div>
+          <div>SKU: {publicSku(sel.id)}</div>
           {sel.vesta
             ? <div>🆕 <b style={{ color: 'var(--ink)' }}>New</b> — {sel.inStock ? 'in stock at Vesta Kitchen' : 'currently out of stock at Vesta Kitchen'}.</div>
             : sel.vendor
@@ -101,7 +101,7 @@ export default function ProductBuyPanel({ units, initialId }) {
                     <span className="unit-radio" aria-hidden="true" />
                     <span className="unit-option-main">
                       <ConditionPill condition={u.condition} />
-                      <span className="unit-option-sku">SKU {u.id}{u.sold ? ' · sold' : ''}{u.vendor ? ` · sold by ${u.vendor.name}` : ''}</span>
+                      <span className="unit-option-sku">SKU {publicSku(u.id)}{u.sold ? ' · sold' : ''}{u.vendor ? ` · sold by ${u.vendor.name}` : ''}</span>
                     </span>
                     <span className="unit-option-price">
                       <span className="price">{money(u.price)}</span>

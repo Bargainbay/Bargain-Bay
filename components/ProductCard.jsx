@@ -1,4 +1,4 @@
-import { money, pctOff } from '../lib/constants';
+import { money, pctOff, productPath } from '../lib/constants';
 import ConditionPill from './ConditionPill';
 import AddToCartButton from './AddToCartButton';
 
@@ -16,7 +16,7 @@ function shortTitle(t) {
 export default function ProductCard({ unit, count = 1 }) {
   const grouped = count > 1;
   const off = pctOff(unit.price, unit.compareAt);
-  const href = `/product/${encodeURIComponent(unit.id)}`;
+  const href = productPath(unit.id);
   const name = unit.title || `${unit.make} ${unit.model}`;
   return (
     <div className={'card' + (unit.onClearance ? ' card-clearance' : '')}>
