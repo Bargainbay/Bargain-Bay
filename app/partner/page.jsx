@@ -32,9 +32,9 @@ const RateSheet = () => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 160 }}>
           <b style={{ fontSize: 14 }}>Delivery and installation rate sheet</b>
-          <div className="hint" style={{ fontSize: 12.5 }}>What delivery, haul-away and installation cost and include.</div>
+          <div className="hint" style={{ fontSize: 12.5 }}>What delivery, haul-away and installation cost, and what each includes.</div>
         </div>
-        <a className="btn" href="/partner/RS-Solutions-Delivery-Rate-Sheet-2026.pdf" target="_blank" rel="noreferrer">Open the PDF</a>
+        <a className="btn" href="/partner/rates">Open the rates</a>
       </div>
     </div>
   </div>
