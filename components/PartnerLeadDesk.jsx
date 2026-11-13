@@ -16,6 +16,40 @@ function Badge({ l }) {
   return <span style={{ fontWeight: 700, color: l.success ? GOOD : bad ? '#7a7a7a' : '#2e2d2b' }}>{l.statusLabel}</span>;
 }
 
+// The board's columns: the real path a lead takes, left to right, and one last column for the ones that did not work out.
+const ENDED = ['not_interested', 'couldnt_reach', 'wrong_number', 'not_counted'];
+const COLUMNS = [
+  ['sent', 'Sent'], ['with_team', 'With our team'], ['called', 'Called'], ['talking', 'In conversation'],
+  ['quote', 'Quote sent'], ['sold', 'Sold'], ['completed', 'Completed'], ['ended', "Didn't work out"]
+];
+
+function LeadBoard({ leads, admin }) {
+  const colOf = (l) => (ENDED.includes(l.status) ? 'ended' : l.status);
+  return (
+    <div className="disp-cols" style={{ marginTop: 6 }}>
+      {COLUMNS.map(([key, label]) => {
+        const items = leads.filter((l) => colOf(l) === key);
+        return (
+          <div className="disp-col" key={key} style={{ flex: '0 0 240px' }}>
+            <div className="disp-col-head"><b style={{ color: key === 'sold' || key === 'completed' ? GOOD : undefined }}>{label}</b><span className="disp-count">{items.length}</span></div>
+            <div className="disp-col-body">
+              {items.length === 0 ? <p className="hint" style={{ margin: 0, fontSize: 12.5 }}>None</p> : items.map((l) => (
+                <div key={l.id} style={{ border: '1px solid #e5e5e0', borderRadius: 8, padding: '8px 10px', marginBottom: 8, background: '#fff' }}>
+                  <div style={{ fontWeight: 700 }}>{l.name}</div>
+                  <div className="hint" style={{ fontSize: 12 }}>{[l.phone, l.email].filter(Boolean).join(' · ')}</div>
+                  <div style={{ fontSize: 12.5, marginTop: 4 }}>{l.wants}</div>
+                  {key === 'ended' && <div style={{ fontSize: 12.5, marginTop: 4 }}><Badge l={l} /></div>}
+                  <div className="hint" style={{ fontSize: 11.5, marginTop: 4 }}>{admin && l.sender ? `${l.sender} · ` : ''}sent {fmt(l.submittedAt)} · updated {fmt(l.changedAt)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function PartnerLeadDesk({ role }) {
   const empty = { name: '', phone: '', email: '', want: '', howReached: '', note: '' };
   const [f, setF] = useState(empty);
@@ -25,6 +59,7 @@ export default function PartnerLeadDesk({ role }) {
   const [shot, setShot] = useState(null);            // { id, preview, candidates, warnings, message, picked }
   const [reading, setReading] = useState(false);
   const fileRef = useRef(null);
+  const [view, setView] = useState('board');
   const admin = role === 'admin';
 
   const load = async () => {
@@ -150,8 +185,14 @@ export default function PartnerLeadDesk({ role }) {
       )}
 
       <div className="panel">
-        <h2 style={{ marginTop: 0, fontSize: 18 }}>{admin ? 'All your leads' : 'What happened to your leads'}</h2>
-        {!data ? <p className="hint">Loading…</p> : data.leads.length === 0 ? <p className="hint" style={{ marginBottom: 0 }}>No leads sent yet.</p> : (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <h2 style={{ marginTop: 0, fontSize: 18 }}>{admin ? 'All your leads' : 'What happened to your leads'}</h2>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button type="button" className={view === 'board' ? 'btn btn-primary' : 'btn'} onClick={() => setView('board')}>Board</button>
+            <button type="button" className={view === 'list' ? 'btn btn-primary' : 'btn'} onClick={() => setView('list')}>List</button>
+          </div>
+        </div>
+        {!data ? <p className="hint">Loading…</p> : data.leads.length === 0 ? <p className="hint" style={{ marginBottom: 0 }}>No leads sent yet.</p> : view === 'board' ? <LeadBoard leads={data.leads} admin={admin} /> : (
           <div className="table-wrap"><table className="admin" style={{ minWidth: 0 }}>
             <thead><tr><th>Person</th>{admin && <th>Sent by</th>}<th>Wants</th><th>Sent</th><th>Status</th><th>Updated</th></tr></thead>
             <tbody>{data.leads.map((l) => (
