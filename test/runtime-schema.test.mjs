@@ -24,7 +24,7 @@ const NOT_TABLES = new Set([
   // Looked at and confirmed NOT tables: Postgres catalogs; `EXTRACT(QUARTER FROM d)` (lib/analytics);
   // an English sentence ("Created from invoice", lib/invoices); `of` in prose (lib/vendor-orders);
   // and CTEs built by a helper that the regex cannot see being defined (`latest`, `here` in lib/locations).
-  'pg_class', 'pg_namespace', 'pg_attribute', 'd', 'invoice', 'of', 'latest', 'here'
+  'pg_class', 'pg_namespace', 'pg_attribute', 'pg_constraint', 'd', 'invoice', 'of', 'latest', 'here'
 ]);
 
 function sourceFiles() {
