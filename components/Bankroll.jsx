@@ -30,7 +30,7 @@ export default function Bankroll({ initial }) {
   async function saveDeposit(e) {
     e.preventDefault();
     const r = await call({ action: 'cash_deposit', amount: dep.amount, date: dep.date }, 'dep');
-    if (r) { setDep((x) => ({ ...x, amount: '' })); setMsg('Deposit recorded. The till is down and the bank side is counted until TD shows it; then press "Bank shows it".'); }
+    if (r) { setDep((x) => ({ ...x, amount: '' })); setMsg('Deposit recorded. The till is down, and the deposit counts as on its way until the bank shows it. It clears itself then; or press "Mark received".'); }
   }
   const [payTo, setPayTo] = useState({});
   const [openRow, setOpenRow] = useState(null);
@@ -376,7 +376,7 @@ export default function Bankroll({ initial }) {
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>{signed(e.amount)}</td>
                 <td style={{ fontSize: 12 }}>{e.bankShows ? <b style={{ color: 'var(--c1)' }}>The bank now shows {cad(e.bankShows.gross)} to {e.bankShows.who} on {e.bankShows.date}</b> : ''}</td>
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <button className="dash-filter active" disabled={!!busy} onClick={() => call({ action: 'clear', id: e.id, line: e.bankShows ? { kind: e.bankShows.kind, id: e.bankShows.id } : null }, 'row')}>Bank shows it</button>{' '}
+                  <button className="dash-filter active" disabled={!!busy} onClick={() => call({ action: 'clear', id: e.id, line: e.bankShows ? { kind: e.bankShows.kind, id: e.bankShows.id } : null }, 'row')}>Mark received</button>{' '}
                   <button className="dash-filter" disabled={!!busy} onClick={() => window.confirm('Void this entry?') && call({ action: 'void', id: e.id }, 'row')}>Void</button>
                 </td>
               </tr>))}

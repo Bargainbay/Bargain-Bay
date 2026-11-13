@@ -111,3 +111,18 @@ test('cleanRead KEEPS ONLY WHAT IS PLAUSIBLE FROM THE MODEL', () => {
   assert(h.tax === null && h.date === null && h.category === null, 'impossible tax, odd date and unknown category are dropped');
   assert(cleanRead('no json here').total === null);
 });
+
+test('SEVERAL RECEIPTS CAN BE PAID BACK BY ONE TRANSFER', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { markReimbursedMany } = await import('../lib/receipts.js');
+    const a = await createReceipt({ date: '2026-11-05', vendor: 'A', total: 40, category: 'Tools / supplies', paidWith: 'personal', paidBy: 'Ravi', by: 'x' });
+    const b = await createReceipt({ date: '2026-11-06', vendor: 'B', total: 60.5, category: 'Tools / supplies', paidWith: 'personal', paidBy: 'Ravi', by: 'x' });
+    const r = await markReimbursedMany([a, b], { how: 'bank', by: 'x' });
+    equal(r.count, 2); equal(r.total, 100.5);
+    const left = (await listReceipts()).filter((x) => x.reimburse === 'owed');
+    equal(left.length, 0);
+    let threw = false; try { await markReimbursedMany([a], { how: 'bank', by: 'x' }); } catch { threw = true; }
+    assert(threw, 'cannot be paid back twice');
+  } finally { await done(); }
+});
