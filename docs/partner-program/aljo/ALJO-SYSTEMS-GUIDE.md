@@ -63,7 +63,7 @@ generators do not. Reseller pricing is not shown to your lead generators.
 ## 9. Money
 - We pay **Aljo**, not individuals. How you share it with your people is your business.
 - Commission is a percentage of **our profit** on each order (what we sold it for, less what it cost us, after any discount). A cheaper sale means a smaller profit and a smaller commission.
-- Rates: reseller sales 15% of profit; sales with your people's codes 10% of profit; leads our team closes 10% of profit. [confirm before sending]
+- Rates: reseller sales 15% of profit; sales with your people's codes 10% of profit; leads our team closes 10% of profit.
 - [Commission is earned when an order is delivered and paid; reported on your portal and a monthly statement.]
 - Refunds and cancellations reduce commission. A customer is attached to Aljo [permanently / for 12 months] once their first order is credited.
 - You see sale price, discount, profit and commission for orders from your team. Your lead generators see none of this.
