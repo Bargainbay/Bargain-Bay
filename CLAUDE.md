@@ -5327,6 +5327,32 @@ anyone at SecondShop can sign in, send clients, and track the sales; 10% of marg
 - **The link code can be changed** (`setPartnerCode`, "Link code" on `/admin/referral-partners`, migration 0064). The old code is kept in `partner_code_aliases` so links already sent still work; the end-user discount code follows (JAYSON5 -> SECONDSHOP5; the old discount code stops working). Refused if the new code, or its discount code, is taken.
 - Not built: visit counts per link (one count for both), commission paid to individual teammates.
 
+## Lead generators inside a partner organisation (Aljo Systems, phase 1 added 2026-11-12)
+Design and the two guides for Aljo and their generators: `docs/partner-program/aljo/` (DESIGN.md is the plan; build in 6 PRs).
+Phase 1 = migration `0067_partner_roles` (**run Run schema migration after deploy**), `test/partner-generators.test.mjs`.
+- **`partner_members.role`**: `admin` (default, so SecondShop is unchanged) or `affiliate` (a lead generator). **`getPartner()` is
+  admin-only on purpose**: every existing partner screen and route (clients, money, statement, request, team) asks it, so a generator
+  is refused by all of them without any of them knowing generators exist. Generators are read with `getPartnerSeat()` instead
+  (`{ org, role, name }`; `org` is a scoping key, never sent to a browser). **Any new partner-facing route must use one or the other
+  deliberately.** The test calls the real routes as a generator and requires 403.
+- **`referral_partners.generators`** is the switch (OFF by default; `addTeamMember(..., role:'affiliate')` is refused until an admin turns it on at
+  `/admin/referral-partners`). **`lead_pct`** (default 10) = % of PROFIT when our reps close a sale from the partner's leads.
+- A generator's invite email says nothing about commission. Only admin logins may add or remove logins.
+- Owner decisions 2026-11-12: **no consent tick on leads** (the person contacted the generator, which is the inquiry); commission is a % of OUR PROFIT
+  (reseller 15, code sales 10 = 15 less the 5% customer discount, leads we close 10 — editable per partner); everything else per DESIGN.md section 9.
+- **Generators are ON for every organisation by default** (owner, 2026-11-12: "organisations add generators automatically, no extra work for me"): `referral_partners.generators` defaults true and is only a KILL SWITCH. Guard rails instead of a gate: max `MAX_GENERATORS` (100) per organisation and 30 added per hour. Adding one creates their login and emails them a set-password link.
+
+### Phase 2 — leads (added 2026-11-13; migration `0068_partner_leads`, also created idempotently at runtime by `ensurePartnerLeadSchema`, so nothing has to be pressed)
+`lib/partner-leads.js`, `lib/partner-lead-rules.js` (no imports; also used by the browser form), `lib/partner-attribution.js`, `components/PartnerLeadDesk.jsx` (`/partner`, both roles),
+`/api/partner/leads`, `/admin/partner-leads` + `components/PartnerLeadQueue.jsx` + `/api/admin/partner-leads` (STAFF: sales, reps, admin), `/api/cron/partner-leads` (hourly, heartbeat + `EXPECTED`), `test/partner-leads.test.mjs`.
+- A partner lead is an ordinary `leads` row (`partner_email`, `partner_member_email`, `source='referral'`, warm, owner NULL). **Consent: no tick** (owner); the generator picks how the person reached them.
+- **FIRST IN TIME WINS**: advisory lock on phone + email, check, insert, in ONE transaction, with partial unique indexes under it; refused if the person is any lead, any customer, or a partner login. The second sender gets one fixed sentence (`DUP_OTHER`) and a saved notice: **never who, when, which organisation, or that they are a customer**. Only an organisation's own admin sees who sent a duplicate, and only inside that organisation (`partner_dup_attempts`).
+- **The sender sees a derived status, never a note, rep or number** (`partnerStatus`): Sent, With our team, Called, In conversation, Quote sent, Sold, Completed, Not interested, Couldn't reach, Wrong number, Not counted. **Sold/Completed need a real counted order for the customer the lead became** (`SALE` predicate, so a cancelled order takes it back).
+- **Our team claims** from `/admin/partner-leads` (conditional UPDATE, so two reps cannot both get it), then works it with the Sales Hub's own `logLeadActivity` / `setLeadStage` / `convertLead`. A rep is NOT made the owner of a partner's customer (`convertLead`): the customer is stamped `partner_email` + `partner_member_email` instead, so no account earns on two plans. New lost reasons: `wrong_number`, `junk`.
+- New-lead email is batched (one per 10 minutes, to `PARTNER_LEAD_NOTIFY_TO` else `SALES_EMAIL`) and AWAITED; unclaimed after 2 hours is chased hourly. Ceilings: 10 leads per 10 minutes, 40 a day per login.
+- **The owner's backend: `/admin/partner-portfolio`** (admin; Reports hub entry + a "Partners" tab; `lib/partner-portfolio.js`, `/api/admin/partner-portfolio`): every organisation with generators, leads sent/reached/sold/completed, duplicates, orders, earned/pending/paid/owed, per-generator rows, flags (owed, missing costs, no leads in 14 days, idle generators, quality) and the change log. Read-only, recomputed from the same sources the partners' own pages use.
+- Not built yet: per-generator codes and the lead -> order attribution at checkout and nightly reconcile (3), screenshot reader (4), posting kit and nightly take-down email (5).
+
 ## Referral partners (added 2026-11-09)
 `lib/referral-partners.js`, migration `0060_referral_partners` (**run Run schema migration after deploy**), `/partner` (the partner's own page),
 `/admin/referral-partners` (ADMIN; on the Reports hub), `/api/admin/referral-partners`, `test/referral-partners.test.mjs`. Owner's rule: **Jayson

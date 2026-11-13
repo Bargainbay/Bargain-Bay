@@ -7,7 +7,7 @@ const post = (body) => fetch(api, { method: 'POST', headers: { 'Content-Type': '
 export default function ReferralPartnersAdmin() {
   const [partners, setPartners] = useState([]);
   const [msg, setMsg] = useState('');
-  const [f, setF] = useState({ email: '', name: '', pct: '10', customerPct: '5', basis: 'profit', pricePct: '8', pricePctRetail: '6', capPct: '35' });
+  const [f, setF] = useState({ email: '', name: '', pct: '10', customerPct: '5', basis: 'profit', pricePct: '8', pricePctRetail: '6', capPct: '35', leadPct: '', generators: '' });
   const [pick, setPick] = useState('');          // partner email whose clients are being added
   const [q, setQ] = useState('');
   const [found, setFound] = useState([]);
@@ -27,7 +27,7 @@ export default function ReferralPartnersAdmin() {
   async function save(e) {
     e.preventDefault(); setMsg('');
     const r = await post({ action: 'save', ...f });
-    setMsg(r.ok ? done(r, 'Saved.') : r.error || 'Could not save.'); if (r.ok) { setF({ email: '', name: '', pct: '10', customerPct: '5', basis: 'profit', pricePct: '8', pricePctRetail: '6', capPct: '35' }); load(); }
+    setMsg(r.ok ? done(r, 'Saved.') : r.error || 'Could not save.'); if (r.ok) { setF({ email: '', name: '', pct: '10', customerPct: '5', basis: 'profit', pricePct: '8', pricePctRetail: '6', capPct: '35', leadPct: '', generators: '' }); load(); }
   }
   const done = (r, base) => (r.link ? `${base} ${r.emailed ? 'The sign-in email has been sent.' : 'The email did not send — pass this link on yourself:'} ${r.emailed ? '' : r.link}` : base);
   async function invite(email) {
@@ -88,6 +88,12 @@ export default function ReferralPartnersAdmin() {
             <input placeholder="% of price (end users)" value={f.pricePctRetail} onChange={(e) => setF({ ...f, pricePctRetail: e.target.value })} style={{ width: 150 }} />
             <input placeholder="Cap: % of profit" value={f.capPct} onChange={(e) => setF({ ...f, capPct: e.target.value })} style={{ width: 130 }} />
           </>}
+          <input placeholder="% of profit on leads we close" title="Commission on sales our reps close from this partner's leads (blank = leave as is; new partners start at 10)" value={f.leadPct} onChange={(e) => setF({ ...f, leadPct: e.target.value })} style={{ width: 210 }} />
+          <select value={f.generators} onChange={(e) => setF({ ...f, generators: e.target.value })} title="On for everyone by default. Turn OFF only to stop one organisation adding lead generators">
+            <option value="">Lead generators: leave as is (on by default)</option>
+            <option value="true">Lead generators: ON</option>
+            <option value="false">Lead generators: OFF (kill switch)</option>
+          </select>
           <button className="btn btn-primary" type="submit">Save</button>
         </form>
         <p className="hint" style={{ marginBottom: 0 }}>The account is created for them and a link to choose a password is emailed (valid 7 days). Use “Send sign-in email” to send another.</p>

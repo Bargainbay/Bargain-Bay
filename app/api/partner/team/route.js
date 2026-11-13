@@ -1,4 +1,5 @@
-// A partner's team: any signed-in member of the organisation can add or remove a login. The partner is read from the
+// A partner's team: any ADMIN login of the organisation can add or remove a login. getPartner() is admin-only, so a lead
+// generator (role 'affiliate') is refused here with 403 and can never add anybody. The partner is read from the
 // SESSION, never the request, so nobody can touch another organisation's team.
 import { NextResponse } from 'next/server';
 import { getSession } from '../../../../lib/auth';
@@ -14,7 +15,7 @@ export async function POST(req) {
   if (!partner) return NextResponse.json({ error: 'Not a referral partner.' }, { status: 403 });
   let b; try { b = await req.json(); } catch { return NextResponse.json({ error: 'Bad request' }, { status: 400 }); }
   try {
-    if (b.action === 'add') return NextResponse.json(await addTeamMember(partner.email, { email: b.email, name: b.name }, s.email));
+    if (b.action === 'add') return NextResponse.json(await addTeamMember(partner.email, { email: b.email, name: b.name, role: b.role }, s.email));
     if (b.action === 'remove') {
       if (String(b.email || '').toLowerCase().trim() === s.email.toLowerCase()) return NextResponse.json({ error: 'You cannot remove your own login.' }, { status: 400 });
       return NextResponse.json(await removeTeamMember(partner.email, b.email, s.email));
