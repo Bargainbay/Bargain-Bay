@@ -36,7 +36,7 @@ const unit = { id: 'U1', price: 1000, compareAt: 2000, cost: 400 };
 
 test('a lower regular rate lowers the member price', () => {
   const r = normalizeRates({ regularRate: 0.60 }).rates;
-  equal(memberRegular(unit, r), 1000, '60% of 2000 = 1200, capped at the public 1000');
+  equal(memberRegular(unit, r), 900, '60% of 2000 = 1200, held to the 10% minimum discount (900)');
   const cheap = { id: 'U2', price: 1500, compareAt: 1500, cost: 400 };
   equal(memberRegular(cheap, normalizeRates({ regularRate: 0.60 }).rates), 900);
   equal(memberRegular(cheap, normalizeRates({ regularRate: 0.70 }).rates), 1050);
@@ -53,7 +53,7 @@ test('however low the rate, the floor holds', () => {
 test('a typed override is held between the floor and the public price', () => {
   const r = DEFAULT_MEMBER_RATES;
   equal(memberRegular(unit, r, { U1: 700 }), 700, 'inside the bounds it stands');
-  equal(memberRegular(unit, r, { U1: 10 }), 600, 'too low is lifted to the floor');
+  equal(memberRegular(unit, r, { U1: 10 }), 400, 'too low is lifted to cost only');
   equal(memberRegular(unit, r, { U1: 99999 }), 1000, 'too high is capped at the public price');
 });
 
@@ -61,7 +61,7 @@ test('a typed override applies to a clearance unit, held between the floor and t
   const r = DEFAULT_MEMBER_RATES;
   const cl = { price: 1000 };
   equal(unitPrices(unit, { cl, member: true, rates: r, overrides: { U1: 700 } }).price, 700, 'typed price stands');
-  equal(unitPrices(unit, { cl, member: true, rates: r, overrides: { U1: 10 } }).price, 600, 'lifted to the floor');
+  equal(unitPrices(unit, { cl, member: true, rates: r, overrides: { U1: 10 } }).price, 400, 'lifted to cost only');
   equal(unitPrices(unit, { cl, member: true, rates: r, overrides: { U1: 99999 } }).price, 1000, 'capped at the clearance price');
   equal(unitPrices(unit, { cl, member: true, rates: r, overrides: {} }).price, 900, 'no typed price: the usual 90%');
   equal(unitPrices(unit, { cl, member: false, rates: r, overrides: { U1: 700 } }).price, 1000, 'the public never sees it');
