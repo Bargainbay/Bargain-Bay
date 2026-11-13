@@ -62,9 +62,9 @@ export default async function PartnerPortfolioPage() {
             <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Lead generators ({o.generatorRows.length})</summary>
             {o.generatorRows.length === 0 ? <p className="hint">None yet.</p> : (
               <div className="table-wrap"><table className="admin" style={{ minWidth: 0 }}>
-                <thead><tr><th>Name</th><th>Sent</th><th>With us</th><th>Reached</th><th>Sold</th><th>Completed</th><th>Unreachable</th><th>Junk</th><th>Duplicates</th><th>Last sent</th></tr></thead>
+                <thead><tr><th>Name</th><th>Code</th><th>Sent</th><th>With us</th><th>Reached</th><th>Sold</th><th>Completed</th><th>Unreachable</th><th>Junk</th><th>Duplicates</th><th>Last sent</th></tr></thead>
                 <tbody>{o.generatorRows.map((g) => (
-                  <tr key={g.email}><td>{g.name}<div className="hint" style={{ fontSize: 11.5 }}>{g.email}</div></td><td>{g.sent}</td><td>{g.withTeam}</td><td>{g.called}</td><td>{g.sold}</td><td>{g.completed}</td><td>{g.unreachable}</td><td>{g.notCounted}</td><td>{g.dups}</td><td>{fmt(g.last)}</td></tr>))}</tbody>
+                  <tr key={g.email}><td>{g.name}<div className="hint" style={{ fontSize: 11.5 }}>{g.email}</div></td><td>{g.code || '—'}</td><td>{g.sent}</td><td>{g.withTeam}</td><td>{g.called}</td><td>{g.sold}</td><td>{g.completed}</td><td>{g.unreachable}</td><td>{g.notCounted}</td><td>{g.dups}</td><td>{fmt(g.last)}</td></tr>))}</tbody>
               </table></div>
             )}
           </details>
