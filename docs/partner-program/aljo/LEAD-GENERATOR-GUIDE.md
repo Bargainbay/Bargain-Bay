@@ -69,7 +69,7 @@ The same lists are on your dashboard all day. Before posting something, refresh 
 Facebook's rules for selling.
 
 ## Your code and link
-You have your own code (like `ALJO-ANNA5`) and link. When a customer uses the code at checkout, or arrives from your link and buys, the
+You have your own code (like `ALJO-ANNA`) and link. When a customer uses the code at checkout, or arrives from your link and buys, the
 sale is credited to you. Tell buyers: "Use my code at bargainbay.ca for a discount." Using your own code on your own order doesn't count.
 
 ## Rules

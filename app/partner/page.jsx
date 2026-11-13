@@ -106,14 +106,14 @@ export default async function PartnerPage({ searchParams }) {
             <span className="hint">{c.orders.length} order{c.orders.length === 1 ? '' : 's'} · {money(c.sales)} · commission {money(c.commission)}</span>
           </div>
           <div className="hint" style={{ margin: '4px 0 8px' }}>
-            {[c.email, c.phone].filter(Boolean).join(' · ') || 'No contact details on file'} · {MEMBER[c.membership]}
+            {[c.email, c.phone].filter(Boolean).join(' · ') || 'No contact details on file'} · {MEMBER[c.membership]}{c.generator ? ` · via ${c.generator}` : ''}
           </div>
           {c.orders.length === 0 ? <p className="hint" style={{ marginBottom: 0 }}>No orders yet.</p> : (
             <div className="table-wrap"><table className="admin" style={{ minWidth: 0 }}>
-              <thead><tr><th>Order</th><th>Date</th><th>Items</th><th>Total (pre-tax)</th><th>Discount</th><th>Profit</th><th>Rate</th><th>Status</th><th>Commission</th></tr></thead>
+              <thead><tr><th>Order</th><th>Date</th><th>Items</th><th>How</th><th>Total (pre-tax)</th><th>Discount</th><th>Profit</th><th>Rate</th><th>Status</th><th>Commission</th></tr></thead>
               <tbody>{c.orders.map((o) => (
                 <tr key={o.number}>
-                  <td>{o.number}</td><td>{fmt(o.at)}</td><td>{o.items || '—'}</td>
+                  <td>{o.number}</td><td>{fmt(o.at)}</td><td>{o.items || '—'}</td><td>{o.own ? 'your own team (no commission)' : o.source === 'lead' ? 'from a lead' : o.source === 'code' ? 'with a code' : 'reseller'}</td>
                   <td>{money(o.subtotal)}</td><td>{o.discount > 0 ? money(o.discount) : '—'}</td><td>{money(o.profit)}</td><td>{rateText(o)}</td><td>{o.statusLabel}</td><td>{money(o.commission)} <span className="hint">{o.earned ? 'earned' : 'pending'}</span></td>
                 </tr>))}</tbody>
             </table></div>

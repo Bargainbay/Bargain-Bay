@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { WANTS, HOW_REACHED } from '../lib/partner-lead-rules';
+import CopyLink from './CopyLink';
 
 // A partner's lead desk. A lead generator sees only what they sent and what happened to it; an organisation admin sees the
 // whole organisation's leads, each generator's numbers and the duplicates refused. Nothing here ever shows money.
@@ -48,6 +49,15 @@ export default function PartnerLeadDesk({ role }) {
         </div>
       )}
 
+      {!admin && data?.mine?.code && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <h2 style={{ marginTop: 0, fontSize: 18 }}>Your code and link</h2>
+          <p className="hint" style={{ marginTop: 0 }}>Your code is <b>{data.mine.code}</b>. Shoppers who use it at bargainbay.ca get {data.mine.discountPct}% off, and the sale is credited to you. Share your link, or tell them to type the code at checkout.</p>
+          <CopyLink link={data.mine.link} />
+          <p className="hint" style={{ marginBottom: 0 }}>Orders from your customers so far: <b>{data.mine.orders}</b>{data.mine.delivered ? ` (${data.mine.delivered} delivered)` : ''}.</p>
+        </div>
+      )}
+
       <div className="panel" style={{ marginBottom: 14 }}>
         <h2 style={{ marginTop: 0, fontSize: 18 }}>Send a lead</h2>
         <p className="hint" style={{ marginTop: 0 }}>Only someone who contacted <b>you</b>. Double-check the phone number: it is the only way we can reach them.</p>
@@ -75,9 +85,9 @@ export default function PartnerLeadDesk({ role }) {
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Your lead generators</h2>
           {data.overview.generators.length === 0 ? <p className="hint">Add your first lead generator in “Your team” above.</p> : (
             <div className="table-wrap"><table className="admin" style={{ minWidth: 0 }}>
-              <thead><tr><th>Name</th><th>Sent</th><th>With our team</th><th>Reached</th><th>Sold</th><th>Completed</th><th>Unreachable</th><th>Junk</th><th>Duplicates</th><th>Last sent</th></tr></thead>
+              <thead><tr><th>Name</th><th>Code</th><th>Sent</th><th>With our team</th><th>Reached</th><th>Sold</th><th>Completed</th><th>Unreachable</th><th>Junk</th><th>Duplicates</th><th>Orders</th><th>Last sent</th></tr></thead>
               <tbody>{data.overview.generators.map((g) => (
-                <tr key={g.email}><td>{g.name}<div className="hint" style={{ fontSize: 11.5 }}>{g.email}</div></td><td>{g.sent}</td><td>{g.withTeam}</td><td>{g.called}</td><td>{g.sold}</td><td>{g.completed}</td><td>{g.unreachable}</td><td>{g.notCounted}</td><td>{g.dups}</td><td>{fmt(g.last)}</td></tr>))}</tbody>
+                <tr key={g.email}><td>{g.name}<div className="hint" style={{ fontSize: 11.5 }}>{g.email}</div></td><td>{g.code || '—'}</td><td>{g.sent}</td><td>{g.withTeam}</td><td>{g.called}</td><td>{g.sold}</td><td>{g.completed}</td><td>{g.unreachable}</td><td>{g.notCounted}</td><td>{g.dups}</td><td>{g.orders}</td><td>{fmt(g.last)}</td></tr>))}</tbody>
             </table></div>
           )}
           {data.overview.duplicates.length > 0 && (<>

@@ -26,7 +26,7 @@ export default function PartnerTeam({ team, me, generators = false }) {
       <p className="hint" style={{ marginTop: 0 }}>Admins sign in with their own email and see the same clients, orders and commission.{generators ? ' Lead generators see only the leads they send themselves, and never any money.' : ''}</p>
       {list.map((m) => (
         <div key={m.email} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0' }}>
-          <span style={{ flex: 1 }}>{m.name ? `${m.name} · ` : ''}{m.email}{m.primary ? ' (main login)' : ''}{m.role === 'affiliate' ? ' · lead generator' : ''}</span>
+          <span style={{ flex: 1 }}>{m.name ? `${m.name} · ` : ''}{m.email}{m.primary ? ' (main login)' : ''}{m.role === 'affiliate' ? ` · lead generator${m.code ? ' · code ' + m.code : ''}` : ''}</span>
           {!m.primary && m.email.toLowerCase() !== String(me).toLowerCase() && <button className="btn" onClick={() => remove(m.email)}>Remove</button>}
         </div>))}
       <form onSubmit={add} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
