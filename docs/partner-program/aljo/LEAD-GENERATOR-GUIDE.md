@@ -30,6 +30,7 @@ you only think might want one.
 2. We read it and fill in the form for you. **Check every field, especially the phone number.** Fix anything wrong.
 3. Pick how they reached you and press **Send**.
 Nothing is sent until you press Send. If the screenshot can't be read, fill in the form by hand.
+Your screenshot is stored privately with the lead so we have the record of the enquiry, and it is deleted after 90 days. Only use a screenshot of someone who contacted you.
 
 ## If it says "already entered"
 It means someone else sent this person first (or we already know them). That's normal. It's not counted for you, and nothing is wrong with

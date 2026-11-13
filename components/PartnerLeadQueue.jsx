@@ -46,6 +46,7 @@ function Card({ l, claim, work, onDone }) {
       </div>
       <div className="hint" style={{ marginTop: 4 }}>From {l.sender}{l.org ? ` (${l.org})` : ''}{l.owner && !work ? ` · with ${l.owner}` : ''}{l.stage !== 'new' ? ` · ${l.stage}` : ''}</div>
       {l.note && <div style={{ fontSize: 13.5, marginTop: 4 }}>{l.note}</div>}
+      {l.screenshotId && <div style={{ marginTop: 4 }}><a href={`/api/partner/screenshot?id=${l.screenshotId}`} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline', fontSize: 13.5 }}>See the screenshot they sent</a></div>}
       {work && open && <Work lead={l} onDone={onDone} />}
     </div>
   );

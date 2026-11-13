@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { compress } from './photo-pick';
 import { WANTS, HOW_REACHED } from '../lib/partner-lead-rules';
 import CopyLink from './CopyLink';
 
@@ -21,6 +22,9 @@ export default function PartnerLeadDesk({ role }) {
   const [data, setData] = useState(null);
   const [res, setRes] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [shot, setShot] = useState(null);            // { id, preview, candidates, warnings, message, picked }
+  const [reading, setReading] = useState(false);
+  const fileRef = useRef(null);
   const admin = role === 'admin';
 
   const load = async () => {
@@ -29,11 +33,35 @@ export default function PartnerLeadDesk({ role }) {
   };
   useEffect(() => { load(); }, []);
 
+  const apply = (c) => setF((cur) => ({ ...cur, name: c.name || '', phone: c.phone || '', email: c.email || '', want: c.want || cur.want, howReached: c.how || cur.howReached, note: c.note || cur.note }));
+
+  // One picture per request, shrunk on the phone first (a serverless body is ~4.5MB). Text needs more pixels than a photo does.
+  async function pickShot(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setReading(true); setRes(null); setShot(null);
+    try {
+      const blob = await compress(file, { max: 2200, quality: 0.85 });
+      const fd = new FormData(); fd.set('file', blob, 'screenshot.jpg');
+      const r = await fetch(`${api}/screenshot`, { method: 'POST', body: fd });
+      const text = await r.text(); let d = {}; try { d = JSON.parse(text); } catch { /* an HTML error page */ }
+      if (!r.ok || !d.screenshotId) {
+        setRes({ ok: false, error: d.error || (r.status === 413 ? 'That picture is too big to send.' : 'We could not send that screenshot. Please fill in the form by hand.') });
+      } else {
+        const cands = d.candidates || [];
+        setShot({ id: d.screenshotId, preview: URL.createObjectURL(blob), candidates: cands, warnings: d.warnings || [], message: d.message || null, picked: cands.length === 1 });
+        if (cands.length === 1) apply(cands[0]);
+      }
+    } catch { setRes({ ok: false, error: 'That picture could not be read on your phone. Please fill in the form by hand.' }); }
+    setReading(false);
+  }
+
   async function send(e) {
     e.preventDefault(); setBusy(true); setRes(null);
-    const r = await call({ action: 'submit', ...f });
+    const r = await call({ action: 'submit', ...f, screenshotId: shot?.id || undefined });
     setBusy(false); setRes(r);
-    if (r.ok) setF(empty);
+    if (r.ok) { setF(empty); setShot(null); }
     load();
   }
   async function dismiss() { await call({ action: 'seen' }); load(); }
@@ -61,6 +89,27 @@ export default function PartnerLeadDesk({ role }) {
       <div className="panel" style={{ marginBottom: 14 }}>
         <h2 style={{ marginTop: 0, fontSize: 18 }}>Send a lead</h2>
         <p className="hint" style={{ marginTop: 0 }}>Only someone who contacted <b>you</b>. Double-check the phone number: it is the only way we can reach them.</p>
+        <div style={{ marginBottom: 10 }}>
+          <input ref={fileRef} type="file" accept="image/*" onChange={pickShot} style={{ display: 'none' }} />
+          <button type="button" className="btn" disabled={reading} onClick={() => fileRef.current?.click()}>{reading ? 'Reading your screenshot…' : 'Fill it in from a screenshot'}</button>
+        </div>
+        {shot && (
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start', margin: '0 0 12px', padding: 10, background: '#fafaf7', border: '1px solid #e5e5e0', borderRadius: 8 }}>
+            <img src={shot.preview} alt="Your screenshot" style={{ width: 120, maxHeight: 200, objectFit: 'contain', border: '1px solid #ddd', borderRadius: 6, background: '#fff' }} />
+            <div style={{ flex: 1, minWidth: 220, fontSize: 14 }}>
+              {shot.candidates.length > 0 && <div style={{ fontWeight: 700 }}>Read from your screenshot. Please check every field, especially the phone number.</div>}
+              {shot.candidates.length > 1 && !shot.picked && (
+                <div style={{ marginTop: 6 }}>
+                  <div className="hint">There is more than one person in it. Who is this lead for?</div>
+                  {shot.candidates.map((c, i) => (<button key={i} type="button" className="btn" style={{ margin: '4px 6px 0 0' }} onClick={() => { apply(c); setShot({ ...shot, picked: true }); }}>{c.name || c.phone || c.email}</button>))}
+                </div>
+              )}
+              {shot.message && <div style={{ color: '#b45309', marginTop: 4 }}>{shot.message}</div>}
+              {shot.warnings.map((w, i) => <div key={i} style={{ color: '#b45309', marginTop: 4 }}>{w}</div>)}
+              <button type="button" className="btn" style={{ marginTop: 8 }} onClick={() => setShot(null)}>Remove the screenshot</button>
+            </div>
+          </div>
+        )}
         <form onSubmit={send} style={{ display: 'grid', gap: 8, maxWidth: 520 }}>
           <input placeholder="Their name" required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoComplete="off" />
           <input placeholder="Phone (10 digits)" inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} autoComplete="off" />

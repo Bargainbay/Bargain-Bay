@@ -25,10 +25,9 @@ async function decode(file) {
 // survive a serverless body limit, let alone a rural upload. If any step of the
 // shrink fails we send the ORIGINAL rather than nothing — a 4MB photo that
 // arrives beats a tidy one that doesn't.
-export async function compress(file) {
+export async function compress(file, { max = 1400, quality = 0.72 } = {}) {
   const { src, w, h, done } = await decode(file);
   try {
-    const max = 1400;
     let width = w, height = h;
     if (!width || !height) return file;
     if (width > max || height > max) {
@@ -38,7 +37,7 @@ export async function compress(file) {
     const c = document.createElement('canvas');
     c.width = width; c.height = height;
     c.getContext('2d').drawImage(src, 0, 0, width, height);
-    const out = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.72));
+    const out = await new Promise((r) => c.toBlob(r, 'image/jpeg', quality));
     return out || file;
   } finally {
     done();
