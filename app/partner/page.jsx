@@ -18,6 +18,16 @@ const MEMBER = { approved: 'Reseller pricing approved', pending: 'Reseller appli
 // A referral partner's page: their clients, each client's orders and live status, and the commission owed.
 // The partner is read from the SESSION; an admin may preview one with ?as=<email>. Nothing in the request
 // can name whose clients to read for anyone else. Cost and profit are never returned.
+const RateSheet = () => (
+  <div className="panel" style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+    <div style={{ flex: 1, minWidth: 220 }}>
+      <div style={{ fontWeight: 700 }}>Reference: delivery and installation rate sheet</div>
+      <div className="hint" style={{ fontSize: 13 }}>What delivery, haul-away and installation cost, and what each service includes. Handy when a customer asks.</div>
+    </div>
+    <a className="btn btn-primary" href="/partner/RS-Solutions-Delivery-Rate-Sheet-2026.pdf" target="_blank" rel="noreferrer">Open the PDF</a>
+  </div>
+);
+
 export default async function PartnerPage({ searchParams }) {
   const session = await getSession();
   if (!session) redirect('/login?next=/partner');
@@ -38,6 +48,7 @@ export default async function PartnerPage({ searchParams }) {
         </div>
         <p style={{ fontSize: 14 }}>You are signed in with {seat.orgName || 'your team'}. Send a lead below and see what happened to each one you sent.</p>
       </div>
+      <RateSheet />
       <PartnerLeadDesk role="affiliate" />
       <PartnerPostingKit /></div>);
     }
@@ -79,6 +90,7 @@ export default async function PartnerPage({ searchParams }) {
       )}
 
       {!preview && <PartnerTeam team={r.team} me={session.email} generators={r.partner.generators} />}
+      {!preview && r.partner.generators && <RateSheet />}
       {!preview && r.partner.generators && <div style={{ marginBottom: 12 }}><PartnerLeadDesk role="admin" /></div>}
       {!preview && r.partner.generators && <PartnerPostingKit />}
 
