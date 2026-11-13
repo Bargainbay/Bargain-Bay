@@ -18,6 +18,28 @@ const MEMBER = { approved: 'Reseller pricing approved', pending: 'Reseller appli
 // A referral partner's page: their clients, each client's orders and live status, and the commission owed.
 // The partner is read from the SESSION; an admin may preview one with ?as=<email>. Nothing in the request
 // can name whose clients to read for anyone else. Cost and profit are never returned.
+const RateSheet = () => (
+  <div className="panel" style={{ marginBottom: 14 }}>
+    <div style={{ fontWeight: 700, marginBottom: 8 }}>Learn and reference</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <b style={{ fontSize: 14 }}>Training manual</b>
+          <div className="hint" style={{ fontSize: 12.5 }}>How to post, send leads and use your code. About 15 minutes.</div>
+        </div>
+        <a className="btn btn-primary" href="/partner/training">Open the manual</a>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <b style={{ fontSize: 14 }}>Delivery and installation rate sheet</b>
+          <div className="hint" style={{ fontSize: 12.5 }}>What delivery, haul-away and installation cost, and what each includes.</div>
+        </div>
+        <a className="btn" href="/partner/rates">Open the rates</a>
+      </div>
+    </div>
+  </div>
+);
+
 export default async function PartnerPage({ searchParams }) {
   const session = await getSession();
   if (!session) redirect('/login?next=/partner');
@@ -38,6 +60,7 @@ export default async function PartnerPage({ searchParams }) {
         </div>
         <p style={{ fontSize: 14 }}>You are signed in with {seat.orgName || 'your team'}. Send a lead below and see what happened to each one you sent. <a href="/account?stay=1" style={{ textDecoration: 'underline' }}>My orders and profile</a></p>
       </div>
+      <RateSheet />
       <PartnerLeadDesk role="affiliate" />
       <PartnerPostingKit /></div>);
     }
@@ -79,6 +102,7 @@ export default async function PartnerPage({ searchParams }) {
       )}
 
       {!preview && <PartnerTeam team={r.team} me={session.email} generators={r.partner.generators} />}
+      {!preview && r.partner.generators && <RateSheet />}
       {!preview && r.partner.generators && <div style={{ marginBottom: 12 }}><PartnerLeadDesk role="admin" /></div>}
       {!preview && r.partner.generators && <PartnerPostingKit />}
 
