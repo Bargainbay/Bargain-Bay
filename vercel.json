@@ -29,6 +29,14 @@
       "schedule": "*/30 * * * *"
     },
     {
+      "path": "/api/cron/partner-digest",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/partner-digest",
+      "schedule": "30 0 * * *"
+    },
+    {
       "path": "/api/cron/partner-leads",
       "schedule": "10 * * * *"
     },

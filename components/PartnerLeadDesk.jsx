@@ -134,9 +134,9 @@ export default function PartnerLeadDesk({ role }) {
           <h2 style={{ marginTop: 0, fontSize: 18 }}>Your lead generators</h2>
           {data.overview.generators.length === 0 ? <p className="hint">Add your first lead generator in “Your team” above.</p> : (
             <div className="table-wrap"><table className="admin" style={{ minWidth: 0 }}>
-              <thead><tr><th>Name</th><th>Code</th><th>Sent</th><th>With our team</th><th>Reached</th><th>Sold</th><th>Completed</th><th>Unreachable</th><th>Junk</th><th>Duplicates</th><th>Orders</th><th>Last sent</th></tr></thead>
+              <thead><tr><th>Name</th><th>Code</th><th>Sent</th><th>With our team</th><th>Reached</th><th>Sold</th><th>Completed</th><th>Unreachable</th><th>Junk</th><th>Duplicates</th><th>Orders</th><th>Listings up</th><th>Sold, still up</th><th>Last sent</th></tr></thead>
               <tbody>{data.overview.generators.map((g) => (
-                <tr key={g.email}><td>{g.name}<div className="hint" style={{ fontSize: 11.5 }}>{g.email}</div></td><td>{g.code || '—'}</td><td>{g.sent}</td><td>{g.withTeam}</td><td>{g.called}</td><td>{g.sold}</td><td>{g.completed}</td><td>{g.unreachable}</td><td>{g.notCounted}</td><td>{g.dups}</td><td>{g.orders}</td><td>{fmt(g.last)}</td></tr>))}</tbody>
+                <tr key={g.email}><td>{g.name}<div className="hint" style={{ fontSize: 11.5 }}>{g.email}</div></td><td>{g.code || '—'}</td><td>{g.sent}</td><td>{g.withTeam}</td><td>{g.called}</td><td>{g.sold}</td><td>{g.completed}</td><td>{g.unreachable}</td><td>{g.notCounted}</td><td>{g.dups}</td><td>{g.orders}</td><td>{g.posting?.up ?? 0}</td><td style={{ color: g.posting?.late ? '#b91c1c' : undefined, fontWeight: g.posting?.toTakeDown ? 700 : undefined }}>{g.posting?.toTakeDown ?? 0}{g.posting?.late ? ` (${g.posting.late} late)` : ''}</td><td>{fmt(g.last)}</td></tr>))}</tbody>
             </table></div>
           )}
           {data.overview.duplicates.length > 0 && (<>
