@@ -17,7 +17,7 @@ stock and what sold so the Facebook posts can be taken down. Generators never se
 |---|---|---|
 | Aljo as an organisation with logins, `/partner`, statement, payments, funnel | `referral_partners`, `partner_members`, `lib/referral-partners.js` (SecondShop) | Add a **role** to `partner_members` (`admin` default = today's behaviour, `affiliate` = new, sees only their own) |
 | Reseller sign-up link | `/join/<code>` + approval at `/admin/resellers` | None. Aljo uses the org link; generators do **not** recruit resellers |
-| End-user code | `ensureCustomerCoupon` (`SECONDSHOP5`) | One code **per generator** (`ALJO-ANNA5`), attributing to the org **and** the generator |
+| End-user code | `ensureCustomerCoupon` (`SECONDSHOP5`) | One code **per generator** (`ALJO-ANNA`), attributing to the org **and** the generator |
 | Lead tracker, duplicate rule, claim, stages, activity log | Sales Hub `leads`, `lead_activities`, `findDuplicate` | Add partner columns, a partner-aware duplicate path, a "Partner leads" queue |
 | Reading a document/image with Claude | `lib/pdf-stops.js` (same API pattern) | New `lib/lead-screenshot.js`, same discipline: proposes, a person confirms |
 | Posting kit (title, caption, photos zip) | `lib/fb-kit.js`, `/api/admin/fb-listings/zip` | Affiliate-facing version with their own link/code; posted-ticks move from browser storage to the database |
@@ -146,10 +146,10 @@ nothing happened. Guards:
 ## 6. Codes and links
 
 - **Org links (Aljo):** reseller link `/join/<code>`, end-user link `/join/<code>/shop` — exactly SecondShop's.
-- **Per-generator coupon:** created when Aljo adds the person (e.g. `ALJO-ANNA5`), customer discount = the org's `customer_pct`
+- **Per-generator coupon:** created when Aljo adds the person (e.g. `ALJO-ANNA`), customer discount = the org's `customer_pct`
   (default 5%), `commission_pct 0` (we pay via the partner system, as SecondShop). Same checkout floors as any typed code. Format:
   upper-case letters/digits, unique across all coupons, no look-alike characters, profanity/collision checked.
-- **Per-generator link** `bargainbay.ca/?ref=ALJO-ANNA5` (and `/product/<id>?ref=...`), already understood by `RefCapture`.
+- **Per-generator link** `bargainbay.ca/?ref=ALJO-ANNA` (and `/product/<id>?ref=...`), already understood by `RefCapture`.
 - Attribution: coupon on the order → org + generator; else the 30-day cookie/ref; else the lead match (5). The **most recent valid**
   generator code wins only if the customer has no partner yet (never re-assigned).
 - Visits per generator are counted (existing daily-per-browser rule). Visits ≠ conversions, labelled.

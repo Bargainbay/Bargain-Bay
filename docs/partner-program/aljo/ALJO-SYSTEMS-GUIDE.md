@@ -19,7 +19,7 @@ You can see:
 ## 3. Setting up your team
 1. Open **Your team** in your portal, pick **Lead generator**, enter their name and email and press **Add a lead generator**. There is nothing to ask us for: it works straight away (up to 100 people).
 2. They get an email to choose a password. Their login only ever shows **their own** leads.
-3. Each person automatically gets their own discount code (for example `ALJO-ANNA5`) and link. Do not make codes up yourselves.
+3. Each person automatically gets their own discount code (for example `ALJO-ANNA`) and link. Do not make codes up yourselves.
 4. To remove someone, press **Remove**. Their login stops immediately and their code stops working for new orders. Leads they already sent stay on the record.
 5. Only you (the Aljo logins) can add or remove people. Your lead generators cannot.
 6. **Add people you know.** Each person is your responsibility: what they post, and how they treat the people they contact, reflects on you and on us.
