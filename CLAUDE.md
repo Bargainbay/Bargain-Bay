@@ -254,6 +254,11 @@ Photograph -> Take photo (repeatable) / Choose from phone -> Save -> it leaves t
 - **A TYPED member price is bound only by cost and the public price (2026-11-12, owner)** — `boundTypedPrice` in `lib/pricing.js`. The $200-clear
   and cost + 10% floors apply to the percentage rates only; they were refusing a typed $250 on a $100-cost cooktop that was plainly profitable.
   A typed price under cost is still lifted to cost.
+- **A list price above the tracker's is a LIST-PRICE OVERRIDE (2026-11-13, owner).** The importer prices a unit as Retail x Condition % and
+  IGNORES the sheet's Suggested Sale Price cell, so typing a price there does nothing. On `/admin/member-pricing` a public price ABOVE the
+  tracker price now saves `list_price_overrides` (`lib/list-price-overrides.js`, settings key, `{sku: {price, tracker}}`), updates
+  `products.price` immediately, and is re-applied on every sync (`syncInventoryFromTracker`), so it survives. A price at or under the tracker
+  price is still a clearance markdown. "Back to tracker price" removes either. Retail and Condition are never touched.
 - **The four member numbers are SETTINGS now, not constants (2026-10-28).** `/admin/member-pricing`
   (ADMIN; `lib/member-rates.js`, `lib/member-rate-rules.js`, settings keys `member_rates` and
   `member_price_overrides`) sets the 55% / 90% / cost + 10% / $200, and a typed member price for one SKU.

@@ -126,7 +126,7 @@ export default function MemberPricingManager({ initial }) {
         )}
         <p className="hint" style={{ marginTop: 0 }}>
           Type a new <b>public</b> price and/or <b>member</b> price in a row and press <b>Save</b> (or Enter). A member never pays less than the floor or more than the public price.
-          Changing a public price marks the unit down from its tracker price, so it shows on the Clearance page; <i>Back to tracker price</i> undoes that.
+          A public price under the tracker price is a markdown and shows on the Clearance page; one above it becomes the unit's list price. <i>Back to tracker price</i> undoes either.
         </p>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
           <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Search by SKU, brand, model or name" style={{ ...input, width: '100%', maxWidth: 380 }} />
@@ -145,7 +145,7 @@ export default function MemberPricingManager({ initial }) {
                 <td>{r.retail ? money(r.retail) : '—'}</td>
                 <td>
                   <div>$ <input style={cell} inputMode="decimal" value={ed.pub ?? plain(r.public)} onChange={(e) => setEdit(r.sku, { pub: e.target.value })} onKeyDown={onKey} aria-label={`Public price for ${r.sku}`} /></div>
-                  {r.onClearance && <button type="button" className="btn" style={{ marginTop: 4, fontSize: 12, padding: '2px 8px' }} disabled={rowBusy === r.sku} onClick={() => { if (confirm(`Put ${r.sku} back to its tracker price of ${money(r.listPrice)}?`)) saveRow(r, { publicPrice: null }); }}>Back to tracker price ({money(r.listPrice)})</button>}
+                  {(r.onClearance || r.listOverride) && <button type="button" className="btn" style={{ marginTop: 4, fontSize: 12, padding: '2px 8px' }} disabled={rowBusy === r.sku} onClick={() => { if (confirm(`Put ${r.sku} back to its tracker price of ${money(r.trackerPrice ?? r.listPrice)}?`)) saveRow(r, { publicPrice: null }); }}>Back to tracker price ({money(r.trackerPrice ?? r.listPrice)})</button>}
                 </td>
                 <td>
                   <div>$ <input style={cell} inputMode="decimal" value={ed.member ?? plain(r.memberNow)} onChange={(e) => setEdit(r.sku, { member: e.target.value })} onKeyDown={onKey} aria-label={`Member price for ${r.sku}`} /></div>
