@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, canKeepBooks } from '../../../../lib/auth';
 import { audit } from '../../../../lib/audit';
-import { createReceipt, linkReceiptToBank, markReimbursed, voidReceipt, bankCandidates } from '../../../../lib/receipts';
+import { createReceipt, linkReceiptToBank, markReimbursed, markReimbursedMany, voidReceipt, bankCandidates } from '../../../../lib/receipts';
 import { loadBankroll } from '../../../../lib/bankroll-load';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +40,9 @@ export async function POST(req) {
     } else if (b.action === 'reimburse') {
       await markReimbursed(b.id, { how: b.how, on: b.on, note: b.note, bankExpenseId: b.bankExpenseId, by });
       await audit(session, { action: 'receipt.reimbursed', entity: 'receipt', entityId: String(b.id), summary: `Receipt #${b.id} paid back (${b.how})` });
+    } else if (b.action === 'reimburse_many') {
+      const r = await markReimbursedMany(b.ids, { how: b.how, on: b.on, note: b.note, bankExpenseId: b.bankExpenseId, by });
+      await audit(session, { action: 'receipt.reimbursed', entity: 'receipt', entityId: (b.ids || []).join(','), summary: `${r.count} receipts paid back, $${r.total.toFixed(2)} (${b.how})` });
     } else if (b.action === 'void') {
       await voidReceipt(b.id, by);
       await audit(session, { action: 'receipt.void', entity: 'receipt', entityId: String(b.id), summary: `Receipt #${b.id} voided` });

@@ -258,3 +258,18 @@ test('A CASH DEPOSIT IS ONE ENTRY: THE TILL GOES DOWN, THE BANK SIDE IS COUNTED,
     assert(threw, 'a zero deposit is refused');
   } finally { await done(); }
 });
+
+test('A CASH DEPOSIT CLEARS ITSELF WHEN THE BANK SHOWS THAT AMOUNT COMING IN, SO IT IS NEVER COUNTED TWICE', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { addCashDeposit } = await import('../lib/bankroll.js');
+    await addEntry({ date: today(), kind: 'count', amount: 2000, note: 'count', by: 't' });
+    await addCashDeposit({ date: today(), amount: 1810, by: 't' });
+    const waiting = await bankrollSummary(today(), { days: 7 });
+    equal(waiting.pending, 1810, 'on its way until the bank shows it');
+    await recordActivity({ extId: 'plaid:dep1', date: today(), amount: 1810, pending: false, name: 'DEPOSIT', description: 'DEPOSIT', memo: null, category: null, accountLabel: 'TD', counterparty: null });
+    const after = await bankrollSummary(today(), { days: 7 });
+    equal(after.pending, 0, 'the on-its-way balance is back to zero by itself');
+    equal(after.entries.find((e) => e.kind === 'pending').cleared, true);
+  } finally { await done(); }
+});

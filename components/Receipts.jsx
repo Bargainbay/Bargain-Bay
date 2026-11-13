@@ -91,6 +91,15 @@ export default function Receipts({ d, setD }) {
 
   const rows = (d.receipts || []).filter((r) => view === 'all' || (view === 'owed' && r.reimburse === 'owed') || (view === 'waiting' && r.bank && r.bank.state === 'waiting'));
   const owedN = (d.receipts || []).filter((r) => r.reimburse === 'owed').length;
+  // Everything owed to one person, so a single transfer that paid them back can close all of it at once.
+  const owedBy = {};
+  for (const r of d.receipts || []) if (r.reimburse === 'owed') { const k = r.paidBy || 'Unnamed'; (owedBy[k] = owedBy[k] || []).push(r); }
+  async function payBackAll(who) {
+    const list = owedBy[who];
+    const total = list.reduce((t, r) => t + Number(r.total), 0);
+    if (!window.confirm(`Mark ${list.length} receipts (${cad(total)}) as paid back to ${who}? Use this when one transfer covered them all.`)) return;
+    await act({ action: 'reimburse_many', ids: list.map((r) => r.id), how: 'bank', on: back.on, note: `Paid back ${who} in one transfer` }, 'backall');
+  }
   const waitN = (d.receipts || []).filter((r) => r.bank && r.bank.state === 'waiting').length;
 
   return (
@@ -140,6 +149,13 @@ export default function Receipts({ d, setD }) {
           {[['all', 'All'], ['owed', `Owed back (${owedN})`], ['waiting', `Waiting for the bank (${waitN})`]].map(([k, l]) => (
             <button key={k} type="button" className={'dash-filter' + (view === k ? ' active' : '')} onClick={() => setView(k)}>{l}</button>))}
         </div>
+        {Object.keys(owedBy).length > 0 && (
+          <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {Object.keys(owedBy).map((who) => (
+              <button key={who} type="button" className="dash-filter active" disabled={!!busy} onClick={() => payBackAll(who)}>
+                Mark all {owedBy[who].length} owed to {who} paid back ({cad(owedBy[who].reduce((t, r) => t + Number(r.total), 0))})</button>))}
+          </div>
+        )}
         {rows.length === 0 ? <p className="hint" style={{ margin: 0 }}>Nothing here yet.</p> : (
           <div className="table-wrap"><table className="admin">
             <thead><tr><th>Date</th><th>Vendor</th><th style={{ textAlign: 'right' }}>Total</th><th>Paid with</th><th>Bank</th><th>Paid back</th><th /></tr></thead>
