@@ -4,7 +4,7 @@ import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { upsertCustomer } from '../lib/customers.js';
 import {
-  savePartner, addTeamMember, removeTeamMember, getPartnerSeat, partnerByCouponCode, attachPartnerForOrder, partnerReport, ensureGeneratorCode
+  savePartner, revokePartner, setPartnerCode, addTeamMember, removeTeamMember, getPartnerSeat, partnerByCouponCode, attachPartnerForOrder, partnerReport, ensureGeneratorCode
 } from '../lib/referral-partners.js';
 import { submitLead, myLeads, orgOverview, claimLead } from '../lib/partner-leads.js';
 import { reconcilePartnerLeads } from '../lib/partner-attribution.js';
@@ -163,5 +163,24 @@ test('with no customer discount there is no generator coupon, and switching it b
     await savePartner({ email: ORG, pct: 15, customerPct: 5 }, OWNER);
     equal((await codeOf(ANNA)).code, 'ALJO-ANNA');
     equal(await ensureGeneratorCode('nobody@x.ca'), null);
+  } finally { done(); }
+});
+
+test('revoking a partner switches off the end-user code and every generator code, and frees the link code for reuse', async () => {
+  const { done } = await withTestDb();
+  try {
+    await setup();
+    const a = await codeOf(ANNA);
+    await revokePartner(ORG, OWNER);
+    const active = (await query(`SELECT code, active FROM coupons WHERE code IN ('ALJO5', 'ALJO-ANNA', 'ALJO-BEN') ORDER BY code`)).rows;
+    equal(active.length, 3);
+    assert(active.every((c) => c.active === false), 'no shopper can still get a discount from a revoked partner');
+    equal(await partnerByCouponCode('ALJO-ANNA'), null);
+    assert(a.coupon_id, 'the generator coupon existed');
+    // A new organisation can now have the link code the revoked one held.
+    const NEW = 'real@aljo.ca';
+    await savePartner({ email: NEW, name: 'Aljo Real', pct: 15 }, OWNER);
+    const got = await setPartnerCode(NEW, 'aljo', OWNER);
+    equal(got.code, 'aljo');
   } finally { done(); }
 });
