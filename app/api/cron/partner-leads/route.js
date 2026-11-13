@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cronAuthorized } from '../../../../lib/cron-auth';
 import { withHeartbeat } from '../../../../lib/heartbeat';
-import { remindUnclaimedLeads, notifyTeamOfNewLeads } from '../../../../lib/partner-leads';
+import { remindUnclaimedLeads, notifyTeamOfNewLeads, notifyGeneratorsOfSales } from '../../../../lib/partner-leads';
 import { reconcilePartnerLeads } from '../../../../lib/partner-attribution';
 import { purgeOldScreenshots } from '../../../../lib/lead-screenshot';
 
@@ -18,7 +18,8 @@ async function run(req) {
     const reminded = await remindUnclaimedLeads();
     const reconciled = await reconcilePartnerLeads();
     const purged = await purgeOldScreenshots();
-    return NextResponse.json({ ok: true, notified, reminded, reconciled, purged });
+    const sold = await notifyGeneratorsOfSales();
+    return NextResponse.json({ ok: true, notified, reminded, reconciled, purged, sold });
   } catch (e) {
     console.error('cron partner-leads failed', e?.message || e);
     return NextResponse.json({ ok: false, error: e?.message || 'failed' }, { status: 500 });

@@ -36,7 +36,7 @@ export default async function PartnerPage({ searchParams }) {
           <h1 style={{ marginTop: 0, color: 'var(--charcoal)', flex: 1 }}>Welcome{seat.name ? `, ${seat.name.split(' ')[0]}` : ''}</h1>
           <PartnerSignOut />
         </div>
-        <p style={{ fontSize: 14 }}>You are signed in with {seat.orgName || 'your team'}. Send a lead below and see what happened to each one you sent.</p>
+        <p style={{ fontSize: 14 }}>You are signed in with {seat.orgName || 'your team'}. Send a lead below and see what happened to each one you sent. <a href="/account?stay=1" style={{ textDecoration: 'underline' }}>My orders and profile</a></p>
       </div>
       <PartnerLeadDesk role="affiliate" />
       <PartnerPostingKit /></div>);
