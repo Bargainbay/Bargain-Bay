@@ -3,6 +3,7 @@ import { cronAuthorized } from '../../../../lib/cron-auth';
 import { withHeartbeat } from '../../../../lib/heartbeat';
 import { remindUnclaimedLeads, notifyTeamOfNewLeads } from '../../../../lib/partner-leads';
 import { reconcilePartnerLeads } from '../../../../lib/partner-attribution';
+import { purgeOldScreenshots } from '../../../../lib/lead-screenshot';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,7 +17,8 @@ async function run(req) {
     const notified = await notifyTeamOfNewLeads();
     const reminded = await remindUnclaimedLeads();
     const reconciled = await reconcilePartnerLeads();
-    return NextResponse.json({ ok: true, notified, reminded, reconciled });
+    const purged = await purgeOldScreenshots();
+    return NextResponse.json({ ok: true, notified, reminded, reconciled, purged });
   } catch (e) {
     console.error('cron partner-leads failed', e?.message || e);
     return NextResponse.json({ ok: false, error: e?.message || 'failed' }, { status: 500 });
