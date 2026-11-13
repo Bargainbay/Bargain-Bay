@@ -19,12 +19,24 @@ const MEMBER = { approved: 'Reseller pricing approved', pending: 'Reseller appli
 // The partner is read from the SESSION; an admin may preview one with ?as=<email>. Nothing in the request
 // can name whose clients to read for anyone else. Cost and profit are never returned.
 const RateSheet = () => (
-  <div className="panel" style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-    <div style={{ flex: 1, minWidth: 220 }}>
-      <div style={{ fontWeight: 700 }}>Reference: delivery and installation rate sheet</div>
-      <div className="hint" style={{ fontSize: 13 }}>What delivery, haul-away and installation cost, and what each service includes. Handy when a customer asks.</div>
+  <div className="panel" style={{ marginBottom: 14 }}>
+    <div style={{ fontWeight: 700, marginBottom: 8 }}>Learn and reference</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <b style={{ fontSize: 14 }}>Training manual</b>
+          <div className="hint" style={{ fontSize: 12.5 }}>How to post, send leads and use your code. About 15 minutes.</div>
+        </div>
+        <a className="btn btn-primary" href="/partner/training">Open the manual</a>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <b style={{ fontSize: 14 }}>Delivery and installation rate sheet</b>
+          <div className="hint" style={{ fontSize: 12.5 }}>What delivery, haul-away and installation cost and include.</div>
+        </div>
+        <a className="btn" href="/partner/RS-Solutions-Delivery-Rate-Sheet-2026.pdf" target="_blank" rel="noreferrer">Open the PDF</a>
+      </div>
     </div>
-    <a className="btn btn-primary" href="/partner/RS-Solutions-Delivery-Rate-Sheet-2026.pdf" target="_blank" rel="noreferrer">Open the PDF</a>
   </div>
 );
 
