@@ -5,6 +5,7 @@ import { clientIp, honeypotTripped, isDisposableEmail } from '../../../lib/antif
 import { sendEmail, esc } from '../../../lib/email';
 import { SERVICE_EMAIL, phoneKey } from '../../../lib/constants';
 import { WORKSHOP, dayLabel } from '../../../lib/workshop';
+import { SITE_URL } from '../../../lib/site';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -66,7 +67,7 @@ export async function POST(req) {
             .map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#777">${k}</td><td>${esc(v || '—')}</td></tr>`).join('')}
         </table>
         ${row.about ? `<p><b>About them:</b><br>${esc(row.about).replace(/\n/g, '<br>')}</p>` : ''}
-        <p style="color:#777;font-size:13px">Reply to this applicant at ${esc(email)} or call ${esc(phone)}. Applications are stored in workshop_applications.</p>
+        <p style="color:#777;font-size:13px">Reply to this applicant at ${esc(email)} or call ${esc(phone)}. <a href="${SITE_URL}/admin/workshop">Open the workshop board</a></p>
       </div>`
     }).catch((e) => console.error('workshop notify failed', e.message));
 
