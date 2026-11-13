@@ -8,6 +8,7 @@ import PartnerRequest from '../../components/PartnerRequest';
 import PartnerSignOut from '../../components/PartnerSignOut';
 import PartnerTeam from '../../components/PartnerTeam';
 import PartnerLeadDesk from '../../components/PartnerLeadDesk';
+import PartnerPostingKit from '../../components/PartnerPostingKit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'My clients — Bargain Bay', robots: { index: false } };
@@ -37,7 +38,8 @@ export default async function PartnerPage({ searchParams }) {
         </div>
         <p style={{ fontSize: 14 }}>You are signed in with {seat.orgName || 'your team'}. Send a lead below and see what happened to each one you sent.</p>
       </div>
-      <PartnerLeadDesk role="affiliate" /></div>);
+      <PartnerLeadDesk role="affiliate" />
+      <PartnerPostingKit /></div>);
     }
     return (<div className="narrow"><div className="panel">
       <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Not a referral partner</h1>
@@ -78,6 +80,7 @@ export default async function PartnerPage({ searchParams }) {
 
       {!preview && <PartnerTeam team={r.team} me={session.email} generators={r.partner.generators} />}
       {!preview && r.partner.generators && <div style={{ marginBottom: 12 }}><PartnerLeadDesk role="admin" /></div>}
+      {!preview && r.partner.generators && <PartnerPostingKit />}
 
       <div className="panel" style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
         {stat('Clients', r.clients.length)}
