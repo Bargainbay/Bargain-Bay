@@ -5,7 +5,7 @@ import { getOrdersForCustomer } from '../../lib/orders';
 import { invoicesForEmail } from '../../lib/invoices';
 import { quotesForEmail } from '../../lib/quotes';
 import { getMembership } from '../../lib/members';
-import { getPartner } from '../../lib/referral-partners';
+import { getPartner, getPartnerSeat } from '../../lib/referral-partners';
 import { linkToken } from '../../lib/links';
 import MemberRequest from './MemberRequest';
 import AccountProfile from './AccountProfile';
@@ -29,6 +29,7 @@ export default async function AccountPage() {
   let dbOk = hasDb();
   let membership = null;
   let partner = null;
+  let seat = null;
   if (dbOk) {
     try {
       const { rows } = await query('SELECT email, name, phone, created_at FROM users WHERE id = $1', [session.userId]);
@@ -37,6 +38,7 @@ export default async function AccountPage() {
       orders = await getOrdersForCustomer(session.userId, session.email);
       membership = await getMembership(session.userId);
       partner = await getPartner(session.email);
+      seat = await getPartnerSeat(session.email).catch(() => null);
     } catch (e) {
       console.error('account load failed', e);
       dbOk = false;
@@ -57,6 +59,13 @@ export default async function AccountPage() {
         <AccountProfile profile={{ email: profile.email, name: profile.name, phone: profile.phone }} />
       </div>
 
+      {seat && seat.role === 'affiliate' && (
+        <div className="panel" style={{ borderColor: 'var(--charcoal)' }}>
+          <h2>Lead generator portal</h2>
+          <p style={{ fontSize: 14.5, margin: 0 }}>Send leads, see what happened to them, and get your posting kit and discount code. <a href="/partner" style={{ textDecoration: 'underline', fontWeight: 700 }}>Open the lead generator portal →</a></p>
+        </div>
+      )}
+
       {partner && (
         <div className="panel">
           <h2>Referral partner</h2>
@@ -64,7 +73,7 @@ export default async function AccountPage() {
         </div>
       )}
 
-      <div className="panel">
+      {!(seat && seat.role === 'affiliate') && <div className="panel">
         <h2>Wholesale / Reseller access</h2>
         {membership?.role === 'member' && membership?.member_status === 'approved' ? (
           <p style={{ fontSize: 14.5, margin: 0 }}><b style={{ color: '#0B6B3A' }}>✓ You're an approved reseller.</b> Wholesale pricing is active across the store and at checkout. <a href="/account/member" style={{ textDecoration: 'underline', fontWeight: 700 }}>Open your reseller dashboard →</a></p>
@@ -73,7 +82,7 @@ export default async function AccountPage() {
         ) : (
           <MemberRequest />
         )}
-      </div>
+      </div>}
 
       <h2 style={{ color: 'var(--charcoal)' }}>Your orders</h2>
       {!dbOk && <div className="error-box">Order history is unavailable right now.</div>}
