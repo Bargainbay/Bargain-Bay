@@ -247,6 +247,13 @@ Photograph -> Take photo (repeatable) / Choose from phone -> Save -> it leaves t
   shopper. That also means a deliberate below-cost clearance markdown still stands
   for members; only the extra 10% underneath it is floored. A cost of 0 (haul-away)
   is a real answer and floors nothing.
+- **Minimum 10% off public for members (2026-11-12, owner).** `MEMBER_MIN_DISCOUNT` in `lib/pricing.js`: on the regular path the
+  member price is the LOWER of (55% of retail / the June table) and 90% of the public price, then the cost floor still applies,
+  then the public ceiling. Why: many units are listed near 50% of retail, so 55% of retail sat above the public price and 12 of
+  109 units gave members nothing. Typed prices are exempt. Units whose cost + 10% is near the public price still get under 10%.
+- **A TYPED member price is bound only by cost and the public price (2026-11-12, owner)** — `boundTypedPrice` in `lib/pricing.js`. The $200-clear
+  and cost + 10% floors apply to the percentage rates only; they were refusing a typed $250 on a $100-cost cooktop that was plainly profitable.
+  A typed price under cost is still lifted to cost.
 - **The four member numbers are SETTINGS now, not constants (2026-10-28).** `/admin/member-pricing`
   (ADMIN; `lib/member-rates.js`, `lib/member-rate-rules.js`, settings keys `member_rates` and
   `member_price_overrides`) sets the 55% / 90% / cost + 10% / $200, and a typed member price for one SKU.

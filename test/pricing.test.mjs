@@ -13,7 +13,7 @@
 //   ceiling = the public price, APPLIED LAST, so it wins
 import { suite, test, assert, equal } from './_harness.mjs';
 import {
-  costFloorOf, boundMemberPrice, memberRegular, memberClearance, decorate,
+  costFloorOf, boundMemberPrice, boundTypedPrice, memberRegular, memberClearance, decorate,
   MEMBER_COST_FLOOR, MEMBER_MIN_PROFIT, MEMBER_CLEARANCE_RATE, MEMBER_REGULAR_FALLBACK
 } from '../lib/pricing.js';
 
@@ -110,9 +110,29 @@ test('a stale table row can never overcharge a member', () => {
 
 test('with no table row it falls back to 55% of retail, still bounded', () => {
   const unit = { id: 'NOT-IN-TABLE-EITHER', price: 1000, compareAt: 2000, cost: 0 };
-  equal(memberRegular(unit), 1100 > 1000 ? 1000 : 1100, 'capped by the public price');
+  equal(memberRegular(unit), 900, '55% of retail is above public, so the 10% minimum discount applies');
   const cheap = { id: 'ALSO-NOT-IN-TABLE', price: 1000, compareAt: 1000, cost: 0 };
   equal(memberRegular(cheap), 550, '55% of retail when nothing else binds');
+});
+
+test('a member always gets at least 10% off public where the floor allows', () => {
+  // Public listed at 50% of retail: 55% of retail used to sit above it and the member got nothing.
+  const half = { id: 'HALF-OFF-RETAIL', price: 944.5, compareAt: 1889, cost: 358.35 };
+  equal(memberRegular(half), 850, '90% of public');
+  // No room: cost + 10% is above 90% of public, so the floor wins and the ceiling still holds.
+  const tight = { id: 'TIGHT-MARGIN', price: 959, compareAt: 945, cost: 799 };
+  equal(memberRegular(tight), 879, 'cost + 10%');
+  // A typed price is the owner's call and is not touched by the minimum discount.
+  equal(memberRegular(half, undefined, { 'HALF-OFF-RETAIL': 940 }), 940, 'typed price stands');
+});
+
+test('a typed member price is held only by cost and the public price', () => {
+  // Forno cooktop: cost 100, public 319.99. The $200-clear floor (300) used to override a typed 250.
+  const u = { id: 'FORNO', price: 319.99, compareAt: 399.99, cost: 100 };
+  equal(memberRegular(u, undefined, { FORNO: 250 }), 250, 'typed price stands');
+  equal(memberRegular(u, undefined, { FORNO: 80 }), 100, 'but never under cost');
+  equal(memberRegular(u, undefined, { FORNO: 500 }), 319.99, 'or over the public price');
+  equal(boundTypedPrice(50, { cost: 0 }, 100), 50, 'cost 0 floors nothing');
 });
 
 suite('lib/pricing — cost never reaches a page');
