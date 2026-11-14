@@ -34,8 +34,8 @@ export default async function TutorialsPage() {
         </div>
         <p className="hint" style={{ margin: '8px 0 0' }}>Short narrated walkthroughs. The people and orders in them are examples, not real customers.</p>
       </div>
-      {manager && <Video v="managers" title="Your partner portal" mins="about 2½ minutes" text="For managers: your links, your team, the lead board, the posting kit, and your totals." />}
-      <Video v="generators" title="Your lead desk" mins="about 1½ minutes" text="For lead generators: your code, sending a lead, reading your board, and the posting kit." />
+      {manager && <Video v="managers" title="Your partner portal" mins="about 2 minutes" text="For managers: your links, your team, the lead board, the posting kit, and your totals." />}
+      <Video v="generators" title="Your lead desk" mins="about 2 minutes" text="For lead generators: your code, sending a lead, reading your board, and the posting kit." />
     </div>
   );
 }
