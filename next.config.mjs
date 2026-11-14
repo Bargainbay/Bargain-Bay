@@ -21,7 +21,9 @@ const nextConfig = {
   // DIRECTORY would have deployed empty and the button would have reported
   // "no migrations found" on production while working perfectly in dev.
   outputFileTracingIncludes: {
-    '/api/admin/migrate': ['./db/migrations/**/*.sql']
+    '/api/admin/migrate': ['./db/migrations/**/*.sql'],
+    // The partner tutorial videos are served through a signed-in route, not from /public, so they must be traced in.
+    '/api/partner/tutorial': ['./private-media/**/*.mp4']
   },
   // The Appliance Repair Workshop is an RS Solutions product and lives on
   // rssolutions.ca. It was briefly built here by mistake; anything that was
