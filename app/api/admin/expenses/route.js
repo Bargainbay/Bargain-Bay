@@ -11,8 +11,14 @@ export const runtime = 'nodejs';
 // HST is exactly what an accountant is here to do.
 async function admin() { return canKeepBooks(await getSession()); }
 
-export async function GET() {
+export async function GET(req) {
   if (!(await admin())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+  const sp = new URL(req.url).searchParams;
+  // ?from=&to= (inclusive ISO dates) returns that window in full, newest first.
+  if (sp.get('from') || sp.get('to')) {
+    const expenses = await listExpenses({ from: sp.get('from'), to: sp.get('to'), limit: 5000 });
+    return NextResponse.json({ expenses });
+  }
   const [expenses, recurring] = await Promise.all([listExpenses(1000), listRecurringExpenses()]);
   return NextResponse.json({ expenses, recurring });
 }
