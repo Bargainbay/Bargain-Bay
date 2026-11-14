@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { listOffersAdmin, decideOffer, openOfferCount, OfferError } from '../../../../lib/member-offers';
+import { listOffersAdmin, decideOffer, openOfferCount, getOfferModes, setOfferMode, OfferError } from '../../../../lib/member-offers';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +17,7 @@ async function gate() {
 export async function GET(req) {
   const g = await gate(); if (g.res) return g.res;
   const sp = new URL(req.url).searchParams;
+  if (sp.get('modes')) return NextResponse.json({ modes: await getOfferModes() });
   if (sp.get('count')) return NextResponse.json({ pending: await openOfferCount() });
   return NextResponse.json({ offers: await listOffersAdmin({ status: sp.get('status') || 'open' }) });
 }
@@ -24,6 +25,10 @@ export async function GET(req) {
 export async function POST(req) {
   const g = await gate(); if (g.res) return g.res;
   let b; try { b = await req.json(); } catch { b = {}; }
+  if (b.action === 'mode') {
+    try { return NextResponse.json(await setOfferMode(b.sku, b.mode || null, g.session)); }
+    catch (e) { return NextResponse.json({ error: e.message || 'Could not save.' }, { status: 400 }); }
+  }
   const id = Number(b.id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: 'Which offer?' }, { status: 400 });
   try {

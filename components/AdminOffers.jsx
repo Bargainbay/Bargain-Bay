@@ -22,8 +22,36 @@ export default function AdminOffers({ initial }) {
     await load(status);
   }
 
+  const [modes, setModes] = useState(null);
+  const [sku, setSku] = useState('');
+  async function loadModes() {
+    const r = await fetch('/api/admin/offers?modes=1', { cache: 'no-store' });
+    const d = await r.json().catch(() => ({}));
+    setModes(d.modes || {});
+  }
+  async function setMode(k, mode) {
+    setMsg('');
+    const r = await fetch('/api/admin/offers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mode', sku: k, mode }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { setMsg(d.error || 'Could not save.'); return; }
+    setModes(d.modes); setSku('');
+  }
+
   return (
     <div>
+      <details className="panel" style={{ marginBottom: 12 }} onToggle={(e) => { if (e.currentTarget.open && !modes) loadModes(); }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Force a unit open or closed to offers</summary>
+        <p className="hint">By default a unit is open when its price has room above the floor. Here you can force one open (the floor still applies) or closed.</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU" aria-label="SKU" />
+          <button className="btn" disabled={!sku.trim()} onClick={() => setMode(sku, 'open')}>Force open</button>
+          <button className="btn" disabled={!sku.trim()} onClick={() => setMode(sku, 'closed')}>Force closed</button>
+          <button className="btn" disabled={!sku.trim()} onClick={() => setMode(sku, '')}>Back to automatic</button>
+        </div>
+        {modes && Object.keys(modes).length > 0 && <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 14 }}>
+          {Object.entries(modes).map(([k, m]) => <li key={k}>{k}: <b>{m}</b> <button className="btn" style={{ marginLeft: 6 }} onClick={() => setMode(k, '')}>Reset</button></li>)}
+        </ul>}
+      </details>
       <div className="mp-chips">
         {[['open', 'Waiting'], ['accepted', 'Accepted'], ['purchased', 'Bought'], ['declined', 'Declined'], ['all', 'All']].map(([k, l]) =>
           <button key={k} className="mp-chip" aria-pressed={status === k} onClick={() => load(k)}>{l}</button>)}
