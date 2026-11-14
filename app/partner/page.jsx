@@ -116,7 +116,9 @@ export default async function PartnerPage({ searchParams }) {
         {stat('Balance owed to you', money(t.balance))}
       </div>
       <p className="hint" style={{ margin: '8px 2px 16px' }}>
-        {r.partner.basis === 'price'
+        {r.partner.basis === 'spread'
+          ? <>Everything a customer pays above our member price of the unit is yours (the customer's {r.partner.customerPct}% code discount comes out of it). When we sell at member price there is nothing above it, so you earn {r.partner.leadPct}% of the profit on that unit instead. </>
+          : r.partner.basis === 'price'
           ? <>Commission is {r.partner.pricePct}% of the sale price (after any discount, before tax) on each order your resellers place, and {r.partner.pricePctRetail}% on sales made with your end-user code, but never more than {r.partner.capPct}% of the profit on that order. </>
           : <>Commission is {r.partner.pct}% of the profit on each order your resellers place, and {r.partner.retailPct}% on sales made with your end-user code (that sale carries the {r.partner.customerPct}% customer discount). </>}
         It becomes earned once the order is delivered and paid for.

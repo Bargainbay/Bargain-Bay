@@ -82,6 +82,7 @@ export default function ReferralPartnersAdmin() {
           <select value={f.basis} onChange={(e) => setF({ ...f, basis: e.target.value })} title="How this partner is paid">
             <option value="profit">Paid on profit</option>
             <option value="price">Paid on sale price (capped)</option>
+            <option value="spread">Paid the spread over member price</option>
           </select>
           {f.basis === 'price' && <>
             <input placeholder="% of price (resellers)" value={f.pricePct} onChange={(e) => setF({ ...f, pricePct: e.target.value })} style={{ width: 150 }} />
@@ -101,7 +102,7 @@ export default function ReferralPartnersAdmin() {
       {partners.map((p) => (
         <div className="panel" key={p.email} style={{ marginBottom: 12, opacity: p.revoked_at ? 0.55 : 1 }}>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <strong style={{ flex: 1 }}>{p.name || p.email} <span className="hint">{p.email} · {p.basis === 'price' ? `${p.price_pct}% / ${p.price_pct_retail}% of price, capped at ${p.price_cap_pct}% of profit` : `${p.pct}% of profit`} · link code {p.code || '—'} · {p.customerCode ? `end-user code ${p.customerCode}` : 'no end-user code'} · {p.clients} client{p.clients === 1 ? '' : 's'}{p.revoked_at ? ' · revoked' : ''}</span></strong>
+            <strong style={{ flex: 1 }}>{p.name || p.email} <span className="hint">{p.email} · {p.basis === 'spread' ? `the spread over member price (${p.lead_pct}% of profit at member price)` : p.basis === 'price' ? `${p.price_pct}% / ${p.price_pct_retail}% of price, capped at ${p.price_cap_pct}% of profit` : `${p.pct}% of profit`} · link code {p.code || '—'} · {p.customerCode ? `end-user code ${p.customerCode}` : 'no end-user code'} · {p.clients} client{p.clients === 1 ? '' : 's'}{p.revoked_at ? ' · revoked' : ''}</span></strong>
             {!p.revoked_at && <>
               <a className="btn" href={`/partner?as=${encodeURIComponent(p.email)}`} target="_blank" rel="noreferrer">See their page</a>
               <button className="btn" onClick={() => invite(p.email)}>Send sign-in email</button>
