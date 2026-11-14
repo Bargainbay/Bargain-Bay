@@ -10,6 +10,8 @@ import { quotesForEmail } from '../../../lib/quotes';
 import { linkToken } from '../../../lib/links';
 import { money, STATUS_LABELS } from '../../../lib/constants';
 import MemberPortal from '../../../components/MemberPortal';
+import MemberOffers from '../../../components/MemberOffers';
+import { myOffers } from '../../../lib/member-offers';
 import { recordVisit } from '../../../lib/member-prefs';
 import { getPartner } from '../../../lib/referral-partners';
 
@@ -29,11 +31,12 @@ export default async function MemberDashboard() {
   const partner = await getPartner(session.email);
   if (!(m?.role === 'member' && m?.member_status === 'approved')) redirect('/resellers');
 
-  const [units, orders, invoices, quotes] = await Promise.all([
+  const [units, orders, invoices, quotes, offers] = await Promise.all([
     getAvailable().then((u) => decorate(u, session)).catch(() => []),
     getOrdersForCustomer(session.userId, session.email).catch(() => []),
     invoicesForEmail(session.email).catch(() => []),
-    quotesForEmail(session.email).catch(() => [])
+    quotesForEmail(session.email).catch(() => []),
+    myOffers(session.userId).catch(() => [])
   ]);
 
   const catalogue = units.map((u) => ({
@@ -61,6 +64,10 @@ export default async function MemberDashboard() {
         ? <div className="panel">No stock is available right now. New units arrive often, so check back soon.</div>
         : <MemberPortal units={catalogue} newSkus={visit.newSkus} firstVisit={visit.firstVisit} initialWatch={visit.watch}
             stats={{ orders: counted.length, spent, owing: owing.length }} />}
+
+      <h2 id="offers" style={{ color: 'var(--charcoal)', marginTop: 28 }}>Make an offer</h2>
+      <p className="hint" style={{ marginTop: 0 }}>See something you would take at a better price? Offer it. If we accept, the unit is held for you for 48 hours.</p>
+      <MemberOffers units={catalogue} initial={JSON.parse(JSON.stringify(offers))} />
 
       <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Your orders</h2>
       {orders.length === 0 ? (

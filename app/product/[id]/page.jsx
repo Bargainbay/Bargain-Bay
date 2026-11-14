@@ -2,6 +2,7 @@ import { productPath, publicSku } from '../../../lib/constants';
 import { notFound } from 'next/navigation';
 import { getById, getSiblings } from '../../../lib/inventory';
 import { decorateOne, decorate } from '../../../lib/pricing';
+import { openToOffers } from '../../../lib/member-offers';
 import { getSession } from '../../../lib/auth';
 import { isUnavailable } from '../../../lib/reservations';
 import { conditionCopy, leadSentence, specRows, seoDescription, warrantyPhrase, withWarranty } from '../../../lib/specs';
@@ -88,7 +89,9 @@ export default async function Product({ params }) {
   // Every available unit of this model, cheapest first; the URL's unit is the
   // one preselected in the picker. Siblings come from getAvailable(), so they're
   // already in stock — only the URL unit can be sold/on-hold.
+  const open = await openToOffers([u, ...siblings]);
   const units = [forPanel(u, sold), ...siblings.map((s) => forPanel(s, false))]
+    .map((x) => ({ ...x, openToOffers: open.has(String(x.id).toUpperCase()) }))
     .sort((a, b) => a.price - b.price);
 
   const explainer = withWarranty(explain(u), u.warrantyMonths);
