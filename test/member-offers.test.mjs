@@ -1,0 +1,16 @@
+import { suite, test, assert, equal } from './_harness.mjs';
+import { offerFloor, offerProblem } from '../lib/member-offer-rules.js';
+
+suite('member offers: rules');
+test('floor is the highest of cost, member floor, consignment floor', () => {
+  equal(offerFloor({ cost: 100, memberFloor: 300, consignFloor: 120 }), 300);
+  equal(offerFloor({ cost: 400, memberFloor: 300 }), 400);
+  equal(offerFloor({}), 0);
+});
+test('offer must be under the member price and at/over the floor', () => {
+  assert(offerProblem({ amount: 0, memberPrice: 500, floor: 300 }));
+  assert(offerProblem({ amount: 500, memberPrice: 500, floor: 300 }), 'at price is refused');
+  assert(offerProblem({ amount: 299.99, memberPrice: 500, floor: 300 }), 'under floor is refused');
+  equal(offerProblem({ amount: 300, memberPrice: 500, floor: 300 }), '');
+  assert(offerProblem({ amount: 'abc', memberPrice: 500, floor: 300 }));
+});

@@ -54,6 +54,8 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // Who has applied to buy wholesale, who is approved, and what each has bought. Admin: approving
     // one changes what the storefront charges them.
     { key: 'resellers', label: 'Resellers', href: '/admin/resellers' },
+    // Prices resellers have offered on a unit: accept (holds it 48h at that price), counter or decline. Admin: shows cost.
+    { key: 'offers', label: 'Offers', href: '/admin/offers' },
     // The people who promote our stock for a percentage: applications, their codes, what they are owed.
     { key: 'affiliates', label: 'Affiliates', href: '/admin/affiliates' },
     // Every partner organisation, its lead generators, what we owe it. Admin.
@@ -97,6 +99,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
           <a key={i.key} href={i.href} className={'admin-nav-link' + (i.key === active ? ' active' : '')}>
             {i.label}
             {i.key === 'resellers' && <PendingBadge />}
+            {i.key === 'offers' && <PendingBadge url="/api/admin/offers?count=1" />}
           </a>
         ))}
         {/* A coordinator has no storefront to view, and "View store" on an
