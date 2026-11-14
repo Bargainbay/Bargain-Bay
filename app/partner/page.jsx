@@ -18,13 +18,22 @@ const MEMBER = { approved: 'Reseller pricing approved', pending: 'Reseller appli
 // A referral partner's page: their clients, each client's orders and live status, and the commission owed.
 // The partner is read from the SESSION; an admin may preview one with ?as=<email>. Nothing in the request
 // can name whose clients to read for anyone else. Cost and profit are never returned.
-const RateSheet = () => (
+const RateSheet = ({ admin = false }) => (
   <div className="panel" style={{ marginBottom: 14 }}>
     <div style={{ fontWeight: 700, marginBottom: 8 }}>Learn and reference</div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 10 }}>
+      {admin && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <b style={{ fontSize: 14 }}>Partner guide</b>
+            <div className="hint" style={{ fontSize: 12.5 }}>What each link is for, a tour of this page, and how you are paid.</div>
+          </div>
+          <a className="btn btn-primary" href="/partner/guide">Open the guide</a>
+        </div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 160 }}>
-          <b style={{ fontSize: 14 }}>Training manual</b>
+          <b style={{ fontSize: 14 }}>{admin ? 'Training manual for your generators' : 'Training manual'}</b>
           <div className="hint" style={{ fontSize: 12.5 }}>How to post, send leads and use your code. About 15 minutes.</div>
         </div>
         <a className="btn btn-primary" href="/partner/training">Open the manual</a>
@@ -102,7 +111,7 @@ export default async function PartnerPage({ searchParams }) {
       )}
 
       {!preview && <PartnerTeam team={r.team} me={session.email} generators={r.partner.generators} />}
-      {!preview && r.partner.generators && <RateSheet />}
+      {!preview && r.partner.generators && <RateSheet admin />}
       {!preview && r.partner.generators && <div style={{ marginBottom: 12 }}><PartnerLeadDesk role="admin" /></div>}
       {!preview && r.partner.generators && <PartnerPostingKit />}
 
