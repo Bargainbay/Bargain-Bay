@@ -23,7 +23,7 @@ const COLUMNS = [
   ['quote', 'Quote sent'], ['sold', 'Sold'], ['completed', 'Completed'], ['ended', "Didn't work out"]
 ];
 
-function LeadBoard({ leads, admin }) {
+export function LeadBoard({ leads, admin }) {
   const colOf = (l) => (ENDED.includes(l.status) ? 'ended' : l.status);
   return (
     <div className="disp-cols" style={{ marginTop: 6 }}>
