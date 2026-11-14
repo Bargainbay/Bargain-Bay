@@ -62,6 +62,20 @@ const Kit = () => (
   </div>
 );
 
+const Team = () => (
+  <div className="panel" style={{ marginBottom: 14 }}>
+    <h2 style={{ marginTop: 0, fontSize: 18 }}>Your team</h2>
+    <p className="hint" style={{ marginTop: 0 }}>Admins sign in with their own email and see the same clients, orders and commission. Lead generators see only the leads they send themselves, and never any money.</p>
+    {[['Aljo Systems · info@aljosystems.com (main login)', ''], ['Anna Lopez · anna@example.com · lead generator · code ALJO-ANNA', 'Remove'], ['Ben Ray · ben@example.com · lead generator · code ALJO-BEN', 'Remove'], ['Carla Singh · carla@example.com · lead generator · code ALJO-CARLA', 'Remove']].map(([t, r]) => (
+      <div key={t} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '6px 0', borderTop: '1px solid #eceae5' }}><span style={{ flex: 1 }}>{t}</span>{r && <span className="btn">{r}</span>}</div>))}
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+      <input placeholder="Name" readOnly /><input placeholder="Email" readOnly />
+      <select disabled><option>Lead generator (sees only their own)</option></select>
+      <span className="btn btn-primary">Add a lead generator</span>
+    </div>
+  </div>
+);
+
 export default async function PartnerDemo({ searchParams }) {
   const sp = (await searchParams) || {};
   const key = sp.org === 'secondshop' ? 'secondshop' : 'aljo';
@@ -103,7 +117,7 @@ export default async function PartnerDemo({ searchParams }) {
         </div>
 
         {key === 'aljo' && (<>
-          <Reference /><SendLead />
+          <Team /><Reference /><SendLead />
           <div className="panel" style={{ marginBottom: 12 }}>
             <h2 style={{ marginTop: 0, fontSize: 17 }}>All your leads</h2>
             <LeadBoard leads={DEMO_ALJO_LEADS} admin />
