@@ -4,6 +4,7 @@ import {
   verifyPassword, createSessionToken, sessionCookieOptions,
   SESSION_COOKIE, normalizeEmail
 } from '../../../../lib/auth';
+import { recordPartnerSignIn } from '../../../../lib/partner-signin';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +25,7 @@ export async function POST(req) {
     const ok = user && (await verifyPassword(password, user.password_hash));
     if (!ok) return NextResponse.json({ error: 'Incorrect email or password.' }, { status: 401 });
 
+    await recordPartnerSignIn(user.email);              // best-effort; never blocks a sign-in
     const token = await createSessionToken(user);
     const res = NextResponse.json({ user: { id: user.id, email: user.email, name: user.name } });
     res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
