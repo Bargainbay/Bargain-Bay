@@ -139,9 +139,10 @@ export async function POST(req) {
   // Fast pre-check (the transaction below is the authoritative race-safe gate).
   const blocked = await unavailableSkus(skus);
   // A unit held for THIS member's accepted offer is theirs to buy: not blocked for them.
-  const preSession = await getSession();
-  if (blocked.size && preSession?.email) {
-    for (const k of await (await import('../../../lib/member-offers')).ownOfferSkus(preSession.email)) { for (const b of [...blocked]) if (b.toUpperCase() === k) blocked.delete(b); }
+  const offers = await import('../../../lib/member-offers');
+  const offerScope = blocked.size ? await offers.offerScope(await getSession()) : null;
+  if (offerScope) {
+    for (const k of await offers.ownOfferSkus(offerScope)) { for (const b of [...blocked]) if (b.toUpperCase() === k) blocked.delete(b); }
   }
   if (blocked.size) {
     return NextResponse.json(
@@ -345,7 +346,7 @@ export async function POST(req) {
       );
       // Card checkout holds the unit for 30 min (pay-now window); offline orders
       // hold it long-term until the owner confirms payment or cancels a no-show.
-      if (session?.email) await (await import('../../../lib/member-offers')).consumeOffers(client, session.email, skus, orderId);
+      await offers.consumeOffers(client, await offers.offerScope(session), skus, orderId);
       await reserveWithClient(client, skus, orderId, cardOnline ? RESERVATION_MINUTES : CHECKOUT_HOLD_MINUTES);
       for (const u of items) {
         await client.query(

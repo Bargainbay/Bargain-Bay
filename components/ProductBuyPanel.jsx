@@ -4,6 +4,7 @@ import { money, pctOff, PICKUP_ADDRESS, productPath, publicSku } from '../lib/co
 import { warrantyPhrase } from '../lib/specs';
 import ConditionPill from './ConditionPill';
 import AddToCartButton from './AddToCartButton';
+import MakeOffer from './MakeOffer';
 import ProductGallery from './ProductGallery';
 
 // Buy panel for a model that may have several identical in-stock units.
@@ -120,6 +121,7 @@ export default function ProductBuyPanel({ units, initialId }) {
             : (sel.marketplace || sel.vesta) && !sel.orderable
             ? <button className="btn block" disabled>Ordering opens soon</button>
             : <AddToCartButton sku={sel.id} available={!sel.sold} price={sel.price} name={name} />}
+          {!sel.sold && !sel.vesta && !sel.marketplace && !sel.vendor && <MakeOffer key={sel.id} sku={sel.id} price={sel.price} />}
         </div>
 
         <div className="meta-list" style={{ marginTop: 18 }}>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { unavailableSkus } from '../../../lib/reservations';
 import { getSession } from '../../../lib/auth';
-import { ownOfferSkus } from '../../../lib/member-offers';
+import { ownOfferSkus, offerScope } from '../../../lib/member-offers';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ export async function GET(req) {
   const skus = raw.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 200);
   const blocked = await unavailableSkus(skus.length ? skus : null);
   // A unit held for the signed-in member's own accepted offer is not unavailable to them.
-  const session = await getSession().catch(() => null);
-  if (session?.email) for (const k of await ownOfferSkus(session.email)) for (const b of [...blocked]) if (b.toUpperCase() === k) blocked.delete(b);
+  const scope = blocked.size ? await offerScope(await getSession().catch(() => null)) : null;
+  if (scope) for (const k of await ownOfferSkus(scope)) for (const b of [...blocked]) if (b.toUpperCase() === k) blocked.delete(b);
   return NextResponse.json({ unavailable: [...blocked] });
 }

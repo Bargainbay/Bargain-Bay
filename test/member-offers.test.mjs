@@ -14,3 +14,13 @@ test('offer must be under the member price and at/over the floor', () => {
   equal(offerProblem({ amount: 300, memberPrice: 500, floor: 300 }), '');
   assert(offerProblem({ amount: 'abc', memberPrice: 500, floor: 300 }));
 });
+
+import { publicOfferFloor, holdHoursFor } from '../lib/member-offer-rules.js';
+suite('public offers: rules');
+test('public floor is cost + 25%, rounded up, or the consignment floor', () => {
+  equal(publicOfferFloor({ cost: 400 }), 500);
+  equal(publicOfferFloor({ cost: 379.35 }), 475);
+  equal(publicOfferFloor({ cost: 400, consignFloor: 520 }), 520);
+  equal(publicOfferFloor({ cost: 0 }), 0);
+});
+test('hold length by kind', () => { equal(holdHoursFor('public'), 24); equal(holdHoursFor('member'), 48); });

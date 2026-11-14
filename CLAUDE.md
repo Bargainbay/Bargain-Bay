@@ -5437,3 +5437,14 @@ first use), `/sales/agreement` (+ `/sales/agreement/copy`), `/api/sales/agreemen
   probation / no-notice clause is NOT in the signed text, so that review is still the owner's to get. Changing wording means a new `EMPLOYMENT_TERMS_VERSION`.
 - **The company countersignature is a separate admin act** (typed name, `countersign`); until then every copy says "Awaiting the company's countersignature".
 - Not built: a PDF generated server-side (the browser's Save as PDF is used), a drawn signature, signing by anyone but the rep.
+
+## Offers on units (added 2026-11-14)
+`lib/member-offers.js`, `lib/member-offer-rules.js` (pure), migration `0074_member_offers` (**run Run schema migration**; table also created on first use), `/admin/offers` (ADMIN, nav "Offers"),
+`/api/offers` (anyone), `/api/account/offers` (approved members), `/api/offers/respond` + `/offer/<id>?t=` (a guest's emailed link), `components/{MakeOffer,MemberOffers,OfferStatus,AdminOffers}.jsx`, `test/member-offers.test.mjs`.
+- **An offer is a request.** Nothing changes until an admin ACCEPTS or COUNTERS. Accepting holds the unit for the buyer (a `reservations` row with no order, like a rep hold): **members 48h, everyone else 24h** (`holdHoursFor`).
+- **Floors, checked on submit AND on accept/counter, never shown to the buyer ("too low" only):** member = max(cost, cost+10%/$200 member floor, consignment floor); **public = max(cost, cost + 25%, consignment floor)** (`PUBLIC_MARGIN_PCT`). Must be below what the buyer pays today.
+- **Public offers need name, email, phone**; the offer waits until the guest presses Confirm on the emailed link (GET shows, POST acts), and **admin cannot accept an unconfirmed one**. Honeypot, `isBlocked`, disposable-domain refusal, 5 live offers / 15 a day per email, 10 a day per IP. An unconfirmed offer lapses after 3 days.
+- **Everything goes through the admin queue** (owner's choice, 2026-11-14); there is no auto-accept. Admin only because the queue shows cost and margin.
+- **The agreed price is applied in `decorate()`** (so cart, product page and `/api/checkout` agree), only while accepted and unexpired, and only ever lowers a price. The buyer is a signed-in member (by email) or a browser holding the `bb_offers` cookie set from the emailed link (a bearer link, like a coupon). `offerScope` returns null (no DB hit) for everyone else.
+- Checkout and `/api/availability` treat a unit held for the buyer's own accepted offer as available to them; the order transaction marks the offer `purchased` and clears the hold before the normal reservation.
+- Not built: auto-accept thresholds, an offer history for staff on the customer page, and SMS.

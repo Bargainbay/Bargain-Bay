@@ -40,17 +40,17 @@ export default function AdminOffers({ initial }) {
               <span className="status-chip">{o.status}</span>
             </div>
             <div style={{ fontSize: 14, marginTop: 6 }}>
-              {o.business_name || o.email} offered <b>{money(o.amount)}</b> · their price {money(o.list_price)}
+              {o.kind === 'public' ? <>{o.name} ({o.email}{o.phone ? `, ${o.phone}` : ''}) <span className="status-chip">{o.verified_at ? 'email confirmed' : 'email NOT confirmed'}</span> </> : <>{o.business_name || o.email} <span className="status-chip">reseller</span> </>}offered <b>{money(o.amount)}</b> · their price {money(o.list_price)}
               {o.cost != null && <> · cost {money(o.cost)} · margin at offer <b style={{ color: margin < 0 ? 'var(--warn)' : undefined }}>{money(margin)}</b></>}
               {o.agreed_price != null && <> · agreed {money(o.agreed_price)}</>}
             </div>
             {o.note && <div style={{ fontSize: 13.5, marginTop: 4, color: 'var(--muted)' }}>“{o.note}”</div>}
             {waiting && (
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                <button className="btn" onClick={() => decide(o.id, 'accept')} disabled={o.status === 'countered'}>Accept {money(o.amount)}</button>
+                <button className="btn" onClick={() => decide(o.id, 'accept')} disabled={o.status === 'countered' || !o.verified_at}>Accept {money(o.amount)}</button>
                 <input type="number" step="0.01" placeholder="Counter $" value={counter[o.id] || ''} style={{ width: 110 }}
                   onChange={(e) => setCounter({ ...counter, [o.id]: e.target.value })} aria-label="Counter price" />
-                <button className="btn" onClick={() => decide(o.id, 'counter', counter[o.id])} disabled={!counter[o.id]}>Counter</button>
+                <button className="btn" onClick={() => decide(o.id, 'counter', counter[o.id])} disabled={!counter[o.id] || !o.verified_at}>Counter</button>
                 <button className="btn" onClick={() => decide(o.id, 'decline')}>Decline</button>
               </div>
             )}

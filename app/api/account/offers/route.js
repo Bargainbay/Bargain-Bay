@@ -35,8 +35,8 @@ export async function PATCH(req) {
   const id = Number(b.id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: 'Which offer?' }, { status: 400 });
   try {
-    if (b.action === 'withdraw') return NextResponse.json(await withdrawOffer(g.session.userId, id));
-    if (b.action === 'accept_counter') return NextResponse.json(await acceptCounter(g.session, id));
+    if (b.action === 'withdraw') return NextResponse.json(await withdrawOffer({ userId: g.session.userId }, id));
+    if (b.action === 'accept_counter') return NextResponse.json(await acceptCounter({ userId: g.session.userId }, id));
     return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
   } catch (e) { return fail(e); }
 }
