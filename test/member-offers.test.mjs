@@ -24,3 +24,13 @@ test('public floor is cost + 25%, rounded up, or the consignment floor', () => {
   equal(publicOfferFloor({ cost: 0 }), 0);
 });
 test('hold length by kind', () => { equal(holdHoursFor('public'), 24); equal(holdHoursFor('member'), 48); });
+
+import { hasOfferRoom } from '../lib/member-offer-rules.js';
+suite('offers: which units are open');
+test('room must be at least $40 and 8% of the price', () => {
+  assert(hasOfferRoom({ price: 800, floor: 500 }), '$300 room on $800');
+  assert(!hasOfferRoom({ price: 800, floor: 760 }), '$40 room is under 8% of $800');
+  assert(!hasOfferRoom({ price: 300, floor: 275 }), 'under $40');
+  assert(hasOfferRoom({ price: 300, floor: 250 }), '$50 room, >8%');
+  assert(!hasOfferRoom({ price: 0, floor: 0 }));
+});

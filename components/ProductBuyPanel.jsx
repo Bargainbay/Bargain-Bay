@@ -121,7 +121,7 @@ export default function ProductBuyPanel({ units, initialId }) {
             : (sel.marketplace || sel.vesta) && !sel.orderable
             ? <button className="btn block" disabled>Ordering opens soon</button>
             : <AddToCartButton sku={sel.id} available={!sel.sold} price={sel.price} name={name} />}
-          {!sel.sold && !sel.vesta && !sel.marketplace && !sel.vendor && <MakeOffer key={sel.id} sku={sel.id} price={sel.price} />}
+          {!sel.sold && sel.openToOffers && <MakeOffer key={sel.id} sku={sel.id} price={sel.price} />}
         </div>
 
         <div className="meta-list" style={{ marginTop: 18 }}>
