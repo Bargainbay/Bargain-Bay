@@ -1,6 +1,6 @@
 # Aljo Systems — your Bargain Bay partner guide
 
-DRAFT. Items in [brackets] are confirmed when we agree your rates. Questions: Service@rssolutions.ca.
+The same guide, with a page-by-page tour of your portal, is in the portal itself: sign in at bargainbay.ca/partner and press **Open the guide** under Learn and reference. Questions: Service@rssolutions.ca.
 
 ## 1. What this is
 You and your team send Bargain Bay warm leads and sell our appliances online. You run your own team; we run the sales calls, the
@@ -44,10 +44,12 @@ Each generator's code gives the customer [5]% off online at bargainbay.ca and cr
 types the code at checkout, or arrives from the person's link. If a customer already belongs to another partner they stay with that partner.
 A sale made by someone using their own code is not counted.
 
-## 7. Resellers
-Resellers are businesses that buy regularly at reseller pricing. Send them **your reseller link** (shown in your portal). They create an
-account and apply; we approve them. Resellers you bring are credited to Aljo. Only Aljo logins have the reseller link; your lead
-generators do not. Reseller pricing is not shown to your lead generators.
+## 7. Your links: what each is for
+- **Link for resellers** (`bargainbay.ca/join/aljo`): for **businesses that buy to resell** (installers, landlords, small dealers). They create an account and apply for reseller pricing; once we approve them they are your clients and their orders earn you commission. Give it to businesses, not to shoppers or your lead generators.
+- **Link for end users** (`bargainbay.ca/join/aljo/shop`): for **ordinary shoppers**. It opens the shop with your code ready, for 5% off. Anyone who buys through it is credited to you.
+- **Your end-user code** (`ALJO5`): the same discount typed at checkout.
+- **Each lead generator's own code and link** (for example `ALJO-ANNA`): made automatically when you add them. Same discount; the sale is credited to that person and to you.
+Only Aljo logins have the reseller link. Reseller pricing is never shown to your lead generators.
 
 ## 8. Posting on Facebook (your team's daily routine)
 - Every lead generator's dashboard has a **Posting kit**: ready captions, photos and their own link for every unit we have.
@@ -62,9 +64,8 @@ generators do not. Reseller pricing is not shown to your lead generators.
 
 ## 9. Money
 - We pay **Aljo**, not individuals. How you share it with your people is your business.
-- Commission is a percentage of **our profit** on each order (what we sold it for, less what it cost us, after any discount). A cheaper sale means a smaller profit and a smaller commission.
-- Rates: reseller sales 15% of profit; sales with your people's codes 10% of profit; leads our team closes 10% of profit.
-- [Commission is earned when an order is delivered and paid; reported on your portal and a monthly statement.]
+- **Your deal is the spread over member price.** Everything a customer pays above our member price of the unit is yours (the 5% code discount comes out of it). When we sell at member price there is nothing above it, so you earn 10% of the profit on that unit instead. Never more than the unit made.
+- Commission is earned when an order is delivered and paid; it shows as pending until then, in your portal and the monthly statement.
 - Refunds and cancellations reduce commission. A customer is attached to Aljo [permanently / for 12 months] once their first order is credited.
 - You see sale price, discount, profit and commission for orders from your team. Your lead generators see none of this.
 
