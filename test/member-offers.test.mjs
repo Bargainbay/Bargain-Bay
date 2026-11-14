@@ -34,3 +34,11 @@ test('room must be at least $40 and 8% of the price', () => {
   assert(hasOfferRoom({ price: 300, floor: 250 }), '$50 room, >8%');
   assert(!hasOfferRoom({ price: 0, floor: 0 }));
 });
+
+suite('offers: refurbished units');
+test('a refurbished unit opens on a lower bar, and still needs some room', () => {
+  assert(!hasOfferRoom({ price: 800, floor: 760 }), 'regular: $40 on $800 is under 8%');
+  assert(hasOfferRoom({ price: 800, floor: 740, refurbished: true }), 'refurbished: $60 clears max($20, 3%)');
+  assert(!hasOfferRoom({ price: 800, floor: 790, refurbished: true }), 'refurbished with $10 of room stays closed');
+  assert(!hasOfferRoom({ price: 500, floor: 600, refurbished: true }), 'floor above the price is never open');
+});
