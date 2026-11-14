@@ -23,6 +23,7 @@ export default async function PartnerDemo({ searchParams }) {
           <Tab href="/partner/demo?org=aljo" on={key === 'aljo' && !gen}>Aljo: organisation</Tab>
           <Tab href="/partner/demo?org=aljo&view=generator" on={gen}>Aljo: a lead generator</Tab>
           <Tab href="/partner/demo?org=secondshop" on={key === 'secondshop'}>SecondShop</Tab>
+          <Tab href="/partner/demo/admin" on={false}>Owner's admin pages</Tab>
         </div>
       </div>
 
