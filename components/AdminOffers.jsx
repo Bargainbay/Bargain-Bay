@@ -7,6 +7,7 @@ export default function AdminOffers({ initial }) {
   const [rows, setRows] = useState(initial);
   const [msg, setMsg] = useState('');
   const [counter, setCounter] = useState({});
+  const [who, setWho] = useState('all');   // all | member | public
 
   async function load(s) {
     setStatus(s);
@@ -56,9 +57,13 @@ export default function AdminOffers({ initial }) {
         {[['open', 'Waiting'], ['accepted', 'Accepted'], ['purchased', 'Bought'], ['declined', 'Declined'], ['all', 'All']].map(([k, l]) =>
           <button key={k} className="mp-chip" aria-pressed={status === k} onClick={() => load(k)}>{l}</button>)}
       </div>
+      <div className="mp-chips">
+        {[['all', 'All'], ['member', 'Resellers'], ['public', 'Retail customers']].map(([k, l]) =>
+          <button key={k} className="mp-chip" aria-pressed={who === k} onClick={() => setWho(k)}>{l} ({k === 'all' ? rows.length : rows.filter((r) => r.kind === k).length})</button>)}
+      </div>
       {msg && <div className="error-box">{msg}</div>}
-      {rows.length === 0 && <div className="panel">Nothing here.</div>}
-      {rows.map((o) => {
+      {rows.filter((r) => who === 'all' || r.kind === who).length === 0 && <div className="panel">Nothing here.</div>}
+      {rows.filter((r) => who === 'all' || r.kind === who).map((o) => {
         const margin = o.cost == null ? null : o.amount - o.cost;
         const waiting = o.status === 'open' || o.status === 'countered';
         return (
@@ -68,7 +73,9 @@ export default function AdminOffers({ initial }) {
               <span className="status-chip">{o.status}</span>
             </div>
             <div style={{ fontSize: 14, marginTop: 6 }}>
-              {o.kind === 'public' ? <>{o.name} ({o.email}{o.phone ? `, ${o.phone}` : ''}) <span className="status-chip">{o.verified_at ? 'email confirmed' : 'email NOT confirmed'}</span> </> : <>{o.business_name || o.email} <span className="status-chip">reseller</span> </>}offered <b>{money(o.amount)}</b> · their price {money(o.list_price)}
+              {o.kind === 'public'
+                ? <><span className="status-chip" style={{ background: '#e8eefc', color: '#1d3a8a' }}>Retail customer</span> {o.name} ({o.email}{o.phone ? `, ${o.phone}` : ''}) <span className="status-chip">{o.verified_at ? 'email confirmed' : 'email NOT confirmed'}</span> </>
+                : <><span className="status-chip" style={{ background: '#e3f6ea', color: '#136a3a' }}>Reseller</span> {o.business_name || o.email} </>}offered <b>{money(o.amount)}</b> · their price {money(o.list_price)}
               {o.cost != null && <> · cost {money(o.cost)} · margin at offer <b style={{ color: margin < 0 ? 'var(--warn)' : undefined }}>{money(margin)}</b></>}
               {o.agreed_price != null && <> · agreed {money(o.agreed_price)}</>}
             </div>

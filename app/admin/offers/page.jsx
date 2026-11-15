@@ -6,7 +6,7 @@ import AdminNav from '../../../components/AdminNav';
 import AdminOffers from '../../../components/AdminOffers';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Reseller offers — Bargain Bay' };
+export const metadata = { title: 'Offers — Bargain Bay' };
 
 export default async function OffersPage() {
   const session = await getSession();
@@ -20,8 +20,8 @@ export default async function OffersPage() {
   return (
     <div>
       <AdminNav active="offers" />
-      <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 8px' }}>Reseller offers</h1>
-      <p className="hint">Accepting holds the unit for the reseller for 48 hours at the agreed price. Offers under the floor are refused when they are made and again here.</p>
+      <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 8px' }}>Offers</h1>
+      <p className="hint">Each offer says whether it came from a reseller or a retail customer. Accepting holds the unit for 48 hours (resellers) or 24 hours (retail) at the agreed price. Offers under the floor are refused when they are made and again here.</p>
       <AdminOffers initial={offers} />
     </div>
   );
