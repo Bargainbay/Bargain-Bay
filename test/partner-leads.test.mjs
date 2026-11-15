@@ -7,7 +7,7 @@ import { __setTestCookies } from './stubs/next-headers.mjs';
 import { createSessionToken, SESSION_COOKIE } from '../lib/auth.js';
 import { upsertCustomer } from '../lib/customers.js';
 import { savePartner, addTeamMember, getPartnerSeat } from '../lib/referral-partners.js';
-import { submitLead, myLeads, orgOverview, claimLead, partnerLeadQueue, notifyTeamOfNewLeads, markNoticesSeen } from '../lib/partner-leads.js';
+import { submitLead, myLeads, orgOverview, claimLead, partnerLeadQueue, notifyTeamOfNewLeads, notifyGeneratorsOfSales, markNoticesSeen } from '../lib/partner-leads.js';
 import { logLeadActivity, convertLead, setLeadStage } from '../lib/leads.js';
 import { partnerPortfolio } from '../lib/partner-portfolio.js';
 import { partnerStatus, validPhone } from '../lib/partner-lead-rules.js';
@@ -248,5 +248,20 @@ test('the owner\'s portfolio: one row per partner with leads, money, generators 
     equal(o.generatorRows.find((g) => g.email === ANNA).sent, 1);
     assert(p.changes.some((c) => /lead generator/.test(c.summary || '')), 'who added whom is on the change log');
     equal(p.totals.leads, 1);
+  } finally { done(); }
+});
+
+test('a generator is told ONCE when their lead has bought, and never about a lead that has not', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { anna } = await setup();
+    const { id } = await submitLead(anna, { name: 'Maria Lopez', phone: '4165551234', email: 'maria@x.ca', ...base });
+    await claimLead(id, REP);
+    await convertLead(id, REP);
+    equal((await notifyGeneratorsOfSales()).sent, 0, 'converted is not a sale');
+    await order('maria@x.ca', 'confirmed');
+    equal((await notifyGeneratorsOfSales()).sent, 1, 'a real order tells the sender');
+    assert((await query(`SELECT sold_notified_at FROM leads WHERE id = $1`, [id])).rows[0].sold_notified_at, 'remembered');
+    equal((await notifyGeneratorsOfSales()).sent, 0, 'and never again');
   } finally { done(); }
 });

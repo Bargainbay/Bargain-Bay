@@ -4443,7 +4443,7 @@ its own `vercel.json` entry; `runAbandonedCartPass` in `lib/cron-jobs.js`).
 
 ## The lead log (added 2026-11-15)
 `lib/lead-log.js`, `/admin/lead-log` (STAFF, nav tab "Lead log", Reports hub under Selling), `components/LeadLog.jsx`, `/api/admin/lead-log`,
-migration `0073_lead_log` (**run Run schema migration after deploy**; `ensureLeadLogSchema` is the safety net), `test/lead-log.test.mjs`.
+migration `0075_lead_log` (**run Run schema migration after deploy**; `ensureLeadLogSchema` is the safety net), `test/lead-log.test.mjs`.
 Asked for by the owner: inbound leads (phone, Facebook, partners, lead-generation teams) were not tracked, so "our conversion is low
 because we lacked stock" was a claim nobody could evidence. 10-20 leads a day are expected.
 - **Built on the Sales Hub's `leads` table, not beside it.** Same duplicate blocking, ownership, stages and activity log. Added only
@@ -5458,3 +5458,14 @@ first use), `/sales/agreement` (+ `/sales/agreement/copy`), `/api/sales/agreemen
   probation / no-notice clause is NOT in the signed text, so that review is still the owner's to get. Changing wording means a new `EMPLOYMENT_TERMS_VERSION`.
 - **The company countersignature is a separate admin act** (typed name, `countersign`); until then every copy says "Awaiting the company's countersignature".
 - Not built: a PDF generated server-side (the browser's Save as PDF is used), a drawn signature, signing by anyone but the rep.
+
+## Offers on units (added 2026-11-14)
+`lib/member-offers.js`, `lib/member-offer-rules.js` (pure), migration `0074_member_offers` (**run Run schema migration**; table also created on first use), `/admin/offers` (ADMIN, nav "Offers"),
+`/api/offers` (anyone), `/api/account/offers` (approved members), `/api/offers/respond` + `/offer/<id>?t=` (a guest's emailed link), `components/{MakeOffer,MemberOffers,OfferStatus,AdminOffers}.jsx`, `test/member-offers.test.mjs`.
+- **An offer is a request.** Nothing changes until an admin ACCEPTS or COUNTERS. Accepting holds the unit for the buyer (a `reservations` row with no order, like a rep hold): **4 hours for everyone** (`OFFER_HOLD_HOURS` / `PUBLIC_HOLD_HOURS`, owner 2026-11-15). **Once the offer is checked out, the order must be PAID within `OFFER_PAYMENT_HOURS` (12)**: `cancelUnpaidOfferOrders` (lib/reservations.js, run hourly by `/api/cron/offer-orders` and inside `expireReservations`) cancels an unpaid `pending_payment` order linked from `member_offers.order_id`, which voids its web invoice, frees the unit and emails the customer. A manual invoice's order is never swept. An admin marks the order confirmed when the e-transfer lands, so that has to happen inside 12 hours.
+- **Floors, checked on submit AND on accept/counter, never shown to the buyer ("too low" only):** member = max(cost, cost+10%/$200 member floor, consignment floor); **public = max(cost, cost + 25%, consignment floor)** (`PUBLIC_MARGIN_PCT`). Must be below what the buyer pays today.
+- **Public offers need name, email, phone**; the offer waits until the guest presses Confirm on the emailed link (GET shows, POST acts), and **admin cannot accept an unconfirmed one**. Honeypot, `isBlocked`, disposable-domain refusal, 5 live offers / 15 a day per email, 10 a day per IP. An unconfirmed offer lapses after 3 days.
+- **Everything goes through the admin queue** (owner's choice, 2026-11-14); there is no auto-accept. Admin only because the queue shows cost and margin.
+- **The agreed price is applied in `decorate()`** (so cart, product page and `/api/checkout` agree), only while accepted and unexpired, and only ever lowers a price. The buyer is a signed-in member (by email) or a browser holding the `bb_offers` cookie set from the emailed link (a bearer link, like a coupon). `offerScope` returns null (no DB hit) for everyone else.
+- Checkout and `/api/availability` treat a unit held for the buyer's own accepted offer as available to them; the order transaction marks the offer `purchased` and clears the hold before the normal reservation.
+- Not built: auto-accept thresholds, an offer history for staff on the customer page, and SMS.

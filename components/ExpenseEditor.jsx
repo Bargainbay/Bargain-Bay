@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { money } from '../lib/constants';
 import { exTaxOf } from '../lib/tax';
@@ -29,6 +29,44 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
   const [shown, setShown] = useState(100);
   // The line being split into several: { id, total (cents), parts: [...] }.
   const [splitting, setSplitting] = useState(null);
+
+  // Date filter. The page loads only the newest 1000 lines; choosing a range
+  // here fetches that whole window, so older bank months (August on) can be reached.
+  const [range, setRange] = useState('latest'); // latest | 30d | month | lastmonth | pick | year | all
+  const [pickMonth, setPickMonth] = useState('');
+  const [pickYear, setPickYear] = useState(String(new Date().getFullYear()));
+  const [loading, setLoading] = useState(false);
+  const firstRun = useRef(true);
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  function bounds() {
+    const now = new Date();
+    if (range === '30d') { const f = new Date(now); f.setDate(f.getDate() - 30); return { from: iso(f), to: iso(now) }; }
+    if (range === 'month') return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(new Date(now.getFullYear(), now.getMonth() + 1, 0)) };
+    if (range === 'lastmonth') return { from: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)), to: iso(new Date(now.getFullYear(), now.getMonth(), 0)) };
+    if (range === 'pick' && /^\d{4}-\d{2}$/.test(pickMonth)) {
+      const [y, m] = pickMonth.split('-').map(Number);
+      return { from: iso(new Date(y, m - 1, 1)), to: iso(new Date(y, m, 0)) };
+    }
+    if (range === 'year') return { from: `${pickYear}-01-01`, to: `${pickYear}-12-31` };
+    if (range === 'all') return { from: '2000-01-01' };
+    return null; // latest: the rows the page loaded with
+  }
+  useEffect(() => {
+    if (firstRun.current) { firstRun.current = false; return; }
+    if (range === 'pick' && !pickMonth) return;
+    const b = bounds();
+    setShown(100);
+    if (!b) { setRows(initial); return; }
+    let live = true;
+    setLoading(true); setErr('');
+    const p = new URLSearchParams(); if (b.from) p.set('from', b.from); if (b.to) p.set('to', b.to);
+    fetch(`/api/admin/expenses?${p}`).then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => { if (!ok) throw new Error(d.error || 'Could not load'); if (live) setRows(d.expenses || []); })
+      .catch((e) => { if (live) setErr(e.message); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range, pickMonth, pickYear]);
 
   // What actually gets stored, given which way the amount was typed. Entering a
   // receipt total is the common case, so it's supported rather than left as
@@ -184,6 +222,18 @@ export default function ExpenseEditor({ initial = [], recurringInitial = [], cat
           : 'Amount is the cost before tax. Put the HST beside it and it comes off your remittance.'}
       </p>
       {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 14 }}>
+        {[['latest', 'Latest'], ['30d', 'Last 30 days'], ['month', 'This month'], ['lastmonth', 'Last month'], ['pick', 'Choose month'], ['year', 'Year'], ['all', 'All time']].map(([k, label]) => (
+          <button key={k} className={`dash-filter${range === k ? ' active' : ''}`} onClick={() => setRange(k)}>{label}</button>
+        ))}
+        {range === 'pick' && <input type="month" value={pickMonth} min="2026-08" onChange={(e) => setPickMonth(e.target.value)} style={{ ...inp, width: 'auto' }} />}
+        {range === 'year' && (
+          <select value={pickYear} onChange={(e) => setPickYear(e.target.value)} style={{ ...inp, width: 'auto' }}>
+            {Array.from({ length: 4 }, (_, i) => String(new Date().getFullYear() - i)).map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        )}
+        {loading && <span className="hint" style={{ margin: 0 }}>Loading…</span>}
+      </div>
       {rows.length > 0 && (
         <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input value={q} onChange={(e) => { setQ(e.target.value); setShown(100); }} placeholder="Search vendor, category, date or amount…" style={{ ...inp, minWidth: 260 }} />

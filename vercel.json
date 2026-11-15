@@ -41,6 +41,10 @@
       "schedule": "10 * * * *"
     },
     {
+      "path": "/api/cron/offer-orders",
+      "schedule": "25 * * * *"
+    },
+    {
       "path": "/api/cron/interac-names",
       "schedule": "17 * * * *"
     },

@@ -34,8 +34,6 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // Every inbound lead written down the day it arrives (phone, Facebook, partners, lead teams), and what became of each:
     // bought, lost, lost for no stock. Staff: it is the customer's sale.
     { key: 'lead-log', label: 'Lead log', href: '/admin/lead-log', sales: true },
-    // Applications to the Appliance Repair Workshop: a kanban board, junk column, who we have spoken to, and call notes.
-    { key: 'workshop', label: 'Workshop', href: '/admin/workshop', sales: true },
     // Where every unit is standing, and the stickers that say so. Staff: finding
     // the fridge for the customer at the counter is a selling job.
     { key: 'warehouse', label: 'Warehouse', href: '/admin/warehouse', sales: true },
@@ -59,6 +57,8 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // Who has applied to buy wholesale, who is approved, and what each has bought. Admin: approving
     // one changes what the storefront charges them.
     { key: 'resellers', label: 'Resellers', href: '/admin/resellers' },
+    // Prices resellers have offered on a unit: accept (holds it 48h at that price), counter or decline. Admin: shows cost.
+    { key: 'offers', label: 'Offers', href: '/admin/offers' },
     // The people who promote our stock for a percentage: applications, their codes, what they are owed.
     { key: 'affiliates', label: 'Affiliates', href: '/admin/affiliates' },
     // Every partner organisation, its lead generators, what we owe it. Admin.
@@ -102,6 +102,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
           <a key={i.key} href={i.href} className={'admin-nav-link' + (i.key === active ? ' active' : '')}>
             {i.label}
             {i.key === 'resellers' && <PendingBadge />}
+            {i.key === 'offers' && <PendingBadge url="/api/admin/offers?count=1" />}
           </a>
         ))}
         {/* A coordinator has no storefront to view, and "View store" on an

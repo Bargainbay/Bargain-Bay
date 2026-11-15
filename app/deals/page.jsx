@@ -4,6 +4,7 @@ import { decorate } from '../../lib/pricing';
 import { groupByModel } from '../../lib/group-units';
 import { dealsSnapshot } from '../../lib/deals';
 import { describeCoupon, dayLabel, GIVEAWAY } from '../../lib/deals-config';
+import { openToOffers } from '../../lib/member-offers';
 import ProductCard from '../../components/ProductCard';
 
 export const dynamic = 'force-dynamic';
@@ -33,8 +34,10 @@ export default async function DealsPage() {
   const pick = (ids) => ids.map((id) => byId.get(id)).filter(Boolean);
   const clearance = units.filter((u) => u.onClearance);
   const drop = snap.drop ? byId.get(snap.drop.sku) : null;
+  const open = await openToOffers(units);
+  const offerUnits = units.filter((u) => open.has(String(u.id).toUpperCase()));
 
-  const nothing = !snap.active.length && !drop && !snap.giveaway;
+  const nothing = !snap.active.length && !drop && !snap.giveaway && !offerUnits.length;
 
   return (
     <div>
@@ -93,6 +96,19 @@ export default async function DealsPage() {
             One unit a week gets an extra markdown. This is this week&apos;s. There is only one.
           </p>
           <Grid units={[drop]} />
+        </section>
+      )}
+
+      {offerUnits.length > 0 && (
+        <section className="deal-block" id="offers">
+          <div className="section-head">
+            <h2>Make us an offer</h2>
+            <span className="hint" style={{ margin: 0 }}>{offerUnits.length} unit{offerUnits.length === 1 ? '' : 's'} open to offers</span>
+          </div>
+          <p style={{ margin: '0 0 12px', fontSize: 15 }}>
+            These are priced to move and we have room to deal. Open one and tap <b>Make an offer</b>; we may accept, counter, or pass.
+          </p>
+          <Grid units={offerUnits} />
         </section>
       )}
 

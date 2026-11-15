@@ -10,7 +10,8 @@
 import { NextResponse } from 'next/server';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { unitsNeedingPhotos, findUnits, resolveUnitSku } from '../../../../lib/photo-queue';
-import { addUnitPhotos, listUnitPhotos, deleteUnitPhoto, MAX_PHOTOS } from '../../../../lib/unit-photos';
+import { addUnitPhotos, listUnitPhotos, deleteUnitPhoto, photoCounts, MAX_PHOTOS } from '../../../../lib/unit-photos';
+import { pushPhotoCountsToRsOps } from '../../../../lib/rsops-push';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -39,6 +40,11 @@ export async function POST(req) {
   if (!s) return denied();
   let form;
   try { form = await req.formData(); } catch { return NextResponse.json({ error: 'Invalid upload.' }, { status: 400 }); }
+  // sync=all: resend every unit's photo count to RS Ops (it missed one, or was down).
+  if (form.get('sync') === 'all') {
+    const counts = await photoCounts();
+    return NextResponse.json({ ok: true, units: Object.keys(counts).length, rsops: await pushPhotoCountsToRsOps(counts) });
+  }
   // Never trust a typed SKU: a model number or a typo would be saved, load fine, and belong to nothing.
   const resolved = await resolveUnitSku(form.get('sku'));
   if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: 400 });

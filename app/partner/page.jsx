@@ -18,6 +18,44 @@ const MEMBER = { approved: 'Reseller pricing approved', pending: 'Reseller appli
 // A referral partner's page: their clients, each client's orders and live status, and the commission owed.
 // The partner is read from the SESSION; an admin may preview one with ?as=<email>. Nothing in the request
 // can name whose clients to read for anyone else. Cost and profit are never returned.
+const RateSheet = ({ admin = false }) => (
+  <div className="panel" style={{ marginBottom: 14 }}>
+    <div style={{ fontWeight: 700, marginBottom: 8 }}>Learn and reference</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 10 }}>
+      {admin && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            <b style={{ fontSize: 14 }}>Partner guide</b>
+            <div className="hint" style={{ fontSize: 12.5 }}>What each link is for, a tour of this page, and how you are paid.</div>
+          </div>
+          <a className="btn btn-primary" href="/partner/guide">Open the guide</a>
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <b style={{ fontSize: 14 }}>{admin ? 'Training manual for your generators' : 'Training manual'}</b>
+          <div className="hint" style={{ fontSize: 12.5 }}>How to post, send leads and use your code. About 15 minutes.</div>
+        </div>
+        <a className="btn btn-primary" href="/partner/training">Open the manual</a>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <b style={{ fontSize: 14 }}>Video tutorials</b>
+          <div className="hint" style={{ fontSize: 12.5 }}>{admin ? 'Short narrated walkthroughs of this portal, for you and for your lead generators.' : 'A short narrated walkthrough of your lead desk.'}</div>
+        </div>
+        <a className="btn btn-primary" href="/partner/tutorials">Watch</a>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <b style={{ fontSize: 14 }}>Delivery and installation rate sheet</b>
+          <div className="hint" style={{ fontSize: 12.5 }}>What delivery, haul-away and installation cost, and what each includes.</div>
+        </div>
+        <a className="btn" href="/partner/rates">Open the rates</a>
+      </div>
+    </div>
+  </div>
+);
+
 export default async function PartnerPage({ searchParams }) {
   const session = await getSession();
   if (!session) redirect('/login?next=/partner');
@@ -36,8 +74,9 @@ export default async function PartnerPage({ searchParams }) {
           <h1 style={{ marginTop: 0, color: 'var(--charcoal)', flex: 1 }}>Welcome{seat.name ? `, ${seat.name.split(' ')[0]}` : ''}</h1>
           <PartnerSignOut />
         </div>
-        <p style={{ fontSize: 14 }}>You are signed in with {seat.orgName || 'your team'}. Send a lead below and see what happened to each one you sent.</p>
+        <p style={{ fontSize: 14 }}>You are signed in with {seat.orgName || 'your team'}. Send a lead below and see what happened to each one you sent. <a href="/account?stay=1" style={{ textDecoration: 'underline' }}>My orders and profile</a></p>
       </div>
+      <RateSheet />
       <PartnerLeadDesk role="affiliate" />
       <PartnerPostingKit /></div>);
     }
@@ -79,6 +118,7 @@ export default async function PartnerPage({ searchParams }) {
       )}
 
       {!preview && <PartnerTeam team={r.team} me={session.email} generators={r.partner.generators} />}
+      {!preview && r.partner.generators && <RateSheet admin />}
       {!preview && r.partner.generators && <div style={{ marginBottom: 12 }}><PartnerLeadDesk role="admin" /></div>}
       {!preview && r.partner.generators && <PartnerPostingKit />}
 
@@ -92,7 +132,9 @@ export default async function PartnerPage({ searchParams }) {
         {stat('Balance owed to you', money(t.balance))}
       </div>
       <p className="hint" style={{ margin: '8px 2px 16px' }}>
-        {r.partner.basis === 'price'
+        {r.partner.basis === 'spread'
+          ? <>Everything a customer pays above our member price of the unit is yours (the customer's {r.partner.customerPct}% code discount comes out of it). When we sell at member price there is nothing above it, so you earn {r.partner.leadPct}% of the profit on that unit instead. </>
+          : r.partner.basis === 'price'
           ? <>Commission is {r.partner.pricePct}% of the sale price (after any discount, before tax) on each order your resellers place, and {r.partner.pricePctRetail}% on sales made with your end-user code, but never more than {r.partner.capPct}% of the profit on that order. </>
           : <>Commission is {r.partner.pct}% of the profit on each order your resellers place, and {r.partner.retailPct}% on sales made with your end-user code (that sale carries the {r.partner.customerPct}% customer discount). </>}
         It becomes earned once the order is delivered and paid for.

@@ -1,6 +1,6 @@
 # Lead Generator Guide — Bargain Bay
 
-DRAFT. Your Aljo Systems manager added you. Read this once, then keep it handy.
+Your Aljo Systems manager added you. This is the short version. The full training manual is in your portal under **Learn and reference**; read it once, then keep it handy. This guide is for lead generators only: it has no links to share, no team, and no money.
 
 ## What you do
 1. **Post** appliances on Facebook (we give you the photos and words).
@@ -18,7 +18,7 @@ the price or delivery. **Do not send:** someone you picked from a list, a strang
 you only think might want one.
 
 **Option 1: type it in**
-1. Press **Send a lead**.
+1. Find **Send a lead** on your page.
 2. Enter their **name** and their **phone** (or email). Double-check the number.
 3. Pick **what they want**: buy an appliance, delivery, installation, repair.
 4. Add a short note (e.g. "wants a washer, in Ajax, asked about Saturday").
@@ -26,7 +26,7 @@ you only think might want one.
 6. Press **Send**.
 
 **Option 2: upload a screenshot**
-1. Press **Send a lead from a screenshot** and choose a screenshot of the chat that shows their details.
+1. Press **Fill it in from a screenshot** and choose a screenshot of the chat that shows their details.
 2. We read it and fill in the form for you. **Check every field, especially the phone number.** Fix anything wrong.
 3. Pick how they reached you and press **Send**.
 Nothing is sent until you press Send. If the screenshot can't be read, fill in the form by hand.
@@ -55,10 +55,10 @@ You can't change these. They update as our team works the lead.
 
 ## Posting on Facebook
 1. Open **Posting kit** on your dashboard. Every item we have for sale is listed with a ready title, words and photos.
-2. Download the photos, post on **your own** Facebook Marketplace, and paste the words.
+2. Press **Copy the words** and **Photos** on an item, then post on **your own** Facebook Marketplace, and paste the words.
 3. **Don't change the price, the condition, or the warranty.** Don't promise a delivery date. Our team confirms those.
 4. When a buyer messages you: send them your link or code, or send us their details as a lead.
-5. Press **I posted this** on each item you post.
+5. Press **Mark as posted** on each item you post.
 
 **Every night** you get an email at about 7 pm with:
 - **Take these down:** items you posted that are sold. Please delete those listings **that night**.

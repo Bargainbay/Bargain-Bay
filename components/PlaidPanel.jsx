@@ -200,6 +200,14 @@ export default function PlaidPanel({ status }) {
         {lastSync && <span className="hint" style={{ margin: 0 }}>Last pull {new Date(lastSync).toLocaleString('en-CA')}</span>}
       </div>
 
+      {institutions.some((i) => /\bTD\b/i.test(i.institution || '')) && (
+        <div className="hint" style={{ marginTop: 10 }}>
+          TD Canada Trust only lets Plaid update transactions between about 11pm and 6am Toronto time (4am-11am UTC).
+          Pull now at any other hour fails with "Institution not responding" — that is TD's limit, not a fault here.
+          The nightly sync runs inside that window.
+        </div>
+      )}
+
       {msg && <div className="notice-box" style={{ marginTop: 10 }}>{msg}</div>}
       {err && <div className="error-box" style={{ marginTop: 10 }}>{err}</div>}
     </div>

@@ -18,7 +18,8 @@ export const metadata = { title: 'My Account — Bargain Bay' };
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-CA') : '—');
 const pillClass = (s) => (['paid', 'converted', 'accepted'].includes(s) ? 'ok' : s === 'open' ? 'warn' : 'sold');
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }) {
+  const sp = (await searchParams) || {};
   const session = await getSession();
   if (!session) redirect('/login?next=/account');
 
@@ -46,6 +47,9 @@ export default async function AccountPage() {
     try { invoices = await invoicesForEmail(session.email); } catch (e) { console.error('account invoices failed', e.message); }
     try { quotes = await quotesForEmail(session.email); } catch (e) { console.error('account quotes failed', e.message); }
   }
+
+  // A lead generator's home is the lead desk, not the retail account page. "stay" lets them still reach their own orders.
+  if (seat && seat.role === 'affiliate' && !sp.stay) redirect('/partner');
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>
