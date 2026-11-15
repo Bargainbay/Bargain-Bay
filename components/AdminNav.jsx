@@ -31,6 +31,9 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     { key: 'fb-listings', label: 'Facebook', href: '/admin/fb-listings', sales: true },
     // Warm leads sent by partners' lead generators: claim one, work it. Sales and reps (it is the customer's sale).
     { key: 'partner-leads', label: 'Partner leads', href: '/admin/partner-leads', sales: true },
+    // Every inbound lead written down the day it arrives (phone, Facebook, partners, lead teams), and what became of each:
+    // bought, lost, lost for no stock. Staff: it is the customer's sale.
+    { key: 'lead-log', label: 'Lead log', href: '/admin/lead-log', sales: true },
     // Applications to the Appliance Repair Workshop: a kanban board, junk column, who we have spoken to, and call notes.
     { key: 'workshop', label: 'Workshop', href: '/admin/workshop', sales: true },
     // Where every unit is standing, and the stickers that say so. Staff: finding

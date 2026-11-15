@@ -4441,6 +4441,27 @@ its own `vercel.json` entry; `runAbandonedCartPass` in `lib/cron-jobs.js`).
   or refuses (`lib/environment.js`), and the claim row / `notified_at` are handed
   back so a staging run on a shared database cannot burn a customer's reminders.
 
+## The lead log (added 2026-11-15)
+`lib/lead-log.js`, `/admin/lead-log` (STAFF, nav tab "Lead log", Reports hub under Selling), `components/LeadLog.jsx`, `/api/admin/lead-log`,
+migration `0073_lead_log` (**run Run schema migration after deploy**; `ensureLeadLogSchema` is the safety net), `test/lead-log.test.mjs`.
+Asked for by the owner: inbound leads (phone, Facebook, partners, lead-generation teams) were not tracked, so "our conversion is low
+because we lacked stock" was a claim nobody could evidence. 10-20 leads a day are expected.
+- **Built on the Sales Hub's `leads` table, not beside it.** Same duplicate blocking, ownership, stages and activity log. Added only
+  `wanted`, `wanted_category`, `source_detail` (which partner or team), the sources `phone` / `social` / `lead_team` / `partner`, and the
+  lost reasons `no_stock` ("We did not have what they wanted") and `timing` (`lib/lead-rules.js`). `WANTED_CATEGORIES` is a fixed list so
+  "what did we not have" can be counted.
+- **BOUGHT IS DERIVED, NEVER TYPED.** A lead is bought when it is linked to a customer or a non-cancelled order exists for its email or phone
+  placed AFTER the lead was logged (same logic as abandoned carts). A lead marked lost that later buys is BOUGHT. The log has no "won"
+  button, which keeps "Won is never set by hand" true and stops the conversion figure being flattered.
+- **UNRECORDED IS A ROW.** A lead with no source is counted under "Not recorded". Every lost reason is listed even at zero.
+- **Out of the funnel:** RS Solutions leads (`side = 'rs'`) and imported lists (`source = 'imported'`): different funnel, thousands of rows.
+  Partner leads ARE in it (source `referral`, partner shown from `partner_email`).
+- **Scoping is inside the query:** a non-admin sees only leads they own; an admin sees everyone's. `conversionPct` is of ALL leads in the
+  window, so recent days read low (open leads may still buy); `decidedPct` is bought / (bought + lost).
+- **The number the investor asks about** is "Lost: no stock" and the list under it of what people asked for and we did not have (also the
+  list to buy against). Nothing there is estimated; until leads are logged it is empty.
+- Not built: a lead auto-created from the website chat or form, a per-source cost (cost per lead), and importing last month's leads.
+
 ## The sales team scorecard and quotas (added 2026-10-08)
 `repScorecard` in `lib/analytics.js`, `lib/rep-match.js` (no imports), `lib/quotas.js`,
 table `sales_quotas` (migration 0015), `components/RepScorecard.jsx`,
