@@ -56,7 +56,7 @@ export default function MemberOffers({ units, initial }) {
           </label>
           <button className="btn" disabled={busy || !sku}>Send offer</button>
         </div>
-        {unit && <p className="hint" style={{ marginBottom: 0 }}>Your price today is {money(unit.price)}. An accepted offer holds the unit for you for 48 hours at the agreed price.</p>}
+        {unit && <p className="hint" style={{ marginBottom: 0 }}>Your price today is {money(unit.price)}. An accepted offer holds the unit for you for 4 hours at the agreed price, and the order must be paid within 12 hours of checkout.</p>}
       </form>
       {msg && <div className="hint" role="status" style={{ margin: '8px 0' }}>{msg}</div>}
       {offers.map((o) => (

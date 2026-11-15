@@ -23,7 +23,7 @@ test('public floor is cost + 25%, rounded up, or the consignment floor', () => {
   equal(publicOfferFloor({ cost: 400, consignFloor: 520 }), 520);
   equal(publicOfferFloor({ cost: 0 }), 0);
 });
-test('hold length by kind', () => { equal(holdHoursFor('public'), 24); equal(holdHoursFor('member'), 48); });
+test('hold length by kind', () => { equal(holdHoursFor('public'), 4); equal(holdHoursFor('member'), 4); });
 
 import { hasOfferRoom } from '../lib/member-offer-rules.js';
 suite('offers: which units are open');

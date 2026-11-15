@@ -15,7 +15,7 @@ export default function OfferStatus({ offer, token }) {
     if (action === 'claim') { addToCart(d.sku); window.location.href = '/cart'; return; }
     if (action === 'confirm') setO({ ...o, verified_at: new Date().toISOString() });
     if (action === 'withdraw') setO({ ...o, status: 'withdrawn' });
-    if (action === 'accept_counter') setO({ ...o, status: 'accepted', expires_at: new Date(Date.now() + 24 * 3600e3).toISOString() });
+    if (action === 'accept_counter') setO({ ...o, status: 'accepted', expires_at: new Date(Date.now() + 4 * 3600e3).toISOString() });
   }
   const live = ['open', 'countered', 'accepted'].includes(o.status);
   return (
@@ -25,7 +25,7 @@ export default function OfferStatus({ offer, token }) {
       {o.status === 'open' && !o.verified_at && <><p>Please confirm your email address so we can look at your offer.</p><button className="btn" onClick={() => act('confirm')}>Confirm my email</button></>}
       {o.status === 'open' && o.verified_at && <p>We have your offer and will answer by email, usually within a business day.</p>}
       {o.status === 'countered' && <><p>We can do <b>{money(Number(o.agreed_price))}</b>. Nothing is held until you take it.</p><button className="btn" onClick={() => act('accept_counter')}>Take {money(Number(o.agreed_price))}</button></>}
-      {o.status === 'accepted' && <><p>Accepted at <b>{money(Number(o.agreed_price))}</b>. Held for you until {new Date(o.expires_at).toLocaleString('en-CA')}.</p><button className="btn" onClick={() => act('claim')}>Add to order &amp; check out</button></>}
+      {o.status === 'accepted' && <><p>Accepted at <b>{money(Number(o.agreed_price))}</b>. Held for you until {new Date(o.expires_at).toLocaleString('en-CA')}. Please pay right away: an order not paid within 12 hours of checkout is cancelled.</p><button className="btn" onClick={() => act('claim')}>Add to order &amp; check out</button></>}
       {['declined', 'expired', 'withdrawn', 'purchased'].includes(o.status) && <p>This offer is {o.status === 'purchased' ? 'complete. Thank you!' : o.status + '.'} <a href="/shop" style={{ textDecoration: 'underline' }}>Back to the shop</a></p>}
       {live && o.status !== 'accepted' && <p style={{ marginTop: 10 }}><button className="btn" onClick={() => act('withdraw')}>Withdraw my offer</button></p>}
       {msg && <div className="error-box" role="alert">{msg}</div>}
