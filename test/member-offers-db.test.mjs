@@ -113,3 +113,30 @@ test('counter, floor on the counter, decline, withdraw, and the per-unit overrid
     await setOfferMode('CHEAP-1', '', ADMIN);
   } finally { restore(); t.done(); }
 });
+
+import { cancelUnpaidOfferOrders } from '../lib/reservations.js';
+suite('offers: pay within 12 hours');
+test('an unpaid order from an accepted offer is cancelled after 12 hours; a paid or younger one is not', async () => {
+  const t = await withTestDb();
+  try {
+    const mk = (n, status, hoursAgo) => query(
+      `INSERT INTO orders (order_number, email, name, delivery_method, status, subtotal, hst, total, created_at)
+       VALUES ($1,'buyer@example.com','Buyer','pickup',$2,500,65,565, now() - ($3 || ' hours')::interval) RETURNING id`, [n, status, String(hoursAgo)]);
+    const old = (await mk('BB-T1', 'pending_payment', 13)).rows[0].id;
+    const fresh = (await mk('BB-T2', 'pending_payment', 5)).rows[0].id;
+    const paid = (await mk('BB-T3', 'confirmed', 20)).rows[0].id;
+    const plain = (await mk('BB-T4', 'pending_payment', 30)).rows[0].id;      // not from an offer: this sweep leaves it alone
+    for (const [oid, sku] of [[old, 'S1'], [fresh, 'S2'], [paid, 'S3']]) {
+      await query(`INSERT INTO member_offers (kind, email, sku, list_price, amount, status, order_id) VALUES ('public','buyer@example.com',$1,800,520,'purchased',$2)`, [sku, oid]);
+    }
+    await query(`INSERT INTO reservations (sku, order_id, expires_at) VALUES ('S1', $1, now() + interval '7 days')`, [old]);
+    equal(await cancelUnpaidOfferOrders(), 1);
+    const st = async (id) => (await query('SELECT status FROM orders WHERE id = $1', [id])).rows[0].status;
+    equal(await st(old), 'cancelled');
+    equal(await st(fresh), 'pending_payment');
+    equal(await st(paid), 'confirmed');
+    equal(await st(plain), 'pending_payment');
+    equal((await query(`SELECT count(*)::int AS n FROM reservations WHERE sku = 'S1'`)).rows[0].n, 0, 'the unit is freed');
+    equal(await cancelUnpaidOfferOrders(), 0, 'running again changes nothing');
+  } finally { t.done(); }
+});

@@ -66,7 +66,7 @@ export default async function MemberDashboard() {
             stats={{ orders: counted.length, spent, owing: owing.length }} />}
 
       <h2 id="offers" style={{ color: 'var(--charcoal)', marginTop: 28 }}>Make an offer</h2>
-      <p className="hint" style={{ marginTop: 0 }}>See something you would take at a better price? Offer it. If we accept, the unit is held for you for 48 hours.</p>
+      <p className="hint" style={{ marginTop: 0 }}>See something you would take at a better price? Offer it. If we accept, the unit is held for you for 4 hours, and the order needs to be paid within 12 hours of checkout.</p>
       <MemberOffers units={catalogue} initial={JSON.parse(JSON.stringify(offers))} />
 
       <h2 style={{ color: 'var(--charcoal)', marginTop: 28 }}>Your orders</h2>
