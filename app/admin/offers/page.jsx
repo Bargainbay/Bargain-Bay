@@ -21,7 +21,7 @@ export default async function OffersPage() {
     <div>
       <AdminNav active="offers" />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 8px' }}>Offers</h1>
-      <p className="hint">Each offer says whether it came from a reseller or a retail customer. Accepting holds the unit for 4 hours at the agreed price. Once they check out, an order not paid within 12 hours is cancelled, its invoice voided and the unit relisted. Offers under the floor are refused when they are made and again here.</p>
+      <p className="hint">Each offer says whether it came from a reseller or a retail customer. Accepting holds the unit at the agreed price: 4 hours for a reseller, 24 hours for a retail customer. Once they check out, an order not paid within 12 hours is cancelled, its invoice voided and the unit relisted. Offers under the floor are refused when they are made and again here.</p>
       <AdminOffers initial={offers} />
     </div>
   );
