@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
-import { listOffersAdmin, decideOffer, openOfferCount, getOfferModes, setOfferMode, OfferError } from '../../../../lib/member-offers';
+import { listOffersAdmin, decideOffer, reactivateOffer, openOfferCount, getOfferModes, setOfferMode, OfferError } from '../../../../lib/member-offers';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +32,7 @@ export async function POST(req) {
   const id = Number(b.id);
   if (!Number.isInteger(id)) return NextResponse.json({ error: 'Which offer?' }, { status: 400 });
   try {
+    if (b.action === 'reactivate') return NextResponse.json(await reactivateOffer(id, g.session));
     return NextResponse.json(await decideOffer(id, b.decision, { price: b.price, note: b.note }, g.session));
   } catch (e) {
     if (e instanceof OfferError) return NextResponse.json({ error: e.message, code: e.code }, { status: 409 });
