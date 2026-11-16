@@ -10,7 +10,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isStaff } from '../../../../lib/auth';
 import { unitsNeedingPhotos, findUnits, resolveUnitSku } from '../../../../lib/photo-queue';
-import { addUnitPhotos, listUnitPhotos, deleteUnitPhoto, photoCounts, MAX_PHOTOS } from '../../../../lib/unit-photos';
+import { addUnitPhotos, listUnitPhotos, deleteUnitPhoto, photoCounts, photoUploaders, MAX_PHOTOS } from '../../../../lib/unit-photos';
 import { pushPhotoCountsToRsOps } from '../../../../lib/rsops-push';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +30,8 @@ export async function GET(req) {
   }
   // ?find=text — units matching what is typed, with how many photos each has, to PICK from.
   if (params.get('find') != null) return NextResponse.json({ units: await findUnits(params.get('find')) });
+  // ?who=SKU,SKU — who saved the photos of these units (staff only; the public reads never carry this).
+  if (params.get('who')) return NextResponse.json({ uploads: await photoUploaders(params.get('who').split(',')) });
   const sku = (params.get('sku') || '').trim();
   if (!sku) return NextResponse.json({ error: 'Missing sku' }, { status: 400 });
   return NextResponse.json({ sku, photos: await listUnitPhotos(sku) });
