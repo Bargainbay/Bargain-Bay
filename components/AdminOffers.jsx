@@ -15,9 +15,9 @@ export default function AdminOffers({ initial }) {
     const d = await r.json().catch(() => ({}));
     setRows(d.offers || []);
   }
-  async function decide(id, decision, price) {
+  async function decide(id, decision, price, action) {
     setMsg('');
-    const r = await fetch('/api/admin/offers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, decision, price }) });
+    const r = await fetch('/api/admin/offers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, decision, price, action }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { setMsg(d.error || 'Could not save.'); return; }
     await load(status);
@@ -80,6 +80,11 @@ export default function AdminOffers({ initial }) {
               {o.agreed_price != null && <> · agreed {money(o.agreed_price)}</>}
             </div>
             {o.note && <div style={{ fontSize: 13.5, marginTop: 4, color: 'var(--muted)' }}>“{o.note}”</div>}
+            {o.status === 'expired' && o.agreed_price != null && (
+              <div style={{ marginTop: 10 }}>
+                <button className="btn" onClick={() => { if (confirm(`Reactivate this offer at ${money(o.agreed_price)}? The unit is held again and the buyer is emailed.`)) decide(o.id, null, null, 'reactivate'); }}>Reactivate</button>
+              </div>
+            )}
             {waiting && (
               <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                 <button className="btn" onClick={() => decide(o.id, 'accept')} disabled={o.status === 'countered' || !o.verified_at}>Accept {money(o.amount)}</button>
