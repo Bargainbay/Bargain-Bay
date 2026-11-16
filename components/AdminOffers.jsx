@@ -54,7 +54,7 @@ export default function AdminOffers({ initial }) {
         </ul>}
       </details>
       <div className="mp-chips">
-        {[['open', 'Waiting'], ['accepted', 'Accepted'], ['purchased', 'Bought'], ['declined', 'Declined'], ['all', 'All']].map(([k, l]) =>
+        {[['open', 'Waiting'], ['accepted', 'Accepted'], ['purchased', 'Bought'], ['expired', 'Expired'], ['declined', 'Declined'], ['withdrawn', 'Withdrawn'], ['all', 'All']].map(([k, l]) =>
           <button key={k} className="mp-chip" aria-pressed={status === k} onClick={() => load(k)}>{l}</button>)}
       </div>
       <div className="mp-chips">
