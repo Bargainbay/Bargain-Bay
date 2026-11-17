@@ -9,6 +9,7 @@ import {
   callerFor, toolsFor, tierOf, isGated, isOwnerOnly, overApproval, OWNER_APPROVAL_OVER, TOOL_TIER, DEPTS,
   stalePricing, ageDays, matchPayment, sameName, dayReport, TRACKER_FREE_FIELDS
 } from '../lib/manager-policy.js';
+import { GM_ONLY } from '../lib/manager-policy.js';
 import { TOOLS as MONEY_TOOLS, NEW_TOOL_NAMES } from '../lib/manager-tools.js';
 import { runTool, startInboundCall, greeting } from '../lib/manager-call.js';
 import { BUSINESS_CHECKS } from '../lib/manager-business.js';
@@ -46,7 +47,7 @@ test('refunds, discounts and voids are owner-only; prices, payments and tracker 
 });
 test('every tool the model is offered is listed in a department, and every tiered name is a real tool', () => {
   const names = new Set(MONEY_TOOLS.map((t) => t.name));
-  const inSomeDept = new Set([...DEPTS.delivery.tools, ...DEPTS.sales.tools]);
+  const inSomeDept = new Set([...DEPTS.delivery.tools, ...DEPTS.sales.tools, ...GM_ONLY]);
   for (const n of names) assert(inSomeDept.has(n) || n === 'switch_department', `${n} is in no department, so only the GM could ever use it`);
   const legacy = ['set_photo_from_model', 'run_inventory_sync', 'close_stale_stops', 'run_backup_now', 'resolve_invoice'];
   for (const n of Object.keys(TOOL_TIER)) assert(names.has(n) || legacy.includes(n), `${n} has a tier but is not a tool`);
@@ -253,4 +254,65 @@ test('an install that does not say what kind is not guessed: it is flagged to ve
   equal(guessInstall('Fulgor Milano Washer'), null);
   equal(guessInstall('stacked washer and dryer'), 'stacked_laundry');
   equal(priceDelivery({ km: 80, services: ['install'], installs: [{ type: 'stacked_laundry' }] }).total, 215);
+});
+
+import { TOOLS_B, brief } from '../lib/manager-tools-b.js';
+suite('manager team: batch two');
+test('every batch-two tool is a real, described tool, and each sits in a department or is the General Manager\'s alone', () => {
+  assert(TOOLS_B.length >= 40, `${TOOLS_B.length} tools`);
+  const inDept = new Set([...DEPTS.delivery.tools, ...DEPTS.sales.tools, ...GM_ONLY]);
+  for (const t of TOOLS_B) { assert(t.description && t.input_schema, t.name); assert(inDept.has(t.name), `${t.name} is in no department`); }
+  equal(new Set(TOOLS_B.map((t) => t.name)).size, TOOLS_B.length);
+});
+test('reads are free; anything that reaches a customer, moves a sale or changes what the shop charges is gated; store credit is owner-only', () => {
+  for (const n of ['find_customer', 'find_quote', 'sales_report', 'payables', 'late_stops', 'morning_brief', 'where_are_vans', 'add_customer_note', 'move_stop_day', 'post_team_message']) assert(!isGated(n), n);
+  for (const n of ['resend_invoice', 'convert_quote', 'void_quote', 'set_coupon_active', 'decide_reseller', 'cancel_stop', 'confirm_door_money', 'reject_door_money', 'approve_fill_requests', 'mark_supplier_bill_paid', 'record_affiliate_payout']) assert(isGated(n) && !isOwnerOnly(n), n);
+  for (const n of ['issue_store_credit', 'apply_store_credit']) assert(isOwnerOnly(n), n);
+});
+test('the General Manager alone holds the books and buying; the department managers do not', () => {
+  for (const n of GM_ONLY) { assert(!DEPTS.delivery.tools.includes(n) && !DEPTS.sales.tools.includes(n), n); }
+});
+test('a phone answer is a few rows, not a table, and never carries a secret', () => {
+  const out = brief({ rows: Array.from({ length: 30 }, (_, i) => ({ n: i })), password_hash: 'x', token: 'y', note: 'a'.repeat(400) });
+  equal(out.rows.count, 30); equal(out.rows.first.length, 8);
+  assert(!('password_hash' in out) && !('token' in out) && out.note.length < 170);
+});
+test('store credit and resending an invoice wait for a later yes, and store credit is refused on an unknown line', async () => {
+  await withDb(async (client) => {
+    const id = await call(client);
+    const sc = await runTool(id, 'issue_store_credit', { amount: 80, name: 'Pat' }, { turn: 1 });
+    assert(sc.needs_confirmation && sc.over_fifty === true && /80/.test(sc.read_back), JSON.stringify(sc));
+    const rs = await runTool(id, 'resend_invoice', { number: 'INV-9' }, { turn: 1 });
+    assert(rs.needs_confirmation && /INV-9/.test(rs.read_back), JSON.stringify(rs));
+    const stranger = await call(client, { caller: null });
+    const r = await runTool(stranger, 'issue_store_credit', { amount: 10 }, { turn: 1 });
+    assert(r.error && !r.needs_confirmation, JSON.stringify(r));
+  });
+});
+test('the read tools run against a real database and say honestly when there is nothing', async () => {
+  await withDb(async (client) => {
+    const id = await call(client);
+    const late = await runTool(id, 'late_stops', {}, { turn: 1 });
+    equal(late.count, 0);
+    const brief1 = await runTool(id, 'morning_brief', {}, { turn: 1 });
+    assert(brief1.date && 'stopsToday' in brief1, JSON.stringify(brief1));
+    const h = await runTool(id, 'health_check', {}, { turn: 1 });
+    assert('allClear' in h, JSON.stringify(h));
+    const none = await runTool(id, 'store_credit_balance', { code: 'SC-NOPE-NOPE' }, { turn: 1 });
+    assert(none.error, JSON.stringify(none));
+    const noJob = await runTool(id, 'move_stop_day', { job_number: 'RS-9', date: '2026-12-01' }, { turn: 1 });
+    assert(/cannot find/.test(noJob.error), JSON.stringify(noJob));
+  });
+});
+test('a note on a customer and a Team board post are done at once and logged', async () => {
+  await withDb(async (client) => {
+    const id = await call(client);
+    const { rows: [c] } = await client.query(`INSERT INTO customers (email, name) VALUES ('pat@example.com','Pat') RETURNING id`);
+    const n = await runTool(id, 'add_customer_note', { customer_id: c.id, body: 'Wants the stove Thursday' }, { turn: 1 });
+    assert(n.ok, JSON.stringify(n));
+    const p = await runTool(id, 'post_team_message', { channel: 'general', body: 'Truck two is loaded.' }, { turn: 1 });
+    assert(p.ok, JSON.stringify(p));
+    const { rows } = await client.query(`SELECT body, author_name FROM team_messages`);
+    equal(rows[0].author_name, 'Manager (AI)');
+  });
 });
