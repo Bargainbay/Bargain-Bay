@@ -201,3 +201,20 @@ test('a failing backup is explained, not blank', async () => {
   assert(summariseBackupFailure({ ok: false, tracker: { error: 'Service Accounts do not have storage quota' }, blobs: { failed: 2, errors: ['a: boom'] } }).includes('storage quota'));
   assert(summariseBackupFailure({ ok: false }).length > 0);
 });
+
+suite('manager listening');
+test('it waits 15 seconds for an answer, ends a turn on a 2-second pause, and a nudge waits longer', async () => {
+  const { sayTwiml, LISTEN_SECONDS, LISTEN_AFTER_NUDGE_SECONDS, END_OF_SPEECH_SECONDS } = await import('../lib/import-call.js');
+  assert(LISTEN_SECONDS >= 15 && LISTEN_AFTER_NUDGE_SECONDS > LISTEN_SECONDS && END_OF_SPEECH_SECONDS >= 2);
+  const xml = await sayTwiml('Is it still open?', { gatherTo: 'https://x.test/api/manager/call?callId=1&t=abc' });
+  assert(/<Gather[^>]* timeout="15"/.test(xml), xml);
+  assert(/speechTimeout="2"/.test(xml), 'a flat pause, not "auto", which cut people off mid-sentence');
+  const nudge = await sayTwiml('Take your time.', { gatherTo: 'https://x.test/a?b=1', timeout: LISTEN_AFTER_NUDGE_SECONDS });
+  assert(/timeout="25"/.test(nudge));
+  assert(!/<Gather/.test(await sayTwiml('Goodbye.', { hangUp: true })));
+});
+test('the silent branch nudges once without a question, then says goodbye', async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../app/api/manager/call/route.js', import.meta.url), 'utf8');
+  assert(!/Are you there\?/.test(src), 'no second question after silence');
+  assert(/LISTEN_AFTER_NUDGE_SECONDS/.test(src));
+});
