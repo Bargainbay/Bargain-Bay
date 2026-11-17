@@ -5470,3 +5470,26 @@ first use), `/sales/agreement` (+ `/sales/agreement/copy`), `/api/sales/agreemen
 - **The agreed price is applied in `decorate()`** (so cart, product page and `/api/checkout` agree), only while accepted and unexpired, and only ever lowers a price. The buyer is a signed-in member (by email) or a browser holding the `bb_offers` cookie set from the emailed link (a bearer link, like a coupon). `offerScope` returns null (no DB hit) for everyone else.
 - Checkout and `/api/availability` treat a unit held for the buyer's own accepted offer as available to them; the order transaction marks the offer `purchased` and clears the hold before the normal reservation.
 - Not built: auto-accept thresholds, an offer history for staff on the customer page, and SMS.
+
+## The manager runs the BUSINESS, and acts before it reports (added 2026-11-16)
+`lib/manager-business.js` (the business checks), `lib/manager-actions.js` (what it does, and the log), migration `0076_manager_actions`
+(also created on first use), `test/manager-business.test.mjs`. Extends the Voice Manager above: that was a TECH-health scanner (photos,
+backups, sync) with no view of sales, deliveries or money, which is why it sounded like a reminder bot. Owner's instruction: **act, report after.**
+
+- **The scan now carries the business**: invoices past due (dollars, oldest/largest first), quotes expiring within two days, stops today and
+  tomorrow with no driver, confirmed delivery orders not on the board, web orders unpaid over two days, overdue customer follow-ups, supplier
+  bills unpaid over 30 days. Each is read-only, a check that fails degrades to "nothing found" and never throws, and an issue may name a
+  `fix` (the remedy that clears it). Add a check to `BUSINESS_CHECKS`.
+- **It acts on its own, within a fixed line** (`REMEDIES` in manager-actions.js, run by `runManagerPass` BEFORE it decides to ring, then the
+  scan is re-run so it only rings about what is left): raise ONE unassigned follow-up per expiring quote / overdue invoice (never doubled),
+  put confirmed delivery orders on the dispatch board, email the dispatch desk once a day about tomorrow's unassigned stops, refresh stale stock.
+- **By voice it can also** put a named driver on a stop, raise a follow-up for a named customer, pull orders, say how the day is going
+  (`business_snapshot`: counts only) and list what it did. Names are MATCHED, never guessed: no match or several is a question back.
+  These run immediately; the four older fixes (photo copy, sync, close stale stops, backup) STILL need the second-turn yes.
+- **EVERYTHING IT DOES IS LOGGED AND REPORTED** (`manager_actions`): the next call opens with "While you were away I did N things",
+  and when no call is placed the pass emails `SERVICE_EMAIL` the same list. Reported means SAID (marked only when the call is answered).
+  /admin/manager lists them. A dedupe key means a once-a-day action cannot repeat.
+- **HARD LIMITS, enforced by test:** no tool or import for money in or out, refunds, invoices, prices, coupons, store credit, cost, or
+  anything sent to a CUSTOMER. A voice request for those gets "that needs you on the screen" plus an offer of a follow-up task so the sales team rings.
+- **Not built:** inbound calls, texting the team (it emails the dispatch desk), choosing a driver itself (it only assigns when told),
+  per-rep nudges, quota pacing, and acting on a recommendation it was not asked about beyond the list above.

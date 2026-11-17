@@ -10,6 +10,7 @@ import { planStaleClose, closeStaleStops, backupNow, cdaStatus } from '../../../
 import { setSetting } from '../../../../lib/settings';
 import { query } from '../../../../lib/db';
 import { audit } from '../../../../lib/audit';
+import { recentActions } from '../../../../lib/manager-actions';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -21,9 +22,9 @@ const denied = () => NextResponse.json({ error: 'Not authorized' }, { status: 40
 export async function GET() {
   if (!(await admin())) return denied();
   try {
-    const [scan, calls, notes, snoozes, to] = await Promise.all([scanIssues(), recentCalls(10), openNotes(), loadSnoozes(), managerTarget()]);
+    const [scan, calls, notes, snoozes, to, actions] = await Promise.all([scanIssues(), recentCalls(10), openNotes(), loadSnoozes(), managerTarget(), recentActions(30)]);
     const last4 = (to || '').slice(-4);
-    return NextResponse.json({ ...scan, calls, notes, snoozes, configured: callConfigured(), ringsLast4: last4 });
+    return NextResponse.json({ ...scan, calls, notes, snoozes, actions, configured: callConfigured(), ringsLast4: last4 });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not scan.' }, { status: 500 });
   }
