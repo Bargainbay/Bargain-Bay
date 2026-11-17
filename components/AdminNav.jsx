@@ -9,6 +9,7 @@ import PendingBadge from './PendingBadge';
 // as a broken app rather than as a boundary.
 export default function AdminNav({ active, salesOnly = false, booksOnly = false, dispatchOnly = false }) {
   const all = [
+    { key: 'team', label: 'Team', href: '/team', sales: true },
     { key: 'dashboard', label: 'Dashboards', href: '/admin/dashboard', sales: true },
     { key: 'copilot', label: 'Sarah', href: '/admin/agent' },
     { key: 'manager', label: 'Manager', href: '/admin/manager' },
@@ -91,6 +92,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     : booksOnly
     ? [{ key: 'books', label: 'The books', href: '/admin/reports/books' },
        { key: 'pnl', label: 'Profit & loss', href: '/admin/reports/pnl' },
+       { key: 'team', label: 'Team', href: '/team' },
        { key: 'ledger', label: 'Trial balance', href: '/admin/reports/ledger' },
        { key: 'financial', label: 'Expenses', href: '/admin/financial' }]
     : (salesOnly ? all.filter((i) => i.sales) : all);
@@ -103,6 +105,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
             {i.label}
             {i.key === 'resellers' && <PendingBadge />}
             {i.key === 'offers' && <PendingBadge url="/api/admin/offers?count=1" />}
+            {i.key === 'team' && <PendingBadge url="/api/team?summary=1" field="total" />}
           </a>
         ))}
         {/* A coordinator has no storefront to view, and "View store" on an

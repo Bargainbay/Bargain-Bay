@@ -2026,3 +2026,12 @@ a.pq-btn { text-decoration: none; }
 .dboard .bankroll summary { color: var(--charcoal); font-size: 15px; }
 .dboard .bankroll .notice-box { background: rgba(52,211,153,.16); color: #e8fff6; border: 1px solid rgba(52,211,153,.45); border-radius: 10px; padding: 12px 14px; }
 .dboard .bankroll .error-box { color: #ffd0d0; background: rgba(248,113,113,.16); border: 1px solid rgba(248,113,113,.5); padding: 12px 14px; }
+.disp-grip { cursor: grab; padding: 0 6px 0 2px; color: var(--muted, #888); font-size: 16px; line-height: 1; user-select: none; }
+.disp-grip:active { cursor: grabbing; }
+.disp-card.drop-before { box-shadow: 0 -3px 0 0 #2563eb; }
+.disp-card.drop-after { box-shadow: 0 3px 0 0 #2563eb; }
+
+/* Team board */
+.btn-link { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; }
+.btn-link:hover { color: var(--charcoal); }
+.team-board .panel { margin-bottom: 10px; }

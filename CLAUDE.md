@@ -5529,3 +5529,54 @@ backups, sync) with no view of sales, deliveries or money, which is why it sound
   refunds, store credit, quotes, coupons, reseller approvals, campaigns, ads, or the other ~70 tasks on the proposed list; they are added the same way (tool + tier + department). Prices/charges are not
   yet cross-checked against `lib/pricing.js` floors by the Manager itself (clearance refuses consigned stock under its floor). `delivery_board`/`price_stop` need a driving km: `plan_run` supplies it only with `GOOGLE_MAPS_SERVER_KEY`.
   Untested against a real phone call or the real mailbox.
+
+- **HARD LIMITS, enforced by test:** no tool or import for money in or out, refunds, creating/editing/voiding invoices, prices, coupons, store credit, cost, or
+  anything sent to a CUSTOMER. **ONE exception, added 2026-11-17 on the owner's instruction: it can RECORD that a payment already arrived** (below). A voice request for those gets "that needs you on the screen" plus an offer of a follow-up task so the sales team rings.
+- **Not built:** inbound calls, texting the team (it emails the dispatch desk), choosing a driver itself (it only assigns when told),
+  per-rep nudges, quota pacing, and acting on a recommendation it was not asked about beyond the list above.
+
+### The manager works a list itself, and can record "it was paid on Aug 20th" (added 2026-11-17)
+`nextOverdueInvoice` / `searchOverdueInvoices` / `resolveInvoice` in `lib/manager-actions.js`; tools `next_overdue_invoice`,
+`find_overdue_invoice`, `resolve_invoice`. The first call went badly: told there were 18 late invoices it asked the owner to check them, and
+it answered a mis-heard name ("Roger") with "there is no Roger" and moved on. It now DRIVES: oldest first, "N of 18", "is it still open?",
+and the prompt forbids telling him to go and look anything up.
+- **paid** records the payment dated the day he says (`paid_on`, never future, max two years back - `normalizeBackdate`), for the full balance
+  unless a part amount is given, through `recordInvoicePayment` (the ordinary path: invoice paid, payment ledger, order, stock). Method defaults to Other.
+  **Revenue is booked on the INVOICE date, so this does not touch today's sales or any accrual sales figure**; the date moves the payment ledger and
+  the cash-basis books (`finance-report`, ledger) to Aug 20th. To move the SALE itself use Edit invoice.
+- **THE CUSTOMER IS NEVER EMAILED.** `markInvoicePaid` / `recordInvoicePayment` gained `{ silent }` (default false, nothing else changed): normally
+  they send a "payment received, wait for pickup/delivery" receipt, which for an old sale is wrong. The manager always passes it; a test pins it.
+- **still_owing** keeps it open, raises one unassigned follow-up (optionally due on a promised date) and is not asked again for two days. **skip** the same, no task.
+  "Answered" lives in `manager_actions` (`invoice_review`), so a second call carries on where the first stopped.
+- `find_overdue_invoice` searches EVERY late invoice (answered or not) by name, email or number, tolerant of speech errors (`nameScore`, edit distance;
+  a substring only counts when the shorter side is 3+ letters, or a lone "t" in an email matches everyone).
+- Every payment is in `audit_log` (`invoice.payment`, by "Manager (AI)") and in `manager_actions`. Refunds, voids, creating or editing an invoice stay with a person.
+## The Team board — chat and posts for the whole crew (added 2026-11-17)
+`/team` (every crew member; nav tab "Team" with an unread badge, "💬 Team" on the driver app and a link on `/clock`),
+`lib/team-board.js`, `lib/team-board-rules.js` (no imports), `components/TeamChat.jsx` (not `TeamBoard.jsx`, which is the Sales Hub owner view), `/api/team`, `/api/ops/team`,
+migration `0077_team_board` (**run Run schema migration after deploy**), `test/team-board.test.mjs`.
+Four fixed channels, each with **Chat** (running conversation) and **Posts** (titled notices, pinnable, "Got it" ticks): General, Sales, Warehouse, Delivery.
+
+- **Who sees what comes from the SIGN-IN** (`memberFromSession`), never the request: driver -> General + Delivery; dispatch coordinator -> General + Delivery;
+  `/clock` employee (refurb, cleaners, techs) -> General + Warehouse; staff (admin/sales) -> all four; RS Ops crew -> General + Warehouse.
+  One table of rights in `lib/team-board-rules.js`; a person in two groups gets the union.
+- **RS Ops crew have no account here**, so `/api/ops/team` takes `RSOPS_INTAKE_KEY` + the person's NAME and ROLE from RS Ops' PIN session. Floor roles
+  (associate, cleaner, tech, QA) get General + Warehouse; RS Ops `sales` / `admin` get all four like office staff here. **Same board, same identity on both
+  doors:** a name matching exactly one active RS Solutions employee whose email has an account here becomes that account's key (`user:<id>`), so their own
+  messages, "You" and unread counts agree whichever app they use; otherwise they are `rsops:<name>` shown as "<name> (RS Ops)". The match picks the key
+  and display name only, never the account's groups. RS Ops' side: Team tab, `/api/team` proxy (name and role from the session, never the body).
+- **General's Posts are the office's** (admin, staff, dispatcher post there); every other channel lets its own members post. Moderators (office, plus dispatch in Delivery)
+  can pin, remove anyone's, and see who has ticked "Got it". Anyone removes their own.
+- **Messages are never edited or truly deleted** (`deleted_at`, `deleted_by`); the author is stamped from the session. 20 messages a minute per person.
+- **Updates by polling (5s) while the page is open. No push, SMS or email** — a phone cannot be reached in the background by a web page (same OS limit as live tracking).
+  Not built: photos/attachments, @mentions, direct messages, notifications.
+- `/team` is in `proxy.js`'s allow-list so drivers (signed in on the dispatch host) can open it.
+
+## Sign-up chooses the account type, and records who referred you (added 2026-11-06)
+`app/signup/SignupForm.jsx` (`ACCOUNT_TYPES`), `app/api/auth/signup/route.js`, migration `0051_signup_type_referral` (**run Run schema migration after deploy**).
+Customer / Member-Reseller / Affiliate / Marketplace seller, each with a one-line description. Member and reseller are the same programme here.
+It creates the same plain account for all four; the type only decides where they land next (`/resellers#apply`, `/affiliate`, `/marketplace/sell`),
+because each of those is still approved by us. Nothing is granted by choosing one. `users.signup_type` / `users.referred_by` are written in a
+separate best-effort UPDATE so a missing column can never cost a signup. Referral link: `/signup?ref=NAME-OR-CODE` (optionally `&type=seller`)
+prefills the optional "Referred by" box; `RefCapture` also keeps it for affiliate checkout attribution. Google/Microsoft sign-up keeps the type
+(via `next`) but not the referred-by text.

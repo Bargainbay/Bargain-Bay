@@ -48,7 +48,7 @@ test('every tool the model is offered is listed in a department, and every tiere
   const names = new Set(MONEY_TOOLS.map((t) => t.name));
   const inSomeDept = new Set([...DEPTS.delivery.tools, ...DEPTS.sales.tools]);
   for (const n of names) assert(inSomeDept.has(n) || n === 'switch_department', `${n} is in no department, so only the GM could ever use it`);
-  const legacy = ['set_photo_from_model', 'run_inventory_sync', 'close_stale_stops', 'run_backup_now'];
+  const legacy = ['set_photo_from_model', 'run_inventory_sync', 'close_stale_stops', 'run_backup_now', 'resolve_invoice'];
   for (const n of Object.keys(TOOL_TIER)) assert(names.has(n) || legacy.includes(n), `${n} has a tier but is not a tool`);
   equal(NEW_TOOL_NAMES.size, MONEY_TOOLS.length);
 });

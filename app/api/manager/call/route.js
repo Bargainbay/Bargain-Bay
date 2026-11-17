@@ -14,6 +14,7 @@ import {
   markAnswered, markEnded
 } from '../../../../lib/manager-call';
 import { hasDb } from '../../../../lib/db';
+import { LISTEN_AFTER_NUDGE_SECONDS } from '../../../../lib/import-call';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -54,13 +55,15 @@ export async function POST(req) {
     await markAnswered(callId);
 
     if (silent) {
-      // Ask once, then leave it — a call that reprompts an empty room is worse
+      // Nobody spoke for the whole listening window (15s). Say ONE short, unhurried
+      // line and give them a longer one (25s) — not another question, which is what
+      // read as nagging. Then leave it: a call that reprompts an empty room is worse
       // than one that hangs up, and nothing is lost: it is all on the page.
       if (url.searchParams.get('again') === '1') {
         await markEnded(callId, 'done');
-        return twiml(await sayTwiml('I could not hear you. Everything is on the Manager page. Goodbye.', { hangUp: true }));
+        return twiml(await sayTwiml('I will let you go. Everything is on the Manager page, and you can ring me again any time. Goodbye.', { hangUp: true }));
       }
-      return twiml(await sayTwiml('Sorry, I did not catch that. Are you there?', { gatherTo: `${gatherTo}&again=1` }));
+      return twiml(await sayTwiml('Take your time. I am still here.', { gatherTo: `${gatherTo}&again=1`, timeout: LISTEN_AFTER_NUDGE_SECONDS }));
     }
 
     if (!params.SpeechResult) {

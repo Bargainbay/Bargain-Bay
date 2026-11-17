@@ -122,12 +122,17 @@ test('snooze, notes and issue detail work, and bad keys are refused', async () =
 test('the agent has no tool that can touch money, orders or customers', async () => {
   const src = (await import('node:fs')).readFileSync(new URL('../lib/manager-call.js', import.meta.url), 'utf8');
   const names = [...src.matchAll(/name: '([a-z_]+)',\n\s+description/g)].map((m) => m[1]).sort();
-  equal(names, ['add_followup', 'add_note', 'assign_stop', 'business_snapshot', 'cda_status', 'close_stale_stops', 'email_details', 'end_call', 'issue_details', 'list_drivers', 'pull_orders', 'request_code_change', 'run_backup_now', 'run_inventory_sync', 'set_photo_from_model', 'snooze_issue', 'stale_stops_preview', 'what_i_did']);
+  equal(names, ['add_followup', 'add_note', 'assign_stop', 'business_snapshot', 'cda_status', 'close_stale_stops', 'email_details', 'end_call', 'find_overdue_invoice', 'issue_details', 'list_drivers', 'next_overdue_invoice', 'pull_orders', 'request_code_change', 'resolve_invoice', 'run_backup_now', 'run_inventory_sync', 'set_photo_from_model', 'snooze_issue', 'stale_stops_preview', 'what_i_did']);
   // Whatever it is allowed to do on its own, it never touches money or a customer.
-  assert(!names.some((n) => /refund|invoice|price|pay|charge|cost|customer|send_|email_customer|discount/.test(n)), 'no money or customer-facing tool');
+  // The ONE money action is recording that a payment already arrived (resolve_invoice) plus reading the late list.
+  const allowedInvoiceTools = new Set(['find_overdue_invoice', 'next_overdue_invoice', 'resolve_invoice']);
+  assert(!names.filter((n) => !allowedInvoiceTools.has(n)).some((n) => /refund|invoice|price|pay|charge|cost|customer|send_|email_customer|discount|void/.test(n)), 'no other money or customer-facing tool');
   const actions = (await import('node:fs')).readFileSync(new URL('../lib/manager-actions.js', import.meta.url), 'utf8');
-  assert(!/from '\.\/(invoices|refunds|payments|store-credit|checkout|coupons|pricing)'/.test(actions), 'manager-actions imports nothing that moves money');
-  assert(!/import\('\.\/(invoices|refunds|payments|store-credit|checkout|coupons|pricing)'\)/.test(actions));
+  assert(!/from '\.\/(invoices|refunds|payments|store-credit|checkout|coupons|pricing)'/.test(actions), 'no static import of anything that moves money');
+  // The only dynamic import of money code is lib/invoices, for recordInvoicePayment, and it is always silent.
+  assert(!/import\('\.\/(refunds|payments|store-credit|checkout|coupons|pricing)'\)/.test(actions));
+  assert(!/refundInvoice|voidInvoice|createAndSendInvoice|updateInvoice|setJobCharge|markInvoicePaid\(/.test(actions), 'no refund, void, create, edit or direct mark-paid');
+  assert(/silent: true/.test(actions), 'a recorded payment never emails the customer');
   assert(!/from '\.\/(invoices|orders|refunds|payments|customers|jobs)'/.test(src.replace(/import \{ scanIssues[^\n]*/, '')));
 });
 
@@ -195,4 +200,21 @@ test('a failing backup is explained, not blank', async () => {
   const { summariseBackupFailure } = await import('../lib/offsite-backup.js');
   assert(summariseBackupFailure({ ok: false, tracker: { error: 'Service Accounts do not have storage quota' }, blobs: { failed: 2, errors: ['a: boom'] } }).includes('storage quota'));
   assert(summariseBackupFailure({ ok: false }).length > 0);
+});
+
+suite('manager listening');
+test('it waits 15 seconds for an answer, ends a turn on a 2-second pause, and a nudge waits longer', async () => {
+  const { sayTwiml, LISTEN_SECONDS, LISTEN_AFTER_NUDGE_SECONDS, END_OF_SPEECH_SECONDS } = await import('../lib/import-call.js');
+  assert(LISTEN_SECONDS >= 15 && LISTEN_AFTER_NUDGE_SECONDS > LISTEN_SECONDS && END_OF_SPEECH_SECONDS >= 2);
+  const xml = await sayTwiml('Is it still open?', { gatherTo: 'https://x.test/api/manager/call?callId=1&t=abc' });
+  assert(/<Gather[^>]* timeout="15"/.test(xml), xml);
+  assert(/speechTimeout="2"/.test(xml), 'a flat pause, not "auto", which cut people off mid-sentence');
+  const nudge = await sayTwiml('Take your time.', { gatherTo: 'https://x.test/a?b=1', timeout: LISTEN_AFTER_NUDGE_SECONDS });
+  assert(/timeout="25"/.test(nudge));
+  assert(!/<Gather/.test(await sayTwiml('Goodbye.', { hangUp: true })));
+});
+test('the silent branch nudges once without a question, then says goodbye', async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../app/api/manager/call/route.js', import.meta.url), 'utf8');
+  assert(!/Are you there\?/.test(src), 'no second question after silence');
+  assert(/LISTEN_AFTER_NUDGE_SECONDS/.test(src));
 });
