@@ -5572,6 +5572,24 @@ Four fixed channels, each with **Chat** (running conversation) and **Posts** (ti
   Not built: photos/attachments, @mentions, direct messages, notifications.
 - `/team` is in `proxy.js`'s allow-list so drivers (signed in on the dispatch host) can open it.
 
+### Manager batch 2 — 46 more tools (added 2026-11-17)
+`lib/manager-tools-b.js` (listed beside the first batch by `lib/manager-tools.js`; **it must not import that file**), tiers and hats in
+`lib/manager-policy.js` (`GM_ONLY` = the books and buying, held by the General Manager alone). Same rule as batch 1: every tool wraps the
+function the admin screen calls, and `TOOL_TIER` decides when it runs.
+- **Reads (22, done at once, trimmed by `brief()` to the top rows because it is a phone call):** customers, quotes, sales report, HST, payables, stock gaps,
+  reorder list, abandoned carts, reseller applications, coupons, store-credit balance, unit location, loose ends, money at the door, follow-ups,
+  affiliate payout run, vans, late stops, duplicate customers, open purchase orders, fill requests, health check, and `morning_brief`.
+- **Acts at once (10):** customer note, complete a follow-up, move a stop to another day, reopen a stop, move a unit to a spot, post to the Team board
+  (as "Manager (AI)"), record why a quote was lost, set a reorder level, raise cart follow-ups, book a revisit.
+- **Gated (12, read-back and a yes on a later turn):** resend an invoice (reaches a CUSTOMER), convert / void a quote, coupon on or off, approve or reject a
+  reseller, cancel a stop, confirm / reject door money, approve / reject fill requests (writes cost to the tracker), mark a supplier bill paid, record an
+  affiliate payout already sent.
+- **Owner-only:** issue store credit, apply store credit.
+- **DELIBERATELY NOT TOOLS, whatever the owner asks by voice:** replying to or texting customers, campaigns and ads, moving money out of the bank,
+  granting or revoking access, deleting or merging records, payroll runs. These break the standing guardrails (never contact a customer itself, never
+  move money out, never change who has access, never delete). Merging duplicates is on the screen; `duplicate_customers` only lists them.
+- **Not built, as no function exists to wrap:** a driver-on-the-way text, reviewing proof-of-delivery photos, forgotten clock-outs, expense sorting rules.
+
 ## Sign-up chooses the account type, and records who referred you (added 2026-11-06)
 `app/signup/SignupForm.jsx` (`ACCOUNT_TYPES`), `app/api/auth/signup/route.js`, migration `0051_signup_type_referral` (**run Run schema migration after deploy**).
 Customer / Member-Reseller / Affiliate / Marketplace seller, each with a one-line description. Member and reseller are the same programme here.
