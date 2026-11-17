@@ -473,7 +473,11 @@ function savePod(job) {
   }, i * 400));
 }
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onPartial, onEdit, onMove, onTimes, onCharge, onPay, onNotesChanged, seat, helpingFor }) {
+// The stop being dragged, shared between cards (drag events carry no React state).
+let draggedStop = null;
+
+function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onPartial, onEdit, onMove, onReorder, onTimes, onCharge, onPay, onNotesChanged, seat, helpingFor }) {
+  const [dropAt, setDropAt] = useState(null); // 'before' | 'after' while a stop is dragged over this card
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [timing, setTiming] = useState(false);
@@ -488,14 +492,37 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
   useTicking(live);
   const running = live ? minsBetween(job.timeIn, Date.now()) : 0;
   return (
-    <div className={'disp-card' + (closed ? ' is-closed' : '')}>
+    <div className={'disp-card' + (closed ? ' is-closed' : '') + (dropAt ? ' drop-' + dropAt : '')}
+      onDragOver={seat && onReorder ? (e) => {
+        if (!draggedStop || draggedStop.driverId !== job.driverId || draggedStop.id === job.id) return;
+        e.preventDefault();
+        const r = e.currentTarget.getBoundingClientRect();
+        setDropAt(e.clientY < r.top + r.height / 2 ? 'before' : 'after');
+      } : undefined}
+      onDragLeave={() => setDropAt(null)}
+      onDrop={seat && onReorder ? (e) => {
+        const at = dropAt; setDropAt(null);
+        if (!draggedStop || draggedStop.driverId !== job.driverId || !at) return;
+        e.preventDefault();
+        const id = draggedStop.id; draggedStop = null;
+        onReorder(id, job.id, at);
+      } : undefined}>
       <div className="disp-card-top">
-        {/* The run order, and the two buttons that change it. Numbered because
-            "third stop" is how a driver and a dispatcher talk about it on the
-            phone; arrows rather than drag because this is used one-handed on a
-            warehouse touchscreen. */}
+        {/* The run order. Drag the numbered grip to put a stop anywhere in the
+            run in one move; ▲▼ stay for one-handed touchscreen use. */}
         {seat && (
           <span className="disp-seat">
+            {onReorder && (
+              <span className="disp-grip" draggable={!busy} title="Drag to reorder"
+                onDragStart={(e) => {
+                  draggedStop = { id: job.id, driverId: job.driverId };
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', String(job.id));
+                  const card = e.currentTarget.closest('.disp-card');
+                  if (card) e.dataTransfer.setDragImage(card, 20, 20);
+                }}
+                onDragEnd={() => { draggedStop = null; }}>⠿</span>
+            )}
             <b>{seat.n}</b>
             <button type="button" disabled={busy || seat.first} title="Earlier in the run"
               onClick={() => onMove(job, -1)}>▲</button>
@@ -892,6 +919,20 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
     const ids = run.map((j) => j.id);
     [ids[from], ids[to]] = [ids[to], ids[from]];
     return send('PATCH', { action: 'resequence', driverId: job.driverId, date: board.date, jobIds: ids });
+  }
+
+  // Drag a stop to any place in its driver's run: it lands before or after the
+  // card it was dropped on. Same `resequence` call as ▲▼, whole run sent back.
+  function onReorder(dragId, targetId, where) {
+    const targetJob = board.jobs.find((j) => j.id === targetId);
+    if (!targetJob) return;
+    const run = ownedBy(targetJob.driverId);
+    const ids = run.map((j) => j.id).filter((id) => id !== dragId);
+    if (ids.length === run.length) return; // dragged stop is not in this run
+    const at = ids.indexOf(targetId) + (where === 'after' ? 1 : 0);
+    ids.splice(at, 0, dragId);
+    if (ids.every((id, i) => id === run[i].id)) return;
+    return send('PATCH', { action: 'resequence', driverId: targetJob.driverId, date: board.date, jobIds: ids });
   }
 
   // Put one column in driving order from a base (CDA's depot by default).
@@ -1492,7 +1533,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
                 return (
                   <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                     onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                    onRecord={onRecord} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onMove={onMove} onTimes={onTimes}
+                    onRecord={onRecord} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onMove={onMove} onReorder={onReorder} onTimes={onTimes}
                     onCharge={canManageClients ? onCharge : null} onPay={onPay} onNotesChanged={() => refresh()}
                     helpingFor={j.driver2Id === d.id ? j.driverName : null}
                     seat={k >= 0 ? { n: k + 1, first: k === 0, last: k === own.length - 1 } : null} />
