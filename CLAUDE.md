@@ -5510,3 +5510,30 @@ and the prompt forbids telling him to go and look anything up.
 - `find_overdue_invoice` searches EVERY late invoice (answered or not) by name, email or number, tolerant of speech errors (`nameScore`, edit distance;
   a substring only counts when the shorter side is 3+ letters, or a lone "t" in an email matches everyone).
 - Every payment is in `audit_log` (`invoice.payment`, by "Manager (AI)") and in `manager_actions`. Refunds, voids, creating or editing an invoice stay with a person.
+## The Team board — chat and posts for the whole crew (added 2026-11-17)
+`/team` (every crew member; nav tab "Team" with an unread badge, "💬 Team" on the driver app and a link on `/clock`),
+`lib/team-board.js`, `lib/team-board-rules.js` (no imports), `components/TeamChat.jsx` (not `TeamBoard.jsx`, which is the Sales Hub owner view), `/api/team`, `/api/ops/team`,
+migration `0077_team_board` (**run Run schema migration after deploy**), `test/team-board.test.mjs`.
+Four fixed channels, each with **Chat** (running conversation) and **Posts** (titled notices, pinnable, "Got it" ticks): General, Sales, Warehouse, Delivery.
+
+- **Who sees what comes from the SIGN-IN** (`memberFromSession`), never the request: driver -> General + Delivery; dispatch coordinator -> General + Delivery;
+  `/clock` employee (refurb, cleaners, techs) -> General + Warehouse; staff (admin/sales) -> all four; RS Ops crew -> General + Warehouse.
+  One table of rights in `lib/team-board-rules.js`; a person in two groups gets the union.
+- **RS Ops crew have no account here**, so `/api/ops/team` takes `RSOPS_INTAKE_KEY` + the person's NAME (shown as "<name> (RS Ops)", unverifiable, like the
+  warehouse scan). **The RS Ops screen itself is NOT built** (other repo); until it calls this route, repair/cleaning crew who only use RS Ops reach the board
+  only if they are also added as `/clock` employees and sign in at `/team`.
+- **General's Posts are the office's** (admin, staff, dispatcher post there); every other channel lets its own members post. Moderators (office, plus dispatch in Delivery)
+  can pin, remove anyone's, and see who has ticked "Got it". Anyone removes their own.
+- **Messages are never edited or truly deleted** (`deleted_at`, `deleted_by`); the author is stamped from the session. 20 messages a minute per person.
+- **Updates by polling (5s) while the page is open. No push, SMS or email** — a phone cannot be reached in the background by a web page (same OS limit as live tracking).
+  Not built: photos/attachments, @mentions, direct messages, notifications.
+- `/team` is in `proxy.js`'s allow-list so drivers (signed in on the dispatch host) can open it.
+
+## Sign-up chooses the account type, and records who referred you (added 2026-11-06)
+`app/signup/SignupForm.jsx` (`ACCOUNT_TYPES`), `app/api/auth/signup/route.js`, migration `0051_signup_type_referral` (**run Run schema migration after deploy**).
+Customer / Member-Reseller / Affiliate / Marketplace seller, each with a one-line description. Member and reseller are the same programme here.
+It creates the same plain account for all four; the type only decides where they land next (`/resellers#apply`, `/affiliate`, `/marketplace/sell`),
+because each of those is still approved by us. Nothing is granted by choosing one. `users.signup_type` / `users.referred_by` are written in a
+separate best-effort UPDATE so a missing column can never cost a signup. Referral link: `/signup?ref=NAME-OR-CODE` (optionally `&type=seller`)
+prefills the optional "Referred by" box; `RefCapture` also keeps it for affiliate checkout attribution. Google/Microsoft sign-up keeps the type
+(via `next`) but not the referred-by text.

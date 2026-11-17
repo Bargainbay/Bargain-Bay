@@ -2030,3 +2030,8 @@ a.pq-btn { text-decoration: none; }
 .disp-grip:active { cursor: grabbing; }
 .disp-card.drop-before { box-shadow: 0 -3px 0 0 #2563eb; }
 .disp-card.drop-after { box-shadow: 0 3px 0 0 #2563eb; }
+
+/* Team board */
+.btn-link { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; }
+.btn-link:hover { color: var(--charcoal); }
+.team-board .panel { margin-bottom: 10px; }
