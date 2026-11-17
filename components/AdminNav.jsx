@@ -105,11 +105,11 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
             {i.label}
             {i.key === 'resellers' && <PendingBadge />}
             {i.key === 'offers' && <PendingBadge url="/api/admin/offers?count=1" />}
+            {i.key === 'team' && <PendingBadge url="/api/team?summary=1" field="total" />}
           </a>
         ))}
         {/* A coordinator has no storefront to view, and "View store" on an
             rssolutions.ca host is a link into the other company. */}
-            {i.key === 'team' && <PendingBadge url="/api/team?summary=1" field="total" />}
         {!dispatchOnly && <a href="/" className="admin-nav-link">View store →</a>}
         {dispatchOnly && <NavSignOut />}
         {/* One box over customers, orders, invoices, and quotes (GET → /admin/search).
