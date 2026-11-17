@@ -104,3 +104,30 @@ test('RATE LIMIT STOPS A FLOOD', async () => {
     equal(last.status, 429);
   } finally { done(); }
 });
+
+suite('team board — RS Ops identity (real SQL)');
+test('RS OPS ROLES MAP TO CHANNELS, AND A PERSON WITH BOTH LOGINS IS ONE PERSON', async () => {
+  const { done } = await withTestDb();
+  try {
+    const { query } = await import('../lib/db.js');
+    const { memberFromRsops } = await import('../lib/team-board.js');
+    const tech = await memberFromRsops('Pat', 'Tech');
+    equal(tech.key, 'rsops:pat'); equal(tech.name, 'Pat (RS Ops)');
+    equal(Object.keys(tech.rights).sort().join(), 'general,warehouse');
+    equal(Object.keys((await memberFromRsops('Pat', 'sales')).rights).sort().join(), 'delivery,general,sales,warehouse');
+    equal(await memberFromRsops('', 'tech'), null);
+
+    // Pat is an RS Solutions employee with an account here: same key as signing in here.
+    const tc = await import('../lib/team-clock.js');
+    await tc.saveEmployee({ email: 'pat@example.com', name: 'Pat', company: 'rs_solutions' }, 'owner');
+    const { rows: [u] } = await query(`INSERT INTO users (email, name, password_hash) VALUES ('pat@example.com','Pat Singh','x') RETURNING id`);
+    const same = await memberFromRsops('Pat', 'tech');
+    equal(same.key, `user:${u.id}`); equal(same.name, 'Pat Singh');
+    // ...but the name match never lends an account's groups
+    equal(Object.keys(same.rights).sort().join(), 'general,warehouse');
+    // and what they say through RS Ops is theirs when they sign in here
+    const sent = await sendMessage(same, { channel: 'warehouse', body: 'from RS Ops' });
+    equal((await listMessages(mk(`user:${u.id}`, 'Pat Singh', ['employee']), { channel: 'warehouse' })).messages[0].authorKey, `user:${u.id}`);
+    assert(sent.ok);
+  } finally { done(); }
+});

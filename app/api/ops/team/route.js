@@ -1,7 +1,8 @@
 // The team board for RS Ops crew (repair, cleaning, techs). They sign in there by
 // PIN and have no account here, so this authenticates with RSOPS_INTAKE_KEY and
 // takes the person's NAME, recorded as "<name> (RS Ops)" like the warehouse scan.
-// They get General and Warehouse only; the key can never reach Sales or Delivery.
+// Floor roles get General and Warehouse; RS Ops sales/admin logins get all four, like
+// office staff here. RS Ops sends the person's role from their PIN session.
 import { NextResponse } from 'next/server';
 import { memberFromRsops, handleTeamRequest } from '../../../../lib/team-board';
 
@@ -15,7 +16,7 @@ async function run(req, method, body) {
   if (sent.length !== key.length || sent !== key) return NextResponse.json({ error: 'Bad or missing key' }, { status: 401 });
   const params = Object.fromEntries(new URL(req.url).searchParams);
   const name = body?.name || params.name;
-  const member = await memberFromRsops(name);
+  const member = await memberFromRsops(name, body?.role || params.role);
   if (!member) return NextResponse.json({ error: 'Send the name of the person.' }, { status: 400 });
   const r = await handleTeamRequest(member, { method, params, body });
   return NextResponse.json(r.json, { status: r.status });
