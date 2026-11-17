@@ -108,6 +108,15 @@ export default function VoiceManager() {
       <p><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Something to look into…" style={{ width: '60%' }} />{' '}
         <button className="btn" disabled={busy || !note.trim()} onClick={async () => { if (await post({ action: 'add_note', text: note })) { setNote(''); load(); } }}>Add note</button></p>
 
+      <h2>What the manager did</h2>
+      <p className="hint">It acts on its own on internal, undoable work (follow-ups, the dispatch board, stock refresh) and on your instruction by phone. It never touches money, prices or customers. Each line is also read back to you on the next call.</p>
+      <div className="table-wrap"><table className="admin"><thead><tr><th>When</th><th>Did</th><th>Why</th></tr></thead><tbody>
+        {(data.actions || []).map((a) => (
+          <tr key={a.id}><td>{new Date(a.at).toLocaleString()}</td><td>{a.summary}</td><td>{a.via === 'voice' ? 'You told it to' : 'On its own'}</td></tr>
+        ))}
+        {!(data.actions || []).length && <tr><td colSpan="3" className="hint">Nothing yet.</td></tr>}
+      </tbody></table></div>
+
       <h2>Recent calls</h2>
       <div className="table-wrap"><table className="admin"><thead><tr><th>When</th><th>How</th><th>Result</th><th>What it did</th></tr></thead><tbody>
         {data.calls.map((c) => (

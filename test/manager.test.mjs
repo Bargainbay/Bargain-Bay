@@ -122,7 +122,12 @@ test('snooze, notes and issue detail work, and bad keys are refused', async () =
 test('the agent has no tool that can touch money, orders or customers', async () => {
   const src = (await import('node:fs')).readFileSync(new URL('../lib/manager-call.js', import.meta.url), 'utf8');
   const names = [...src.matchAll(/name: '([a-z_]+)',\n\s+description/g)].map((m) => m[1]).sort();
-  equal(names, ['add_note', 'cda_status', 'close_stale_stops', 'email_details', 'end_call', 'issue_details', 'request_code_change', 'run_backup_now', 'run_inventory_sync', 'set_photo_from_model', 'snooze_issue', 'stale_stops_preview']);
+  equal(names, ['add_followup', 'add_note', 'assign_stop', 'business_snapshot', 'cda_status', 'close_stale_stops', 'email_details', 'end_call', 'issue_details', 'list_drivers', 'pull_orders', 'request_code_change', 'run_backup_now', 'run_inventory_sync', 'set_photo_from_model', 'snooze_issue', 'stale_stops_preview', 'what_i_did']);
+  // Whatever it is allowed to do on its own, it never touches money or a customer.
+  assert(!names.some((n) => /refund|invoice|price|pay|charge|cost|customer|send_|email_customer|discount/.test(n)), 'no money or customer-facing tool');
+  const actions = (await import('node:fs')).readFileSync(new URL('../lib/manager-actions.js', import.meta.url), 'utf8');
+  assert(!/from '\.\/(invoices|refunds|payments|store-credit|checkout|coupons|pricing)'/.test(actions), 'manager-actions imports nothing that moves money');
+  assert(!/import\('\.\/(invoices|refunds|payments|store-credit|checkout|coupons|pricing)'\)/.test(actions));
   assert(!/from '\.\/(invoices|orders|refunds|payments|customers|jobs)'/.test(src.replace(/import \{ scanIssues[^\n]*/, '')));
 });
 
