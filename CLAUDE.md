@@ -5489,7 +5489,24 @@ backups, sync) with no view of sales, deliveries or money, which is why it sound
 - **EVERYTHING IT DOES IS LOGGED AND REPORTED** (`manager_actions`): the next call opens with "While you were away I did N things",
   and when no call is placed the pass emails `SERVICE_EMAIL` the same list. Reported means SAID (marked only when the call is answered).
   /admin/manager lists them. A dedupe key means a once-a-day action cannot repeat.
-- **HARD LIMITS, enforced by test:** no tool or import for money in or out, refunds, invoices, prices, coupons, store credit, cost, or
-  anything sent to a CUSTOMER. A voice request for those gets "that needs you on the screen" plus an offer of a follow-up task so the sales team rings.
+- **HARD LIMITS, enforced by test:** no tool or import for money in or out, refunds, creating/editing/voiding invoices, prices, coupons, store credit, cost, or
+  anything sent to a CUSTOMER. **ONE exception, added 2026-11-17 on the owner's instruction: it can RECORD that a payment already arrived** (below). A voice request for those gets "that needs you on the screen" plus an offer of a follow-up task so the sales team rings.
 - **Not built:** inbound calls, texting the team (it emails the dispatch desk), choosing a driver itself (it only assigns when told),
   per-rep nudges, quota pacing, and acting on a recommendation it was not asked about beyond the list above.
+
+### The manager works a list itself, and can record "it was paid on Aug 20th" (added 2026-11-17)
+`nextOverdueInvoice` / `searchOverdueInvoices` / `resolveInvoice` in `lib/manager-actions.js`; tools `next_overdue_invoice`,
+`find_overdue_invoice`, `resolve_invoice`. The first call went badly: told there were 18 late invoices it asked the owner to check them, and
+it answered a mis-heard name ("Roger") with "there is no Roger" and moved on. It now DRIVES: oldest first, "N of 18", "is it still open?",
+and the prompt forbids telling him to go and look anything up.
+- **paid** records the payment dated the day he says (`paid_on`, never future, max two years back - `normalizeBackdate`), for the full balance
+  unless a part amount is given, through `recordInvoicePayment` (the ordinary path: invoice paid, payment ledger, order, stock). Method defaults to Other.
+  **Revenue is booked on the INVOICE date, so this does not touch today's sales or any accrual sales figure**; the date moves the payment ledger and
+  the cash-basis books (`finance-report`, ledger) to Aug 20th. To move the SALE itself use Edit invoice.
+- **THE CUSTOMER IS NEVER EMAILED.** `markInvoicePaid` / `recordInvoicePayment` gained `{ silent }` (default false, nothing else changed): normally
+  they send a "payment received, wait for pickup/delivery" receipt, which for an old sale is wrong. The manager always passes it; a test pins it.
+- **still_owing** keeps it open, raises one unassigned follow-up (optionally due on a promised date) and is not asked again for two days. **skip** the same, no task.
+  "Answered" lives in `manager_actions` (`invoice_review`), so a second call carries on where the first stopped.
+- `find_overdue_invoice` searches EVERY late invoice (answered or not) by name, email or number, tolerant of speech errors (`nameScore`, edit distance;
+  a substring only counts when the shorter side is 3+ letters, or a lone "t" in an email matches everyone).
+- Every payment is in `audit_log` (`invoice.payment`, by "Manager (AI)") and in `manager_actions`. Refunds, voids, creating or editing an invoice stay with a person.
