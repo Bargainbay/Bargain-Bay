@@ -5598,3 +5598,5 @@ because each of those is still approved by us. Nothing is granted by choosing on
 separate best-effort UPDATE so a missing column can never cost a signup. Referral link: `/signup?ref=NAME-OR-CODE` (optionally `&type=seller`)
 prefills the optional "Referred by" box; `RefCapture` also keeps it for affiliate checkout attribution. Google/Microsoft sign-up keeps the type
 (via `next`) but not the referred-by text.
+
+- **LANDMINE — an e-transfer staff already entered must never be entered again (INV-1410, 2026-11-17).** The scan matched on 'amount equals what the invoice still owes' only, and its only memory was the Gmail message id it had itself processed. A $550 invoice with one $275 deposit entered by hand still owed $275, so the same bank email matched exactly and was applied a second time, marking it paid. `matchPayment` now takes `recorded` (every payment a PERSON put on the ledger in the last 45 days, the Manager's own excluded) and flags `already_recorded` when one of the same amount lies within 3 days of the email; the apply step re-reads the invoice and the ledger at the last moment. Flagged, never applied: he says which invoice, if any.

@@ -316,3 +316,20 @@ test('a note on a customer and a Team board post are done at once and logged', a
     equal(rows[0].author_name, 'Manager (AI)');
   });
 });
+
+suite('manager team: an e-transfer staff already entered is never entered twice');
+test('INV-1410: $550, one $275 deposit entered by hand, a $275 e-transfer email -> flagged, not applied', () => {
+  const at = Date.parse('2026-11-15T20:00:00Z');
+  const inv = [{ number: 'INV-1410', customer: 'Joyce Zhu', balanceCents: 27500, createdAt: Date.parse('2026-11-15T19:25:00Z') }];
+  const p = { amountCents: 27500, name: 'Joyce Zhu', at };
+  equal(matchPayment(p, inv).kind, 'exact');   // with no record of the deposit it WOULD apply: this is the bug's shape
+  const m = matchPayment(p, inv, { recorded: [{ number: 'INV-1410', amountCents: 27500, atMs: at }] });
+  equal(m.kind, 'already_recorded');
+});
+test('a same-amount payment from months ago, or a different amount, does not block a genuine match', () => {
+  const at = Date.parse('2026-11-15T20:00:00Z');
+  const inv = [{ number: 'INV-9', customer: 'Pat Lee', balanceCents: 27500, createdAt: at - 3600_000 }];
+  const p = { amountCents: 27500, name: 'Pat Lee', at };
+  equal(matchPayment(p, inv, { recorded: [{ number: 'INV-1', amountCents: 27500, atMs: at - 40 * 86400_000 }] }).kind, 'exact');
+  equal(matchPayment(p, inv, { recorded: [{ number: 'INV-1', amountCents: 10000, atMs: at }] }).kind, 'exact');
+});
