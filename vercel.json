@@ -103,6 +103,14 @@
     {
       "path": "/api/cron/manager-call",
       "schedule": "0 13,17,21 * * *"
+    },
+    {
+      "path": "/api/cron/manager-report",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/manager-payments",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

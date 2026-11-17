@@ -5489,6 +5489,47 @@ backups, sync) with no view of sales, deliveries or money, which is why it sound
 - **EVERYTHING IT DOES IS LOGGED AND REPORTED** (`manager_actions`): the next call opens with "While you were away I did N things",
   and when no call is placed the pass emails `SERVICE_EMAIL` the same list. Reported means SAID (marked only when the call is answered).
   /admin/manager lists them. A dedupe key means a once-a-day action cannot repeat.
+- **SUPERSEDED 2026-11-17 (owner): see 'The Manager team' below. The autonomous passes (`manager-actions.js`) still have NO money tools, and a test still enforces it; the VOICE tools now include pricing, invoices and the tracker behind a gate.**
+- **HARD LIMITS, enforced by test:** no tool or import for money in or out, refunds, invoices, prices, coupons, store credit, cost, or
+  anything sent to a CUSTOMER. A voice request for those gets "that needs you on the screen" plus an offer of a follow-up task so the sales team rings.
+- **Not built:** inbound calls, texting the team (it emails the dispatch desk), choosing a driver itself (it only assigns when told),
+  per-rep nudges, quota pacing, and acting on a recommendation it was not asked about beyond the list above.
+
+
+## The Manager team — a General Manager plus Delivery and Sales managers, answered by phone (added 2026-11-17)
+`lib/manager-policy.js` (pure: callers, departments, tiers, stale-stock and payment-matching rules, day report),
+`lib/manager-tools.js` (the tools), `lib/manager-payments.js` (e-transfer scan), `lib/manager-report.js` (per-task and end-of-day email),
+`lib/delivery-rates.js` (rate sheet as code), `lib/route-plan.js` (route with an end base), `POST /api/manager/inbound`,
+`/api/cron/manager-payments` (every 30 min), `/api/cron/manager-report` (01:00 UTC = 8/9pm Toronto), migration `0078_manager_team`
+(**Run schema migration after deploy**), `test/manager-team.test.mjs`. Owner's decisions, 2026-11-17:
+
+- **Reports to the owner. One voice, three hats.** `manager_calls.dept` = gm | delivery | sales; the GM has every tool, the department
+  managers a subset (`DEPTS` in the policy file), and `switch_department` changes hat mid-call. A department's work rolls up into the GM's
+  end-of-day report. Every action carries `detail.dept`.
+- **Inbound calls (owner or Ravi only).** Point a Twilio number's "A call comes in" webhook at `/api/manager/inbound` (`?dept=delivery|sales`
+  optional). Twilio signature AND caller ID on the allow-list (`CALLERS`: (647) 643-3035 owner, (647) 244-9765 Ravi); anyone else hears
+  "private line" before any row is written. **Ravi has the same authority as the owner on a call** (owner named him); his name is on the call and
+  in the notifications. Caller ID can be spoofed, so money still needs the read-back and a later-turn yes.
+- **Tiers (`TOOL_TIER`).** `act`: done now, emailed after (assign drivers, windows, run order, non-price tracker cells, follow-ups, payments it can verify).
+  `gated`: pricing and financials, read back and run only on a later turn after his yes (list price, reseller price, back-to-tracker price, stop
+  charge/pay, tracker retail/condition/status, mark paid, record payment). `owner`: refund, discount, void: ONLY on his instruction, refused on a line with
+  no recognised caller. Anything over $50 is read back as such (`OWNER_APPROVAL_OVER`). Refund by voice is MONEY-ONLY (`refundInvoiceAmount`); whole-invoice and
+  per-line refunds stay on the screen.
+- **It proposes price cuts itself.** `checkStaleStock` (a business check) finds units 90+ days on the tracker's Date Received with margin >= $150 and >= 20% of price;
+  `stalePricing` suggests a lower price (never under cost + 10%, rounded to $10). The Manager rings with it; he answers yes / no / his own list AND reseller number.
+- **Payments from service@rssolutions.ca.** `scanPayments` reads Interac "you've received" emails, matches each to ONE open invoice on exact balance, a date not
+  before the invoice, and a name that agrees, and marks it paid itself (a web sale is confirmed through its ORDER, as the orders board does). A different name, several
+  fits, an earlier date or no fit is stored in `manager_payments` as `flag_*`, announced once, listed by `payments_to_review`, and applied only by
+  `match_flagged_payment` on his word. One row per Gmail message id, so a payment is never applied twice.
+- **Notifications are email** (his choice): one per finished task (`notifyDone`, awaited, best-effort) and the end-of-day report. The report hour is a guess (8/9pm); change `vercel.json`.
+- **Delivery pricing.** All CDA deliveries are WHITE GLOVE (full zone rate); only a stop that says threshold gets 80%. A CDA exchange = two haul-aways ($40). A washer/dryer install
+  is priced as stacking only if the stop says stacked; otherwise it is not guessed — the Manager verifies from the crew's photos at end of day, THEN calls to confirm (`needsVerification`).
+  The reissued sheet (A $95 / B $140 / C $225) is the default; the sheet's 200% exchange rule is not used.
+- **Not built / limits:** it never sends money out of the bank, changes access, deletes, or contacts a customer (a test checks tool names). It cannot yet: whole-invoice or per-line
+  refunds, store credit, quotes, coupons, reseller approvals, campaigns, ads, or the other ~70 tasks on the proposed list; they are added the same way (tool + tier + department). Prices/charges are not
+  yet cross-checked against `lib/pricing.js` floors by the Manager itself (clearance refuses consigned stock under its floor). `delivery_board`/`price_stop` need a driving km: `plan_run` supplies it only with `GOOGLE_MAPS_SERVER_KEY`.
+  Untested against a real phone call or the real mailbox.
+
 - **HARD LIMITS, enforced by test:** no tool or import for money in or out, refunds, creating/editing/voiding invoices, prices, coupons, store credit, cost, or
   anything sent to a CUSTOMER. **ONE exception, added 2026-11-17 on the owner's instruction: it can RECORD that a payment already arrived** (below). A voice request for those gets "that needs you on the screen" plus an offer of a follow-up task so the sales team rings.
 - **Not built:** inbound calls, texting the team (it emails the dispatch desk), choosing a driver itself (it only assigns when told),
