@@ -5519,9 +5519,11 @@ Four fixed channels, each with **Chat** (running conversation) and **Posts** (ti
 - **Who sees what comes from the SIGN-IN** (`memberFromSession`), never the request: driver -> General + Delivery; dispatch coordinator -> General + Delivery;
   `/clock` employee (refurb, cleaners, techs) -> General + Warehouse; staff (admin/sales) -> all four; RS Ops crew -> General + Warehouse.
   One table of rights in `lib/team-board-rules.js`; a person in two groups gets the union.
-- **RS Ops crew have no account here**, so `/api/ops/team` takes `RSOPS_INTAKE_KEY` + the person's NAME (shown as "<name> (RS Ops)", unverifiable, like the
-  warehouse scan). **The RS Ops screen itself is NOT built** (other repo); until it calls this route, repair/cleaning crew who only use RS Ops reach the board
-  only if they are also added as `/clock` employees and sign in at `/team`.
+- **RS Ops crew have no account here**, so `/api/ops/team` takes `RSOPS_INTAKE_KEY` + the person's NAME and ROLE from RS Ops' PIN session. Floor roles
+  (associate, cleaner, tech, QA) get General + Warehouse; RS Ops `sales` / `admin` get all four like office staff here. **Same board, same identity on both
+  doors:** a name matching exactly one active RS Solutions employee whose email has an account here becomes that account's key (`user:<id>`), so their own
+  messages, "You" and unread counts agree whichever app they use; otherwise they are `rsops:<name>` shown as "<name> (RS Ops)". The match picks the key
+  and display name only, never the account's groups. RS Ops' side: Team tab, `/api/team` proxy (name and role from the session, never the body).
 - **General's Posts are the office's** (admin, staff, dispatcher post there); every other channel lets its own members post. Moderators (office, plus dispatch in Delivery)
   can pin, remove anyone's, and see who has ticked "Got it". Anyone removes their own.
 - **Messages are never edited or truly deleted** (`deleted_at`, `deleted_by`); the author is stamped from the session. 20 messages a minute per person.
