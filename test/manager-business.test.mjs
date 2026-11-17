@@ -8,7 +8,8 @@ import { torontoDay } from '../lib/manager-business.js';
 import { scanIssues } from '../lib/manager-issues.js';
 import {
   runAutoActions, chaseQuotes, chaseReceivables, assignStopByName, addFollowUpByName,
-  unreportedActions, markReported, reportLine, logAction, businessSnapshot
+  unreportedActions, markReported, reportLine, logAction, businessSnapshot,
+  nextOverdueInvoice, searchOverdueInvoices, resolveInvoice, nameScore
 } from '../lib/manager-actions.js';
 
 async function withDb(fn) {
@@ -135,5 +136,85 @@ test('the snapshot is counts only and says nothing about cost', async () => {
     const s = await businessSnapshot();
     assert(s.sales && s.deliveries && s.receivables);
     assert(!/cost|profit|margin/i.test(JSON.stringify(s)));
+  });
+});
+
+suite('manager works the overdue list');
+const seedLate = async (c) => {
+  await c.query(`INSERT INTO invoices (number, email, name, status, total, due_date, created_at) VALUES
+    ('INV-8001','r@x.ca','Rogers Appliance','open',1240,$1::date,$1::timestamptz),
+    ('INV-8002','s@x.ca','Smith Kitchens','open',800,$2::date,$2::timestamptz),
+    ('INV-8003','t@x.ca','Tran Homes','open',500,$3::date,$3::timestamptz),
+    ('INV-8004','f@x.ca','Future Co','open',900,$4::date,$4::timestamptz)`,
+    ['2026-08-10', '2026-09-01', '2026-10-15', torontoDay(30)]);
+};
+
+test('it reads the oldest late invoice first, says where it is in the list, and skips ones already answered', async () => {
+  await withDb(async (c) => {
+    await seedLate(c);
+    const a = await nextOverdueInvoice();
+    equal(a.number, 'INV-8001'); equal(a.position, 1); equal(a.of, 3); equal(a.remainingAfterThis, 2);
+    assert(a.owing === 1240 && a.daysLate > 30);
+    await resolveInvoice({ number: 'INV-8001', outcome: 'skip' });
+    equal((await nextOverdueInvoice()).number, 'INV-8002');
+    await resolveInvoice({ number: 'INV-8002', outcome: 'skip' });
+    await resolveInvoice({ number: 'INV-8003', outcome: 'skip' });
+    assert((await nextOverdueInvoice()).done, 'a finished list says so rather than starting over');
+  });
+});
+
+test('a mis-heard name still finds the invoice, and a stranger is "none" with the count, not a dead end', async () => {
+  await withDb(async (c) => {
+    await seedLate(c);
+    const r = await searchOverdueInvoices('Roger');
+    equal(r.matches[0].number, 'INV-8001');
+    equal((await searchOverdueInvoices('smyth')).matches[0].number, 'INV-8002');
+    equal((await searchOverdueInvoices('INV-8003')).matches[0].number, 'INV-8003');
+    const none = await searchOverdueInvoices('Zzzzzz Qqqq');
+    equal(none.matches.length, 0); equal(none.overdueCount, 3);
+    assert(nameScore('roger', 'Rogers') > 0.8);
+  });
+});
+
+test('"paid on Aug 20th" is dated Aug 20th, leaves the sale on its own date, and emails nobody', async () => {
+  await withDb(async (c) => {
+    await seedLate(c);
+    process.env.RESEND_API_KEY = 're_test';
+    const sent = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => { if (String(url).includes('resend')) sent.push(String(url)); return new Response('{"id":"x"}', { status: 200 }); };
+    try {
+      assert((await resolveInvoice({ number: 'INV-8001', outcome: 'paid' })).error, 'no date, no payment');
+      assert((await resolveInvoice({ number: 'INV-8001', outcome: 'paid', paidOn: '2999-01-01' })).error, 'not in the future');
+      const r = await resolveInvoice({ number: 'INV-8001', outcome: 'paid', paidOn: '2026-08-20', method: 'etransfer' });
+      assert(r.ok && r.fullyPaid, JSON.stringify(r));
+      assert(/does not count in today/.test(r.said));
+      const inv = (await c.query(`SELECT status, payment_method, (paid_at AT TIME ZONE 'America/Toronto')::date::text AS paid_day FROM invoices WHERE number='INV-8001'`)).rows[0];
+      equal(inv.status, 'paid'); equal(inv.paid_day, '2026-08-20'); equal(inv.payment_method, 'E-transfer');
+      const pay = (await c.query(`SELECT p.amount::float AS a, (p.paid_at AT TIME ZONE 'America/Toronto')::date::text AS d FROM invoice_payments p JOIN invoices i ON i.id=p.invoice_id WHERE i.number='INV-8001'`)).rows;
+      equal(pay.length, 1); equal(pay[0].a, 1240); equal(pay[0].d, '2026-08-20');
+      // The sale itself stays on the invoice date: nothing lands on today.
+      const ord = (await c.query(`SELECT (o.created_at AT TIME ZONE 'America/Toronto')::date::text AS d FROM orders o JOIN invoices i ON i.order_id = o.id WHERE i.number='INV-8001'`)).rows;
+      if (ord.length) equal(ord[0].d, '2026-08-10');
+      equal(sent.length, 0, 'the customer is never emailed');
+      assert((await c.query(`SELECT 1 FROM audit_log WHERE entity_id = 'INV-8001'`)).rows.length >= 1, 'it is in the change log');
+      assert((await resolveInvoice({ number: 'INV-8001', outcome: 'paid', paidOn: '2026-08-20' })).error, 'already paid');
+      assert((await unreportedActions()).some((a) => /INV-8001.*2026-08-20/.test(a.summary)));
+    } finally { globalThis.fetch = realFetch; delete process.env.RESEND_API_KEY; }
+  });
+});
+
+test('"still open" keeps it open, raises a follow-up, and stops asking for two days', async () => {
+  await withDb(async (c) => {
+    await seedLate(c);
+    await c.query(`INSERT INTO customers (email, name) VALUES ('s@x.ca','Smith Kitchens')`);
+    const r = await resolveInvoice({ number: 'INV-8002', outcome: 'still_owing', promisedOn: '2026-11-25' });
+    assert(r.ok && /follow-up/.test(r.said));
+    equal((await c.query(`SELECT status FROM invoices WHERE number='INV-8002'`)).rows[0].status, 'open');
+    const t = (await c.query('SELECT title, due_on::text AS due FROM customer_tasks')).rows;
+    equal(t.length, 1); equal(t[0].due, '2026-11-25');
+    assert((await nextOverdueInvoice()).number !== 'INV-8002');
+    assert((await resolveInvoice({ number: 'INV-0000', outcome: 'skip' })).error);
+    assert((await resolveInvoice({ number: 'INV-8002', outcome: 'banana' })).error);
   });
 });
