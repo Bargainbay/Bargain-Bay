@@ -17,6 +17,7 @@ const RS_HOSTS = new Set(
 //   /admin, /driver  — the people using it
 //   /clock           — staff who aren't drivers clock in and out here; the RS
 //                      staff use this host, and without it they hit the board
+//   /team            — the team board: drivers and RS crew reach it on this host
 //   /d/<token>       — the link texted to a driver to sign their phone in.
 //                      It is sent on the RS host, so redirecting it here would
 //                      bounce every driver to a board they can't see.
@@ -37,6 +38,7 @@ const ALLOWED = [
   /^\/driver(\/|$)/,
   /^\/clock$/,
   /^\/sales(\/|$)/,
+  /^\/team$/,
   /^\/d\/[^/]+$/,
   /^\/api(\/|$)/,
   /^\/invoice(\/|$)/,

@@ -17,7 +17,10 @@ export default async function ClockPage() {
   return (
     <div className="drv-page">
       {employee
-        ? <ClockButton name={employee.name || session.name || session.email} />
+        ? (<>
+            <ClockButton name={employee.name || session.name || session.email} />
+            <p style={{ textAlign: 'center' }}><a className="drv-btn" href="/team">💬 Team board</a></p>
+          </>)
         : (
           <div className="drv-card">
             <h1 className="drv-hello" style={{ marginTop: 0 }}>Not on the team list yet</h1>
