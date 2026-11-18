@@ -47,3 +47,28 @@ test('the countdown ends at 23:59:59 Toronto time on the last day, in EST and in
   equal(new Date(endOfTorontoDayMs('2026-07-15')).toISOString(), '2026-07-16T03:59:59.000Z');   // EDT, UTC-4
   equal(endOfTorontoDayMs('nonsense'), null);
 });
+
+test('refurbished units are not in the Black Friday sale: not a card, not the headline percentage', () => {
+  const units = [
+    u('R1', 'Whirlpool', 'WFW', 'Washer', 399, 1099, { condition: 'Refurbished' }),          // 64%: the deepest, but refurbished
+    u('N1', 'Whirlpool', 'WRS', 'Refrigerator', 712, 1695, { condition: 'New Scratch & Dent' }), // 58%
+    u('N2', 'JennAir', 'JWD', 'Warming drawer', 671, 1399, { condition: 'New Open Box' })       // 52%
+  ];
+  equal(topOffPct(units), 58, 'the headline is the deepest NON-refurbished markdown');
+  const picks = pickDoorbusters(units, 4);
+  equal(picks.map((p) => p.rep.id), ['N1', 'N2']);
+  assert(!picks.some((p) => p.rep.condition === 'Refurbished'));
+  equal(topOffPct([units[0]]), 0);
+});
+
+test('major appliances come before accessories: a warming drawer or a range hood only fills a card when there are not enough majors', () => {
+  const units = [
+    u('H1', 'Electrolux', 'EH', 'Range Hood', 620, 1148),                 // 46%, an accessory
+    u('D1', 'JennAir', 'JWD', 'Warming Drawer', 671, 1399),               // 52%, an accessory
+    u('F1', 'Whirlpool', 'WRS', 'Refrigerator', 712, 1695),               // 58%
+    u('W1', 'Electrolux', 'EFLS', 'Washer', 799, 1343),                   // 41%
+    u('F2', 'Frigidaire', 'FRS', 'Refrigerator', 957, 1993)               // 52%
+  ];
+  equal(pickDoorbusters(units, 3).map((p) => p.rep.id), ['F1', 'W1', 'F2'], 'majors first, then the deepest accessory only if short');
+  equal(pickDoorbusters(units, 4).map((p) => p.rep.id), ['F1', 'W1', 'F2', 'D1']);
+});

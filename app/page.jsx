@@ -58,7 +58,7 @@ export default async function Home() {
   return (
     <div>
       {promo && promo.scene === 'blackfriday' ? (
-        <BlackFridayHero promo={promo} units={units} markedDown={clearance.length} />
+        <BlackFridayHero promo={promo} units={units} markedDown={clearance.filter((u) => u.condition !== 'Refurbished').length} />
       ) : promo ? (
         <section className={'hero hero-promo' + (promo.video ? ' hero-has-video' : '') + (promo.scene ? ` hero-scene-${promo.scene}` : '')} style={promo.bg ? { '--hero-bg': `url(${promo.bg})` } : undefined}>
           {promo.video && <HeroVideo src={promo.video} />}

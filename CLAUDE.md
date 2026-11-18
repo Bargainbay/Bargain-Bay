@@ -5649,3 +5649,4 @@ exactly three things: `GET` the hours report, `POST {action:'shift_create'}` and
 `/api/admin/dispatch`). Nothing else (rates, payroll payments, invoices, bank) is reachable; any other action is a 400. Every write is an
 `audit_log` row by `hours-agent` and the shift is stamped "edited by AI manager". Key lives in `~/.claude/secrets/hours-agent.key` on the owner's
 Mac, never in the repo. Rotate: new value in Vercel + redeploy. Staff-clock (`staff_shifts`) edits are NOT covered; only driver shifts.
+- **REFURBISHED units are NOT in the Black Friday sale (owner, 2026-11-18).** `inSale` in `lib/bf-hero.js` excludes them from the cards, from `topOffPct` (the headline can never be a refurbished unit's discount) and from the hero's "units marked down" count. They stay on `/clearance` and `/refurbished` like any other day.
