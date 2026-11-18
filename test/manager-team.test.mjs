@@ -47,7 +47,7 @@ test('refunds, discounts and voids are owner-only; prices, payments and tracker 
 });
 test('every tool the model is offered is listed in a department, and every tiered name is a real tool', () => {
   const names = new Set(MONEY_TOOLS.map((t) => t.name));
-  const inSomeDept = new Set([...DEPTS.delivery.tools, ...DEPTS.sales.tools, ...GM_ONLY]);
+  const inSomeDept = new Set([...DEPTS.delivery.tools, ...DEPTS.sales.tools, ...DEPTS.tech.tools, ...GM_ONLY]);
   for (const n of names) assert(inSomeDept.has(n) || n === 'switch_department', `${n} is in no department, so only the GM could ever use it`);
   const legacy = ['set_photo_from_model', 'run_inventory_sync', 'close_stale_stops', 'run_backup_now', 'resolve_invoice'];
   for (const n of Object.keys(TOOL_TIER)) assert(names.has(n) || legacy.includes(n), `${n} has a tier but is not a tool`);
@@ -260,7 +260,7 @@ import { TOOLS_B, brief } from '../lib/manager-tools-b.js';
 suite('manager team: batch two');
 test('every batch-two tool is a real, described tool, and each sits in a department or is the General Manager\'s alone', () => {
   assert(TOOLS_B.length >= 40, `${TOOLS_B.length} tools`);
-  const inDept = new Set([...DEPTS.delivery.tools, ...DEPTS.sales.tools, ...GM_ONLY]);
+  const inDept = new Set([...DEPTS.delivery.tools, ...DEPTS.sales.tools, ...DEPTS.tech.tools, ...GM_ONLY]);
   for (const t of TOOLS_B) { assert(t.description && t.input_schema, t.name); assert(inDept.has(t.name), `${t.name} is in no department`); }
   equal(new Set(TOOLS_B.map((t) => t.name)).size, TOOLS_B.length);
 });
