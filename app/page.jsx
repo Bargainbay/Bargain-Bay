@@ -7,6 +7,7 @@ import ProductCard from '../components/ProductCard';
 import HeroVideo from '../components/HeroVideo';
 import Hero3D from '../components/Hero3D';
 import PoppyArt from '../components/PoppyArt';
+import BlackFridayHero from '../components/BlackFridayHero';
 import { dealsSnapshot } from '../lib/deals';
 import { heroFor, dayLabel } from '../lib/deals-config';
 
@@ -56,7 +57,9 @@ export default async function Home() {
 
   return (
     <div>
-      {promo ? (
+      {promo && promo.scene === 'blackfriday' ? (
+        <BlackFridayHero promo={promo} units={units} markedDown={clearance.length} />
+      ) : promo ? (
         <section className={'hero hero-promo' + (promo.video ? ' hero-has-video' : '') + (promo.scene ? ` hero-scene-${promo.scene}` : '')} style={promo.bg ? { '--hero-bg': `url(${promo.bg})` } : undefined}>
           {promo.video && <HeroVideo src={promo.video} />}
           <div className="hero-inner">
