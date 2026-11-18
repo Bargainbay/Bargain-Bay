@@ -4,18 +4,19 @@
 // WHY IT IS NOT UNDER /api/admin: the admin two-factor gate (proxy.js) stands in front of
 // every /api/admin route, and the owner does not want hours to wait on their phone. But a
 // second way into ADMIN would defeat the second factor, so this is not one. The key can do
-// exactly three things and nothing else: read the hours report, add a missing shift, and
-// correct a shift's times. It cannot reach pay rates, payroll payments, invoices, orders,
+// exactly these and nothing else: read the hours report, add a missing shift (driver clock, or
+// staff clock for warehouse work) and correct a driver shift's times. It cannot reach pay rates, payroll payments, invoices, orders,
 // the bank, or any other admin action.
 //
 // Off until HOURS_AGENT_KEY is set (>= 32 chars). Unset the variable to revoke it. Every
 // write is an audit_log row ("hours-agent") and the shift itself records who edited it.
 import crypto from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { hasDb } from '../../../lib/db';
+import { hasDb, query } from '../../../lib/db';
 import { createShift, setShiftTimes } from '../../../lib/shifts';
 import { hoursReport, presetRange } from '../../../lib/hours';
 import { audit } from '../../../lib/audit';
+import { employeeByEmail, addStaffShift } from '../../../lib/team-clock';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -48,6 +49,12 @@ export async function POST(req) {
   const by = ACTOR.name;
   try {
     if (body.action === 'shift_create') {
+      // Name the driver by email when the id is not to hand (the report shows emails, not ids).
+      if (!body.driverId && body.email) {
+        const { rows } = await query('SELECT id FROM users WHERE lower(email) = $1 LIMIT 2', [String(body.email).trim().toLowerCase()]);
+        if (rows.length !== 1) throw new Error('No single driver account has that email.');
+        body = { ...body, driverId: rows[0].id };
+      }
       const shift = await createShift(body, by);
       await audit(ACTOR, { action: 'shift.create', entity: 'driver_shift', entityId: shift?.id,
         summary: `Added a shift for driver ${body.driverId} on ${body.date}`, detail: { body } });
@@ -59,7 +66,16 @@ export async function POST(req) {
         summary: `Corrected the times on shift ${body.shiftId}`, detail: { body } });
       return NextResponse.json({ ok: true, shift });
     }
-    return NextResponse.json({ error: 'Only shift_create and shift_times are allowed here.' }, { status: 400 });
+    if (body.action === 'staff_shift_create') {
+      // A finished shift on the /clock (staff) clock, for someone who worked the warehouse.
+      const emp = await employeeByEmail(body.email);
+      if (!emp) throw new Error('No active employee has that email.');
+      const shift = await addStaffShift(emp.id, { date: body.date, start: body.startTime, end: body.endTime, note: body.note }, by);
+      await audit(ACTOR, { action: 'shift.create', entity: 'staff_shift', entityId: shift?.id,
+        summary: `Added a staff-clock shift for ${emp.name} on ${body.date}`, detail: { body } });
+      return NextResponse.json({ ok: true, shift });
+    }
+    return NextResponse.json({ error: 'Only shift_create, staff_shift_create and shift_times are allowed here.' }, { status: 400 });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not do that.' }, { status: 400 });
   }
