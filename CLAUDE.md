@@ -5562,7 +5562,7 @@ and the prompt forbids telling him to go and look anything up.
 migration `0077_team_board` (**run Run schema migration after deploy**), `test/team-board.test.mjs`.
 Four fixed channels, each with **Chat** (running conversation) and **Posts** (titled notices, pinnable, "Got it" ticks): General, Sales, Warehouse, Delivery.
 
-- **Who sees what comes from the SIGN-IN** (`memberFromSession`), never the request: driver -> General + Delivery; dispatch coordinator -> General + Delivery;
+- **Who sees what comes from the SIGN-IN** (`memberFromSession`), never the request: driver -> General + Delivery; dispatch coordinator -> General + Delivery + Warehouse (moderates General and Delivery only);
   `/clock` employee (refurb, cleaners, techs) -> General + Warehouse; staff (admin/sales) -> all four; RS Ops crew -> General + Warehouse.
   One table of rights in `lib/team-board-rules.js`; a person in two groups gets the union.
 - **RS Ops crew have no account here**, so `/api/ops/team` takes `RSOPS_INTAKE_KEY` + the person's NAME and ROLE from RS Ops' PIN session. Floor roles
