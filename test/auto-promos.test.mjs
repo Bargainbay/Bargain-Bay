@@ -169,3 +169,21 @@ test('a cell still wrapped with the old x1.2 uplift is unwrapped first', () => {
 test('a typed value is never wrapped', () => {
   equal(wrapListFormula('1078.92', LOPT), null);
 });
+
+// Black Friday Week was pulled forward to 2026-11-17 and must show its hero with NO coupon live, advertising no code.
+import { DEALS as BF_DEALS, isRunning as bfRunning, heroFor as bfHero, bannerFor as bfBanner } from '../lib/deals-config.js';
+test('Black Friday Week shows its hero from Nov 17 without a coupon, and the teaser bar is gone', () => {
+  const bf = BF_DEALS.find((d) => d.id === 'blackfriday');
+  const day = (iso) => new Date(`${iso}T15:00:00Z`);   // 10:00 Toronto
+  assert(!bfRunning(bf, day('2026-11-16')));
+  assert(bfRunning(bf, day('2026-11-17')) && bfRunning(bf, day('2026-11-30')) && !bfRunning(bf, day('2026-12-01')));
+  const tease = BF_DEALS.find((d) => d.id === 'bf-tease');
+  assert(!bfRunning(tease, day('2026-11-17')), 'a bar saying "starts November 23" would contradict a live hero');
+  const snap = { active: [{ ...bf, coupon: null }], giveaway: false };
+  const hero = bfHero(snap);
+  assert(hero && /Black Friday/.test(hero.kicker) && hero.code === null, 'hero, with no code advertised');
+  assert(/Black Friday Week is on/.test(bfBanner(snap).text));
+  // Once the code is live it appears on the hero by itself.
+  const withCode = bfHero({ active: [{ ...bf, coupon: { code: 'BLACKFRIDAY', kind: 'percent', value: 10, minSubtotal: 0, endsAt: '2026-11-30' } }], giveaway: false });
+  assert(withCode.code && withCode.code.code === 'BLACKFRIDAY');
+});
