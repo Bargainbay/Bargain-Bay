@@ -134,3 +134,30 @@ test('THE CLOCK POSTS TO OWED BY ITSELF, TWICE IS THE SAME, AND A WEEK THE OFFIC
     equal(Number(owed[1].amount), 200); equal(owed[1].source, 'hours');
   } finally { await done(); }
 });
+
+test('DRIVERS ARE PAID BY THE HOUR: THEIR DRIVER-APP SHIFTS COUNT, AN OWNER AND A DOUBLE CLOCK DO NOT', async () => {
+  const db = await withTestDb();
+  try {
+    const { ensureShiftSchema } = await import('../lib/shifts.js');
+    await ensureShiftSchema();
+    const usr = async (name, email, rate, owner = false) => (await query(
+      `INSERT INTO users (email, name, password_hash, hourly_rate, paid_as_owner) VALUES ($1,$2,'x',$3,$4) RETURNING id`, [email, name, rate, owner])).rows[0].id;
+    const ds = (uid, day, a, b) => query(
+      `INSERT INTO driver_shifts (user_id, driving, started_at, ended_at)
+       VALUES ($1, true, ($2::date + $3::time) AT TIME ZONE 'America/Toronto', ($2::date + $4::time) AT TIME ZONE 'America/Toronto')`, [uid, day, a, b]);
+    const rob = await usr('Rob', 'rob@d.test', 22);
+    const boss = await usr('Boss', 'boss@d.test', 50, true);
+    await ds(rob, '2026-11-10', '08:00', '16:00');      // 8h x $22 = $176
+    await ds(boss, '2026-11-10', '08:00', '16:00');     // owner: not payroll
+    // Sam is on BOTH clocks for the same stretch: paid once, off the /clock shift.
+    const sam = await usr('Sam', 'sam@x.ca', 30);
+    const samEmp = await emp('Sam', 25, 'sam@x.ca');
+    await shift(samEmp, '2026-11-10', '09:00', '17:00', 25);
+    await ds(sam, '2026-11-10', '09:00', '17:00');
+    const wk = await payrollWeek('2026-11-09');
+    const by = (n) => wk.people.find((p) => p.name === n);
+    equal(by('Rob').hours, 8); equal(by('Rob').earned, 176);
+    assert(!by('Boss'), 'an owner paid as owner is not on payroll');
+    equal(by('Sam').hours, 8); equal(by('Sam').earned, 200);
+  } finally { db.done(); }
+});
