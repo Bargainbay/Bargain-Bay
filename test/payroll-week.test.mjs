@@ -161,3 +161,25 @@ test('DRIVERS ARE PAID BY THE HOUR: THEIR DRIVER-APP SHIFTS COUNT, AN OWNER AND 
     equal(by('Sam').hours, 8); equal(by('Sam').earned, 200);
   } finally { db.done(); }
 });
+
+test('ONE ACCOUNT ON BOTH CLOCKS IS ONE PERSON, UNDER THE EMPLOYEE\'S NAME', async () => {
+  const db = await withTestDb();
+  try {
+    const { ensureShiftSchema } = await import('../lib/shifts.js');
+    await ensureShiftSchema();
+    const uid = (await query(`INSERT INTO users (email, name, password_hash, hourly_rate) VALUES ('nick@x.ca','Nicholas Carter','x',20) RETURNING id`)).rows[0].id;
+    const eid = await emp('Nick', 18, 'nick@x.ca');
+    await shift(eid, '2026-11-10', '09:00', '13:00', 18);   // 4h x 18 = 72
+    await query(`INSERT INTO driver_shifts (user_id, driving, started_at, ended_at)
+      VALUES ($1, true, ('2026-11-11'::date + '09:00'::time) AT TIME ZONE 'America/Toronto', ('2026-11-11'::date + '17:00'::time) AT TIME ZONE 'America/Toronto')`, [uid]); // 8h x 20 = 160
+    const wk = await payrollWeek('2026-11-09');
+    equal(wk.people.filter((p) => /nick/i.test(p.name)).length, 1);
+    const n = wk.people.find((p) => p.name === 'Nick');
+    equal(n.hours, 12); equal(n.earned, 232);
+    // A line the clock posted earlier under the old driver name is taken off by the next sync, not left to owe it twice.
+    await query(`INSERT INTO pay_ledger (person, kind, amount, period_start, period_end, note, source) VALUES ('Nicholas Carter','owed',160,'2026-11-09','2026-11-15','old','hours')`);
+    await syncOwedFromClock('test');
+    const owed = (await query(`SELECT lower(person) AS p FROM pay_ledger WHERE kind='owed' AND source='hours' AND voided_at IS NULL AND period_start='2026-11-09'`)).rows.map((r) => r.p);
+    assert(!owed.includes('nicholas carter'), 'the old line under the driver name is voided');
+  } finally { db.done(); }
+});
