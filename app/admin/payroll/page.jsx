@@ -5,6 +5,7 @@ import { torontoToday } from '../../../lib/constants';
 import { listEmployees, staffShiftReport } from '../../../lib/team-clock';
 import { weekBounds, syncOwedFromClock } from '../../../lib/payroll-week';
 import { payBalances } from '../../../lib/pay-ledger';
+import { listDriversForOffice } from '../../../lib/drivers';
 import AdminNav from '../../../components/AdminNav';
 import PayrollHub from '../../../components/PayrollHub';
 import TeamClockAdmin from '../../../components/TeamClockAdmin';
@@ -31,10 +32,10 @@ export default async function PayrollPage({ searchParams }) {
   const ok = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
   const from = ok(sp?.from) ? sp.from : w.start;
   const to = ok(sp?.to) ? sp.to : w.end;
-  let hours = null, pay = { people: [], names: [] }, employees = [], shifts = [], error = '';
+  let hours = null, pay = { people: [], names: [] }, employees = [], shifts = [], drivers = [], error = '';
   try {
     hours = await syncOwedFromClock(session.email || session.name || null);
-    [pay, employees, shifts] = await Promise.all([payBalances(), listEmployees(), staffShiftReport(from, to)]);
+    [pay, employees, shifts, drivers] = await Promise.all([payBalances(), listEmployees(), staffShiftReport(from, to), listDriversForOffice().catch(() => [])]);
   } catch (e) { console.error('payroll load failed', e.message); error = 'Could not load payroll.'; }
   return (
     <div>
@@ -46,7 +47,7 @@ export default async function PayrollPage({ searchParams }) {
             <HoursPanel />
           </div>
           <div style={{ marginTop: 18 }}>
-            <TeamClockAdmin employees={employees} shifts={JSON.parse(JSON.stringify(shifts))} from={from} to={to} />
+            <TeamClockAdmin employees={employees} shifts={JSON.parse(JSON.stringify(shifts))} from={from} to={to} drivers={JSON.parse(JSON.stringify(drivers))} />
           </div>
           <details className="panel" style={{ marginTop: 18 }}>
             <summary style={{ cursor: 'pointer', fontWeight: 700 }}>Piece-rate and delivery work (the older method)</summary>

@@ -27,7 +27,7 @@ function parseList(text) {
 const hm = (m) => (m == null ? 'open' : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`);
 
 // Admin: who may clock in (and at what rate), and the hours they've logged.
-export default function TeamClockAdmin({ employees, shifts, from, to }) {
+export default function TeamClockAdmin({ employees, shifts, from, to, drivers = [] }) {
   const router = useRouter();
   const [emp, setEmp] = useState({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '', phone: '' });
   const [fix, setFix] = useState(null);
@@ -37,6 +37,7 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [rates, setRates] = useState({}); // driver id -> typed rate
 
   async function send(body, after) {
     setBusy(true); setErr('');
@@ -45,6 +46,19 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Failed');
       after?.(); router.refresh();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
+
+  // A driver's or assistant's hourly rate lives on their account; the same call the Dispatch roster uses.
+  async function saveDriverRate(d) {
+    setBusy(true); setErr('');
+    try {
+      const r = await fetch('/api/admin/dispatch', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'driver_rate', driverId: d.id, hourlyRate: rates[d.id] }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Failed');
+      setRates((x) => { const n = { ...x }; delete n[d.id]; return n; });
+      router.refresh();
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
 
@@ -60,7 +74,8 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
         Add someone by email. They sign up at <b>/signup</b> with that address (or already have an account),
         then open the clock page on their phone and tap Clock in / Clock out. Save it to their home screen.
         <a href="/clock" style={{ marginLeft: 6 }}>Open the employee clock page →</a>
-        Drivers keep using the driver app. Don&apos;t add a driver here too, or their hours count twice.
+        Drivers and ride-along assistants are added in Dispatch, clock in on the driver app, and appear in the second table below
+        as soon as they are created: set their hourly rate there. Don&apos;t add a driver here too, or their hours count twice.
       </p>
 
       <div className="table-wrap"><table className="admin">
@@ -79,6 +94,30 @@ export default function TeamClockAdmin({ employees, shifts, from, to }) {
           ))}
         </tbody>
       </table></div>
+
+      <h3 style={{ margin: '16px 0 6px', color: 'var(--charcoal)' }}>Drivers and assistants</h3>
+      <div className="table-wrap"><table className="admin">
+        <thead><tr><th>Name</th><th>Phone</th><th style={{ textAlign: 'right' }}>$/hour</th><th></th></tr></thead>
+        <tbody>
+          {drivers.length === 0 && <tr><td colSpan={4} className="hint">No drivers or assistants yet. Add them in Dispatch → People &amp; access.</td></tr>}
+          {drivers.map((d) => {
+            const typed = rates[d.id];
+            return (
+              <tr key={d.id}>
+                <td>{d.name || d.email}{d.paidAsOwner && <span className="hint"> · paid as owner (hours not costed)</span>}</td>
+                <td>{d.phone || '—'}</td>
+                <td style={{ textAlign: 'right' }}>
+                  <input style={{ ...input, width: 90 }} type="number" min="0" step="0.25" inputMode="decimal"
+                    placeholder={d.hourlyRate == null ? 'not set' : ''}
+                    value={typed !== undefined ? typed : (d.hourlyRate == null ? '' : d.hourlyRate)}
+                    onChange={(e) => setRates({ ...rates, [d.id]: e.target.value })} />
+                </td>
+                <td><button type="button" className="dash-filter active" disabled={busy || typed === undefined} onClick={() => saveDriverRate(d)}>Save rate</button></td>
+              </tr>);
+          })}
+        </tbody>
+      </table></div>
+      <p className="hint">A driver&apos;s rate applies to all of their hours, including shifts already clocked.</p>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '12px 0 4px' }}>
         <input style={{ ...input, width: 210 }} placeholder="Email" value={emp.email} onChange={(e) => setEmp({ ...emp, email: e.target.value })} />
