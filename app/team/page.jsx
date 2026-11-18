@@ -23,6 +23,8 @@ export default async function TeamPage({ searchParams }) {
       </div></div>
     );
   }
+  // A driver is in the app: send them to the board INSIDE it (it is in the app's scope).
+  if (member.groups.length === 1 && member.groups[0] === 'driver') redirect('/driver/team');
   const back = member.groups.includes('admin') || member.groups.includes('staff') ? { href: '/admin', label: '← Back to the portal' }
     : member.groups.includes('driver') ? { href: '/driver', label: '← Back to my stops' }
     : member.groups.includes('dispatcher') ? { href: '/admin/dispatch', label: '← Back to dispatch' }

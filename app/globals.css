@@ -2035,3 +2035,6 @@ a.pq-btn { text-decoration: none; }
 .btn-link { background: none; border: 0; padding: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; }
 .btn-link:hover { color: var(--charcoal); }
 .team-board .panel { margin-bottom: 10px; }
+
+/* Unread / pending counts (admin nav, Team board, driver app). Had no rule, so it rendered as bare text. */
+.nav-badge { display: inline-block; min-width: 18px; padding: 1px 6px; border-radius: 999px; background: var(--danger, #c0392b); color: #fff; font-size: 11px; font-weight: 800; line-height: 16px; text-align: center; vertical-align: middle; }
