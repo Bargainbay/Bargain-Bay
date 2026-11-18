@@ -5617,3 +5617,19 @@ prefills the optional "Referred by" box; `RefCapture` also keeps it for affiliat
 (via `next`) but not the referred-by text.
 
 - **LANDMINE — an e-transfer staff already entered must never be entered again (INV-1410, 2026-11-17).** The scan matched on 'amount equals what the invoice still owes' only, and its only memory was the Gmail message id it had itself processed. A $550 invoice with one $275 deposit entered by hand still owed $275, so the same bank email matched exactly and was applied a second time, marking it paid. `matchPayment` now takes `recorded` (every payment a PERSON put on the ledger in the last 45 days, the Manager's own excluded) and flags `already_recorded` when one of the same amount lies within 3 days of the email; the apply step re-reads the invoice and the ledger at the last moment. Flagged, never applied: he says which invoice, if any.
+
+## The Black Friday hero is a campaign, built from the live catalogue (changed 2026-11-17)
+`components/BlackFridayHero.jsx`, `components/BfCountdown.jsx` (client), `lib/bf-hero.js`, `.bfh-*` in `app/globals.css`,
+`test/bf-hero.test.mjs`. Replaces the one-unit 3D stage ("ONE UNIT. ONE CHANCE.", a "1/1 LEFT" badge on a placeholder dishwasher the
+owner called cheesy, and which made a claim about a unit that was not actually a doorbuster). `app/page.jsx` uses it when the running
+deal's hero has `scene: 'blackfriday'`; every other promotion still goes through the generic hero.
+- **Every figure is a fact about stock we hold NOW**: "up to X% off retail" is `topOffPct` (deepest real markdown on our own units, never a
+  seller's or Vesta's), and the four cards are `pickDoorbusters` — biggest markdowns first, ONE PER MODEL ("N available, from $X"), a spread
+  of appliance types before any repeats, real photography only (a placeholder drawing is never headlined), retail >= $500 and >= 30% off.
+  Nothing is typed in, so a sold unit drops off by itself. **Do not hand-write units or percentages into this hero.**
+- **No code is mentioned unless one is live**: `promo.code` comes from the `BLACKFRIDAY` coupon (lib/deals.js); with none the hero names no code.
+- The countdown ends 23:59:59 Toronto on `promo.ends` (`endOfTorontoDayMs`, DST-safe). The server renders the plain end date; digits appear
+  after mount, so the cached HTML never shows a stale clock.
+- **`.bfh-photo` is a flex item: it needs `min-height: 0` and an absolutely positioned image** or the source file's height beats
+  `aspect-ratio` and the cards balloon (same trap as `.thumb`; found in the first render).
+- Local preview note: a symlinked `node_modules` breaks Turbopack AND webpack dev here; `cp -Rc` (APFS clone) works instantly.

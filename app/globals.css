@@ -2038,3 +2038,67 @@ a.pq-btn { text-decoration: none; }
 
 /* Unread / pending counts (admin nav, Team board, driver app). Had no rule, so it rendered as bare text. */
 .nav-badge { display: inline-block; min-width: 18px; padding: 1px 6px; border-radius: 999px; background: var(--danger, #c0392b); color: #fff; font-size: 11px; font-weight: 800; line-height: 16px; text-align: center; vertical-align: middle; }
+
+/* ── Black Friday hero (2026-11-17) ───────────────────────────────────────────────────────────────────────────
+   Black, gold and the site's red; Jost for the masthead like the rest of the brand. Mobile first: copy, then the
+   four deal cards as a 2x2 grid, then the proof strip. From 900px the copy and the cards sit side by side. */
+.bfh { position: relative; overflow: hidden; background: #0c0c0e; color: #fff; border-radius: 14px; margin: 0 0 18px; border: 1px solid #2b2620; }
+.bfh::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; background: linear-gradient(90deg, #b8862b, #f3cd6b 50%, #b8862b); }
+.bfh-glow { position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(60% 55% at 88% 0%, rgba(233,184,74,.22), transparent 70%), radial-gradient(50% 60% at 0% 100%, rgba(185,28,28,.28), transparent 70%); }
+.bfh-inner { position: relative; display: grid; gap: 26px; padding: 30px 20px 8px; }
+.bfh-kicker { display: inline-block; font: 600 12px/1 var(--font-head); letter-spacing: .18em; text-transform: uppercase; color: #f3cd6b;
+  border: 1px solid rgba(243,205,107,.5); border-radius: 999px; padding: 8px 14px; }
+.bfh-title { margin: 18px 0 0; display: flex; flex-direction: column; font: 700 clamp(58px, 15vw, 132px)/.86 var(--font-head); text-transform: uppercase; letter-spacing: .01em; color: #fff; }
+.bfh-title .bfh-gold { background: linear-gradient(180deg, #ffe08a, #e9b949 55%, #b8862b); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.bfh-big { margin: 16px 0 0; font: 500 clamp(22px, 4.2vw, 34px)/1.1 var(--font-head); text-transform: uppercase; letter-spacing: .04em; color: #fff; }
+.bfh-big b { color: #ff5a4f; font-weight: 700; }
+.bfh-sub { margin: 14px 0 0; max-width: 520px; color: #d9d2c8; font-size: 16px; line-height: 1.5; }
+.bfh-code { margin: 14px 0 0; color: #f3cd6b; font-size: 15px; }
+.bfh-code code { background: rgba(243,205,107,.14); padding: 3px 8px; border-radius: 6px; color: #fff; letter-spacing: .08em; }
+.bfh-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
+.bfh-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px; border-radius: 8px; font: 600 14px/1 var(--font-head); letter-spacing: .12em; text-transform: uppercase; text-decoration: none; }
+.bfh-btn-gold { background: linear-gradient(180deg, #ffe08a, #e9b949); color: #1a1408; }
+.bfh-btn-gold:hover { background: #fff1c2; }
+.bfh-btn-ghost { border: 1px solid rgba(255,255,255,.6); color: #fff; }
+.bfh-btn-ghost:hover { background: rgba(255,255,255,.12); }
+.bfh-clock { margin-top: 24px; display: flex; flex-direction: column; gap: 8px; }
+.bfh-clock-label { font: 600 12px/1 var(--font-head); letter-spacing: .18em; text-transform: uppercase; color: #a79e91; }
+.bfh-count { display: flex; gap: 8px; }
+.bfh-count-cell { min-width: 62px; text-align: center; padding: 10px 6px 8px; background: rgba(255,255,255,.06); border: 1px solid rgba(243,205,107,.35); border-radius: 8px; }
+.bfh-count-cell b { display: block; font: 700 28px/1 var(--font-head); font-variant-numeric: tabular-nums; color: #fff; }
+.bfh-count-cell small { display: block; margin-top: 4px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #a79e91; }
+.bfh-count-fallback { color: #d9d2c8; font-size: 15px; }
+
+.bfh-deals-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.bfh-deals-head b { font: 600 13px/1 var(--font-head); letter-spacing: .16em; text-transform: uppercase; color: #fff; }
+.bfh-deals-head span { font-size: 12px; color: #8f867a; }
+.bfh-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.bfh-card { position: relative; display: flex; flex-direction: column; background: #fff; color: #2a2825; border-radius: 12px; overflow: hidden; text-decoration: none; box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .15s ease, box-shadow .15s ease; }
+.bfh-card:hover { transform: translateY(-3px); box-shadow: 0 16px 38px rgba(0,0,0,.5); }
+.bfh-ribbon { position: absolute; z-index: 2; top: 10px; left: 0; background: #c81e1e; color: #fff; font: 700 13px/1 var(--font-head); letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px 7px 10px; border-radius: 0 6px 6px 0; }
+/* min-height: 0 + an absolutely positioned image are load-bearing: .bfh-photo is a flex item, so without them the photo's own
+   height beats aspect-ratio and the card grows to the source file (the same trap as .thumb above). */
+.bfh-photo { position: relative; display: block; min-height: 0; aspect-ratio: 1 / 1; background: #fff; }
+.bfh-photo img { position: absolute; inset: 0; width: 100%; height: 100%; padding: 8px; box-sizing: border-box; object-fit: contain; display: block; }
+.bfh-card-body { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px 13px; border-top: 1px solid #eee7de; }
+.bfh-card-body small { color: #837a71; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.bfh-card-body b { font-size: 13px; line-height: 1.25; font-weight: 600; min-height: 2.5em; }
+.bfh-price { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; margin-top: 2px; }
+.bfh-price em { font-style: normal; font-size: 11px; color: #837a71; text-transform: uppercase; }
+.bfh-price strong { font: 700 24px/1 var(--font-head); color: #b91c1c; }
+.bfh-price s { color: #9a9086; font-size: 13px; }
+.bfh-avail { font-size: 11px; font-weight: 600; color: #0f6e56; }
+
+.bfh-proof { position: relative; list-style: none; margin: 22px 0 0; padding: 14px 20px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 14px; border-top: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.35); font-size: 13px; color: #cfc7bb; }
+.bfh-proof b { color: #f3cd6b; }
+
+@media (min-width: 900px) {
+  .bfh-photo { aspect-ratio: 16 / 11; }
+  .bfh-card-body { padding: 8px 12px 11px; }
+  .bfh-card-body b { min-height: 0; }
+  .bfh-title { font-size: clamp(72px, 9vw, 118px); }
+  .bfh-inner { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 36px; padding: 40px 40px 14px; align-items: center; }
+  .bfh-proof { grid-template-columns: repeat(4, auto); justify-content: space-between; padding: 16px 40px; }
+}
+@media (prefers-reduced-motion: reduce) { .bfh-card { transition: none; } }
