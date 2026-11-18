@@ -63,6 +63,16 @@ export async function GET(req) {
   }
 }
 
+
+// An e-transfer entered by a person goes through the same check the Manager follows: backed by a bank email nothing
+// else has used, and a second payment of the same amount needs a second e-transfer (lib/manager-payments.js).
+async function checkedPayment(invoiceId, { method, amount = null, paidDate = null, body = {}, apply }) {
+  const { withPaymentCheck } = await import('../../../../lib/manager-payments');
+  const session = await getSession();
+  return withPaymentCheck(invoiceId, { method, amount, paidDate, isAdmin: isAdmin(session), overrideReason: body.overrideReason, by: session?.name || session?.email || '', apply });
+}
+const blocked = (e) => (e?.code === 'DOUBLE_PAYMENT' ? NextResponse.json({ error: e.message, needsOverride: !!e.canOverride }, { status: 409 }) : null);
+
 export async function POST(req) {
   if (!(await staff())) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   if (!hasDb()) return noDb();
@@ -131,9 +141,19 @@ export async function POST(req) {
       createdBy: { email: session?.email, name: session?.name },
       leadSource, leadBy, hideHstNumber
     });
-    if (paidNowMethod) await markInvoicePaid(invoice.id, paidNowMethod, invoiceDate || undefined);
+    let paymentNote = null;
+    if (paidNowMethod) {
+      try {
+        const done = await checkedPayment(invoice.id, { method: paidNowMethod, paidDate: invoiceDate || undefined, body, apply: () => markInvoicePaid(invoice.id, paidNowMethod, invoiceDate || undefined) });
+        if (done?.check?.warnings?.length) paymentNote = done.check.warnings.join(' ');
+      } catch (e) {
+        // The sale is raised and stays OPEN; only the "paid" step was refused. Saying so matters: a retry would raise it twice.
+        if (e?.code !== 'DOUBLE_PAYMENT') throw e;
+        paymentNote = `${invoice.number} was raised but NOT marked paid: ${e.message}`;
+      }
+    }
     await audit(session, { action: 'invoice.create', entity: 'invoice', entityId: invoice?.number, summary: `${quickSale ? 'Quick sale' : 'Invoice'} raised, total ${invoice?.total ?? '?'}${paidNowMethod ? ', paid ' + paidNowMethod : ''}${hideHstNumber ? ', HST number hidden on customer copy' : ''}`, detail: { total: invoice?.total ?? null, lines: items.length } });
-    return NextResponse.json({ ok: true, invoice });
+    return NextResponse.json({ ok: true, invoice, paymentNote });
   } catch (e) {
     console.error('create invoice failed', e?.message || e);
     return NextResponse.json({ error: e?.message || 'Something went wrong creating the invoice.' }, { status: 500 });
@@ -250,11 +270,12 @@ export async function PATCH(req) {
     // Partial payment (deposit / instalment). Auto-completes to fully paid when
     // the recorded payments reach the invoice total.
     if (body.action === 'record_payment') {
-      const r = await recordInvoicePayment(invoiceId, {
-        amount: body.amount, method: String(body.method || '').trim(),
+      const payMethod = String(body.method || '').trim();
+      const r = await checkedPayment(invoiceId, { method: payMethod, amount: body.amount, paidDate: String(body.paidDate || '').trim(), body, apply: () => recordInvoicePayment(invoiceId, {
+        amount: body.amount, method: payMethod,
         paidDate: String(body.paidDate || '').trim(), note: body.note
-      });
-      await audit(await getSession(), { action: 'invoice.payment', entity: 'invoice', entityId: r?.number || invoiceId, summary: `Payment of ${body.amount} by ${body.method || '?'} recorded`, detail: { amount: body.amount, method: body.method } });
+      }) });
+      await audit(await getSession(), { action: 'invoice.payment', entity: 'invoice', entityId: r?.number || invoiceId, summary: `Payment of ${body.amount} by ${body.method || '?'} recorded${r?.check ? (r.check.overridden ? ' (double-payment check overridden)' : r.check.verified ? ' (bank e-transfer matched)' : ' (NOT verified against a bank email)') : ''}`, detail: { amount: body.amount, method: body.method, check: r?.check || null } });
       return NextResponse.json({ ok: true, invoice: r });
     }
     // Remove a payment recorded in error (only while the invoice isn't settled).
@@ -305,10 +326,11 @@ export async function PATCH(req) {
     }
     const method = String(body.method || '').trim();
     if (!PAYMENT_METHODS[method]) return NextResponse.json({ error: 'Pick a valid payment method.' }, { status: 400 });
-    const invoice = await markInvoicePaid(invoiceId, method, String(body.paidDate || '').trim());
-    await audit(await getSession(), { action: 'invoice.paid', entity: 'invoice', entityId: invoice?.number || invoiceId, summary: `Marked paid by ${method}` });
+    const invoice = await checkedPayment(invoiceId, { method, paidDate: String(body.paidDate || '').trim(), body, apply: () => markInvoicePaid(invoiceId, method, String(body.paidDate || '').trim()) });
+    await audit(await getSession(), { action: 'invoice.paid', entity: 'invoice', entityId: invoice?.number || invoiceId, summary: `Marked paid by ${method}${invoice?.check ? (invoice.check.overridden ? ' (double-payment check overridden)' : invoice.check.verified ? ' (bank e-transfer matched)' : method === 'etransfer' ? ' (NOT verified against a bank email)' : '') : ''}` });
     return NextResponse.json({ ok: true, invoice });
   } catch (e) {
+    const b = blocked(e); if (b) return b;
     console.error('update invoice failed', e?.message || e);
     return NextResponse.json({ error: e?.message || 'Could not update the invoice.' }, { status: 500 });
   }
