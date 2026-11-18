@@ -21,7 +21,7 @@ import OrderNotes from './OrderNotes';
 
 const SHIPMENT = { white_glove: 'WHITE GLOVE — into the room', threshold: 'THRESHOLD — to the door' };
 const SERVICE_LABEL = {
-  delivery_only: 'Delivery only', install: 'Install', haul_away: 'Haul away',
+  delivery_only: 'Delivery', install: 'Install', haul_away: 'Haul away',
   exchange: 'Exchange', return_pickup: 'Return pickup', parts_drop: 'Parts drop-off', warranty: 'Warranty'
 };
 const FAIL_REASONS = {
@@ -228,6 +228,9 @@ export default function DriverStops({ initial, driverName }) {
   }
 
   const start = (s) => act(s, { status: 'on_the_way' }, { action: 'status', status: 'on_the_way' });
+  // Tapped On the way on the wrong stop: put it back so the office and the
+  // customer aren't told the driver is heading somewhere they aren't.
+  const undoStart = (s) => act(s, { status: 'scheduled' }, { action: 'undo_start' });
   // Arriving starts the clock, and the driver has to be able to SEE that it
   // started — the whole reason the office was retyping these times out of the
   // group chat is that nothing on either screen ever showed them.
@@ -357,7 +360,7 @@ export default function DriverStops({ initial, driverName }) {
 
       {left.map((s, i) => (
         <StopCard key={s.id} stop={s} n={i + 1}
-          onStart={() => start(s)} onArrive={() => arrive(s)}
+          onStart={() => start(s)} onUndo={() => undoStart(s)} onArrive={() => arrive(s)}
           onFinish={() => setFinishing(s)} onFail={() => couldNot(s)} />
       ))}
 
@@ -406,7 +409,7 @@ export default function DriverStops({ initial, driverName }) {
               </p>
               {earlier.map((s, i) => (
                 <StopCard key={s.id} stop={s} n={i + 1}
-                  onStart={() => start(s)} onArrive={() => arrive(s)}
+                  onStart={() => start(s)} onUndo={() => undoStart(s)} onArrive={() => arrive(s)}
                   onFinish={() => setFinishing(s)} onFail={() => couldNot(s)} />
               ))}
             </>
@@ -450,7 +453,7 @@ export default function DriverStops({ initial, driverName }) {
   );
 }
 
-function StopCard({ stop, n, done, preview, me, onStart, onArrive, onFinish, onFail, onAddPhotos, onReview }) {
+function StopCard({ stop, n, done, preview, me, onStart, onUndo, onArrive, onFinish, onFail, onAddPhotos, onReview }) {
   const [notesOpen, setNotesOpen] = useState(false);
   const addr = fullAddress(stop);
   const isService = stop.type === 'service_call';
@@ -629,6 +632,11 @@ function StopCard({ stop, n, done, preview, me, onStart, onArrive, onFinish, onF
               <button type="button" className="drv-btn go" onClick={onArrive}>📍 Arrived</button>
             ) : (
               <button type="button" className="drv-btn go" onClick={onFinish}>✅ Finish stop</button>
+            )}
+            {stop.status === 'on_the_way' && onUndo && (
+              <button type="button" className="drv-btn" onClick={() => {
+                if (window.confirm('Not heading to this stop? This puts it back to Scheduled.')) onUndo();
+              }}>↩ Not on the way</button>
             )}
             {stop.status === 'arrived' ? null : (
               <button type="button" className="drv-btn" onClick={onFinish}>✅ Finish</button>
