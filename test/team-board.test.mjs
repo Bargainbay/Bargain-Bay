@@ -14,7 +14,7 @@ test('CHANNELS FOLLOW THE ROLE', () => {
   equal(chans(mk('a', 'A', ['driver'])), 'delivery,general');
   equal(chans(mk('a', 'A', ['employee'])), 'general,warehouse');
   equal(chans(mk('a', 'A', ['rsops'])), 'general,warehouse');
-  equal(chans(mk('a', 'A', ['dispatcher'])), 'delivery,general');
+  equal(chans(mk('a', 'A', ['dispatcher'])), 'delivery,general,warehouse');
   equal(chans(mk('a', 'A', ['staff'])), 'delivery,general,sales,warehouse');
   equal(chans(mk('a', 'A', ['driver', 'employee'])), 'delivery,general,warehouse');
   equal(chans(mk('a', 'A', [])), '');
@@ -25,6 +25,8 @@ test('ONLY THE OFFICE POSTS IN GENERAL; EVERYONE POSTS IN THEIR OWN CHANNEL', ()
   assert(!mk('d', 'D', ['driver']).rights.delivery.moderate);
   assert(mk('s', 'S', ['staff']).rights.general.post);
   assert(mk('x', 'X', ['dispatcher']).rights.delivery.moderate);
+  assert(mk('x', 'X', ['dispatcher']).rights.warehouse.post, 'dispatch can post in Warehouse');
+  assert(!mk('x', 'X', ['dispatcher']).rights.warehouse.moderate, 'but not pin or remove others there');
 });
 
 suite('team board — messages (real SQL)');

@@ -199,6 +199,7 @@ export default function InvoiceForm({ inventory = [], customers = [], senders = 
       }
       setBelowFloor(false); setBelowFloorRep(false);
       setDone(d.invoice);
+      if (d.paymentNote) setErr(d.paymentNote);
       setName(''); setEmail(''); setItems([blankItem()]); setMemo(''); setInvoiceDate(todayToronto());
       setDeliveryMethod('pickup'); setAddress(''); setCity(''); setPostal(''); setPhone('');
       // Cleared like every other field: the next customer is a different lead,

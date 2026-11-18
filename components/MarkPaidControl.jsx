@@ -66,21 +66,30 @@ export default function MarkPaidControl({ invoiceId, balance, payments = [] }) {
     }
   }
 
-  async function mark() {
+  async function mark(overrideReason) {
     if (!method) { setErr('Pick how it was paid'); return; }
     if (amount !== '' && (!Number.isFinite(amt) || amt <= 0)) { setErr('Amount must be a positive number'); return; }
     setBusy(true); setErr('');
     try {
       const body = isPartial
-        ? { action: 'record_payment', invoiceId, amount: amt, method, paidDate }
-        : { invoiceId, method, paidDate };
+        ? { action: 'record_payment', invoiceId, amount: amt, method, paidDate, overrideReason }
+        : { invoiceId, method, paidDate, overrideReason };
       const res = await fetch('/api/admin/invoices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
       const d = await res.json();
-      if (!res.ok) { setErr(d.error || 'Failed'); return; }
+      if (!res.ok) {
+        // A second payment of the same amount with no second bank e-transfer behind it. Only the owner can go ahead, with a reason.
+        if (res.status === 409 && d.needsOverride) {
+          const why = window.prompt(`${d.error}\n\nOwner only: type the reason to record it anyway (it is written on the payment), or Cancel.`);
+          if (why && why.trim().length >= 5) { setBusy(false); return await mark(why.trim()); }
+        }
+        setErr(d.error || 'Failed'); return;
+      }
+      const warns = d.invoice?.check?.warnings || [];
+      if (warns.length) window.alert(`Recorded, but check this:\n\n- ${warns.join('\n- ')}`);
       window.location.reload();
     } catch {
       setErr('Network error');
@@ -106,7 +115,7 @@ export default function MarkPaidControl({ invoiceId, balance, payments = [] }) {
         placeholder={bal > 0 ? `${fmt(bal)} (full)` : 'amount'}
         title="Leave blank to mark the whole balance paid, or enter a smaller amount to record a deposit / partial payment"
         style={{ padding: '3px 5px', fontSize: 12.5, width: 96 }} />
-      <button className="btn" style={{ padding: '4px 10px', fontSize: 12.5 }} disabled={busy || !method} onClick={mark}>
+      <button className="btn" style={{ padding: '4px 10px', fontSize: 12.5 }} disabled={busy || !method} onClick={() => mark()}>
         {busy ? '…' : isPartial ? `Record ${fmt(amt)}` : 'Mark paid'}
       </button>
       <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
