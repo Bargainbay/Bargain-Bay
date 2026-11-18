@@ -5640,3 +5640,12 @@ deal's hero has `scene: 'blackfriday'`; every other promotion still goes through
 - **`.bfh-photo` is a flex item: it needs `min-height: 0` and an absolutely positioned image** or the source file's height beats
   `aspect-ratio` and the cards balloon (same trap as `.thumb`; found in the first render).
 - Local preview note: a symlinked `node_modules` breaks Turbopack AND webpack dev here; `cp -Rc` (APFS clone) works instantly.
+
+## The hours key — fixing hours without the owner's two-step code (added 2026-11-18)
+`app/api/hours-agent/route.js`, env `HOURS_AGENT_KEY` (32+ chars, Production; unset = off = revoked), `test/hours-agent.test.mjs`.
+The admin two-factor gate (`proxy.js`) covers every `/api/admin` route, so the AI manager (RS Manager / Claude in a session) could not
+add or fix a shift unless the owner entered a code. **This is NOT a second way into admin.** Bearer-key route outside `/api/admin` that does
+exactly three things: `GET` the hours report, `POST {action:'shift_create'}` and `{action:'shift_times'}` (same payloads as
+`/api/admin/dispatch`). Nothing else (rates, payroll payments, invoices, bank) is reachable; any other action is a 400. Every write is an
+`audit_log` row by `hours-agent` and the shift is stamped "edited by AI manager". Key lives in `~/.claude/secrets/hours-agent.key` on the owner's
+Mac, never in the repo. Rotate: new value in Vercel + redeploy. Staff-clock (`staff_shifts`) edits are NOT covered; only driver shifts.
