@@ -359,6 +359,7 @@ test('the assistant\'s text tool is a CONFIRMED write, and only the owner (admin
 });
 
 test('admin sessions get the manager team; sales, drivers and RS Ops crew do not', async () => {
+  const was = { a: process.env.ADMIN_EMAILS, s: process.env.SALES_EMAILS };   // restored below: other test files rely on them
   process.env.ADMIN_EMAILS = 'boss@example.com'; process.env.SALES_EMAILS = 'rep@example.com';
   const { personFromSession, personFromRsops } = await import('../lib/assistant/people.js');
   const boss = await personFromSession({ userId: 1, email: 'boss@example.com', name: 'Boss' });
@@ -366,7 +367,8 @@ test('admin sessions get the manager team; sales, drivers and RS Ops crew do not
   const rep = await personFromSession({ userId: 2, email: 'rep@example.com', name: 'Rep' });
   assert(!rep.teams.includes('manager'));
   assert(!personFromRsops({ name: 'Dinesh' }).teams.includes('manager'));
-  delete process.env.ADMIN_EMAILS; delete process.env.SALES_EMAILS;
+  if (was.a === undefined) delete process.env.ADMIN_EMAILS; else process.env.ADMIN_EMAILS = was.a;
+  if (was.s === undefined) delete process.env.SALES_EMAILS; else process.env.SALES_EMAILS = was.s;
 });
 
 test('outside the send window a real pass does nothing, and says so', async () => {
