@@ -1,5 +1,5 @@
 import { suite, test, assert, equal } from './_harness.mjs';
-import { thisWeek, renderReport, netBeforeOverhead } from '../lib/pnl-email.js';
+import { thisWeek, renderReport, netBeforeOverhead, dailyReportDecision, torontoMidnightIso } from '../lib/pnl-email.js';
 
 suite('lib/pnl-email — the daily and weekly P&L emails');
 
@@ -38,4 +38,16 @@ test('a service call or pickup counts only when it carries a charge, and is neve
     equal(p.buckets[0].revenue, 180);
     equal(p.totals.unpricedRevenue, 0);
   } finally { await done(); }
+});
+
+test('the daily report waits for everyone to clock out, then forces at 12:01am', () => {
+  const D = (hour, minute, open, alreadySent = null) => dailyReportDecision({ now: { date: '2026-11-17', hour, minute }, open, alreadySent });
+  equal(D(21, 15, 2).action, 'wait');
+  equal(D(22, 0, 0), { action: 'send', reportDay: '2026-11-17', forced: false });
+  equal(D(0, 0, 1).action, 'wait');
+  equal(D(0, 1, 1), { action: 'send', reportDay: '2026-11-16', forced: true });
+  equal(D(0, 15, 0, '2026-11-16').action, 'skip');
+  equal(D(14, 0, 0).action, 'skip');
+  equal(torontoMidnightIso('2026-11-18'), '2026-11-18T05:00:00.000Z');
+  equal(torontoMidnightIso('2026-07-02'), '2026-07-02T04:00:00.000Z');
 });

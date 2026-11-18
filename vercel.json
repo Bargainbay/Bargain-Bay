@@ -94,7 +94,7 @@
     },
     {
       "path": "/api/cron/daily-report",
-      "schedule": "0 2 * * *"
+      "schedule": "1,15,30,45 1-5 * * *"
     },
     {
       "path": "/api/cron/weekly-report",
