@@ -5497,7 +5497,7 @@ backups, sync) with no view of sales, deliveries or money, which is why it sound
 - **SUPERSEDED 2026-11-17 (owner): see 'The Manager team' below. The autonomous passes (`manager-actions.js`) still have NO money tools, and a test still enforces it; the VOICE tools now include pricing, invoices and the tracker behind a gate.**
 - **HARD LIMITS, enforced by test:** no tool or import for money in or out, refunds, invoices, prices, coupons, store credit, cost, or
   anything sent to a CUSTOMER. A voice request for those gets "that needs you on the screen" plus an offer of a follow-up task so the sales team rings.
-- **Not built:** inbound calls, texting the team (it emails the dispatch desk), choosing a driver itself (it only assigns when told),
+- **Not built:** inbound calls, texting the team (SUPERSEDED 2026-11-18: see 'The Tech Manager, and texting staff'), choosing a driver itself (it only assigns when told),
   per-rep nudges, quota pacing, and acting on a recommendation it was not asked about beyond the list above.
 
 
@@ -5537,7 +5537,7 @@ backups, sync) with no view of sales, deliveries or money, which is why it sound
 
 - **HARD LIMITS, enforced by test:** no tool or import for money in or out, refunds, creating/editing/voiding invoices, prices, coupons, store credit, cost, or
   anything sent to a CUSTOMER. **ONE exception, added 2026-11-17 on the owner's instruction: it can RECORD that a payment already arrived** (below). A voice request for those gets "that needs you on the screen" plus an offer of a follow-up task so the sales team rings.
-- **Not built:** inbound calls, texting the team (it emails the dispatch desk), choosing a driver itself (it only assigns when told),
+- **Not built:** inbound calls, texting the team (SUPERSEDED 2026-11-18: see 'The Tech Manager, and texting staff'), choosing a driver itself (it only assigns when told),
   per-rep nudges, quota pacing, and acting on a recommendation it was not asked about beyond the list above.
 
 ### The manager works a list itself, and can record "it was paid on Aug 20th" (added 2026-11-17)
@@ -5556,6 +5556,39 @@ and the prompt forbids telling him to go and look anything up.
 - `find_overdue_invoice` searches EVERY late invoice (answered or not) by name, email or number, tolerant of speech errors (`nameScore`, edit distance;
   a substring only counts when the shorter side is 3+ letters, or a lone "t" in an email matches everyone).
 - Every payment is in `audit_log` (`invoice.payment`, by "Manager (AI)") and in `manager_actions`. Refunds, voids, creating or editing an invoice stay with a person.
+## The Tech Manager, and texting staff (added 2026-11-18)
+`lib/tech-manager.js` (the pass), `lib/tech-manager-rules.js` (no imports: config, window, cooldown, wording, prompts), `lib/staff-texts.js`
+(the ONE gate and log for texting staff), `/api/cron/tech-manager` (every 30 min, heartbeat + `EXPECTED`), `/api/admin/tech-manager` (ADMIN),
+migration `0079_staff_texts` (**Run schema migration after deploy**), `test/tech-manager.test.mjs`. Owner's instruction: the managers can text
+employees, and a Tech Manager manages the tech department, talks Tamil to the people who want it, and may swear at Dinesh (friends, both fine with it).
+
+- **Texting staff = `staff-texts.js`, from every door.** The Manager team (`text_employee`, in the GM, Delivery and Tech hats, tier `act`: done now, logged, emailed after),
+  the RS Manager assistant (`text_employee`, **admin only** through a new `manager` team in `people.js`, and a normal CONFIRMED write: read back, second message to
+  carry it out) and the Tech Manager's own nudges. **Only an active employee (`employees.phone`) or a driver (`users.phone`) can be found**, by name / email / number
+  from those two tables; the number is never taken from a request or a model, and a customer cannot be resolved, so cannot be texted. From the OPERATIONS number
+  (`sendSms`'s default), never the marketing one. **Refused outside production** (`isProduction()`, stricter than sendSms's redirect). Every attempt, including refused and
+  failed ones, is a `staff_texts` row (who sent, to whom, the text, status, reason, Twilio sid) and an `audit_log` row.
+- **The Tech Manager only looks after the people on its list** (setting `tech_manager`, `people[]`), and does nothing until `enabled` is switched on. Three nudges:
+  `shift_open` (a `staff_shifts` or `driver_shifts` row still open past `shiftLimitHours`, default 10), `no_parts` (a unit in repair with no parts marked after
+  `partsGraceMinutes`, default 60) and `long_on_unit` (one tech on one unit past `unitLimitHours`, **default 3, a setting**). Send window 07:00-22:30 Toronto, a per-subject
+  cooldown (`cooldownMinutes` 180) and a daily cap (`maxPerPersonPerDay` 4), counted from `staff_texts`. A failed or STOP-blocked send counts toward the cooldown so it is not retried every 30 minutes.
+- **THE TONE IS A PER-PERSON SETTING, OFF BY DEFAULT.** `people[].banter` / `.lang` ('en' | 'ta'). With banter on, the prompt (`TECH_BANTER`) allows swearing and taking the piss, in Tamil
+  street slang for a Tamil speaker, and keeps the driver assistant's limits: **never at anyone's race, religion, caste, sex, sexuality, body, disability or family, never about a
+  customer or colleague, the instruction is said plainly, safety wins**. The text is also CHECKED after the model writes it (`messageOk`): a unit nudge must name the unit and a shift nudge
+  must say clock out, or the plain template (English, or Tamil for a Tamil person) goes instead. **The same persona is added to the live RS Manager assistant** for anyone the config matches (by
+  email or, for RS Ops crew who arrive by name, by name), replacing the drivers' road banter. Turn Dinesh's on or off with `set_person` on `/api/admin/tech-manager`; nobody else has it
+  until the owner sets it. Dinesh is `din.dinesh4@gmail.com` (names `Dinesh`, `dinesh din`); **he is NOT on the list until somebody posts him** (a migration that seeds data would break the backup restore tests).
+- **BENCH CONTRACT — the parts and time-on-unit nudges need ONE new route in RS Ops, which is a different repo and is NOT built.** `GET /api/intake/bench` (`x-rsops-key`) returning
+  `{ units: [{ id, model, stage, assignedToName, assignedToEmail?, workingSince, partsMarked }] }` for our own lots' units in repair (`partsMarked` true when the parts-needed list has anything OR
+  the tech marked "no parts needed"; waiting-for-a-part is excluded, it is a reason not a stall; no cost or price). Until it exists the pass reports `benchError` and the shift nudges still go.
+  A silent half-check is the failure this is built against, so the dry run and the cron response both say it.
+- **Dry run:** `GET /api/cron/tech-manager?dry=1` (cron secret) or `GET /api/admin/tech-manager?dry=1` (admin) lists who would be texted and the composed text, writes nothing and sends nothing,
+  even when switched off or outside production (and says so in `notes`).
+- **Env vars:** none new are required. It uses `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` (operations number), `ANTHROPIC_API_KEY` (without it the plain templates go),
+  `RSOPS_INTAKE_KEY` (+ optional `RSOPS_BASE_URL`) for the bench, `CRON_SECRET`. Optional `TECH_MANAGER_MODEL` (default `claude-sonnet-5-5`).
+- **Not built:** the RS Ops bench route (above); replies to a nudge by SMS (an inbound text goes to `/api/sms/inbound`, which only records STOP; the conversation is through the RS Manager widget/voice);
+  push notifications (a web page cannot reach a locked phone, same OS limit as live tracking, so nudges are SMS); a screen for the settings (the admin route is the interface for now).
+
 ## The Team board — chat and posts for the whole crew (added 2026-11-17)
 `/team` (every crew member; nav tab "Team" with an unread badge, "💬 Team" on the driver app and a link on `/clock`),
 `lib/team-board.js`, `lib/team-board-rules.js` (no imports), `components/TeamChat.jsx` (not `TeamBoard.jsx`, which is the Sales Hub owner view), `/api/team`, `/api/ops/team`,
