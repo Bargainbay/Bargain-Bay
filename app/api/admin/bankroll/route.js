@@ -36,9 +36,10 @@ export async function POST(req) {
   try {
     if (b.action === 'add') {
       const amt = Math.abs(Number(b.amount));
-      const signed = b.direction === 'out' && b.kind !== 'count' ? -amt : amt;
+      // A typed bank balance keeps its own sign (an overdrawn account is negative); a till count is never negative.
+      const signed = b.kind === 'bank' ? Number(b.amount) : b.direction === 'out' && b.kind !== 'count' ? -amt : amt;
       const id = await addEntry({ date: b.date, kind: b.kind, amount: signed, note: b.note, by, category: b.category, payee: b.payee });
-      await audit(session, { action: 'bankroll.add', entity: 'bankroll', entityId: String(id), summary: `${{ cash: 'Cash', count: 'Cash count', pending: 'Not at the bank yet' }[b.kind] || b.kind}: ${signed} ${b.note || ''}`.trim() });
+      await audit(session, { action: 'bankroll.add', entity: 'bankroll', entityId: String(id), summary: `${{ cash: 'Cash', count: 'Cash count', pending: 'Not at the bank yet', bank: 'Bank balance typed' }[b.kind] || b.kind}: ${signed} ${b.note || ''}`.trim() });
     } else if (b.action === 'clear') {
       await clearEntry(b.id, by, b.line || null);
     } else if (b.action === 'promote') {

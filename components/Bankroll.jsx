@@ -26,6 +26,7 @@ export default function Bankroll({ initial }) {
   const [count, setCount] = useState('');
   const [thru, setThru] = useState({ direction: 'out', amount: '', payee: '', category: 'Wages', note: '', date: initial.date });
   const [countDate, setCountDate] = useState(initial.date);
+  const [typedBank, setTypedBank] = useState('');
   const [dep, setDep] = useState({ amount: '', date: initial.date });
   async function saveDeposit(e) {
     e.preventDefault();
@@ -127,6 +128,11 @@ export default function Bankroll({ initial }) {
     const r = await call({ action: 'promote', activityId: row.activityId, category }, 'cat');
     if (r) setMsg('Sorted. It is now an expense in that category.');
   }
+  async function saveBank(e) {
+    e.preventDefault();
+    const r = await call({ action: 'add', kind: 'bank', amount: typedBank, note: 'Bank balance typed from the TD app' }, 'bankbal');
+    if (r) { setTypedBank(''); setMsg('Bank balance saved. The bankroll uses it until the bank feed reads again.'); }
+  }
   async function saveCount(e) {
     e.preventDefault();
     const r = await call({ action: 'add', kind: 'count', amount: count, date: countDate, note: 'Cash counted' }, 'count');
@@ -153,7 +159,7 @@ export default function Bankroll({ initial }) {
         )}
         <p className="hint" style={{ margin: '10px 0 0', color: bank.stale ? 'var(--danger)' : undefined }}>
           {bank.at
-            ? <>Bank figure from <b>{ago(bank.minutesOld)}</b> ({new Date(bank.at).toLocaleString('en-CA')}).{bank.stale ? ' That is old — get the live balance before you trust the total.' : ''}</>
+            ? <>{bank.source === 'typed' ? <>Bank balance <b>typed in{bank.by ? ` by ${bank.by}` : ''}</b>, </> : 'Bank figure from '}<b>{ago(bank.minutesOld)}</b> ({new Date(bank.at).toLocaleString('en-CA')}).{bank.stale ? ' That is old — get the live balance, or type the balance from the TD app, before you trust the total.' : ''}</>
             : 'No bank balance has been read yet, so the total above leaves the bank out.'}
         </p>
         {d.bankNewest && (
@@ -177,6 +183,12 @@ export default function Bankroll({ initial }) {
           <input type="date" value={dep.date} onChange={(e) => setDep((x) => ({ ...x, date: e.target.value }))} />
           <button className="btn" disabled={!!busy}>{busy === 'dep' ? 'Saving…' : 'Record deposit'}</button>
         </form>
+        <form onSubmit={saveBank} style={{ marginTop: 10, display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <span className="hint" style={{ margin: 0 }}>Bank feed down? Type what the TD app shows:</span>
+          <input type="number" step="0.01" value={typedBank} onChange={(e) => setTypedBank(e.target.value)} placeholder="$ in the bank" required style={{ width: 140 }} />
+          <button className="btn" disabled={!!busy}>{busy === 'bankbal' ? 'Saving…' : 'Save bank balance'}</button>
+        </form>
+        <p className="hint" style={{ margin: '4px 0 0', fontSize: 12 }}>It stands in for the bank figure until the feed reads again. Anything you already moved that the app does not show yet stays under &quot;on its way&quot;.</p>
         {(d.owed.count > 0 || d.waitingForBank > 0) && (
           <p className="hint" style={{ margin: '10px 0 0' }}>
             {d.owed.count > 0 && <>Owed back to people: <b>{cad(d.owed.amount)}</b> ({d.owed.count} receipt{d.owed.count === 1 ? '' : 's'}). </>}

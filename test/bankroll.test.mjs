@@ -4,7 +4,7 @@ import { withTestDb } from './db.mjs';
 import { query } from '../lib/db.js';
 import { upsertExpense, suggestExpenseRules } from '../lib/finance.js';
 import { setSetting } from '../lib/settings.js';
-import { bankFigure, bankroll, looksCleared, addEntry, clearEntry, voidEntry, bankrollSummary, cashOnHand } from '../lib/bankroll.js';
+import { chooseBank, bankFigure, bankroll, looksCleared, addEntry, clearEntry, voidEntry, bankrollSummary, cashOnHand } from '../lib/bankroll.js';
 
 const acct = (over) => ({ name: 'TD BUSINESS UNLIMITED', mask: '4676', type: 'depository', current: 100, available: 45, ...over });
 
@@ -98,4 +98,29 @@ test('PATTERNS NEVER GROUP LINES BY THE BANK AND ACCOUNT NAME THEY ALL SHARE', a
     assert(!s.some((g) => ['trust', 'td', 'business', 'unlimited', 'account'].includes(g.token)), 'no shared-bank-name pattern: ' + JSON.stringify(s.map((g) => g.token)));
     equal(s.length, 0, 'four unrelated lines are not a pattern');
   } finally { done(); }
+});
+
+test('A TYPED BANK BALANCE STANDS IN WHEN THE FEED IS OLD, AND THE FEED WINS AGAIN WHEN IT READS', async () => {
+  const { done } = await withTestDb();
+  try {
+    await setSetting('bank_balance_snapshot', { at: new Date(Date.now() - 5 * 3600000).toISOString(), accounts: [acct()] });
+    await addEntry({ date: '2026-11-18', kind: 'count', amount: 1210, by: 'a' });
+    let s = await bankrollSummary('2026-11-18');
+    equal(s.bank, 45); assert(s.bankInfo.stale && s.bankInfo.source === 'bank');
+    await addEntry({ date: '2026-11-18', kind: 'bank', amount: 3647.68, note: 'typed', by: 'sai' });
+    s = await bankrollSummary('2026-11-18');
+    equal(s.bank, 3647.68); equal(s.total, 4857.68);
+    assert(s.bankInfo.source === 'typed' && s.bankInfo.by === 'sai' && !s.bankInfo.stale, 'says it was typed, by whom');
+    await addEntry({ date: '2026-11-18', kind: 'bank', amount: -20, by: 'sai' }); // overdrawn is a real balance
+    equal((await bankrollSummary('2026-11-18')).bank, -20);
+    await setSetting('bank_balance_snapshot', { at: new Date(Date.now() + 60000).toISOString(), accounts: [acct()] });
+    s = await bankrollSummary('2026-11-18');
+    equal(s.bank, 45); assert(s.bankInfo.source === 'bank', 'a newer feed reading wins over a typed figure');
+  } finally { done(); }
+});
+
+test('chooseBank KEEPS THE FEED WITH NOTHING TYPED', () => {
+  const f = bankFigure({ at: new Date().toISOString(), accounts: [acct()] });
+  equal(chooseBank(f, null).available, 45);
+  equal(chooseBank(bankFigure(null), { amount: 10, at: new Date().toISOString() }).available, 10);
 });

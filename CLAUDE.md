@@ -5057,6 +5057,7 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
 - **The bank figure carries its age** (`bank_balance_snapshot`, written by `liveBalances()`); older than `STALE_MINUTES` (120) it is shown as old.
   Cached `/accounts/get` has no timestamp and was $3,900 out when the real balance was $45. **Pull now / Get live balance** call
   `refreshFromBank()` (`/transactions/refresh`), sync, then `liveBalances()` (`/accounts/balance/get`, billed per call) and say what each did.
+- **If the bank feed is down, TYPE the balance** (`kind = 'bank'`, "Save bank balance" on the bankroll card, migration 0080). `chooseBank` uses the typed figure only while it is NEWER than the feed's last reading, so a working feed takes over again by itself; the card says "typed in by …". It is a balance as of when it was typed (the TD app's figure); money you already moved that the app doesn't show stays under "on its way".
 - **CASH is a count plus what moved since, never typed sales.** `cashOnHand` = last `count` entry + cash payments on invoices since (`invoice_payments`
   method `cash`, already in the system) + other cash entries − cash receipts (`expenses.source = 'cash'`). No count = UNKNOWN, not zero. "Since" is
   compared INSIDE the database against the count row (a JS Date round-trip lost microseconds and flipped the answer in tests).
