@@ -17,6 +17,6 @@ test('hours key: off with no env, refuses a wrong key, never lets another action
   process.env.HOURS_AGENT_KEY = KEY;
   const r = await POST(mk({ authorization: `Bearer ${KEY}` }, 'POST', { action: 'driver_rate', driverId: 1, rate: 99 }));
   equal(r.status, 400);
-  assert(/Only shift_create and shift_times/.test((await r.json()).error));
+  assert(/Only shift_create, staff_shift_create and shift_times/.test((await r.json()).error));
   delete process.env.HOURS_AGENT_KEY;
 });
