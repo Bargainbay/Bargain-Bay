@@ -4717,6 +4717,11 @@ not shown anywhere until the storefront slice.
   alongside the marketplace ones). The runner keys on the full filename so it works; pick the next
   free number when adding one.
 - **The screens (slice 4).** Vendor portal at `/vendor` (home with standing + strike meter + balances,
+- **The DAILY report waits for the clocks (owner, 2026-11-17: "otherwise these reports are BS").** `/api/cron/daily-report` now fires at :01/:15/:30/:45 from 01:00-05:59 UTC
+  and `sendDailyReportWhenReady` (lib/pnl-email.js) decides in Toronto time: from 9pm it sends the first time nobody is clocked in (`staff_shifts` AND `driver_shifts`
+  both checked); if anyone is STILL clocked in at midnight it sends at 12:01am for the day just ended, costing each open shift as ending at midnight (`asOf` on
+  `dailyPnl` / `profitReport` / `staffLabourByDay`; nothing is written to the shift, it is costed properly when they clock out). Once per day, claimed in the
+  `daily_report_sent` setting. The WEEKLY report is unchanged (still Monday 02:00 UTC, no wait).
   listings and the listing editor with photo upload, payouts with the bank form, performance with the
   rules); public application at `/marketplace/sell`; staff/admin at `/admin/marketplace` (Applications,
   Listings to review, Vendors; and for admins only Bank accounts, Payouts, Strike review — those tabs'
