@@ -21,7 +21,7 @@ import { hasDb } from '../../../../lib/db';
 import { getSetting, setSetting } from '../../../../lib/settings';
 import { addReturnToBase, saveBases, listBases, driversOut } from '../../../../lib/return-to-base';
 import {
-  createJob, assignJob, resequence, setJobStatus, cancelJob,
+  createJob, assignJob, resequence, setJobStatus, undoOnTheWay, cancelJob,
   upsertClient, importReadyBargainBayOrders, importOneBargainBayOrder, dispatchBoard,
   jobInvoiceForPayment, noteJobEvent,
   setTicketStatus, listTickets, reopenJob, updateJob, recordPartialDelivery,
@@ -649,6 +649,12 @@ export async function PATCH(req) {
     if (!jobId) return NextResponse.json({ error: 'jobId is required.' }, { status: 400 });
     if (body.action === 'assign') {
       return NextResponse.json({ ok: true, job: await assignJob(jobId, body, who(s)) });
+    }
+    // "On the way" pressed on the wrong stop: back to Scheduled, start time cleared.
+    if (body.action === 'undo_start') {
+      const job = await undoOnTheWay(jobId, who(s));
+      if (!job) return NextResponse.json({ error: 'That stop is not on the way.' }, { status: 409 });
+      return NextResponse.json({ ok: true, job });
     }
     if (body.action === 'status') {
       const job = await setJobStatus(jobId, body.status, body, who(s));

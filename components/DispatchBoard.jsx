@@ -476,7 +476,7 @@ function savePod(job) {
 // The stop being dragged, shared between cards (drag events carry no React state).
 let draggedStop = null;
 
-function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDone, onRecord, onReopen, onPartial, onEdit, onMove, onReorder, onTimes, onCharge, onPay, onNotesChanged, seat, helpingFor }) {
+function JobCard({ job, drivers, busy, onAssign, onStatus, onUndoStart, onCancel, onServiceDone, onRecord, onReopen, onPartial, onEdit, onMove, onReorder, onTimes, onCharge, onPay, onNotesChanged, seat, helpingFor }) {
   const [dropAt, setDropAt] = useState(null); // 'before' | 'after' while a stop is dragged over this card
   const [open, setOpen] = useState(false);
   const [collecting, setCollecting] = useState(false);
@@ -762,6 +762,10 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onCancel, onServiceDo
                 <button type="button" className="btn" disabled={busy}
                   onClick={() => onStatus(job.id, 'on_the_way')}>Start</button>
               )}
+              {job.status === 'on_the_way' && (
+                <button type="button" className="btn" disabled={busy}
+                  onClick={() => onUndoStart(job.id)}>Back to scheduled</button>
+              )}
               <button type="button" className="btn" disabled={busy} onClick={() => onServiceDone(job)}>
                 {job.type === 'service_call' ? 'Close out visit' : 'Close out'}
               </button>
@@ -901,6 +905,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
   const onAssign = (jobId, patch) => send('PATCH', { action: 'assign', jobId, jobDate: board.date, ...patch });
 
   const onReopen = (jobId) => send('PATCH', { action: 'reopen', jobId });
+  const onUndoStart = (jobId) => send('PATCH', { action: 'undo_start', jobId });
   const onPartial = (jobId, patch) => send('PATCH', { action: 'partial_delivery', jobId, ...patch });
 
   // Moving a stop up or down its driver's run. The whole run is sent back in its
@@ -1486,7 +1491,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
           {unassignedToday.map((j) => (
             <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
               onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-              onRecord={onRecord} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onTimes={onTimes}
+              onRecord={onRecord} onUndoStart={onUndoStart} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onTimes={onTimes}
               onCharge={canManageClients ? onCharge : null} onPay={onPay} onNotesChanged={() => refresh()} />
           ))}
           {board.unscheduled.length > 0 && (
@@ -1495,7 +1500,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
               {board.unscheduled.map((j) => (
                 <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                   onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                  onRecord={onRecord} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onTimes={onTimes}
+                  onRecord={onRecord} onUndoStart={onUndoStart} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onTimes={onTimes}
               onCharge={canManageClients ? onCharge : null} onPay={onPay} onNotesChanged={() => refresh()} />
               ))}
             </>
@@ -1533,7 +1538,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
                 return (
                   <JobCard key={j.id} job={j} drivers={board.drivers} busy={busy}
                     onAssign={onAssign} onStatus={onStatus} onCancel={onCancel} onServiceDone={setClosing}
-                    onRecord={onRecord} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onMove={onMove} onReorder={onReorder} onTimes={onTimes}
+                    onRecord={onRecord} onUndoStart={onUndoStart} onReopen={onReopen} onPartial={onPartial} onEdit={setEditing} onMove={onMove} onReorder={onReorder} onTimes={onTimes}
                     onCharge={canManageClients ? onCharge : null} onPay={onPay} onNotesChanged={() => refresh()}
                     helpingFor={j.driver2Id === d.id ? j.driverName : null}
                     seat={k >= 0 ? { n: k + 1, first: k === 0, last: k === own.length - 1 } : null} />
