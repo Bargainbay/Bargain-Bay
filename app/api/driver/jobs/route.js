@@ -8,7 +8,7 @@ import {
   jobPhotosWithRef, saveJobSignature, addJobPhoto, markOrderDeliveredForJob
 } from '../../../../lib/driver-jobs';
 import {
-  setJobStatus, completeJob, markReviewAsked
+  setJobStatus, undoOnTheWay, completeJob, markReviewAsked
 } from '../../../../lib/jobs';
 import { getSetting } from '../../../../lib/settings';
 import { recordDoorCollection } from '../../../../lib/door-money';
@@ -78,6 +78,10 @@ export async function PATCH(req) {
         jobId, kind: body.kind === 'extra' ? 'extra' : 'note', body: body.body, by: who(s), role: 'driver'
       });
       return NextResponse.json({ ok: true, note });
+    }
+    if (body.action === 'undo_start') {
+      const job = await undoOnTheWay(jobId, who(s));
+      return NextResponse.json({ ok: true, job, unchanged: !job });
     }
     if (body.action === 'status') {
       const { rows } = await query('SELECT status FROM jobs WHERE id = $1', [jobId]);
