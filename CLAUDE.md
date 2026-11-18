@@ -5590,6 +5590,14 @@ function the admin screen calls, and `TOOL_TIER` decides when it runs.
   move money out, never change who has access, never delete). Merging duplicates is on the screen; `duplicate_customers` only lists them.
 - **Not built, as no function exists to wrap:** a driver-on-the-way text, reviewing proof-of-delivery photos, forgotten clock-outs, expense sorting rules.
 
+## Everybody's hours on the Payroll tab, drivers included (added 2026-11-17)
+`lib/hours.js`, `components/HoursPanel.jsx` (top of the Payroll page, under the totals table), `GET /api/admin/hours?range=today|yesterday|this_week|last_week|two_weeks_ago|this_month|last_month` (or `from`/`to`; ADMIN),
+`test/hours.test.mjs`. Reads BOTH clocks (`staff_shifts` and `driver_shifts`) in one shape: who is clocked in now, every shift with in/out times, per-person totals.
+- Same rules as the Daily P&L / Profit tab: an open shift or one over `MAX_SHIFT_HOURS` is LISTED, never added into hours or money, and named in a warning. Staff cost = the rate on the shift; driver cost = `users.hourly_rate`; `paid_as_owner` is hours only. A day is the Toronto day the shift STARTED; weeks run Monday-Sunday.
+- **NOT yet in the owed/paid totals above it**: `payroll-week.js` (`syncOwedFromClock`) still reads `staff_shifts` only, so a driver's shift hours appear in this panel but do not post to "We owe". Drivers are paid per stop on dispatch (`pay_amount`); wiring their clock hours into owed is a decision, not a fix.
+- Someone on BOTH clocks (an employee row and a driver account with the same email) is warned about: their hours count twice.
+- **Riders can add fuel** (owner, 2026-11-16: the assistant often pays and the driver forgets). `DriverShift` shows "Add fuel" to a rider; `/api/driver/fuel` files it against the van of the driver they ride with (that driver's open shift) and neither asks for nor stores an odometer reading from a rider.
+
 ## Sign-up chooses the account type, and records who referred you (added 2026-11-06)
 `app/signup/SignupForm.jsx` (`ACCOUNT_TYPES`), `app/api/auth/signup/route.js`, migration `0051_signup_type_referral` (**run Run schema migration after deploy**).
 Customer / Member-Reseller / Affiliate / Marketplace seller, each with a one-line description. Member and reseller are the same programme here.
