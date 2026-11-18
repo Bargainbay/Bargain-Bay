@@ -365,3 +365,21 @@ test('the Manager can undo ITS OWN payment on a paid invoice (back to part paid,
     if (o.id) equal((await client.query('SELECT status FROM orders WHERE id = $1', [o.id])).rows[0].status, 'pending_payment');
   });
 });
+
+import { logAction } from '../lib/manager-actions.js';
+test('INV-1410 as it really is: the closing payment has NO note, and is still recognised as the Manager\'s from its action log', async () => {
+  await withDb(async (client) => {
+    const { rows: [inv] } = await client.query(`INSERT INTO invoices (number, email, name, total, status, channel) VALUES ('INV-T2','j@example.com','Joyce Zhu',550,'paid','manual') RETURNING id`);
+    const { rows: [staff] } = await client.query(`INSERT INTO invoice_payments (invoice_id, amount, method, note) VALUES ($1,275,'E-transfer','deposit') RETURNING id`, [inv.id]);
+    const { rows: [closing] } = await client.query(`INSERT INTO invoice_payments (invoice_id, amount, method) VALUES ($1,275,'E-transfer') RETURNING id`, [inv.id]);
+    let refused = '';
+    try { await voidInvoicePayment(inv.id, closing.id); } catch (e) { refused = e.message; }
+    assert(/locked/.test(refused), 'with no record of the Manager doing it, it is staff money and stays locked');
+    await logAction({ kind: 'payment_marked', via: 'auto', summary: 'marked INV-T2 paid', detail: { number: 'INV-T2', amount: 275 } });
+    let staffTry = '';
+    try { await voidInvoicePayment(inv.id, staff.id); } catch (e) { staffTry = e.message; }
+    assert(/locked/.test(staffTry), 'the staff deposit is never undone, even with the log entry');
+    const r = await voidInvoicePayment(inv.id, closing.id);
+    equal(r.status, 'partial'); equal(r.balance, 275);
+  });
+});
