@@ -5576,6 +5576,9 @@ Four fixed channels, each with **Chat** (running conversation) and **Posts** (ti
 - **Updates by polling (5s) while the page is open. No push, SMS or email** — a phone cannot be reached in the background by a web page (same OS limit as live tracking).
   Not built: photos/attachments, @mentions, direct messages, notifications.
 - `/team` is in `proxy.js`'s allow-list so drivers (signed in on the dispatch host) can open it.
+- **Drivers get the board INSIDE the driver app** at `/driver/team` (`app/driver/team/page.jsx`, same `TeamChat`), because the installed app's manifest scope and
+  service worker only cover `/driver`; `/team` would open in a browser overlay. The stop list's "💬 Team" button (`components/DriverTeamLink.jsx`) carries the unread count,
+  and `/team` redirects a driver-only login to `/driver/team`. No offline board: it needs a signal (the stop list itself still works without one).
 
 ### Manager batch 2 — 46 more tools (added 2026-11-17)
 `lib/manager-tools-b.js` (listed beside the first batch by `lib/manager-tools.js`; **it must not import that file**), tiers and hats in

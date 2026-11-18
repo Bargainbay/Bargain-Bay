@@ -1,4 +1,5 @@
 'use client';
+import DriverTeamLink from './DriverTeamLink';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { queueOrSend, flush, queueState, newRef } from '../lib/driver-outbox';
 import { cashAtTheDoor } from '../lib/cash-at-the-door';
@@ -274,7 +275,7 @@ export default function DriverStops({ initial, driverName }) {
             {date ? new Date(`${date}T12:00:00`).toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' }) : ''}
           </div>
         </div>
-        <a href="/team" className="drv-btn" style={{ alignSelf: 'center' }}>💬 Team</a>
+        <DriverTeamLink />
         <div className="drv-left">
           {viewingToday ? `${left.length} to go` : `${stops.length} stop${stops.length === 1 ? '' : 's'}`}
           {viewingToday && owed > 0 && <div className="drv-owed">${owed.toFixed(2)} to collect</div>}
