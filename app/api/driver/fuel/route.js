@@ -52,13 +52,21 @@ export async function POST(req) {
   // already told us this morning, and asking twice is how the field ends up
   // blank and the mileage unusable.
   const shift = await openShift(s.userId);
-  const vehicleId = Number(form.get('vehicleId')) || shift?.vehicleId || null;
+  // A person riding along has no van of their own: the fill belongs to the van
+  // of the driver they ride with (their open shift), so the Profit tab and the
+  // mileage figure see it against the right truck.
+  let ridingVan = null;
+  if (shift && shift.driving === false && shift.ridingWith) {
+    const lead = await openShift(shift.ridingWith);
+    ridingVan = lead?.vehicleId || null;
+  }
+  const vehicleId = Number(form.get('vehicleId')) || shift?.vehicleId || ridingVan || null;
 
   // The reading at the pump is the other place a van's odometer gets recorded,
   // so it gets the same guard as the shift's. A fill is where a driver in the
   // wrong truck is most likely to be caught: they are standing still, looking
   // at the dash, and the number is fresh.
-  if (vehicleId && num('odometer')) {
+  if (vehicleId && num('odometer') && shift?.driving !== false) {
     try {
       await assertOdometer(vehicleId, Math.round(num('odometer')), { vehicleName: shift?.vehicleName });
     } catch (e) {
@@ -89,7 +97,7 @@ export async function POST(req) {
      RETURNING id, expense_date, amount, litres, odometer_km`,
     [date, round2(amount), s.userId, String(form.get('note') || '').trim().slice(0, 300) || null,
      s.email || null, s.name || null,
-     num('litres'), num('odometer') ? Math.round(num('odometer')) : null,
+     num('litres'), num('odometer') && shift?.driving !== false ? Math.round(num('odometer')) : null,
      vehicleId, shift?.id || null, receipt.pathname, receipt.url, ref || null]
   );
   return NextResponse.json({ ok: true, fuel: rows[0], receiptSaved: !!receipt.pathname });

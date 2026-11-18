@@ -9,6 +9,7 @@ import AdminNav from '../../../components/AdminNav';
 import PayrollHub from '../../../components/PayrollHub';
 import TeamClockAdmin from '../../../components/TeamClockAdmin';
 import PayrollManager from '../../../components/PayrollManager';
+import HoursPanel from '../../../components/HoursPanel';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Payroll — Bargain Bay' };
@@ -41,6 +42,9 @@ export default async function PayrollPage({ searchParams }) {
       {error || !hours ? <div className="error-box">{error || 'No data.'}</div> : (
         <>
           <PayrollHub initial={{ hours, pay: JSON.parse(JSON.stringify(pay)) }} today={today} />
+          <div style={{ marginTop: 18 }}>
+            <HoursPanel />
+          </div>
           <div style={{ marginTop: 18 }}>
             <TeamClockAdmin employees={employees} shifts={JSON.parse(JSON.stringify(shifts))} from={from} to={to} />
           </div>

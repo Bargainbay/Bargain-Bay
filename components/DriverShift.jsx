@@ -184,13 +184,13 @@ export default function DriverShift({ onChanged }) {
             </span>
           </div>
           <div className="drv-row">
-            {/* Only the person driving buys the fuel. A passenger tapping this
-                would file a fill against a van they aren't responsible for. */}
-            {shift.driving !== false && (
-              <button type="button" className="drv-btn" onClick={() => setForm(form === 'fuel' ? null : 'fuel')}>
-                ⛽ Add fuel
-              </button>
-            )}
+            {/* Whoever is at the pump files the fill, driver or the person riding
+                along (owner, 2026-11-16: the assistant often pays and the driver
+                forgets). A rider has no odometer reading to give; the van comes
+                from the driver they ride with (see /api/driver/fuel). */}
+            <button type="button" className="drv-btn" onClick={() => setForm(form === 'fuel' ? null : 'fuel')}>
+              ⛽ Add fuel
+            </button>
             <button type="button" className="drv-btn bad" onClick={() => setForm(form === 'end' ? null : 'end')}>
               ■ End shift
             </button>
@@ -347,10 +347,12 @@ function FuelForm({ shift, onCancel, onSave }) {
         <input inputMode="decimal" value={litres} placeholder="on the pump display"
           onChange={(e) => setLitres(e.target.value)} />
       </label>
-      <label>Odometer
-        <input inputMode="numeric" value={odometer} placeholder="e.g. 148310"
-          onChange={(e) => setOdometer(e.target.value.replace(/\D+/g, ''))} />
-      </label>
+      {shift?.driving !== false && (
+        <label>Odometer
+          <input inputMode="numeric" value={odometer} placeholder="e.g. 148310"
+            onChange={(e) => setOdometer(e.target.value.replace(/\D+/g, ''))} />
+        </label>
+      )}
       {/* No `capture` — on iOS that makes the input camera-ONLY, so a driver who
           already photographed the receipt can't attach it. See CLAUDE.md. */}
       <label>Receipt
