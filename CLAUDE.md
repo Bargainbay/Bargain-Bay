@@ -4721,7 +4721,7 @@ not shown anywhere until the storefront slice.
   and `sendDailyReportWhenReady` (lib/pnl-email.js) decides in Toronto time: from 9pm it sends the first time nobody is clocked in (`staff_shifts` AND `driver_shifts`
   both checked); if anyone is STILL clocked in at midnight it sends at 12:01am for the day just ended, costing each open shift as ending at midnight (`asOf` on
   `dailyPnl` / `profitReport` / `staffLabourByDay`; nothing is written to the shift, it is costed properly when they clock out). Once per day, claimed in the
-  `daily_report_sent` setting. The WEEKLY report is unchanged (still Monday 02:00 UTC, no wait).
+  `daily_report_sent` setting. **Weekly, monthly and quarterly reports (2026-11-17, owner: "do the same")** use the same wait/force rule through `sendReportWhenReady({ kind })`: the same cron schedule runs every night and each skips unless `reportDay` is the last day of its period (Sunday / month end / Mar-Jun-Sep-Dec end), once per period via `<kind>_report_sent`. Routes `/api/cron/{weekly,monthly,quarterly}-report`, all in `EXPECTED`. Monthly and quarterly tables fold days into Monday-Sunday weeks.
   listings and the listing editor with photo upload, payouts with the bank form, performance with the
   rules); public application at `/marketplace/sell`; staff/admin at `/admin/marketplace` (Applications,
   Listings to review, Vendors; and for admins only Bank accounts, Payouts, Strike review — those tabs'

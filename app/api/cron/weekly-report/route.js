@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cronAuthorized } from '../../../../lib/cron-auth';
 import { withHeartbeat } from '../../../../lib/heartbeat';
-import { sendPnlReport } from '../../../../lib/pnl-email';
+import { sendReportWhenReady } from '../../../../lib/pnl-email';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -11,8 +11,8 @@ async function run(req) {
   if (!cronAuthorized(req)) return NextResponse.json({ error: 'Not authorized' }, { status: 401 });
   try {
     const dry = new URL(req.url).searchParams.get('dry') === '1';
-    const r = await sendPnlReport({ kind: 'weekly', send: !dry });
-    if (r.sent && r.sent.ok === false && !r.sent.skipped) return NextResponse.json({ ok: false, ...r }, { status: 502 });
+    const r = await sendReportWhenReady({ kind: 'weekly', send: !dry, force: dry });
+    if (r.action === 'send' && r.sent && r.sent.ok === false && !r.sent.skipped) return NextResponse.json({ ok: false, ...r }, { status: 502 });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     console.error('weekly-report failed', e);

@@ -98,7 +98,15 @@
     },
     {
       "path": "/api/cron/weekly-report",
-      "schedule": "0 2 * * 1"
+      "schedule": "1,15,30,45 1-5 * * *"
+    },
+    {
+      "path": "/api/cron/monthly-report",
+      "schedule": "1,15,30,45 1-5 * * *"
+    },
+    {
+      "path": "/api/cron/quarterly-report",
+      "schedule": "1,15,30,45 1-5 * * *"
     },
     {
       "path": "/api/cron/manager-call",
