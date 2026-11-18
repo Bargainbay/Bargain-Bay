@@ -675,9 +675,17 @@ export async function PATCH(req) {
     // it gets logged tomorrow from a note in someone's pocket.
     if (body.action === 'record_payment') {
       const target = await jobInvoiceForPayment(jobId);
-      const r = await recordInvoicePayment(target.invoiceId, {
-        amount: body.amount, method: String(body.method || '').trim(), note: body.note
-      });
+      const payMethod = String(body.method || '').trim();
+      const { withPaymentCheck, PaymentCheckError } = await import('../../../../lib/manager-payments');
+      let r;
+      try {
+        r = await withPaymentCheck(target.invoiceId, { method: payMethod, amount: body.amount, isAdmin: false, apply: () => recordInvoicePayment(target.invoiceId, {
+          amount: body.amount, method: payMethod, note: body.note
+        }) });
+      } catch (e) {
+        if (e instanceof PaymentCheckError) return NextResponse.json({ error: `${e.message} Nothing was recorded. The owner can record it on the invoice.` }, { status: 409 });
+        throw e;
+      }
       await noteJobEvent(
         jobId, 'payment',
         `${PAYMENT_METHODS[String(body.method || '').trim()] || 'Payment'} $${Number(body.amount).toFixed(2)} on ${target.invoiceNumber}`
