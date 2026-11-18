@@ -333,3 +333,35 @@ test('a same-amount payment from months ago, or a different amount, does not blo
   equal(matchPayment(p, inv, { recorded: [{ number: 'INV-1', amountCents: 27500, atMs: at - 40 * 86400_000 }] }).kind, 'exact');
   equal(matchPayment(p, inv, { recorded: [{ number: 'INV-1', amountCents: 10000, atMs: at }] }).kind, 'exact');
 });
+
+import { consumedByStaff } from '../lib/manager-payments.js';
+import { voidInvoicePayment } from '../lib/invoices.js';
+suite('manager team: a second payment needs a second e-transfer');
+test('one bank email is used up by one hand-entered payment; a second identical email is a genuine second payment', () => {
+  const t = Date.parse('2026-11-15T20:00:00Z');
+  const em = (id, plus = 0) => ({ id, p: { amountCents: 27500, name: 'Joyce Zhu', at: new Date(t + plus).toISOString() } });
+  const one = consumedByStaff([em('a')], new Set(), [{ number: 'INV-1410', amountCents: 27500, atMs: t }]);
+  equal([...one], ['a']);                                  // INV-1410: one email, one entry -> nothing left to apply
+  const two = consumedByStaff([em('a'), em('b', 3600_000)], new Set(), [{ number: 'INV-1410', amountCents: 27500, atMs: t }]);
+  equal([...two], ['a']);                                  // two emails, one entry -> the second email is free to apply
+  const none = consumedByStaff([em('a')], new Set(['a']), [{ number: 'INV-1410', amountCents: 27500, atMs: t }]);
+  equal([...none], []);                                    // an email the Manager already applied is never also "staff's"
+});
+test('the Manager can undo ITS OWN payment on a paid invoice (back to part paid, order back to pending); staff money stays locked', async () => {
+  await withDb(async (client) => {
+    const { rows: [inv] } = await client.query(
+      `INSERT INTO invoices (number, email, name, total, status, channel) VALUES ('INV-T1','j@example.com','Joyce Zhu',550,'paid','manual') RETURNING id`);
+    const { rows: [o] } = await client.query(`INSERT INTO orders (order_number, status, total, email, name) VALUES ('BB-T1','confirmed',550,'j@example.com','Joyce Zhu') RETURNING id`).catch(() => ({ rows: [{}] }));
+    if (o.id) await client.query('UPDATE invoices SET order_id = $2 WHERE id = $1', [inv.id, o.id]);
+    const { rows: [staff] } = await client.query(`INSERT INTO invoice_payments (invoice_id, amount, method, note) VALUES ($1,275,'E-transfer','deposit') RETURNING id`, [inv.id]);
+    const { rows: [mgr] } = await client.query(`INSERT INTO invoice_payments (invoice_id, amount, method, note) VALUES ($1,275,'E-transfer','e-Transfer from Joyce Zhu, verified by the Manager from the bank''s email') RETURNING id`, [inv.id]);
+    let refused = '';
+    try { await voidInvoicePayment(inv.id, staff.id); } catch (e) { refused = e.message; }
+    assert(/locked/.test(refused), `a staff payment on a paid invoice stays locked: ${refused}`);
+    const r = await voidInvoicePayment(inv.id, mgr.id);
+    equal(r.status, 'partial'); equal(r.balance, 275); equal(r.amountPaid, 275);
+    const { rows: [after] } = await client.query('SELECT status, paid_at FROM invoices WHERE id = $1', [inv.id]);
+    equal(after.status, 'partial'); equal(after.paid_at, null);
+    if (o.id) equal((await client.query('SELECT status FROM orders WHERE id = $1', [o.id])).rows[0].status, 'pending_payment');
+  });
+});
