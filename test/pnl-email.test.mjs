@@ -1,5 +1,5 @@
 import { suite, test, assert, equal } from './_harness.mjs';
-import { thisWeek, renderReport, netBeforeOverhead, dailyReportDecision, torontoMidnightIso } from '../lib/pnl-email.js';
+import { thisWeek, renderReport, netBeforeOverhead, dailyReportDecision, torontoMidnightIso, isPeriodEnd, periodRange, groupWeeks } from '../lib/pnl-email.js';
 
 suite('lib/pnl-email — the daily and weekly P&L emails');
 
@@ -50,4 +50,23 @@ test('the daily report waits for everyone to clock out, then forces at 12:01am',
   equal(D(14, 0, 0).action, 'skip');
   equal(torontoMidnightIso('2026-11-18'), '2026-11-18T05:00:00.000Z');
   equal(torontoMidnightIso('2026-07-02'), '2026-07-02T04:00:00.000Z');
+});
+
+test('weekly, monthly and quarterly reports only go on the last day of their period', () => {
+  equal(isPeriodEnd('weekly', '2026-11-22'), true);   // Sunday
+  equal(isPeriodEnd('weekly', '2026-11-21'), false);
+  equal(isPeriodEnd('monthly', '2026-02-28'), true);
+  equal(isPeriodEnd('monthly', '2026-11-29'), false);
+  equal(isPeriodEnd('quarterly', '2026-09-30'), true);
+  equal(isPeriodEnd('quarterly', '2026-10-31'), false);
+  equal(periodRange('monthly', '2026-11-30'), { from: '2026-11-01', to: '2026-11-30' });
+  equal(periodRange('quarterly', '2026-12-31'), { from: '2026-10-01', to: '2026-12-31' });
+  equal(dailyReportDecision({ now: { date: '2026-11-18', hour: 0, minute: 5 }, open: 1, alreadySent: null, kind: 'monthly' }).action, 'skip');
+  equal(dailyReportDecision({ now: { date: '2026-12-01', hour: 0, minute: 5 }, open: 1, alreadySent: null, kind: 'monthly' }),
+    { action: 'send', reportDay: '2026-11-30', forced: true });
+});
+
+test('a long report folds its days into Monday-to-Sunday weeks that add up', () => {
+  const g = groupWeeks([{ day: '2026-11-02', net: 10 }, { day: '2026-11-08', net: 5 }, { day: '2026-11-09', net: 1 }]);
+  equal(g.length, 2); equal(g[0].net, 15); equal(g[1].net, 1);
 });
