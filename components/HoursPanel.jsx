@@ -24,6 +24,11 @@ export default function HoursPanel() {
   // Correcting a shift happens HERE, for both clocks (owner, 2026-11-19: nothing is fixed on Team clock).
   const [fix, setFix] = useState(null);
   const [saving, setSaving] = useState(false);
+  // A shift that is still open is not counted in the totals (it cannot be costed yet), but the
+  // time so far is worth seeing, so it is shown beside them and ticks every 30 seconds.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
+  const soFar = (s) => (s && !s.end && s.start ? Math.max(0, (now - new Date(s.start).getTime()) / 3600000) : 0);
 
   const load = useCallback(async (r) => {
     setErr('');
@@ -76,7 +81,7 @@ export default function HoursPanel() {
         {inNow.length === 0
           ? <span className="hint"> — nobody is clocked in.</span>
           : <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{inNow.map((s) => (
-              <li key={`${s.source}-${s.id}`}>{s.person} — in since {tm(s.start)}{s.role ? ` (${s.role})` : ''}</li>))}</ul>}
+              <li key={`${s.source}-${s.id}`}>{s.person} — in since {tm(s.start)} · {hm(soFar(s))} so far{s.role ? ` (${s.role})` : ''}</li>))}</ul>}
         {todayDone.length > 0 && (
           <div className="hint" style={{ marginTop: 6 }}>
             Already out today: {todayDone.map((s) => `${s.person} ${tm(s.start)}–${tm(s.end)}`).join(' · ')}
@@ -105,7 +110,10 @@ export default function HoursPanel() {
               <tr key={p.email || p.person}>
                 <td style={{ fontWeight: 600 }}>{p.person}</td>
                 <td style={{ textAlign: 'right' }}>{p.daysWorked}</td>
-                <td style={{ textAlign: 'right' }}>{hm(p.hours)}</td>
+                <td style={{ textAlign: 'right' }}>
+                  {hm(p.hours)}
+                  {(() => { const open = data.shifts.filter((x) => !x.end && (x.email || x.person) === (p.email || p.person)).reduce((a, x) => a + soFar(x), 0); return open > 0 ? <span className="hint"> + {hm(open)} so far</span> : null; })()}
+                </td>
                 <td style={{ textAlign: 'right' }}>{p.ownerHours && p.ownerHours === p.hours ? 'owner' : money(p.cost)}</td>
               </tr>
             ))}
@@ -121,7 +129,7 @@ export default function HoursPanel() {
                 <tr key={`${s.source}-${s.id}`}>
                   <td>{s.day}</td><td>{s.person}</td><td>{tm(s.start)}</td>
                   <td>{s.end ? tm(s.end) : <b>still in</b>}</td>
-                  <td style={{ textAlign: 'right' }}>{s.hours == null ? '—' : hm(s.hours)}</td>
+                  <td style={{ textAlign: 'right' }}>{s.end ? (s.hours == null ? '—' : hm(s.hours)) : <span title="Not counted in the totals until they clock out">{hm(soFar(s))} so far</span>}</td>
                   <td style={{ textAlign: 'right' }}>{s.rate > 0 ? `$${Number(s.rate).toFixed(2)}` : '—'}</td>
                   <td className="hint">{[NOTE[s.status], s.edited && 'edited by office'].filter(Boolean).join(' · ')}</td>
                   <td><button type="button" className="dash-filter" onClick={() => setFix({ source: s.source, id: s.id, who: s.person, day: s.day, start: hhmm(s.start), end: hhmm(s.end), still: !s.end })}>Fix times</button></td>
