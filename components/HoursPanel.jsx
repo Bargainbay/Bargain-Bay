@@ -3,7 +3,7 @@
 // shift (in, out, hours, pay) for today / yesterday / this week / last week /
 // this month / last month. Reads /api/admin/hours, which reads BOTH clocks
 // (the staff clock and the driver shifts) -- see lib/hours.js.
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { money } from '../lib/constants';
 
 const RANGES = [
@@ -23,6 +23,11 @@ export default function HoursPanel() {
   const [err, setErr] = useState('');
   // Correcting a shift happens HERE, for both clocks (owner, 2026-11-19: nothing is fixed on Team clock).
   const [fix, setFix] = useState(null);
+  // Filters for the shift list: a custom date range (any From/To) and one person.
+  const [custom, setCustom] = useState({ from: '', to: '' });
+  const [who, setWho] = useState('');
+  const customRef = useRef(custom);
+  customRef.current = custom;
   const [saving, setSaving] = useState(false);
   // A shift that is still open is not counted in the totals (it cannot be costed yet), but the
   // time so far is worth seeing, so it is shown beside them and ticks every 30 seconds.
@@ -33,7 +38,10 @@ export default function HoursPanel() {
   const load = useCallback(async (r) => {
     setErr('');
     try {
-      const res = await fetch(`/api/admin/hours?range=${r}`);
+      const c = customRef.current;
+      const res = await fetch(r === 'custom' && c.from && c.to
+        ? `/api/admin/hours?range=from&from=${c.from}&to=${c.to}`
+        : `/api/admin/hours?range=${r === 'custom' ? 'this_week' : r}`);
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not load hours');
       setData(d);
@@ -46,7 +54,7 @@ export default function HoursPanel() {
       if (res.ok) setLive(await res.json());
     } catch { /* the panel just stays as it was */ }
   }, []);
-  useEffect(() => { load(range); }, [range, load]);
+  useEffect(() => { if (range !== 'custom') load(range); }, [range, load]);
   useEffect(() => { loadLive(); const t = setInterval(loadLive, 60000); return () => clearInterval(t); }, [loadLive]);
 
   async function saveFix() {
@@ -67,6 +75,19 @@ export default function HoursPanel() {
       await Promise.all([load(range), loadLive()]);
     } catch (e) { setErr(e.message); } finally { setSaving(false); }
   }
+
+  const FilterBar = () => (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', margin: '6px 0 10px' }}>
+      {RANGES.map(([k, label]) => (
+        <button key={k} type="button" className={`dash-filter${range === k ? ' active' : ''}`} onClick={() => setRange(k)}>{label}</button>
+      ))}
+      <span className="hint" style={{ margin: '0 2px 0 8px' }}>or dates</span>
+      <input type="date" value={custom.from} onChange={(e) => setCustom({ ...custom, from: e.target.value })} aria-label="From" />
+      <input type="date" value={custom.to} onChange={(e) => setCustom({ ...custom, to: e.target.value })} aria-label="To" />
+      <button type="button" className={`dash-filter${range === 'custom' ? ' active' : ''}`} disabled={!custom.from || !custom.to || custom.to < custom.from}
+        onClick={() => { setRange('custom'); load('custom'); }}>Show</button>
+    </div>
+  );
 
   const inNow = (live?.shifts || []).filter((s) => s.status === 'open');
   const todayDone = (live?.shifts || []).filter((s) => s.status !== 'open');
@@ -89,11 +110,7 @@ export default function HoursPanel() {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-        {RANGES.map(([k, label]) => (
-          <button key={k} type="button" className={`dash-filter${range === k ? ' active' : ''}`} onClick={() => setRange(k)}>{label}</button>
-        ))}
-      </div>
+      {FilterBar()}
 
       {!data ? <p className="hint">Loading…</p> : (<>
         {data.warnings.map((w) => <div key={w} className="error-box" style={{ marginBottom: 8 }}>{w}</div>)}
@@ -121,11 +138,18 @@ export default function HoursPanel() {
         </table></div>
 
         <details open style={{ marginTop: 12 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Every shift ({data.shifts.length})</summary>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Every shift ({data.shifts.filter((x) => !who || (x.email || x.person) === who).length})</summary>
+          {FilterBar()}
+          <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', margin: '0 0 6px' }}>Person
+            <select value={who} onChange={(e) => setWho(e.target.value)}>
+              <option value="">Everyone</option>
+              {data.people.map((p) => <option key={p.email || p.person} value={p.email || p.person}>{p.person}</option>)}
+            </select>
+          </label>
           <div className="table-wrap" style={{ marginTop: 6 }}><table className="admin">
             <thead><tr><th>Day</th><th>Who</th><th>In</th><th>Out</th><th style={{ textAlign: 'right' }}>Time</th><th style={{ textAlign: 'right' }}>Rate</th><th></th><th></th></tr></thead>
             <tbody>
-              {data.shifts.map((s) => (
+              {data.shifts.filter((x) => !who || (x.email || x.person) === who).map((s) => (
                 <tr key={`${s.source}-${s.id}`}>
                   <td>{s.day}</td><td>{s.person}</td><td>{tm(s.start)}</td>
                   <td>{s.end ? tm(s.end) : <b>still in</b>}</td>
