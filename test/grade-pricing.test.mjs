@@ -60,3 +60,9 @@ test('wrapping twice changes nothing, and a typed value is left alone', () => {
   equal(wrapGradeFormula('899', opts), null);
   equal(unwrapGradeFormula('=K12*M12', opts), null);
 });
+
+test('the sheet bump stays under the tracker ask cap on the under-$1000 tier', () => {
+  const w = wrapGradeFormula('=K12*M12', opts);
+  equal(w.includes('K12*Settings!$E$15'), true);
+  equal(unwrapGradeFormula(w, opts), '=K12*M12');
+});
