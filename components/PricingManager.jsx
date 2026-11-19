@@ -58,6 +58,7 @@ export default function PricingManager({ initial }) {
   const [busy, setBusy] = useState(false);
   const [rowBusy, setRowBusy] = useState('');
   const seq = useRef(0);
+  const rowCache = useRef(new Map()); // every row seen, so a pending edit can be resolved after the page changes
 
   const draft = Object.fromEntries(FIELDS.map((f) => [f.key, parse(f.key, text[f.key])]));
   const dirty = FIELDS.some((f) => draft[f.key] !== null && draft[f.key] !== saved[f.key]);
@@ -93,6 +94,48 @@ export default function PricingManager({ initial }) {
   }
 
   const setEdit = (sku, patch) => setEdits((e) => ({ ...e, [sku]: { ...e[sku], ...patch } }));
+  useEffect(() => { (preview?.rows || []).forEach((r) => rowCache.current.set(r.sku, r)); }, [preview]);
+
+  // Everything typed and not yet saved: what to send, and what could not be read.
+  const pendingAll = () => {
+    const items = []; const unreadable = [];
+    for (const [sku, ed] of Object.entries(edits)) {
+      const r = rowCache.current.get(sku);
+      if (!r) continue;
+      const it = { sku };
+      let bad = false;
+      if (ed.pub !== undefined && String(ed.pub).trim() !== '') {
+        const v = resolveTyped(ed.pub, r.public);
+        if (v === null) bad = true; else if (Math.round(v * 100) !== Math.round(r.public * 100)) it.publicPrice = v;
+      }
+      if (ed.member !== undefined && String(ed.member).trim() !== '') {
+        const v = resolveTyped(ed.member, r.memberNow);
+        if (v === null) bad = true; else if (Math.round(v * 100) !== Math.round(r.memberNow * 100)) it.member = v;
+      }
+      if (bad) unreadable.push(sku);
+      if ('publicPrice' in it || 'member' in it) items.push(it);
+    }
+    return { items, unreadable };
+  };
+  const pending = pendingAll();
+  useEffect(() => {
+    if (!pending.items.length) return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [pending.items.length]);
+
+  async function saveAll() {
+    if (!pending.items.length) return;
+    setBusy(true); setErr(''); setNotice('');
+    const { ok, d } = await post({ action: 'set_many', items: pending.items, ...view });
+    setBusy(false);
+    if (!ok) { setErr(d.error || 'Could not save.'); return; }
+    setPreview(d.preview);
+    setEdits((e) => { const n = { ...e }; (d.saved || []).forEach((sku) => delete n[sku]); return n; });
+    setNotice(`Saved ${d.saved.length} unit${d.saved.length === 1 ? '' : 's'}. The tracker and the website are updated.${d.failed.length ? ` ${d.failed.length} NOT saved: ${d.failed.map((f) => `${f.sku} (${f.error})`).join('; ')}` : ''}`);
+  }
+
   // Typing the percentage itself: 65 means 65% of retail. It fills the price box, so Save works as usual.
   const setPct = (r, kind, text) => {
     const clean = text.replace(/[^0-9.]/g, '');
@@ -355,6 +398,16 @@ export default function PricingManager({ initial }) {
           <button className="btn" disabled={busy} onClick={() => { if (confirm('Put all four rates back to the standard 55% / 90% / cost + 10% / $200?')) saveRates('reset_rates'); }}>Reset to standard</button>
         </div>
       </details>
+
+      {(pending.items.length > 0 || pending.unreadable.length > 0) && (
+        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 50, background: '#fff', borderTop: '2px solid var(--charcoal, #222)', boxShadow: '0 -4px 14px rgba(0,0,0,.12)', padding: '10px 16px', display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 14 }}><b>{pending.items.length}</b> unsaved price change{pending.items.length === 1 ? '' : 's'}
+            {pending.unreadable.length > 0 && <span style={{ color: RED }}> · {pending.unreadable.length} box{pending.unreadable.length === 1 ? '' : 'es'} I can't read ({pending.unreadable.slice(0, 3).join(', ')}{pending.unreadable.length > 3 ? '…' : ''})</span>}</span>
+          <button className="btn primary" type="button" disabled={busy || pending.items.length === 0} onClick={saveAll}>{busy ? 'Saving…' : `Save all ${pending.items.length} change${pending.items.length === 1 ? '' : 's'}`}</button>
+          <button className="btn" type="button" disabled={busy} onClick={() => setEdits({})}>Discard all</button>
+        </div>
+      )}
+      {pending.items.length > 0 && <div style={{ height: 64 }} />}
     </div>
   );
 }

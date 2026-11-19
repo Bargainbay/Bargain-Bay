@@ -250,6 +250,22 @@ export async function POST(req) {
       const next = await getMemberRates();
       return NextResponse.json({ ok: true, done: r.done, preview: await previewFor(next.rates, next.overrides, previewOpts(body)) });
     }
+    // Several rows at once, from the Save-all bar: { items: [{ sku, publicPrice?, member? }] }.
+    // Each unit goes through the same path as a single save; one failing never stops the rest.
+    if (body.action === 'set_many') {
+      const items = (Array.isArray(body.items) ? body.items : []).slice(0, 200);
+      if (!items.length) return NextResponse.json({ error: 'Nothing to save.' }, { status: 400 });
+      const saved = []; const failed = [];
+      for (const it of items) {
+        const patch = {};
+        if ('publicPrice' in it) patch.publicPrice = it.publicPrice;
+        if ('member' in it) patch.member = it.member;
+        const res = await applyPrices(session, String(it.sku || '').trim(), patch);
+        if (res.error) failed.push({ sku: it.sku, error: res.error }); else saved.push(it.sku);
+      }
+      const next = await getMemberRates();
+      return NextResponse.json({ ok: true, saved, failed, preview: await previewFor(next.rates, next.overrides, previewOpts(body)) });
+    }
     // Bulk: { skus? | q + filter, target, mode, amount, round, dryRun }. A dry run only reports.
     if (body.action === 'bulk') {
       const t = await bulkTargets(body);
