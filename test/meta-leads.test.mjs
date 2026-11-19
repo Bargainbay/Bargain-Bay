@@ -74,3 +74,26 @@ test('the Manager sees leads nobody has touched after 4 hours', async () => {
     equal(s.hubBb, 1); assert(s.oldestHours >= 29);
   } finally { done(); }
 });
+
+test('the Manager owns the chore: a pull that adds leads is logged and read back; a failing pull is retried by the Manager', async () => {
+  const { done } = await withTestDb();
+  process.env.META_LEADS_ACCESS_TOKEN = 't'; process.env.META_LEAD_PAGES = '111111:bb';
+  try {
+    const { runAutoActions, recentActions, reportLine, unreportedActions } = await import('../lib/manager-actions.js');
+    const f = fakeMeta([lead('M1', 'Bo Chan', 'bo@x.com', '+14165550123')]);
+    await runMetaLeadPull({ fetchImpl: f });
+    const acts = await recentActions(5);
+    assert(acts.some((a) => a.kind === 'pull_meta_leads' && /pulled 1 new Facebook lead/.test(a.summary)), 'the pull is in "What the Manager did"');
+    assert(/pulled 1 new Facebook lead/.test(reportLine(await unreportedActions())), 'and is read back on the next call');
+    // a failing pull raises an issue that names the Manager's own remedy
+    const { BUSINESS_CHECKS } = await import('../lib/manager-business.js');
+    const check = BUSINESS_CHECKS.find(([k]) => k === 'Meta leads')[1];
+    const { setSetting } = await import('../lib/settings.js');
+    await setSetting('meta_leads_status', { ok: false, error: 'Meta said: Token expired' });
+    const issues = await check();
+    const failing = issues.find((i) => i.key === 'biz-meta-leads-pull');
+    assert(failing && failing.fix === 'pull_meta_leads', 'a failing pull names pull_meta_leads as its fix');
+    const res = await runAutoActions([failing]);
+    assert('pull_meta_leads' in res, 'the unattended pass runs it');
+  } finally { delete process.env.META_LEADS_ACCESS_TOKEN; delete process.env.META_LEAD_PAGES; done(); }
+});

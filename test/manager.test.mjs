@@ -122,7 +122,7 @@ test('snooze, notes and issue detail work, and bad keys are refused', async () =
 test('the agent has no tool that can touch money, orders or customers', async () => {
   const src = (await import('node:fs')).readFileSync(new URL('../lib/manager-call.js', import.meta.url), 'utf8');
   const names = [...src.matchAll(/name: '([a-z_]+)',\n\s+description/g)].map((m) => m[1]).sort();
-  equal(names, ['add_followup', 'add_note', 'assign_stop', 'business_snapshot', 'cda_status', 'close_stale_stops', 'email_details', 'end_call', 'find_overdue_invoice', 'issue_details', 'list_drivers', 'next_overdue_invoice', 'pull_orders', 'request_code_change', 'resolve_invoice', 'run_backup_now', 'run_inventory_sync', 'set_photo_from_model', 'snooze_issue', 'stale_stops_preview', 'what_i_did']);
+  equal(names, ['add_followup', 'add_note', 'assign_stop', 'business_snapshot', 'cda_status', 'close_stale_stops', 'email_details', 'end_call', 'find_overdue_invoice', 'issue_details', 'list_drivers', 'next_overdue_invoice', 'pull_meta_leads', 'pull_orders', 'request_code_change', 'resolve_invoice', 'run_backup_now', 'run_inventory_sync', 'set_photo_from_model', 'snooze_issue', 'stale_stops_preview', 'what_i_did']);
   // Whatever it is allowed to do on its own, it never touches money or a customer.
   // The ONE money action is recording that a payment already arrived (resolve_invoice) plus reading the late list.
   const allowedInvoiceTools = new Set(['find_overdue_invoice', 'next_overdue_invoice', 'resolve_invoice']);

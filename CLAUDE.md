@@ -5606,6 +5606,7 @@ migration `0081_meta_leads_seen` (**run Run schema migration after deploy**), `t
 - **A lead is remembered (`meta_leads_seen`) only AFTER it landed on its board**; both destinations also dedupe on email/phone, so a repeat is harmless. An unreachable lead
   (no email and no 10-digit phone) is remembered and skipped. It never emails the person who filled the form; the office gets one "New Meta leads" email per pass that added any.
 - Workshop-board leads are hidden from Dispatch, the chase cron and the voice agent until they pay (`workshop.metaLead` inside `isUnpaidApplication`), take no seat, and cannot use a pay link.
+- **It is the Manager's chore, not just a cron it watches (2026-11-19).** Every pull that brings leads in is logged as `pull_meta_leads` in `manager_actions` (shows under "What the Manager did", read back on the next call). A failing pull's issue carries `fix: 'pull_meta_leads'`, so the unattended pass retries it. By voice: the `pull_meta_leads` tool (Sales Manager and General Manager; internal, no confirm needed). `test/manager.test.mjs` pins the Manager's tool list, so a new tool must be added there on purpose.
 - Not built: Bargain Bay's Page id and a BB lead form (its Meta ad account is disabled for payment), lead-ad webhooks (this polls), auto-assigning pulled leads to a rep.
 
 ## The Team board — chat and posts for the whole crew (added 2026-11-17)
