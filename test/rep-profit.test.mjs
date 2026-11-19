@@ -109,3 +109,16 @@ test('THE COMPANY FIGURE COUNTS EVERY SALE, INCLUDING ONES NO REP CLOSED, AND ON
     equal(q.me.today.gp, 400);
   } finally { done(); }
 });
+
+test('a consigned unit is costed before tax (cost / 1.13), the same as the Daily P&L', async () => {
+  const { client, done } = await fresh();
+  try {
+    await setReps(['Roushi']);
+    await client.query(`CREATE TABLE IF NOT EXISTS consignment_units (sku text PRIMARY KEY, vendor text, cost numeric, note text, created_by text, taken_on date, paid_on date)`);
+    await sale(client, { rep: 'Roushi', price: 1500, cost: 1130 });   // SKU<n> is the next one below
+    const sku = (await client.query(`SELECT sku FROM order_items ORDER BY id DESC LIMIT 1`)).rows[0].sku;
+    await client.query(`INSERT INTO consignment_units (sku, vendor, cost) VALUES ($1,'Abi',1130)`, [sku]);
+    const p = await repProfit({ name: 'Owner' }, { all: true });
+    equal(p.company.today.gp, 500);                       // 1500 - 1130/1.13, not 1500 - 1130
+  } finally { done(); }
+});
