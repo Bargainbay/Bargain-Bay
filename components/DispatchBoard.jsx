@@ -762,6 +762,12 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onUndoStart, onCancel
                 <button type="button" className="btn" disabled={busy}
                   onClick={() => onStatus(job.id, 'on_the_way')}>Start</button>
               )}
+              {/* The driver forgot to tap Arrived. Stamps the on-site clock as of now;
+                  "Set times" fixes it to the real moment afterwards. */}
+              {(job.status === 'scheduled' || job.status === 'on_the_way') && (
+                <button type="button" className="btn" disabled={busy}
+                  onClick={() => onStatus(job.id, 'arrived')}>Mark arrived</button>
+              )}
               {job.status === 'on_the_way' && (
                 <button type="button" className="btn" disabled={busy}
                   onClick={() => onUndoStart(job.id)}>Back to scheduled</button>
