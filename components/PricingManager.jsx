@@ -275,7 +275,7 @@ export default function PricingManager({ initial }) {
         <style>{`
           .pt td, .pt th { padding: 3px 7px !important; font-size: 13px; line-height: 1.25; vertical-align: middle; }
           .pt th { font-size: 12px; white-space: nowrap; }
-          .pt .pt-unit { max-width: 330px; }
+          .pt .pt-unit { width: 190px; max-width: 190px; }
           .pt .pt-unit b, .pt .pt-sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
           .pt .pt-sub { font-size: 11.5px; }
           .pt .pt-price { white-space: nowrap; }
