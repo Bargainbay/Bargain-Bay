@@ -48,6 +48,30 @@ test('late invoices, expiring quotes and unassigned stops become issues, with th
   });
 });
 
+test('a finished stop for an outside client with no charge is flagged; our own, priced, and non-delivery stops are not', async () => {
+  await withDb(async (c) => {
+    const { ensureJobSchema } = await import('../lib/jobs.js');
+    await ensureJobSchema();
+    await c.query(`INSERT INTO clients (name) VALUES ('Canadian Discount Appliances'), ('Bargain Bay')`);
+    const cda = (await c.query(`SELECT id FROM clients WHERE name = 'Canadian Discount Appliances'`)).rows[0].id;
+    const bb = (await c.query(`SELECT id FROM clients WHERE name = 'Bargain Bay'`)).rows[0].id;
+    const ins = (num, client, status, type, charge) => c.query(
+      `INSERT INTO jobs (job_number, type, status, job_date, customer_name, address, client_id, charge_amount) VALUES ($1,$2,$3,$4::date,'X','1 St',$5,$6)`,
+      [num, type, status, torontoDay(-2), client, charge]);
+    await ins('RS-9101', cda, 'done', 'delivery', null);   // flagged
+    await ins('RS-9102', cda, 'done', 'delivery', 135);    // priced
+    await ins('RS-9103', bb, 'done', 'delivery', null);    // ours
+    await ins('RS-9104', null, 'done', 'delivery', null);  // no client: ours
+    await ins('RS-9105', cda, 'scheduled', 'delivery', null); // not finished
+    await ins('RS-9106', cda, 'done', 'service_call', null);  // nothing to chase
+    const scan = await scanIssues();
+    const i = scan.issues.find((x) => x.key === 'biz-client-stops-unpriced');
+    assert(i, 'flagged');
+    equal(i.count, 1);
+    assert(/RS-9101/.test(i.detail) && !/RS-9102|RS-9103|RS-9104|RS-9105|RS-9106/.test(i.detail), i.detail);
+  });
+});
+
 test('a check that throws is an issue, not a clean bill of health', async () => {
   await withDb(async (c) => {
     await c.query('DROP TABLE quotes CASCADE');
