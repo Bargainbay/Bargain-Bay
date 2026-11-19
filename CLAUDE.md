@@ -5592,6 +5592,22 @@ employees, and a Tech Manager manages the tech department, talks Tamil to the pe
 - **Not built:** the RS Ops bench route (above); replies to a nudge by SMS (an inbound text goes to `/api/sms/inbound`, which only records STOP; the conversation is through the RS Manager widget/voice);
   push notifications (a web page cannot reach a locked phone, same OS limit as live tracking, so nudges are SMS); a screen for the settings (the admin route is the interface for now).
 
+## Meta lead forms -> boards, pulled by the Manager (added 2026-11-19)
+`lib/meta-leads.js`, `lib/meta-leads-rules.js` (no imports), `/api/cron/meta-leads` (every 15 min, heartbeat + `EXPECTED`),
+migration `0081_meta_leads_seen` (**run Run schema migration after deploy**), `test/meta-leads.test.mjs`. rs-solutions side:
+`POST/GET /api/ops/meta-leads` + `src/lib/workshopMetaLeads.ts`.
+
+- **Routing is by PAGE and FORM:** RS Solutions page (`656416010891883`, the default) + a form with "workshop" in its name -> the RS Solutions workshop
+  Board (New column, tag "Meta lead"); any other RS form -> Sales Hub lead board, side RS; a page marked `bb` in `META_LEAD_PAGES` (`id:side,id:side`) -> Sales Hub,
+  side Bargain Bay. Hub leads: source `social`, `created_by = meta-leads@system`, unassigned pool.
+- **Dormant until configured, and LOUD about it.** Needs `META_LEADS_ACCESS_TOKEN` (or `META_ADS_ACCESS_TOKEN` if it carries `leads_retrieval` and the Pages are assigned to it)
+  and `META_LEADS_KEY` (shared secret, set on BOTH this project and rs-solutions; at least 16 chars). The Manager's "Meta leads" check
+  (`checkMetaLeads` in `lib/manager-business.js`) raises a high issue when the token is missing or the last pull failed, and when leads are untouched after 4 hours (both boards).
+- **A lead is remembered (`meta_leads_seen`) only AFTER it landed on its board**; both destinations also dedupe on email/phone, so a repeat is harmless. An unreachable lead
+  (no email and no 10-digit phone) is remembered and skipped. It never emails the person who filled the form; the office gets one "New Meta leads" email per pass that added any.
+- Workshop-board leads are hidden from Dispatch, the chase cron and the voice agent until they pay (`workshop.metaLead` inside `isUnpaidApplication`), take no seat, and cannot use a pay link.
+- Not built: Bargain Bay's Page id and a BB lead form (its Meta ad account is disabled for payment), lead-ad webhooks (this polls), auto-assigning pulled leads to a rep.
+
 ## The Team board — chat and posts for the whole crew (added 2026-11-17)
 `/team` (every crew member; nav tab "Team" with an unread badge, "💬 Team" on the driver app and a link on `/clock`),
 `lib/team-board.js`, `lib/team-board-rules.js` (no imports), `components/TeamChat.jsx` (not `TeamBoard.jsx`, which is the Sales Hub owner view), `/api/team`, `/api/ops/team`,
