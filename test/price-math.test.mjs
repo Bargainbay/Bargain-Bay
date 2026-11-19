@@ -45,3 +45,9 @@ test('an unsigned percent is ambiguous and is refused; nonsense is refused', () 
   equal(resolveTyped('', 1000), null);
   equal(resolveTyped('-2000', 1000), null);
 });
+
+test('points of retail: 50% of retail lowered by 25 points is 25% of retail', () => {
+  equal(newPriceFor(7344.5, { cost: 784.45, retail: 14689 }, 'points', -25), 3672.25);
+  equal(newPriceFor(4269.5, { cost: 476.95, retail: 8539 }, 'points', 5), 4696.45);
+  equal(newPriceFor(1000, { cost: 600, retail: 0 }, 'points', -25), null);
+});

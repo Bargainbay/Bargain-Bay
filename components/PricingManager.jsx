@@ -180,7 +180,7 @@ export default function PricingManager({ initial }) {
   // ── bulk ──
   const useTicked = pickedSkus.length > 0 && bulk.scope !== 'matching';
   const amt = Number(bulk.amount);
-  const bulkMode = bulk.how === 'markup' ? 'markup' : bulk.how === 'retail' ? 'retail' : bulk.unit; // pct | usd | markup | retail
+  const bulkMode = bulk.how === 'markup' ? 'markup' : bulk.how === 'retail' ? 'retail' : (bulk.unit === 'pts' ? 'points' : bulk.unit); // pct | points | usd | markup | retail
   const bulkAmount = bulk.how === 'lower' ? -Math.abs(amt) : Math.abs(amt);
   const bulkBody = (dryRun) => ({
     action: 'bulk', dryRun, ...view, target: bulk.target, mode: bulkMode, amount: bulkAmount, round: bulk.round ? 'dollar' : 'cents',
@@ -188,8 +188,7 @@ export default function PricingManager({ initial }) {
   });
   const bulkReady = bulk.amount !== '' && Number.isFinite(amt) && amt !== 0;
   const showsUnit = bulk.how === 'raise' || bulk.how === 'lower';
-  const unitChar = showsUnit ? (bulk.unit === 'pct' ? '%' : '$') : '%';
-  const scopeText = useTicked ? `the ${pickedSkus.length} ticked unit${pickedSkus.length === 1 ? '' : 's'}` : `all ${preview?.total ?? 0} units shown below`;
+    const scopeText = useTicked ? `the ${pickedSkus.length} ticked unit${pickedSkus.length === 1 ? '' : 's'}` : `all ${preview?.total ?? 0} units shown below`;
   async function bulkLook() {
     setBusy(true); setErr(''); setNotice(''); setBulkPreview(null);
     const { ok, d } = await post(bulkBody(true));
@@ -264,7 +263,7 @@ export default function PricingManager({ initial }) {
             <label style={{ fontSize: 12.5 }}>Amount 
               <span><input style={{ ...input, width: 70, padding: '5px 6px' }} inputMode="decimal" placeholder={bulk.how === 'retail' ? '70' : '5'} value={bulk.amount} onChange={(e) => { setBulk({ ...bulk, amount: e.target.value.replace(/[^0-9.]/g, '') }); setBulkPreview(null); }} />
                 {showsUnit
-                  ? <select style={{ ...input, width: 100, marginLeft: 4, padding: '5px 6px' }} value={bulk.unit} onChange={(e) => { setBulk({ ...bulk, unit: e.target.value }); setBulkPreview(null); }} aria-label="Percent or dollars"><option value="pct">percent %</option><option value="usd">dollars $</option></select>
+                  ? <select style={{ ...input, width: 130, marginLeft: 4, padding: '5px 6px' }} value={bulk.unit} onChange={(e) => { setBulk({ ...bulk, unit: e.target.value }); setBulkPreview(null); }} aria-label="Percent or dollars"><option value="pct">% of the price</option><option value="pts">% of retail</option><option value="usd">dollars $</option></select>
                   : <b style={{ marginLeft: 6 }}>%</b>}
               </span></label>
             <label style={{ fontSize: 12.5, paddingBottom: 6 }}><input type="checkbox" checked={bulk.round} onChange={(e) => { setBulk({ ...bulk, round: e.target.checked }); setBulkPreview(null); }} /> Round to whole dollars</label>
