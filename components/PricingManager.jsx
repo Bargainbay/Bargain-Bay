@@ -226,6 +226,14 @@ export default function PricingManager({ initial }) {
 
   return (
     <div>
+      {(pending.items.length > 0 || pending.unreadable.length > 0) && (
+        <div style={{ position: 'sticky', top: 0, zIndex: 50, background: '#fff', border: '2px solid var(--charcoal, #222)', borderRadius: 10, boxShadow: '0 4px 14px rgba(0,0,0,.12)', margin: '0 0 10px', padding: '8px 14px', display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 14 }}><b>{pending.items.length}</b> unsaved price change{pending.items.length === 1 ? '' : 's'}
+            {pending.unreadable.length > 0 && <span style={{ color: RED }}> · {pending.unreadable.length} box{pending.unreadable.length === 1 ? '' : 'es'} I can't read ({pending.unreadable.slice(0, 3).join(', ')}{pending.unreadable.length > 3 ? '…' : ''})</span>}</span>
+          <button className="btn primary" type="button" disabled={busy || pending.items.length === 0} onClick={saveAll}>{busy ? 'Saving…' : `Save all ${pending.items.length} change${pending.items.length === 1 ? '' : 's'}`}</button>
+          <button className="btn" type="button" disabled={busy} onClick={() => setEdits({})}>Discard all</button>
+        </div>
+      )}
       {err && <div className="error-box">{err}</div>}
       {notice && <div className="panel" style={{ color: '#0B6B3A', fontSize: 14 }}>{notice}</div>}
 
@@ -399,15 +407,6 @@ export default function PricingManager({ initial }) {
         </div>
       </details>
 
-      {(pending.items.length > 0 || pending.unreadable.length > 0) && (
-        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 50, background: '#fff', borderTop: '2px solid var(--charcoal, #222)', boxShadow: '0 -4px 14px rgba(0,0,0,.12)', padding: '10px 16px', display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 14 }}><b>{pending.items.length}</b> unsaved price change{pending.items.length === 1 ? '' : 's'}
-            {pending.unreadable.length > 0 && <span style={{ color: RED }}> · {pending.unreadable.length} box{pending.unreadable.length === 1 ? '' : 'es'} I can't read ({pending.unreadable.slice(0, 3).join(', ')}{pending.unreadable.length > 3 ? '…' : ''})</span>}</span>
-          <button className="btn primary" type="button" disabled={busy || pending.items.length === 0} onClick={saveAll}>{busy ? 'Saving…' : `Save all ${pending.items.length} change${pending.items.length === 1 ? '' : 's'}`}</button>
-          <button className="btn" type="button" disabled={busy} onClick={() => setEdits({})}>Discard all</button>
-        </div>
-      )}
-      {pending.items.length > 0 && <div style={{ height: 64 }} />}
     </div>
   );
 }
