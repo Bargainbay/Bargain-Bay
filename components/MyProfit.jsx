@@ -27,6 +27,11 @@ export default function MyProfit({ initial }) {
   const { rule } = data;
   const t = me.today, m = me.month;
   const pct = Math.min(100, (t.gp / rule.threshold) * 100);
+  // The owner's own card counts only sales closed under their name, so it reads $0
+  // on a day the team sold plenty. Say so, with the team's number beside it.
+  const teamToday = Array.isArray(data.team) ? data.team.reduce((a, r) => a + (r.today?.gp || 0), 0) : 0;
+  const teamSales = Array.isArray(data.team) ? data.team.reduce((a, r) => a + (r.today?.sales || 0), 0) : 0;
+  const showTeam = Array.isArray(data.team) && teamSales > 0 && t.sales === 0;
 
   return (
     <div className="panel" style={{ marginBottom: 14 }}>
@@ -36,6 +41,12 @@ export default function MyProfit({ initial }) {
           You earn {rule.pct}% of the day’s gross profit once it reaches {$0(rule.threshold)} · before HST
         </span>
       </div>
+
+      {showTeam && (
+        <div className="hint" style={{ marginTop: 10, padding: '8px 10px', border: '1px solid var(--line-soft)', borderRadius: 6, color: 'var(--charcoal)' }}>
+          <b>Team today: {$(teamToday)}</b> gross profit from {teamSales} sale{teamSales === 1 ? '' : 's'}. This card only counts sales closed under your own name, so it reads {$(t.gp)}. Per-rep figures are in the team table below.
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 12, alignItems: 'flex-start' }}>
         <div style={{ flex: '1 1 300px', minWidth: 260 }}>
