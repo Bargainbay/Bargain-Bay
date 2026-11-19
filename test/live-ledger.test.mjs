@@ -240,36 +240,19 @@ test('A CLEARED ENTRY CAN BE COUNTED IN THE BOOKS ONCE, UNDER ITS CATEGORY, WITH
   } finally { await done(); }
 });
 
-test('A CASH DEPOSIT IS ONE ENTRY: THE TILL GOES DOWN, THE BANK SIDE IS COUNTED, AND THE BANKROLL TOTAL DOES NOT MOVE', async () => {
+test('A CASH DEPOSIT ONLY LOWERS THE TILL: NO SECOND ENTRY FOR THE BANK SIDE, THE BANK FEED CARRIES IT', async () => {
   const { done } = await withTestDb();
   try {
     const { addCashDeposit } = await import('../lib/bankroll.js');
     await addEntry({ date: today(), kind: 'count', amount: 1000, note: 'count', by: 't' });
     const before = await bankrollSummary(today(), { days: 7 });
     const r = await addCashDeposit({ date: today(), amount: 700, by: 't' });
-    equal(r.amount, 700);
+    equal(r.amount, 700); assert(r.outId && !r.inId, 'one entry only');
     const after = await bankrollSummary(today(), { days: 7 });
-    equal(after.total, before.total, 'the bankroll total is unchanged');
     equal(Math.round((before.cash - after.cash) * 100) / 100, 700, 'cash in hand is down by the deposit');
-    await clearEntry(r.inId, 't', null);
-    const cleared = await bankrollSummary(today(), { days: 7 });
-    equal(Math.round((before.total - cleared.total) * 100) / 100, 700, 'once the bank figure carries it, only the till side remains');
+    equal(after.pending, 0, 'nothing is counted as on its way');
+    equal(after.entries.filter((e) => e.kind === 'pending').length, 0, 'no bank-side transaction was added');
     let threw = false; try { await addCashDeposit({ date: today(), amount: 0 }); } catch { threw = true; }
     assert(threw, 'a zero deposit is refused');
-  } finally { await done(); }
-});
-
-test('A CASH DEPOSIT CLEARS ITSELF WHEN THE BANK SHOWS THAT AMOUNT COMING IN, SO IT IS NEVER COUNTED TWICE', async () => {
-  const { done } = await withTestDb();
-  try {
-    const { addCashDeposit } = await import('../lib/bankroll.js');
-    await addEntry({ date: today(), kind: 'count', amount: 2000, note: 'count', by: 't' });
-    await addCashDeposit({ date: today(), amount: 1810, by: 't' });
-    const waiting = await bankrollSummary(today(), { days: 7 });
-    equal(waiting.pending, 1810, 'on its way until the bank shows it');
-    await recordActivity({ extId: 'plaid:dep1', date: today(), amount: 1810, pending: false, name: 'DEPOSIT', description: 'DEPOSIT', memo: null, category: null, accountLabel: 'TD', counterparty: null });
-    const after = await bankrollSummary(today(), { days: 7 });
-    equal(after.pending, 0, 'the on-its-way balance is back to zero by itself');
-    equal(after.entries.find((e) => e.kind === 'pending').cleared, true);
   } finally { await done(); }
 });

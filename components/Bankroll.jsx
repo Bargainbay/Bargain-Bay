@@ -31,7 +31,7 @@ export default function Bankroll({ initial }) {
   async function saveDeposit(e) {
     e.preventDefault();
     const r = await call({ action: 'cash_deposit', amount: dep.amount, date: dep.date }, 'dep');
-    if (r) { setDep((x) => ({ ...x, amount: '' })); setMsg('Deposit recorded. The till is down, and the deposit counts as on its way until the bank shows it. It clears itself then; or press "Mark received".'); }
+    if (r) { setDep((x) => ({ ...x, amount: '' })); setMsg('Deposit recorded. The till is down. The deposit itself shows up by itself when the bank feed updates, so it is not added here.'); }
   }
   const [payTo, setPayTo] = useState({});
   const [openRow, setOpenRow] = useState(null);
