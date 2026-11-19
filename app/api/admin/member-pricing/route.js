@@ -38,9 +38,11 @@ async function buildRows(rates, overrides) {
 
 const titleOf = (u) => u.title || `${u.make} ${u.model}`;
 const belowCostRow = ({ next, cost }) => cost > 0 && (next.clientPrice + 0.005 < cost || next.price + 0.005 < cost);
-const matches = (rows, q, filter) => {
+const matches = (rows, q, filter, category = '', condition = '') => {
   const term = String(q || '').trim().toLowerCase();
   let out = term ? rows.filter(({ u }) => [u.id, u.make, u.model, u.title, u.category, u.condition].join(' ').toLowerCase().includes(term)) : rows;
+  if (category) out = out.filter(({ u }) => String(u.category || '') === category);
+  if (condition) out = out.filter(({ u }) => String(u.condition || '') === condition);
   if (filter === 'below') out = out.filter(belowCostRow);
   return out;
 };
@@ -48,7 +50,7 @@ const matches = (rows, q, filter) => {
 // What a rate set does to the shop RIGHT NOW: per unit, through the same function checkout uses.
 // Every live unit is in `rows`; the screen shows one page of them. `q` narrows by SKU, brand, model,
 // title, category or condition; `filter: 'below'` keeps only units priced under cost; `sort` orders them.
-async function previewFor(rates, overrides, { q = '', page = 1, pageSize = PAGE_SIZE, filter = '', sort = 'title' } = {}) {
+async function previewFor(rates, overrides, { q = '', page = 1, pageSize = PAGE_SIZE, filter = '', sort = 'title', category = '', condition = '' } = {}) {
   const { rows, cmap, listOv } = await buildRows(rates, overrides);
   let discounted = 0, atPublic = 0, discSum = 0, belowCost = 0;
   for (const r of rows) {
@@ -66,13 +68,19 @@ async function previewFor(rates, overrides, { q = '', page = 1, pageSize = PAGE_
     price_high: (a, b) => b.next.clientPrice - a.next.clientPrice || byTitle(a, b),
     price_low: (a, b) => a.next.clientPrice - b.next.clientPrice || byTitle(a, b)
   };
-  const matched = matches(rows, q, filter).sort(sorters[sort] || byTitle);
+  const matched = matches(rows, q, filter, category, condition).sort(sorters[sort] || byTitle);
+  const tally = (pick) => {
+    const m = new Map();
+    for (const { u } of rows) { const k = String(pick(u) || '').trim(); if (k) m.set(k, (m.get(k) || 0) + 1); }
+    return [...m.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  };
   const size = Math.min(100, Math.max(10, Number(pageSize) || PAGE_SIZE));
   const pages = Math.max(1, Math.ceil(matched.length / size));
   const pg = Math.min(pages, Math.max(1, Math.floor(Number(page)) || 1));
   const slice = matched.slice((pg - 1) * size, pg * size);
   return {
     summary: { units: rows.length, discounted, atPublic, belowCost, avgDiscountPct: discounted ? Math.round((discSum / discounted) * 1000) / 10 : 0 },
+    categories: tally((u) => u.category), conditions: tally((u) => u.condition),
     total: matched.length, page: pg, pages, pageSize: size,
     rows: slice.map(({ u, now, next, cost }) => ({
       sku: u.id, title: titleOf(u), condition: u.condition || '', category: u.category || '', retail: u.compareAt || null,
@@ -95,7 +103,7 @@ async function bulkTargets(body) {
   if (!BULK_MODES.includes(mode) || !Number.isFinite(amount)) return { error: 'Pick how to change the price and enter an amount.' };
   const target = ['public', 'member', 'both'].includes(body.target) ? body.target : 'both';
   const skus = Array.isArray(body.skus) ? new Set(body.skus.map(String)) : null;
-  const chosen = skus ? rows.filter(({ u }) => skus.has(String(u.id))) : matches(rows, body.q, body.filter);
+  const chosen = skus ? rows.filter(({ u }) => skus.has(String(u.id))) : matches(rows, body.q, body.filter, body.category, body.condition);
   if (chosen.length > 500) return { error: `That is ${chosen.length} units; change at most 500 at a time (narrow it with the search or the below-cost filter).` };
   const out = [];
   for (const r of chosen) {
@@ -110,7 +118,7 @@ async function bulkTargets(body) {
   return { targets: out, considered: chosen.length };
 }
 
-const previewOpts = (b) => ({ q: b.q, page: b.page, filter: b.filter, sort: b.sort });
+const previewOpts = (b) => ({ q: b.q, page: b.page, filter: b.filter, sort: b.sort, category: b.category, condition: b.condition });
 
 // One unit, one or both prices. A public price reaches the TRACKER first (lib/price-sync.js) and the
 // site second, so a failed sheet write changes nothing and the two never disagree. Member prices have
