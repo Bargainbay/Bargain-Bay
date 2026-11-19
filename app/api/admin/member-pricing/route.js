@@ -83,7 +83,7 @@ async function previewFor(rates, overrides, { q = '', page = 1, pageSize = PAGE_
     categories: tally((u) => u.category), conditions: tally((u) => u.condition),
     total: matched.length, page: pg, pages, pageSize: size,
     rows: slice.map(({ u, now, next, cost }) => ({
-      sku: u.id, title: titleOf(u), condition: u.condition || '', category: u.category || '', retail: u.compareAt || null,
+      sku: u.id, title: titleOf(u), model: u.model || '', make: u.make || '', condition: u.condition || '', category: u.category || '', retail: u.compareAt || null,
       // `listPrice` is what the tracker says; `public` is what the shop charges (a clearance markdown
       // can be lower).
       listPrice: u.price, public: next.clientPrice, onClearance: cmap.has(u.id), cost,

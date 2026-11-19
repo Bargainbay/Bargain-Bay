@@ -193,36 +193,34 @@ export default function PricingManager({ initial }) {
             {(s.belowCost > 0 || filter === 'below') && <> <button type="button" className="btn" style={{ marginLeft: 6, fontSize: 12.5, padding: '2px 10px' }} onClick={() => { setFilter(filter === 'below' ? '' : 'below'); setPage(1); }}>{filter === 'below' ? 'Show all units' : `Show the ${s.belowCost} priced below cost`}</button></>}
           </p>
         )}
-        <p className="hint" style={{ marginTop: 0 }}>
-          Change a price right in the row: type a new price, or <b>+7%</b> / <b>-25</b> to move it from what it shows now, then <b>Save</b>. Every price also shows what <b>percent of retail</b> it is: type a new percentage (say 65) to set the price from it. To change a whole group, use the box above the table.
-          A <b>public</b> price change is written to the <b>tracker</b> and the website. <b>Member</b> prices exist on the website only (the tracker has no member column).
-          A member never pays more than the public price. <i>Back to tracker price</i> undoes a public change.
+        <p className="hint" style={{ margin: '0 0 6px', fontSize: 12.5 }} title="A public price change is written to the tracker and the website. Member prices exist on the website only. A member never pays more than the public price. The back-arrow button on a row undoes a public change.">
+          Type a price, <b>+7%</b>, <b>-25</b>, or the <b>% of retail</b>, then Save. Public prices update the tracker too; member prices are website only.
         </p>
 
-        <div style={{ margin: '0 0 14px', border: '2px solid var(--line)', borderRadius: 12, padding: '12px 14px', background: 'var(--bg, #fafafa)' }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Change many prices at once</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label style={{ fontSize: 13 }}>Which price<br />
-              <select style={{ ...input, width: 170 }} value={bulk.target} onChange={(e) => { setBulk({ ...bulk, target: e.target.value }); setBulkPreview(null); }}>
+        <div style={{ margin: '0 0 8px', border: '1px solid var(--line)', borderRadius: 10, padding: '6px 10px', background: 'var(--bg, #fafafa)' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <b style={{ fontSize: 13, paddingBottom: 8 }}>Change many:</b>
+            <label style={{ fontSize: 12.5 }}>Which price 
+              <select style={{ ...input, width: 150, padding: '5px 6px' }} value={bulk.target} onChange={(e) => { setBulk({ ...bulk, target: e.target.value }); setBulkPreview(null); }}>
                 <option value="both">Public and member</option>
                 <option value="public">Public only</option>
                 <option value="member">Member only</option>
               </select></label>
-            <label style={{ fontSize: 13 }}>What to do<br />
-              <select style={{ ...input, width: 170 }} value={bulk.how} onChange={(e) => { setBulk({ ...bulk, how: e.target.value }); setBulkPreview(null); }}>
+            <label style={{ fontSize: 12.5 }}>What to do 
+              <select style={{ ...input, width: 150, padding: '5px 6px' }} value={bulk.how} onChange={(e) => { setBulk({ ...bulk, how: e.target.value }); setBulkPreview(null); }}>
                 {HOW.map((h) => <option key={h.id} value={h.id}>{h.label}</option>)}
               </select></label>
-            <label style={{ fontSize: 13 }}>Amount<br />
-              <span><input style={{ ...input, width: 90 }} inputMode="decimal" placeholder={bulk.how === 'retail' ? '70' : '5'} value={bulk.amount} onChange={(e) => { setBulk({ ...bulk, amount: e.target.value.replace(/[^0-9.]/g, '') }); setBulkPreview(null); }} />
+            <label style={{ fontSize: 12.5 }}>Amount 
+              <span><input style={{ ...input, width: 70, padding: '5px 6px' }} inputMode="decimal" placeholder={bulk.how === 'retail' ? '70' : '5'} value={bulk.amount} onChange={(e) => { setBulk({ ...bulk, amount: e.target.value.replace(/[^0-9.]/g, '') }); setBulkPreview(null); }} />
                 {showsUnit
-                  ? <select style={{ ...input, width: 110, marginLeft: 6 }} value={bulk.unit} onChange={(e) => { setBulk({ ...bulk, unit: e.target.value }); setBulkPreview(null); }} aria-label="Percent or dollars"><option value="pct">percent %</option><option value="usd">dollars $</option></select>
+                  ? <select style={{ ...input, width: 100, marginLeft: 4, padding: '5px 6px' }} value={bulk.unit} onChange={(e) => { setBulk({ ...bulk, unit: e.target.value }); setBulkPreview(null); }} aria-label="Percent or dollars"><option value="pct">percent %</option><option value="usd">dollars $</option></select>
                   : <b style={{ marginLeft: 6 }}>%</b>}
               </span></label>
-            <label style={{ fontSize: 13, paddingBottom: 8 }}><input type="checkbox" checked={bulk.round} onChange={(e) => { setBulk({ ...bulk, round: e.target.checked }); setBulkPreview(null); }} /> Round to whole dollars</label>
+            <label style={{ fontSize: 12.5, paddingBottom: 6 }}><input type="checkbox" checked={bulk.round} onChange={(e) => { setBulk({ ...bulk, round: e.target.checked }); setBulkPreview(null); }} /> Round to whole dollars</label>
             <button className="btn primary" type="button" disabled={busy || !bulkReady} onClick={bulkLook}>See what changes</button>
           </div>
-          <div className="hint" style={{ marginTop: 6 }}>
-            This will change <b>{scopeText}</b> (the search and filters below decide which). Tick units in the table to change only those.
+          <div className="hint" style={{ marginTop: 2, fontSize: 12 }}>
+            Changes <b>{scopeText}</b>. Filters decide which; tick rows to limit it.
             {pickedSkus.length > 0 && <> <button type="button" className="btn" style={{ fontSize: 12, padding: '2px 8px', marginLeft: 6 }} onClick={() => { setPicked({}); setBulkPreview(null); }}>Untick all</button></>}
           </div>
           {bulkPreview && (
@@ -275,7 +273,7 @@ export default function PricingManager({ initial }) {
         <style>{`
           .pt td, .pt th { padding: 3px 7px !important; font-size: 13px; line-height: 1.25; vertical-align: middle; }
           .pt th { font-size: 12px; white-space: nowrap; }
-          .pt .pt-unit { width: 190px; max-width: 190px; }
+          .pt .pt-unit { width: 150px; max-width: 150px; }
           .pt .pt-unit b, .pt .pt-sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
           .pt .pt-sub { font-size: 11.5px; }
           .pt .pt-price { white-space: nowrap; }
@@ -297,12 +295,13 @@ export default function PricingManager({ initial }) {
             const relMem = ed.member !== undefined && /^[+-]/.test(String(ed.member).trim()) && memShown != null;
             const badPub = ed.pub !== undefined && String(ed.pub).trim() !== '' && pubShown == null;
             const badMem = ed.member !== undefined && String(ed.member).trim() !== '' && memShown == null;
-            const sub = `${r.sku}${r.condition ? ` · ${r.condition}` : ''}${r.onClearance ? ' · markdown' : ''}${r.override != null ? ' · typed member price' : ''}${loss ? ' · below cost' : ''}`;
+            const sub = `${r.sku}${r.onClearance ? ' · markdown' : ''}${r.override != null ? ' · typed' : ''}${loss ? ' · below cost' : ''}`;
+            const tip = `${r.title}${r.condition ? ` — ${r.condition}` : ''} — ${r.sku}`;
             const trackerNow = money(r.trackerPrice ?? r.listPrice);
             return (
               <tr key={r.sku} style={loss ? { background: '#fdecea' } : undefined}>
                 <td><input type="checkbox" checked={!!picked[r.sku]} onChange={(e) => setPicked((p) => ({ ...p, [r.sku]: e.target.checked }))} aria-label={`Tick ${r.sku}`} /></td>
-                <td className="pt-unit" style={{ color: loss ? RED : undefined }} title={`${r.title} — ${sub}`}><b>{r.title}</b>
+                <td className="pt-unit" style={{ color: loss ? RED : undefined }} title={tip}><b>{r.model || r.title}</b>
                   <span className="pt-sub" style={{ color: loss ? RED : 'var(--muted)' }}>{sub}</span></td>
                 <td>{r.cost ? money(r.cost) : <span style={{ color: 'var(--muted)' }}>none</span>}</td>
                 <td>{r.retail ? money(r.retail) : '—'}</td>
