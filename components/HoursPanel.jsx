@@ -12,6 +12,8 @@ const RANGES = [
 ];
 const hm = (h) => { const m = Math.round((h || 0) * 60); return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; };
 const tm = (t) => (t ? new Date(t).toLocaleTimeString('en-CA', { timeZone: 'America/Toronto', hour: 'numeric', minute: '2-digit' }) : '');
+// 24-hour HH:MM in Toronto, the shape the fix endpoints take and a time input shows.
+const hhmm = (t) => (t ? new Date(t).toLocaleTimeString('en-GB', { timeZone: 'America/Toronto', hour: '2-digit', minute: '2-digit', hour12: false }) : '');
 const NOTE = { open: 'Still clocked in', too_long: 'Too long — needs fixing', no_rate: 'No hourly rate', owner: 'Owner (not costed)', ok: '' };
 
 export default function HoursPanel() {
@@ -19,6 +21,9 @@ export default function HoursPanel() {
   const [data, setData] = useState(null);
   const [live, setLive] = useState(null);
   const [err, setErr] = useState('');
+  // Correcting a shift happens HERE, for both clocks (owner, 2026-11-19: nothing is fixed on Team clock).
+  const [fix, setFix] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async (r) => {
     setErr('');
@@ -38,6 +43,25 @@ export default function HoursPanel() {
   }, []);
   useEffect(() => { load(range); }, [range, load]);
   useEffect(() => { loadLive(); const t = setInterval(loadLive, 60000); return () => clearInterval(t); }, [loadLive]);
+
+  async function saveFix() {
+    if (!fix) return;
+    setSaving(true); setErr('');
+    try {
+      const staff = fix.source === 'staff';
+      const res = await fetch(staff ? '/api/admin/team-clock' : '/api/admin/dispatch', {
+        method: staff ? 'POST' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(staff
+          ? { action: 'fix_shift', id: fix.id, date: fix.day, start: fix.start, end: fix.still ? undefined : fix.end, clear: !!fix.still }
+          : { action: 'shift_times', shiftId: fix.id, startTime: fix.start, endTime: fix.still ? undefined : fix.end, clear: !!fix.still })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'Could not save that shift.');
+      setFix(null);
+      await Promise.all([load(range), loadLive()]);
+    } catch (e) { setErr(e.message); } finally { setSaving(false); }
+  }
 
   const inNow = (live?.shifts || []).filter((s) => s.status === 'open');
   const todayDone = (live?.shifts || []).filter((s) => s.status !== 'open');
@@ -91,7 +115,7 @@ export default function HoursPanel() {
         <details open style={{ marginTop: 12 }}>
           <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Every shift ({data.shifts.length})</summary>
           <div className="table-wrap" style={{ marginTop: 6 }}><table className="admin">
-            <thead><tr><th>Day</th><th>Who</th><th>In</th><th>Out</th><th style={{ textAlign: 'right' }}>Time</th><th style={{ textAlign: 'right' }}>Rate</th><th></th></tr></thead>
+            <thead><tr><th>Day</th><th>Who</th><th>In</th><th>Out</th><th style={{ textAlign: 'right' }}>Time</th><th style={{ textAlign: 'right' }}>Rate</th><th></th><th></th></tr></thead>
             <tbody>
               {data.shifts.map((s) => (
                 <tr key={`${s.source}-${s.id}`}>
@@ -100,11 +124,25 @@ export default function HoursPanel() {
                   <td style={{ textAlign: 'right' }}>{s.hours == null ? '—' : hm(s.hours)}</td>
                   <td style={{ textAlign: 'right' }}>{s.rate > 0 ? `$${Number(s.rate).toFixed(2)}` : '—'}</td>
                   <td className="hint">{[NOTE[s.status], s.edited && 'edited by office'].filter(Boolean).join(' · ')}</td>
+                  <td><button type="button" className="dash-filter" onClick={() => setFix({ source: s.source, id: s.id, who: s.person, day: s.day, start: hhmm(s.start), end: hhmm(s.end), still: !s.end })}>Fix times</button></td>
                 </tr>
               ))}
             </tbody>
           </table></div>
-          <p className="hint">Fix a staff shift on <a href="/admin/team-clock">Team clock</a>; a driver shift on the <a href="/admin/dispatch">dispatch</a> Times tab.</p>
+          {fix && (
+            <div className="panel" style={{ marginTop: 8 }}>
+              <strong>Fix shift — {fix.who}, {fix.day}</strong>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 6 }}>
+                <label>In<br /><input type="time" value={fix.start} onChange={(e) => setFix({ ...fix, start: e.target.value })} /></label>
+                <label>Out<br /><input type="time" value={fix.end} disabled={fix.still} onChange={(e) => setFix({ ...fix, end: e.target.value })} /></label>
+                <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" style={{ width: 'auto' }} checked={fix.still} onChange={(e) => setFix({ ...fix, still: e.target.checked })} /> Still clocked in</label>
+                <button type="button" className="dash-filter active" disabled={saving} onClick={saveFix}>{saving ? 'Saving…' : 'Save'}</button>
+                <button type="button" className="dash-filter" disabled={saving} onClick={() => setFix(null)}>Cancel</button>
+              </div>
+              <p className="hint" style={{ marginBottom: 0 }}>Times are Toronto time. An Out before the In means it ran past midnight.</p>
+            </div>
+          )}
+          <p className="hint">Every shift, staff or driver, is fixed here with Fix times.</p>
         </details>
       </>)}
     </div>

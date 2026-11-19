@@ -41,3 +41,23 @@ test('staff + driver shifts in one list; unclosed/too-long left out; payroll inc
     assert(pr && Array.isArray(pr.workers), 'payroll still builds');
   } finally { db.done(); }
 });
+
+test('shifts on both clocks only warn when they overlap in time', async () => {
+  const db = await withTestDb();
+  try {
+    const { query } = await import('../lib/db.js');
+    const { ensureShiftSchema } = await import('../lib/shifts.js');
+    await ensureShiftSchema();
+    const tc = await import('../lib/team-clock.js');
+    const emp = await tc.saveEmployee({ email: 'nick@example.com', name: 'Nick', hourlyRate: '18' }, 'owner');
+    const { rows: [u] } = await query(`INSERT INTO users (email, name, password_hash, hourly_rate, is_driver) VALUES ('nick@example.com','Nicholas','x',18,true) RETURNING id`);
+    await query(`INSERT INTO staff_shifts (employee_id, started_at, ended_at, rate) VALUES ($1,'2026-11-16T18:00:00Z','2026-11-16T20:00:00Z',18)`, [emp.id]);
+    await query(`INSERT INTO driver_shifts (user_id, driving, started_at, ended_at) VALUES ($1,true,'2026-11-16T20:00:00Z','2026-11-17T00:00:00Z')`, [u.id]);
+    const { hoursReport } = await import('../lib/hours.js');
+    let r = await hoursReport({ from: '2026-11-16', to: '2026-11-16' });
+    equal(r.warnings.filter((w) => /SAME time/.test(w)).length, 0);   // 1-3pm staff, then 3-7pm driver: fine
+    await query(`UPDATE driver_shifts SET started_at = '2026-11-16T19:00:00Z' WHERE user_id = $1`, [u.id]);
+    r = await hoursReport({ from: '2026-11-16', to: '2026-11-16' });
+    equal(r.warnings.filter((w) => /SAME time/.test(w)).length, 1);   // now they overlap by an hour
+  } finally { db.done(); }
+});
