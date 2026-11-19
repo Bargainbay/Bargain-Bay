@@ -22,16 +22,61 @@ export default function MyProfit({ initial }) {
     return () => { live = false; clearInterval(t); };
   }, []);
 
+  const co = data?.company;
+  if (co) {
+    return (
+      <div className="panel" style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Today’s gross profit · whole company</h2>
+          <span className="hint" style={{ margin: 0 }}>Every sale, whoever closed it · before HST · per-rep figures are in Rep commission below</span>
+        </div>
+        <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 12, alignItems: 'flex-start' }}>
+          <div style={{ flex: '1 1 260px', minWidth: 240 }}>
+            <div style={{ fontSize: 30, fontWeight: 700, color: 'var(--charcoal)' }}>{$(co.today.gp)}</div>
+            <div className="hint" style={{ marginTop: 4 }}>
+              {co.today.sales} sale{co.today.sales === 1 ? '' : 's'} today. A sale counts on the day it is invoiced, and a refund takes it back.
+            </div>
+          </div>
+          <div style={{ flex: '1 1 260px', minWidth: 240 }}>
+            <h3 style={{ margin: 0, fontSize: 14, color: 'var(--charcoal)' }}>This month · {data.label}</h3>
+            <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--charcoal)', marginTop: 4 }}>{$(co.month.gp)}</div>
+            <div className="hint">from {co.month.sales} sale{co.month.sales === 1 ? '' : 's'}.</div>
+          </div>
+        </div>
+        {co.today.orders.length > 0 && (
+          <div className="table-wrap" style={{ marginTop: 12 }}>
+            <table className="admin" style={{ minWidth: 0 }}>
+              <thead><tr><th>Sale</th><th>Time</th><th>Closed by</th><th style={{ textAlign: 'right' }}>Gross profit</th></tr></thead>
+              <tbody>
+                {co.today.orders.map((o) => (
+                  <tr key={o.number}>
+                    <td>{o.number}{o.units > 1 ? ` · ${o.units} units` : ''}</td>
+                    <td>{o.at}</td>
+                    <td>{o.rep || <span className="hint">No rep recorded</span>}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {$(o.gp)}{o.missing > 0 && <span title="A unit on this sale has no cost on file, so its profit is counted as $0 until the cost is entered." className="pill warn" style={{ marginLeft: 6 }}>cost missing</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {co.missingCost > 0 && (
+          <p className="hint" style={{ marginTop: 8 }}>
+            {co.missingCost} unit{co.missingCost === 1 ? '' : 's'} sold this month {co.missingCost === 1 ? 'has' : 'have'} no cost on file, so the profit shown is lower than the real figure.
+          </p>
+        )}
+        {err && <p className="hint" style={{ color: 'var(--danger, #c0392b)' }}>{err}</p>}
+      </div>
+    );
+  }
+
   const me = data?.me;
   if (!me) return null;
   const { rule } = data;
   const t = me.today, m = me.month;
   const pct = Math.min(100, (t.gp / rule.threshold) * 100);
-  // The owner's own card counts only sales closed under their name, so it reads $0
-  // on a day the team sold plenty. Say so, with the team's number beside it.
-  const teamToday = Array.isArray(data.team) ? data.team.reduce((a, r) => a + (r.today?.gp || 0), 0) : 0;
-  const teamSales = Array.isArray(data.team) ? data.team.reduce((a, r) => a + (r.today?.sales || 0), 0) : 0;
-  const showTeam = Array.isArray(data.team) && teamSales > 0 && t.sales === 0;
 
   return (
     <div className="panel" style={{ marginBottom: 14 }}>
@@ -41,12 +86,6 @@ export default function MyProfit({ initial }) {
           You earn {rule.pct}% of the day’s gross profit once it reaches {$0(rule.threshold)} · before HST
         </span>
       </div>
-
-      {showTeam && (
-        <div className="hint" style={{ marginTop: 10, padding: '8px 10px', border: '1px solid var(--line-soft)', borderRadius: 6, color: 'var(--charcoal)' }}>
-          <b>Team today: {$(teamToday)}</b> gross profit from {teamSales} sale{teamSales === 1 ? '' : 's'}. This card only counts sales closed under your own name, so it reads {$(t.gp)}. Per-rep figures are in the team table below.
-        </div>
-      )}
 
       <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 12, alignItems: 'flex-start' }}>
         <div style={{ flex: '1 1 300px', minWidth: 260 }}>

@@ -88,3 +88,22 @@ test('a login that matches no rep gets no card, never somebody else’s', async 
     equal(p.me, null);
   } finally { done(); }
 });
+
+test('THE COMPANY FIGURE COUNTS EVERY SALE, INCLUDING ONES NO REP CLOSED, AND ONLY FOR AN ADMIN', async () => {
+  const { client, done } = await fresh();
+  try {
+    await setReps(['Roushi']);
+    await sale(client, { rep: 'Roushi', price: 1000, cost: 600 });            // 400
+    await sale(client, { rep: null, price: 500, cost: 200 });                 // 300, nobody closed it
+    await sale(client, { rep: 'Roushi', price: 900, cost: 100, status: 'cancelled' }); // not a sale
+    const p = await repProfit({ name: 'Owner', email: 'o@x.ca' }, { all: true });
+    equal(p.company.today.gp, 700);
+    equal(p.company.today.sales, 2);
+    equal(p.company.month.gp, 700);
+    // the rep's own figure and the team table still read only what they closed
+    equal(p.team.find((r) => r.name === 'Roushi').today.gp, 400);
+    const q = await repProfit({ name: 'Roushi' });
+    equal(q.company, null, 'a rep never gets the company figure');
+    equal(q.me.today.gp, 400);
+  } finally { done(); }
+});

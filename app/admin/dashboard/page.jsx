@@ -88,7 +88,7 @@ export default async function SalesDashboardPage({ searchParams }) {
       </div>
 
       {/* A rep's own quota comes first: it is the number they are working to. */}
-      {profit?.me && <MyProfit initial={profit} />}
+      {(profit?.company || profit?.me) && <MyProfit initial={profit} />}
       {team?.me && <MyQuota data={team} />}
       {!salesOnly && <TeamProfit data={profit} />}
 
