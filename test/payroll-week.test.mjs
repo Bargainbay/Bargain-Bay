@@ -40,11 +40,11 @@ test('summarizeShifts: HOURS X THE RATE EACH SHIFT CARRIED, AND WHAT IT COULD NO
 test('A SHIFT OVER 14 HOURS COUNTS ONCE THE OFFICE HAS CONFIRMED IT, BUT NEVER PAST 20', () => {
   const t = (h) => new Date(Date.UTC(2026, 10, 17, 12, 57) + h * 3600000).toISOString();
   const s = summarizeShifts([
-    { name: 'Taj', started_at: t(0), ended_at: t(14.14), rate: 20, reviewed: true },
-    { name: 'Taj', started_at: t(30), ended_at: t(44.14), rate: 20 },
+    { name: 'Taj', started_at: t(0), ended_at: t(14.3), rate: 20, reviewed: true },
+    { name: 'Taj', started_at: t(30), ended_at: t(44.3), rate: 20 },
     { name: 'Taj', started_at: t(60), ended_at: t(81), rate: 20, reviewed: true }
   ]);
-  equal(s[0].shifts, 1); equal(s[0].hours, 14.14); equal(s[0].earned, 282.8); equal(s[0].tooLong, 2);
+  equal(s[0].shifts, 1); equal(s[0].hours, 14.25); equal(s[0].earned, 285); equal(s[0].tooLong, 2);
 });
 
 test('GURI\'S OCT 19-23 WEEK COMES TO 35.5 HOURS; POSTING IT TWICE UPDATES, NEVER DOUBLES, AND A PAYMENT TAKES IT DOWN', async () => {
