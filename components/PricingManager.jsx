@@ -38,13 +38,6 @@ function profitOf(price, cost) {
   return { p, pct: price > 0 ? Math.round((p / price) * 1000) / 10 : 0 };
 }
 
-const QuickPct = ({ onPick }) => (
-  <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
-    {['-10%', '-5%', '+5%', '+10%'].map((t) => (
-      <button key={t} type="button" className="btn" style={{ fontSize: 11.5, padding: '1px 6px' }} onClick={() => onPick(t)}>{t.replace('-', '−')}</button>))}
-  </div>
-);
-
 export default function PricingManager({ initial }) {
   const [saved, setSaved] = useState(initial.rates);
   const [text, setText] = useState(() => Object.fromEntries(FIELDS.map((f) => [f.key, show(f.key, initial.rates[f.key])])));
@@ -55,6 +48,7 @@ export default function PricingManager({ initial }) {
   const [condition, setCondition] = useState('');
   const [sort, setSort] = useState('title');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
   const [edits, setEdits] = useState({}); // sku -> { member, pub } as typed text
   const [picked, setPicked] = useState({}); // sku -> true
   const [bulk, setBulk] = useState({ scope: 'auto', target: 'both', how: 'raise', unit: 'pct', amount: '', round: false });
@@ -67,7 +61,7 @@ export default function PricingManager({ initial }) {
 
   const draft = Object.fromEntries(FIELDS.map((f) => [f.key, parse(f.key, text[f.key])]));
   const dirty = FIELDS.some((f) => draft[f.key] !== null && draft[f.key] !== saved[f.key]);
-  const view = { q, filter, sort, page, category, condition };
+  const view = { q, filter, sort, page, category, condition, pageSize };
 
   async function post(body) {
     const r = await fetch('/api/admin/member-pricing', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -85,7 +79,7 @@ export default function PricingManager({ initial }) {
     }, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, q, filter, sort, page, category, condition]);
+  }, [text, q, filter, sort, page, category, condition, pageSize]);
 
   async function saveRates(action) {
     setBusy(true); setErr(''); setNotice('');
@@ -182,10 +176,10 @@ export default function PricingManager({ initial }) {
     </div>
   );
 
-  // profit cell: $ on top, margin % beneath; red when it is a loss
+  // profit cell, on one line: dollars, then margin; red when it is a loss
   const profitCell = (pr) => (pr
-    ? <div style={{ color: pr.p < 0 ? RED : undefined, fontWeight: pr.p < 0 ? 700 : 400 }}>{pr.p < 0 ? '−' : ''}{money(Math.abs(pr.p))}<div style={{ fontSize: 12, color: pr.p < 0 ? RED : 'var(--muted)', fontWeight: 400 }}>{pr.pct}%</div></div>
-    : <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>no cost</span>);
+    ? <span style={{ color: pr.p < 0 ? RED : undefined, fontWeight: pr.p < 0 ? 700 : 400, whiteSpace: 'nowrap' }}>{pr.p < 0 ? '−' : ''}{money(Math.abs(pr.p))} <span style={{ fontSize: 11.5, color: pr.p < 0 ? RED : 'var(--muted)', fontWeight: 400 }}>{pr.pct}%</span></span>
+    : <span style={{ color: 'var(--muted)', fontSize: 12 }}>no cost</span>);
 
   return (
     <div>
@@ -200,7 +194,7 @@ export default function PricingManager({ initial }) {
           </p>
         )}
         <p className="hint" style={{ marginTop: 0 }}>
-          Change a price right in the row: type a new price, or click <b>+5%</b> / <b>−5%</b> under it (or type <b>+7%</b>, <b>-25</b>), then <b>Save</b>. Every price also shows what <b>percent of retail</b> it is: type a new percentage (say 65) to set the price from it. To change a whole group, use the box above the table.
+          Change a price right in the row: type a new price, or <b>+7%</b> / <b>-25</b> to move it from what it shows now, then <b>Save</b>. Every price also shows what <b>percent of retail</b> it is: type a new percentage (say 65) to set the price from it. To change a whole group, use the box above the table.
           A <b>public</b> price change is written to the <b>tracker</b> and the website. <b>Member</b> prices exist on the website only (the tracker has no member column).
           A member never pays more than the public price. <i>Back to tracker price</i> undoes a public change.
         </p>
@@ -270,14 +264,28 @@ export default function PricingManager({ initial }) {
             <option value="price_high">Sort: highest price</option>
             <option value="price_low">Sort: lowest price</option>
           </select>
+          <select style={{ ...input, width: 130 }} value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }} aria-label="Rows per page">
+            <option value={50}>50 per page</option>
+            <option value={100}>100 per page</option>
+          </select>
           {(category || condition || filter || q) && <button type="button" className="btn" onClick={() => { setCategory(''); setCondition(''); setFilter(''); setQ(''); setPage(1); }}>Clear filters</button>}
           {pager}
         </div>
 
-        <div className="table-wrap"><table className="admin">
+        <style>{`
+          .pt td, .pt th { padding: 3px 7px !important; font-size: 13px; line-height: 1.25; vertical-align: middle; }
+          .pt th { font-size: 12px; white-space: nowrap; }
+          .pt .pt-unit { max-width: 330px; }
+          .pt .pt-unit b, .pt .pt-sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+          .pt .pt-sub { font-size: 11.5px; }
+          .pt .pt-price { white-space: nowrap; }
+          .pt .pt-price input { padding: 3px 5px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+          .pt .pt-tiny { border: 1px solid var(--line); background: transparent; border-radius: 6px; font-size: 12px; padding: 1px 5px; cursor: pointer; }
+        `}</style>
+        <div className="table-wrap"><table className="admin pt">
           <thead><tr>
             <th style={{ width: 28 }}><input type="checkbox" checked={allOnPage} onChange={togglePage} aria-label="Tick every unit on this page" /></th>
-            <th>Unit</th><th>Cost</th><th>Retail</th><th>Public price<div style={{ fontWeight: 400, fontSize: 11.5 }}>and % of retail</div></th><th>Public profit</th><th>Member price<div style={{ fontWeight: 400, fontSize: 11.5 }}>and % of retail</div></th><th>Member profit</th><th></th></tr></thead>
+            <th>Unit</th><th>Cost</th><th>Retail</th><th>Public price · % of retail</th><th>Public profit</th><th>Member price · % of retail</th><th>Member profit</th><th></th></tr></thead>
           <tbody>{rows.map((r) => {
             const ed = edits[r.sku] || {};
             const changed = ed.member !== undefined || ed.pub !== undefined;
@@ -287,35 +295,35 @@ export default function PricingManager({ initial }) {
             const memShown = resolveTyped(ed.member, r.memberNow);
             const relPub = ed.pub !== undefined && /^[+-]/.test(String(ed.pub).trim()) && pubShown != null;
             const relMem = ed.member !== undefined && /^[+-]/.test(String(ed.member).trim()) && memShown != null;
+            const badPub = ed.pub !== undefined && String(ed.pub).trim() !== '' && pubShown == null;
+            const badMem = ed.member !== undefined && String(ed.member).trim() !== '' && memShown == null;
+            const sub = `${r.sku}${r.condition ? ` · ${r.condition}` : ''}${r.onClearance ? ' · markdown' : ''}${r.override != null ? ' · typed member price' : ''}${loss ? ' · below cost' : ''}`;
+            const trackerNow = money(r.trackerPrice ?? r.listPrice);
             return (
               <tr key={r.sku} style={loss ? { background: '#fdecea' } : undefined}>
                 <td><input type="checkbox" checked={!!picked[r.sku]} onChange={(e) => setPicked((p) => ({ ...p, [r.sku]: e.target.checked }))} aria-label={`Tick ${r.sku}`} /></td>
-                <td style={{ fontSize: 13, color: loss ? RED : undefined }}><b>{r.title}</b>
-                  <div style={{ color: loss ? RED : 'var(--muted)', fontSize: 12 }}>{r.sku}{r.condition ? ` · ${r.condition}` : ''}{r.onClearance ? ' · markdown' : ''}{r.override != null ? ' · typed member price' : ''}{loss ? ' · below cost' : ''}</div></td>
-                <td>{r.cost ? money(r.cost) : <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>none</span>}</td>
+                <td className="pt-unit" style={{ color: loss ? RED : undefined }} title={`${r.title} — ${sub}`}><b>{r.title}</b>
+                  <span className="pt-sub" style={{ color: loss ? RED : 'var(--muted)' }}>{sub}</span></td>
+                <td>{r.cost ? money(r.cost) : <span style={{ color: 'var(--muted)' }}>none</span>}</td>
                 <td>{r.retail ? money(r.retail) : '—'}</td>
-                <td>
-                  <div>$ <input style={cell} inputMode="decimal" value={ed.pub ?? plain(r.public)} onChange={(e) => setEdit(r.sku, { pub: e.target.value, pubPct: undefined })} onKeyDown={onKey} aria-label={`Public price for ${r.sku}`} /></div>
-                  {r.retail > 0 && <div style={{ fontSize: 12.5, marginTop: 4 }}><input style={pctBox} inputMode="decimal" value={ed.pubPct ?? String(pctOfRetail(pubShown ?? r.public, r.retail) ?? '')} onChange={(e) => setPct(r, 'pub', e.target.value)} onKeyDown={onKey} aria-label={`Public price as a percentage of retail for ${r.sku}`} /> % of retail</div>}
-                  {relPub && <div style={{ fontSize: 12, color: 'var(--muted)' }}>becomes {money(pubShown)}</div>}
-                  {ed.pub !== undefined && String(ed.pub).trim() !== '' && pubShown == null && <div style={{ fontSize: 12, color: RED }}>Use +5% or −5%, or a price</div>}
-                  <QuickPct onPick={(t) => setEdit(r.sku, { pub: t })} />
-                  {(r.onClearance || r.listOverride) && <button type="button" className="btn" style={{ marginTop: 4, fontSize: 12, padding: '2px 8px' }} disabled={rowBusy === r.sku} onClick={() => { if (confirm(`Put ${r.sku} back to its tracker price of ${money(r.trackerPrice ?? r.listPrice)}?`)) saveRow(r, { publicPrice: null }); }}>Back to tracker price ({money(r.trackerPrice ?? r.listPrice)})</button>}
+                <td className="pt-price">
+                  $<input style={{ ...cell, width: 84, borderColor: badPub ? RED : undefined }} inputMode="decimal" value={ed.pub ?? plain(r.public)} onChange={(e) => setEdit(r.sku, { pub: e.target.value, pubPct: undefined })} onKeyDown={onKey} aria-label={`Public price for ${r.sku}`} title={badPub ? 'Type a price, or +5% / -5%' : undefined} />
+                  {r.retail > 0 && <> <input style={{ ...pctBox, width: 54, borderColor: badPub ? RED : undefined }} inputMode="decimal" value={ed.pubPct ?? String(pctOfRetail(pubShown ?? r.public, r.retail) ?? '')} onChange={(e) => setPct(r, 'pub', e.target.value)} onKeyDown={onKey} aria-label={`Public price as a percentage of retail for ${r.sku}`} />%</>}
+                  {relPub && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}> → {money(pubShown)}</span>}
+                  {(r.onClearance || r.listOverride) && <> <button type="button" className="pt-tiny" title={`Back to tracker price (${trackerNow})`} disabled={rowBusy === r.sku} onClick={() => { if (confirm(`Put ${r.sku} back to its tracker price of ${trackerNow}?`)) saveRow(r, { publicPrice: null }); }}>↺ {trackerNow}</button></>}
                 </td>
                 <td>{profitCell(profitOf(ed.pub !== undefined && pubShown ? pubShown : r.public, r.cost))}</td>
-                <td>
-                  <div>$ <input style={cell} inputMode="decimal" value={ed.member ?? plain(r.memberNow)} onChange={(e) => setEdit(r.sku, { member: e.target.value, memberPct: undefined })} onKeyDown={onKey} aria-label={`Member price for ${r.sku}`} /></div>
-                  {r.retail > 0 && <div style={{ fontSize: 12.5, marginTop: 4 }}><input style={pctBox} inputMode="decimal" value={ed.memberPct ?? String(pctOfRetail(memShown ?? r.memberNow, r.retail) ?? '')} onChange={(e) => setPct(r, 'member', e.target.value)} onKeyDown={onKey} aria-label={`Member price as a percentage of retail for ${r.sku}`} /> % of retail</div>}
-                  {relMem && <div style={{ fontSize: 12, color: 'var(--muted)' }}>becomes {money(memShown)}</div>}
-                  {ed.member !== undefined && String(ed.member).trim() !== '' && memShown == null && <div style={{ fontSize: 12, color: RED }}>Use +5% or −5%, or a price</div>}
-                  <QuickPct onPick={(t) => setEdit(r.sku, { member: t })} />
-                  {r.memberNext !== r.memberNow && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{money(r.memberNext)} with the new rates</div>}
-                  {r.override != null && <button type="button" className="btn" style={{ marginTop: 4, fontSize: 12, padding: '2px 8px' }} disabled={rowBusy === r.sku} onClick={() => saveRow(r, { member: null })}>Use the rates</button>}
+                <td className="pt-price">
+                  $<input style={{ ...cell, width: 84, borderColor: badMem ? RED : undefined }} inputMode="decimal" value={ed.member ?? plain(r.memberNow)} onChange={(e) => setEdit(r.sku, { member: e.target.value, memberPct: undefined })} onKeyDown={onKey} aria-label={`Member price for ${r.sku}`} title={badMem ? 'Type a price, or +5% / -5%' : undefined} />
+                  {r.retail > 0 && <> <input style={{ ...pctBox, width: 54, borderColor: badMem ? RED : undefined }} inputMode="decimal" value={ed.memberPct ?? String(pctOfRetail(memShown ?? r.memberNow, r.retail) ?? '')} onChange={(e) => setPct(r, 'member', e.target.value)} onKeyDown={onKey} aria-label={`Member price as a percentage of retail for ${r.sku}`} />%</>}
+                  {relMem && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}> → {money(memShown)}</span>}
+                  {r.memberNext !== r.memberNow && <span style={{ fontSize: 11.5, color: 'var(--muted)' }}> (new rates {money(r.memberNext)})</span>}
+                  {r.override != null && <> <button type="button" className="pt-tiny" title="Use the shop-wide rates for this unit again" disabled={rowBusy === r.sku} onClick={() => saveRow(r, { member: null })}>↺ rates</button></>}
                 </td>
                 <td>{profitCell(profitOf(ed.member !== undefined && memShown ? memShown : r.memberNext, r.cost))}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  <button className="btn primary" type="button" disabled={!changed || rowBusy === r.sku} onClick={() => saveRow(r)}>{rowBusy === r.sku ? 'Saving…' : 'Save'}</button>
-                  {changed && <button className="btn" type="button" style={{ marginLeft: 6 }} onClick={() => clearEdit(r.sku)}>Undo</button>}
+                  <button className="btn primary" type="button" style={{ padding: '3px 10px', fontSize: 12.5 }} disabled={!changed || rowBusy === r.sku} onClick={() => saveRow(r)}>{rowBusy === r.sku ? '…' : 'Save'}</button>
+                  {changed && <button className="btn" type="button" style={{ marginLeft: 4, padding: '3px 8px', fontSize: 12.5 }} onClick={() => clearEdit(r.sku)}>Undo</button>}
                 </td>
               </tr>);
           })}

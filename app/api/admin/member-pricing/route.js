@@ -118,7 +118,7 @@ async function bulkTargets(body) {
   return { targets: out, considered: chosen.length };
 }
 
-const previewOpts = (b) => ({ q: b.q, page: b.page, filter: b.filter, sort: b.sort, category: b.category, condition: b.condition });
+const previewOpts = (b) => ({ q: b.q, page: b.page, pageSize: b.pageSize, filter: b.filter, sort: b.sort, category: b.category, condition: b.condition });
 
 // One unit, one or both prices. A public price reaches the TRACKER first (lib/price-sync.js) and the
 // site second, so a failed sheet write changes nothing and the two never disagree. Member prices have
