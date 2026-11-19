@@ -99,7 +99,9 @@ test('THE COMPANY FIGURE COUNTS EVERY SALE, INCLUDING ONES NO REP CLOSED, AND ON
     const p = await repProfit({ name: 'Owner', email: 'o@x.ca' }, { all: true });
     equal(p.company.today.gp, 700);
     equal(p.company.today.sales, 2);
-    equal(p.company.month.gp, 700);
+    equal(p.company.today.revenue, 1500);   // pre-tax sales: 1000 + 500
+    equal(p.company.week.gp, 700); equal(p.company.week.revenue, 1500);
+    equal(p.company.month.gp, 700); equal(p.company.month.sales, 2);
     // the rep's own figure and the team table still read only what they closed
     equal(p.team.find((r) => r.name === 'Roushi').today.gp, 400);
     const q = await repProfit({ name: 'Roushi' });

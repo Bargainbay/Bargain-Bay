@@ -27,21 +27,24 @@ export default function MyProfit({ initial }) {
     return (
       <div className="panel" style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Today’s gross profit · whole company</h2>
-          <span className="hint" style={{ margin: 0 }}>Every sale, whoever closed it · before HST · per-rep figures are in Rep commission below</span>
+          <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Whole company · sales and gross profit</h2>
+          <span className="hint" style={{ margin: 0 }}>Every sale, whoever closed it · before HST · weeks run Monday to Sunday · per-rep figures are in Rep commission below</span>
         </div>
-        <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginTop: 12, alignItems: 'flex-start' }}>
-          <div style={{ flex: '1 1 260px', minWidth: 240 }}>
-            <div style={{ fontSize: 30, fontWeight: 700, color: 'var(--charcoal)' }}>{$(co.today.gp)}</div>
-            <div className="hint" style={{ marginTop: 4 }}>
-              {co.today.sales} sale{co.today.sales === 1 ? '' : 's'} today. A sale counts on the day it is invoiced, and a refund takes it back.
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14, marginTop: 12 }}>
+          {[['Today', co.today], ['This week', co.week], ['This month', co.month]].map(([label, p]) => (
+            <div key={label} style={{ border: '1px solid var(--line-soft)', borderRadius: 8, padding: '10px 12px' }}>
+              <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>{label}</div>
+              <div style={{ marginTop: 6 }}>
+                <div className="hint" style={{ margin: 0 }}>Total sales</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--charcoal)' }}>{$(p.revenue)}</div>
+              </div>
+              <div style={{ marginTop: 6 }}>
+                <div className="hint" style={{ margin: 0 }}>Gross profit</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--charcoal)' }}>{$(p.gp)}</div>
+              </div>
+              <div className="hint" style={{ marginTop: 6 }}>{p.sales} sale{p.sales === 1 ? '' : 's'}</div>
             </div>
-          </div>
-          <div style={{ flex: '1 1 260px', minWidth: 240 }}>
-            <h3 style={{ margin: 0, fontSize: 14, color: 'var(--charcoal)' }}>This month · {data.label}</h3>
-            <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--charcoal)', marginTop: 4 }}>{$(co.month.gp)}</div>
-            <div className="hint">from {co.month.sales} sale{co.month.sales === 1 ? '' : 's'}.</div>
-          </div>
+          ))}
         </div>
         {co.today.orders.length > 0 && (
           <div className="table-wrap" style={{ marginTop: 12 }}>
