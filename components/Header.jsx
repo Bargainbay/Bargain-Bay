@@ -8,9 +8,11 @@ export default function Header({ promo = null }) {
   const [user, setUser] = useState(null);
   const [portals, setPortals] = useState({});
   const [open, setOpen] = useState(false);
+  const [retail, setRetail] = useState(false);
 
   useEffect(() => {
     setCount(getCart().length);
+    try { setRetail(/(?:^|;\s*)bb_view=retail/.test(document.cookie)); } catch {}
     const unsub = onCartChange((cart) => setCount(cart.length));
     fetch('/api/auth/me')
       .then((r) => (r.ok ? r.json() : { user: null }))
@@ -46,6 +48,16 @@ export default function Header({ promo = null }) {
           <div className="header-actions">
             {/* One click back to wherever they work — nobody should have to type a URL. */}
             {portals.staff && <a href="/admin" className="btn primary" style={{ padding: '7px 12px' }}>← {portals.admin ? 'Admin dashboard' : 'Sales portal'}</a>}
+            {portals.staff && (
+              <button type="button" className="btn" style={{ padding: '7px 12px', fontWeight: 700, background: retail ? '#fff4d6' : undefined }}
+                title="Shows the site exactly as the public sees it (no member prices). Click again to go back."
+                onClick={() => {
+                  document.cookie = retail ? 'bb_view=; path=/; max-age=0; samesite=lax' : 'bb_view=retail; path=/; max-age=2592000; samesite=lax';
+                  window.location.reload();
+                }}>
+                {retail ? 'Retail view ON · back to member view' : 'See retail view'}
+              </button>
+            )}
             {portals.vendor && <a href="/vendor" className="btn primary" style={{ padding: '7px 12px' }}>Vendor portal</a>}
             <a href={user ? '/account' : '/login'} className="btn" style={{ padding: '7px 12px' }}>
               {user ? (user.name ? user.name.split(' ')[0] : 'Account') : 'Login'}
