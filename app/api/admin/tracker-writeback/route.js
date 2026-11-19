@@ -5,7 +5,8 @@
 // building block for the nightly Sold catch-up sweep.
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
-import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, applyVendorUpliftToTracker, applyVendorListRuleToTracker, typedPriceReport, appendTrackerUnits, highestSkuNumber, sheetsConfigured } from '../../../../lib/sheets';
+import { loadGrades } from '../../../../lib/grade-pricing';
+import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, applyVendorUpliftToTracker, applyVendorListRuleToTracker, applyGradePricingToTracker, typedPriceReport, appendTrackerUnits, highestSkuNumber, sheetsConfigured } from '../../../../lib/sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -44,6 +45,9 @@ export async function POST(req) {
   // cells, each checked against the pricing rules. Writes nothing.
   // { vendorListRule: { dryRun?: true (default), revert?, fixTyped?, allRows?, vendor? } }: write the
   // retail-percentage rule (VENDOR_LIST_RULES) into the Suggested Sale Price formula.
+  // { gradePricing: { dryRun?: true (default), revert? } }: put the GA/GB New Scratch & Dent bump into the
+  // Suggested Sale Price formula and fill the Grades tab from RS Ops (lib/grade-pricing.js).
+  const gradeRule = b.gradePricing && typeof b.gradePricing === 'object' ? b.gradePricing : null;
   const typedPrices = b.typedPrices === true;
   const listRule = b.vendorListRule && typeof b.vendorListRule === 'object' ? b.vendorListRule : null;
   const vendorUplift = b.vendorUplift && typeof b.vendorUplift === 'object' ? b.vendorUplift : null;
@@ -91,8 +95,15 @@ export async function POST(req) {
     const listRes = listRule
       ? await applyVendorListRuleToTracker({ dryRun: listRule.dryRun !== false, revert: !!listRule.revert, fixTyped: !!listRule.fixTyped, allRows: !!listRule.allRows, vendorKey: String(listRule.vendor || 'abi').toLowerCase() })
       : null;
+    let gradeRes = null;
+    if (gradeRule) {
+      const { grades, error } = await loadGrades();
+      if (error && !Object.keys(grades).length) return NextResponse.json({ error: `RS Ops grades unavailable: ${error}` }, { status: 502 });
+      gradeRes = await applyGradePricingToTracker({ grades, dryRun: gradeRule.dryRun !== false, revert: !!gradeRule.revert });
+      gradeRes.gradesKnown = Object.keys(grades).length;
+    }
     return NextResponse.json({
-      ok: true, added: addRes, vendorListRule: listRes, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
+      ok: true, gradePricing: gradeRes, added: addRes, vendorListRule: listRes, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
       unsoldMissing: unsoldRes.missing, costsUpdated: costRes, invoices: invoiceRes, corrections: correctionRes, vendorUplift: upliftRes, typedPrices: typedRes
     });
   } catch (e) {
