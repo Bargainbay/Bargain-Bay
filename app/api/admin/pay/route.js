@@ -2,9 +2,9 @@
 import { NextResponse } from 'next/server';
 import { getSession, canKeepBooks } from '../../../../lib/auth';
 import { audit } from '../../../../lib/audit';
-import { addOwed, addPayment, voidPayLine, payCandidates, payBalances, linkWaitingPayments } from '../../../../lib/pay-ledger';
+import { addOwed, addPayment, voidPayLine, mergePerson, payCandidates, payBalances, linkWaitingPayments } from '../../../../lib/pay-ledger';
 import { loadBankroll } from '../../../../lib/bankroll-load';
-import { payrollWeek, postWeekOwed } from '../../../../lib/payroll-week';
+import { payrollWeek, postWeekOwed, syncOwedFromClock } from '../../../../lib/payroll-week';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -50,6 +50,11 @@ export async function POST(req) {
     } else if (b.action === 'void') {
       await voidPayLine(b.id, by);
       await audit(session, { action: 'pay.void', entity: 'pay', entityId: String(b.id), summary: `Voided pay line #${b.id}` });
+    } else if (b.action === 'merge_person') {
+      const r = await mergePerson({ from: b.from, to: b.to, by });
+      await syncOwedFromClock(by).catch(() => {});
+      await audit(session, { action: 'pay.merge', entity: 'pay', summary: `Merged ${b.from} into ${b.to}: ${r.linesMoved} lines moved` });
+      extra = r;
     } else {
       return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
     }
