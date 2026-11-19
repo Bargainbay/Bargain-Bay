@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { money } from '../lib/constants';
-import HoursPanel from './HoursPanel';
 
 const money0 = (v) => money(Number(v) || 0);
 
@@ -57,44 +56,16 @@ export default function PayrollManager() {
 
       {err && <div className="error-box">{err}</div>}
 
-      <HoursPanel />
-
-      {data?.balances && (
-        <div className="panel">
-          <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Owed to people</h2>
-          <p className="hint" style={{ marginTop: 0 }}>Earned since {data.balances.from} less what has been paid. Mark paid when you send it.</p>
-          <div className="table-wrap"><table className="admin">
-            <thead><tr><th>Person</th><th style={{ textAlign: 'right' }}>Hours</th><th style={{ textAlign: 'right' }}>Earned</th><th style={{ textAlign: 'right' }}>Paid</th><th style={{ textAlign: 'right' }}>Owed</th><th></th></tr></thead>
-            <tbody>
-              {data.balances.people.map((p) => (
-                <tr key={p.worker}>
-                  <td style={{ fontWeight: 600 }}>{p.worker}</td>
-                  <td style={{ textAlign: 'right' }}>{p.hours ? p.hours.toFixed(2) : '—'}</td>
-                  <td style={{ textAlign: 'right' }}>{money0(p.earned)}</td>
-                  <td style={{ textAlign: 'right' }}>{money0(p.paid)}
-                    {p.payments.map((x) => <div key={x.id} className="hint" style={{ margin: 0, fontSize: 11 }}>{x.paidOn} {money0(x.amount)}{x.note ? ` · ${x.note}` : ''} <a href="#" onClick={(e) => { e.preventDefault(); post({ action: 'void_payment', id: x.id }); }}>undo</a></div>)}
-                  </td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>{money0(p.owed)}</td>
-                  <td>{p.owed > 0 && <button className="btn" disabled={busy} style={{ padding: '4px 10px' }} onClick={() => { if (confirm(`Mark ${money0(p.owed)} paid to ${p.worker}?`)) post({ action: 'clear', worker: p.worker }); }}>Mark paid</button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table></div>
-        </div>
-      )}
-
       <div className="panel">
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>{weekLabel} — pay owed</h2>
           <strong style={{ fontSize: 18, color: 'var(--charcoal)' }}>{report ? money0(report.total) : '—'}</strong>
         </div>
-        {report?.clockWarnings?.map((m) => <div key={m} className="error-box" style={{ marginBottom: 8 }}>{m}</div>)}
-        {report && <p className="hint" style={{ marginTop: 0 }}>{report.from} to {report.to} · <a href={`/admin/hours?from=${report.from}&to=${report.to}`}>see every shift</a></p>}
         {loading ? <p className="hint">Loading…</p> : !report || report.workers.length === 0 ? (
           <p className="hint" style={{ marginTop: 0 }}>No work logged for this week yet. Team members report on Telegram, or add an entry below.</p>
         ) : (
           <div className="table-wrap"><table className="admin">
-            <thead><tr><th>Worker</th><th style={{ textAlign: 'right' }}>Tested</th><th style={{ textAlign: 'right' }}>Cleaned</th><th style={{ textAlign: 'right' }}>Repaired</th><th style={{ textAlign: 'right' }}>Deliveries</th><th style={{ textAlign: 'right' }}>Logged hrs</th><th style={{ textAlign: 'right' }}>Clock hrs</th><th style={{ textAlign: 'right' }}>Pay</th></tr></thead>
+            <thead><tr><th>Worker</th><th style={{ textAlign: 'right' }}>Tested</th><th style={{ textAlign: 'right' }}>Cleaned</th><th style={{ textAlign: 'right' }}>Repaired</th><th style={{ textAlign: 'right' }}>Deliveries</th><th style={{ textAlign: 'right' }}>Hours</th><th style={{ textAlign: 'right' }}>Pay</th></tr></thead>
             <tbody>
               {report.workers.map((w) => (
                 <tr key={w.worker}>
@@ -114,11 +85,6 @@ export default function PayrollManager() {
                     )}
                   </td>
                   <td style={{ textAlign: 'right' }}>{w.hours || '—'}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    {w.clockHours ? `${w.clockHours.toFixed(2)}h · ${money0(w.clockPay)}` : '—'}
-                    {w.doublePay && <div className="hint" style={{ margin: 0, fontSize: 11, color: 'var(--danger)' }}>Also paid per stop on dispatch — check this is not twice</div>}
-                    {w.doubleHours && <div className="hint" style={{ margin: 0, fontSize: 11, color: 'var(--danger)' }}>Has logged hours too — counted twice</div>}
-                  </td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>{money0(w.amount)}</td>
                 </tr>
               ))}
