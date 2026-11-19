@@ -85,6 +85,10 @@
       "schedule": "*/20 * * * *"
     },
     {
+      "path": "/api/cron/stock-photos",
+      "schedule": "20 * * * *"
+    },
+    {
       "path": "/api/cron/vesta",
       "schedule": "30 9 * * *"
     },
