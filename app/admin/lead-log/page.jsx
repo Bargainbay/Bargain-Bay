@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin, isStaff } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
-import { leadFunnel, recentLog, knownDetails } from '../../../lib/lead-log';
+import { leadFunnel, recentLog, knownDetails, assignableReps } from '../../../lib/lead-log';
 import AdminNav from '../../../components/AdminNav';
 import LeadLog from '../../../components/LeadLog';
 
@@ -23,11 +23,11 @@ export default async function LeadLogPage() {
     return (<div><AdminNav active="lead-log" salesOnly={!admin} /><div className="panel">Database not configured — set <code>POSTGRES_URL</code>.</div></div>);
   }
   const viewer = { email: session.email, name: session.name || '', admin };
-  const [funnel, log, details] = await Promise.all([leadFunnel(viewer, { days: 30 }), recentLog(viewer, { days: 14 }), knownDetails(viewer)]);
+  const [funnel, log, details, reps] = await Promise.all([leadFunnel(viewer, { days: 30 }), recentLog(viewer, { days: 14 }), knownDetails(viewer), assignableReps(viewer)]);
   return (
     <div>
       <AdminNav active="lead-log" salesOnly={!admin} />
-      <LeadLog initial={{ funnel, log, details }} isAdmin={admin} />
+      <LeadLog initial={{ funnel, log, details, reps }} isAdmin={admin} />
     </div>
   );
 }

@@ -11,7 +11,7 @@ const api = (method, body) => fetch('/api/admin/lead-log' + (method === 'GET' ? 
 const when = (d) => (d ? new Date(d).toLocaleString('en-CA', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 const pct = (v) => (v == null ? '—' : `${v}%`);
 const DETAIL_SOURCES = ['partner', 'referral', 'lead_team'];
-const blank = { contactName: '', phone: '', email: '', source: '', sourceDetail: '', wantedCategory: '', wanted: '' };
+const blank = { contactName: '', phone: '', email: '', source: '', sourceDetail: '', wantedCategory: '', wanted: '', notes: '', assignTo: '' };
 
 function Field({ id, name, children }) {
   return <div className="field" style={{ margin: 0 }}><label htmlFor={id}>{name}</label>{children}</div>;
@@ -20,8 +20,11 @@ function Kpi({ label: l, value, sub }) {
   return <div className="kpi-card"><div className="kpi-value">{value}</div><div className="kpi-label">{l}</div>{sub && <div className="kpi-sub">{sub}</div>}</div>;
 }
 
-function Row({ l, onChanged }) {
+function Row({ l, reps, isAdmin, onChanged }) {
   const [reason, setReason] = useState('');
+  const [owner, setOwner] = useState(l.owner_email || '');
+  const [adding, setAdding] = useState(false);
+  const [noteText, setNoteText] = useState('');
   const [err, setErr] = useState('');
   async function lose(r) {
     if (!r) return;
@@ -35,6 +38,20 @@ function Row({ l, onChanged }) {
     if (!res.ok) { setErr(res.error || 'Could not save.'); return; }
     onChanged();
   }
+  async function assign() {
+    setErr('');
+    const res = await api('POST', { action: 'assign', id: l.id, ownerEmail: owner });
+    if (!res.ok) { setErr(res.error || 'Could not assign.'); return; }
+    onChanged();
+  }
+  async function addNote() {
+    if (!noteText.trim()) return;
+    setErr('');
+    const res = await api('POST', { action: 'note', id: l.id, notes: noteText });
+    if (!res.ok) { setErr(res.error || 'Could not save the note.'); return; }
+    setNoteText(''); setAdding(false);
+    onChanged();
+  }
   const status = l.status === 'bought' ? <span className="pill paid">Bought</span>
     : l.status === 'lost' ? <span className="pill sold">Lost — {label(LOST_REASONS, l.lost_reason)}</span>
     : <span className="pill">Open</span>;
@@ -43,7 +60,26 @@ function Row({ l, onChanged }) {
       <td>{when(l.created_at)}</td>
       <td><b>{l.contact_name || l.company}</b><div className="hint">{[l.phone, l.email].filter(Boolean).join(' · ')}</div></td>
       <td>{label(LEAD_SOURCES_HUB, l.source) || <span className="hint">Not recorded</span>}{l.detail ? <div className="hint">{l.detail}</div> : null}</td>
-      <td>{[label(WANTED_CATEGORIES, l.wanted_category), l.wanted].filter(Boolean).join(' · ') || <span className="hint">—</span>}</td>
+      <td>{[label(WANTED_CATEGORIES, l.wanted_category), l.wanted].filter(Boolean).join(' · ') || <span className="hint">—</span>}
+        {l.note && <div className="hint" style={{ whiteSpace: 'pre-wrap' }}>Note: {l.note}</div>}
+        {adding ? (
+          <div style={{ marginTop: 4 }}>
+            <textarea rows={2} value={noteText} onChange={(e) => setNoteText(e.target.value)} aria-label="Note" style={{ width: '100%' }} />
+            <button type="button" className="btn" onClick={addNote} style={{ fontSize: 12 }}>Save note</button>{' '}
+            <button type="button" onClick={() => setAdding(false)} style={{ background: 'none', border: 0, cursor: 'pointer', font: 'inherit' }}>Cancel</button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setAdding(true)} style={{ background: 'none', border: 0, padding: 0, marginTop: 2, color: 'var(--link, #06c)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit', fontSize: 12.5 }}>{l.note ? 'Add another note' : 'Add note'}</button>
+        )}
+      </td>
+      <td>
+        {isAdmin ? (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <input type="email" list="ll-reps" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Unassigned" aria-label="Assign to" style={{ width: 160 }} />
+            <button type="button" className="btn" style={{ fontSize: 12 }} disabled={owner === (l.owner_email || '')} onClick={assign}>{owner ? 'Assign' : 'Unassign'}</button>
+          </div>
+        ) : (l.owner_email || <span className="hint">—</span>)}
+      </td>
       <td>
         {status}
         {l.status !== 'bought' && (
@@ -72,7 +108,7 @@ export default function LeadLog({ initial, isAdmin }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const reload = async (d = days) => { const r = await api('GET', d); if (r.ok) setData({ funnel: r.funnel, log: r.log, details: r.details }); };
+  const reload = async (d = days) => { const r = await api('GET', d); if (r.ok) setData({ funnel: r.funnel, log: r.log, details: r.details, reps: r.reps || data.reps }); };
 
   async function save(e) {
     e.preventDefault();
@@ -81,7 +117,7 @@ export default function LeadLog({ initial, isAdmin }) {
     setBusy(false);
     if (!r.ok) { setErr(r.error || 'Could not save.'); return; }
     // Keep the source: the next lead in a batch from the same partner is usually the same source.
-    setF({ ...blank, source: f.source, sourceDetail: f.sourceDetail });
+    setF({ ...blank, source: f.source, sourceDetail: f.sourceDetail, assignTo: f.assignTo });
     setNote('Logged.');
     reload();
   }
@@ -89,6 +125,7 @@ export default function LeadLog({ initial, isAdmin }) {
   const fn = data.funnel;
   return (
     <div>
+      <datalist id="ll-reps">{(data.reps || []).map((r) => <option key={r} value={r} />)}</datalist>
       <form className="panel" onSubmit={save}>
         <h2 style={{ marginTop: 0, fontSize: 16 }}>Log a lead</h2>
         <p className="hint" style={{ marginTop: 0 }}>Write it down the day it arrives. Name, a way to reach them and where it came from are enough; add what they asked for if you know.</p>
@@ -109,6 +146,12 @@ export default function LeadLog({ initial, isAdmin }) {
             <select id="ll-cat" value={f.wantedCategory} onChange={set('wantedCategory')}><option value="">—</option>{WANTED_CATEGORIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
           </Field>
           <Field id="ll-wanted" name="Model, size or budget"><input id="ll-wanted" value={f.wanted} onChange={set('wanted')} placeholder="e.g. LG 36in French door, under $1,200" autoComplete="off" /></Field>
+          <Field id="ll-notes" name="Notes"><textarea id="ll-notes" rows={2} value={f.notes} onChange={set('notes')} placeholder="Anything worth remembering: what they said, when to call back" /></Field>
+          {isAdmin && (
+            <Field id="ll-assign" name="Assign to (blank = unassigned)">
+              <input id="ll-assign" type="email" list="ll-reps" value={f.assignTo} onChange={set('assignTo')} autoComplete="off" />
+            </Field>
+          )}
         </div>
         {err && <p role="alert" style={{ color: 'var(--red, #c33)', fontSize: 14 }}>{err}</p>}
         {note && <p role="status" style={{ color: 'var(--green, #2a7)', fontSize: 14 }}>{note}</p>}
@@ -164,10 +207,10 @@ export default function LeadLog({ initial, isAdmin }) {
       <div className="panel" style={{ marginTop: 18 }}>
         <h2 style={{ marginTop: 0 }}>Recent leads</h2>
         <div className="table-wrap"><table className="admin" style={{ minWidth: 700 }}>
-          <thead><tr><th>Logged</th><th>Who</th><th>Source</th><th>Wanted</th><th>Outcome</th></tr></thead>
+          <thead><tr><th>Logged</th><th>Who</th><th>Source</th><th>Wanted &amp; notes</th><th>Assigned to</th><th>Outcome</th></tr></thead>
           <tbody>
-            {data.log.map((l) => <Row key={l.id} l={l} onChanged={() => reload()} />)}
-            {data.log.length === 0 && <tr><td colSpan={5} className="hint">No leads logged in the last 14 days.</td></tr>}
+            {data.log.map((l) => <Row key={l.id} l={l} reps={data.reps} isAdmin={isAdmin} onChanged={() => reload()} />)}
+            {data.log.length === 0 && <tr><td colSpan={6} className="hint">No leads logged in the last 14 days.</td></tr>}
           </tbody>
         </table></div>
       </div>

@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { getSession, isStaff, isAdmin } from '../../../../lib/auth';
 import { hasDb } from '../../../../lib/db';
 import { LeadError } from '../../../../lib/leads';
-import { logLead, recentLog, leadFunnel, knownDetails, setLeadOutcome } from '../../../../lib/lead-log';
+import { logLead, recentLog, leadFunnel, knownDetails, setLeadOutcome, addLeadNote, assignFromLog, assignableReps } from '../../../../lib/lead-log';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -29,12 +29,13 @@ export async function GET(req) {
   const url = new URL(req.url);
   try {
     const days = url.searchParams.get('days');
-    const [funnel, log, details] = await Promise.all([
+    const [funnel, log, details, reps] = await Promise.all([
       leadFunnel(v, { days: days || 30 }),
       recentLog(v, { days: 14 }),
-      knownDetails(v)
+      knownDetails(v),
+      assignableReps(v)
     ]);
-    return NextResponse.json({ funnel, log, details });
+    return NextResponse.json({ funnel, log, details, reps });
   } catch (e) { return fail(e); }
 }
 
@@ -47,6 +48,10 @@ export async function POST(req) {
     switch (b.action) {
       case 'log': return NextResponse.json(await logLead(b.lead || {}, v));
       case 'outcome': return NextResponse.json(await setLeadOutcome(b.id, { outcome: b.outcome, lostReason: b.lostReason }, v));
+      case 'note': return NextResponse.json(await addLeadNote(b.id, b.notes, v));
+      case 'assign':
+        if (!v.admin) return deny();
+        return NextResponse.json(await assignFromLog(b.id, b.ownerEmail, v));
       default: return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
     }
   } catch (e) { return fail(e); }
