@@ -11,7 +11,7 @@ import { DEFAULT_MEMBER_RATES, MEMBER_RATE_LIMITS, normalizeRates, toPercent } f
 import { money } from '../../../../lib/constants';
 import { getListOverrides, setListOverride, removeListOverride } from '../../../../lib/list-price-overrides';
 import { BULK_MODES, newPriceFor } from '../../../../lib/price-math';
-import { pushPriceToTracker, restoreTrackerPrice } from '../../../../lib/price-sync';
+import { pushPriceToTracker, pushPricesToTracker, restoreTrackerPrice } from '../../../../lib/price-sync';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -118,12 +118,31 @@ async function bulkTargets(body) {
   return { targets: out, considered: chosen.length };
 }
 
+// The tracker half of a batch: ONE sheet read and write for every public price in `items`. Units the
+// site would refuse (consigned stock under its floor) are dropped first and reported, so the sheet is
+// never changed for a price the site then declines. Throws if the sheet cannot be written; the caller
+// then changes nothing.
+async function trackerFirst(items) {
+  const withPublic = items.filter((x) => x.publicPrice !== undefined && x.publicPrice !== null && x.publicPrice !== '');
+  const floors = withPublic.length ? await consignmentFloors(withPublic.map((x) => x.sku)).catch(() => new Map()) : new Map();
+  const refused = new Map();
+  const ok = [];
+  for (const x of withPublic) {
+    const f = floors.get(x.sku);
+    const price = Math.round(Number(x.publicPrice) * 100) / 100;
+    if (f && f.floor > 0 && price + 0.005 < f.floor) refused.set(x.sku, `drop-off stock: it can't go under ${money(f.floor)}`);
+    else ok.push({ sku: x.sku, price });
+  }
+  await pushPricesToTracker(ok);
+  return refused;
+}
+
 const previewOpts = (b) => ({ q: b.q, page: b.page, pageSize: b.pageSize, filter: b.filter, sort: b.sort, category: b.category, condition: b.condition });
 
 // One unit, one or both prices. A public price reaches the TRACKER first (lib/price-sync.js) and the
 // site second, so a failed sheet write changes nothing and the two never disagree. Member prices have
 // no tracker column and live on the site only.
-async function applyPrices(session, sku, body) {
+async function applyPrices(session, sku, body, { trackerDone = false } = {}) {
   const u = await getById(sku).catch(() => null);
   if (!u) return { error: `No product with SKU ${sku}.`, status: 404 };
   const done = [];
@@ -146,7 +165,7 @@ async function applyPrices(session, sku, body) {
         const f = floors.get(sku);
         if (f && f.floor > 0 && price + 0.005 < f.floor) return { error: `${sku} is ${f.vendor ? `${f.vendor}'s` : 'a vendor\u2019s'} drop-off stock: we owe ${money(f.cost)} for it when it sells, so it can't go under ${money(f.floor)}.` };
       }
-      try { await pushPriceToTracker(sku, price); }
+      try { if (!trackerDone) await pushPriceToTracker(sku, price); }
       catch (e) { return { error: `The tracker could not be updated (${e.message}). Nothing was changed.`, status: 502 }; }
       if (price > trackerPrice + 0.005) {
         // ABOVE the tracker price: a list price that wins over the sheet's formula, not a clearance markdown.
@@ -256,12 +275,17 @@ export async function POST(req) {
       const items = (Array.isArray(body.items) ? body.items : []).slice(0, 200);
       if (!items.length) return NextResponse.json({ error: 'Nothing to save.' }, { status: 400 });
       const saved = []; const failed = [];
+      let refused;
+      try { refused = await trackerFirst(items.map((it) => ({ sku: String(it.sku || '').trim(), publicPrice: it.publicPrice }))); }
+      catch (e) { return NextResponse.json({ error: `The tracker could not be updated (${e.message}) Nothing was changed.` }, { status: 502 }); }
       for (const it of items) {
+        const sku = String(it.sku || '').trim();
+        if (refused.has(sku)) { failed.push({ sku, error: refused.get(sku) }); continue; }
         const patch = {};
         if ('publicPrice' in it) patch.publicPrice = it.publicPrice;
         if ('member' in it) patch.member = it.member;
-        const res = await applyPrices(session, String(it.sku || '').trim(), patch);
-        if (res.error) failed.push({ sku: it.sku, error: res.error }); else saved.push(it.sku);
+        const res = await applyPrices(session, sku, patch, { trackerDone: true });
+        if (res.error) failed.push({ sku, error: res.error }); else saved.push(sku);
       }
       const next = await getMemberRates();
       return NextResponse.json({ ok: true, saved, failed, preview: await previewFor(next.rates, next.overrides, previewOpts(body)) });
@@ -275,12 +299,16 @@ export async function POST(req) {
         return NextResponse.json({ ok: true, dryRun: true, considered: t.considered, willChange: t.targets.length, belowCost, sample: t.targets.slice(0, 8) });
       }
       let changed = 0; const failed = [];
+      let refused;
+      try { refused = await trackerFirst(t.targets.map((x) => ({ sku: x.sku, publicPrice: x.movesPublic ? x.newPublic : undefined }))); }
+      catch (e) { return NextResponse.json({ error: `The tracker could not be updated (${e.message}) Nothing was changed.` }, { status: 502 }); }
       for (const x of t.targets) {
+        if (refused.has(x.sku)) { failed.push({ sku: x.sku, error: refused.get(x.sku) }); continue; }
         const patch = {};
         if (x.movesPublic) patch.publicPrice = x.newPublic;
         if (x.movesMember) patch.member = x.newMember;
-        const r = await applyPrices(session, x.sku, patch);
-        if (r.error) failed.push({ sku: x.sku, error: r.error }); else changed++;
+        const res = await applyPrices(session, x.sku, patch, { trackerDone: true });
+        if (res.error) failed.push({ sku: x.sku, error: res.error }); else changed++;
       }
       const next = await getMemberRates();
       return NextResponse.json({ ok: true, changed, failed: failed.slice(0, 20), failedCount: failed.length, preview: await previewFor(next.rates, next.overrides, previewOpts(body)) });
