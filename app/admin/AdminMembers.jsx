@@ -29,7 +29,7 @@ export default function AdminMembers({ initialMembers, heading }) {
     <div>
       <h2 style={{ color: 'var(--charcoal)', marginTop: heading ? 4 : 28 }}>{heading || 'Reseller applications'} ({pending.length} pending)</h2>
       <p className="hint" style={{ marginBottom: 12 }}>
-        Approving a business unlocks wholesale reseller pricing on their account. The rates are set on <a href="/admin/member-pricing">Member pricing</a>.
+        Approving a business unlocks wholesale reseller pricing on their account. The rates are set on <a href="/admin/pricing">Pricing</a>.
       </p>
       {err && <div className="error-box">{err}</div>}
       {pending.length === 0 ? (

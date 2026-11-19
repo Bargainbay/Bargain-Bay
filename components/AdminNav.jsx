@@ -54,7 +54,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     { key: 'sales-services', label: 'Service prices', href: '/admin/sales-services' },
     { key: 'sales-commission', label: 'Rep commission', href: '/admin/sales-commission' },
     // What resellers pay: the four member rates, previewed against live stock, plus one-off prices.
-    { key: 'member-pricing', label: 'Member pricing', href: '/admin/member-pricing' },
+    { key: 'pricing', label: 'Pricing', href: '/admin/pricing' },
     // Who has applied to buy wholesale, who is approved, and what each has bought. Admin: approving
     // one changes what the storefront charges them.
     { key: 'resellers', label: 'Resellers', href: '/admin/resellers' },
