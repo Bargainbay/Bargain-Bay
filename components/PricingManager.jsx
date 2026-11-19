@@ -27,6 +27,10 @@ const HOW = [
   { id: 'retail', label: 'Set to % of retail' }
 ];
 
+// what share of retail a price is, as a number like 65 or 62.5 (null with no retail)
+const pctOfRetail = (price, retail) => (retail > 0 && price > 0 ? Math.round((price / retail) * 1000) / 10 : null);
+const pctBox = { padding: '4px 6px', border: '1px solid var(--line)', borderRadius: 8, width: 62 };
+
 // profit and margin for one price against a cost
 function profitOf(price, cost) {
   if (!cost) return null;
@@ -95,6 +99,14 @@ export default function PricingManager({ initial }) {
   }
 
   const setEdit = (sku, patch) => setEdits((e) => ({ ...e, [sku]: { ...e[sku], ...patch } }));
+  // Typing the percentage itself: 65 means 65% of retail. It fills the price box, so Save works as usual.
+  const setPct = (r, kind, text) => {
+    const clean = text.replace(/[^0-9.]/g, '');
+    const n = Number(clean);
+    const patch = { [`${kind}Pct`]: clean };
+    if (clean !== '' && Number.isFinite(n) && n > 0 && r.retail > 0) patch[kind] = String(Math.round(r.retail * n) / 100);
+    setEdit(r.sku, patch);
+  };
   const clearEdit = (sku) => setEdits((e) => { const n = { ...e }; delete n[sku]; return n; });
 
   // Save one row. Typed text is resolved against what the row shows now ("+5%" etc.).
@@ -188,7 +200,7 @@ export default function PricingManager({ initial }) {
           </p>
         )}
         <p className="hint" style={{ marginTop: 0 }}>
-          Change a price right in the row: type a new price, or click <b>+5%</b> / <b>−5%</b> under it (or type <b>+7%</b>, <b>-25</b>), then <b>Save</b>. To change a whole group, use the box above the table.
+          Change a price right in the row: type a new price, or click <b>+5%</b> / <b>−5%</b> under it (or type <b>+7%</b>, <b>-25</b>), then <b>Save</b>. Every price also shows what <b>percent of retail</b> it is: type a new percentage (say 65) to set the price from it. To change a whole group, use the box above the table.
           A <b>public</b> price change is written to the <b>tracker</b> and the website. <b>Member</b> prices exist on the website only (the tracker has no member column).
           A member never pays more than the public price. <i>Back to tracker price</i> undoes a public change.
         </p>
@@ -265,7 +277,7 @@ export default function PricingManager({ initial }) {
         <div className="table-wrap"><table className="admin">
           <thead><tr>
             <th style={{ width: 28 }}><input type="checkbox" checked={allOnPage} onChange={togglePage} aria-label="Tick every unit on this page" /></th>
-            <th>Unit</th><th>Cost</th><th>Retail</th><th>Public price</th><th>Public profit</th><th>Member price</th><th>Member profit</th><th></th></tr></thead>
+            <th>Unit</th><th>Cost</th><th>Retail</th><th>Public price<div style={{ fontWeight: 400, fontSize: 11.5 }}>and % of retail</div></th><th>Public profit</th><th>Member price<div style={{ fontWeight: 400, fontSize: 11.5 }}>and % of retail</div></th><th>Member profit</th><th></th></tr></thead>
           <tbody>{rows.map((r) => {
             const ed = edits[r.sku] || {};
             const changed = ed.member !== undefined || ed.pub !== undefined;
@@ -283,7 +295,8 @@ export default function PricingManager({ initial }) {
                 <td>{r.cost ? money(r.cost) : <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>none</span>}</td>
                 <td>{r.retail ? money(r.retail) : '—'}</td>
                 <td>
-                  <div>$ <input style={cell} inputMode="decimal" value={ed.pub ?? plain(r.public)} onChange={(e) => setEdit(r.sku, { pub: e.target.value })} onKeyDown={onKey} aria-label={`Public price for ${r.sku}`} /></div>
+                  <div>$ <input style={cell} inputMode="decimal" value={ed.pub ?? plain(r.public)} onChange={(e) => setEdit(r.sku, { pub: e.target.value, pubPct: undefined })} onKeyDown={onKey} aria-label={`Public price for ${r.sku}`} /></div>
+                  {r.retail > 0 && <div style={{ fontSize: 12.5, marginTop: 4 }}><input style={pctBox} inputMode="decimal" value={ed.pubPct ?? String(pctOfRetail(pubShown ?? r.public, r.retail) ?? '')} onChange={(e) => setPct(r, 'pub', e.target.value)} onKeyDown={onKey} aria-label={`Public price as a percentage of retail for ${r.sku}`} /> % of retail</div>}
                   {relPub && <div style={{ fontSize: 12, color: 'var(--muted)' }}>becomes {money(pubShown)}</div>}
                   {ed.pub !== undefined && String(ed.pub).trim() !== '' && pubShown == null && <div style={{ fontSize: 12, color: RED }}>Use +5% or −5%, or a price</div>}
                   <QuickPct onPick={(t) => setEdit(r.sku, { pub: t })} />
@@ -291,7 +304,8 @@ export default function PricingManager({ initial }) {
                 </td>
                 <td>{profitCell(profitOf(ed.pub !== undefined && pubShown ? pubShown : r.public, r.cost))}</td>
                 <td>
-                  <div>$ <input style={cell} inputMode="decimal" value={ed.member ?? plain(r.memberNow)} onChange={(e) => setEdit(r.sku, { member: e.target.value })} onKeyDown={onKey} aria-label={`Member price for ${r.sku}`} /></div>
+                  <div>$ <input style={cell} inputMode="decimal" value={ed.member ?? plain(r.memberNow)} onChange={(e) => setEdit(r.sku, { member: e.target.value, memberPct: undefined })} onKeyDown={onKey} aria-label={`Member price for ${r.sku}`} /></div>
+                  {r.retail > 0 && <div style={{ fontSize: 12.5, marginTop: 4 }}><input style={pctBox} inputMode="decimal" value={ed.memberPct ?? String(pctOfRetail(memShown ?? r.memberNow, r.retail) ?? '')} onChange={(e) => setPct(r, 'member', e.target.value)} onKeyDown={onKey} aria-label={`Member price as a percentage of retail for ${r.sku}`} /> % of retail</div>}
                   {relMem && <div style={{ fontSize: 12, color: 'var(--muted)' }}>becomes {money(memShown)}</div>}
                   {ed.member !== undefined && String(ed.member).trim() !== '' && memShown == null && <div style={{ fontSize: 12, color: RED }}>Use +5% or −5%, or a price</div>}
                   <QuickPct onPick={(t) => setEdit(r.sku, { member: t })} />
