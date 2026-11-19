@@ -174,6 +174,8 @@ remain. **The fix is one key per model in `data/images.json`.** AJ Madison and
 its CDN bot-block scripted lookups (403 even from a browser session) — fetch
 those by hand in a normal browser, don't hammer it.
 
+**Sales owns stock photos (2026-11-19).** The RS Manager's sales tools `stock_photo_gaps` / `set_stock_photo` (confirmed write) list and fill models with no photo, and its prompt makes checking the list a standing duty. Every sync (`alertSalesOfNewPhotoGaps` in `lib/catalog-sync.js`) also emails `SALES_EMAIL` ONCE per newly photo-less model (remembered in setting `stock_photo_alerted`; production only, so a staging mail can't mark models told). The first sync after deploy mails every existing gap once. The assistant cannot fetch manufacturer images itself (CDNs 403 servers), so a person still supplies/approves the link.
+
 **Managed at `/admin/photos` (Photos tab, staff; added 2026-10-05).** Stock photo per
 MODEL via `lib/model-photos.js` / table `model_photos` (migration 0011) — a row
 WINS over `data/images.json`, the file stays as the fallback so nothing was
