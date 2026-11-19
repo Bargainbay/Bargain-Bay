@@ -50,7 +50,6 @@ export async function POST(req) {
       case 'outcome': return NextResponse.json(await setLeadOutcome(b.id, { outcome: b.outcome, lostReason: b.lostReason }, v));
       case 'note': return NextResponse.json(await addLeadNote(b.id, b.notes, v));
       case 'assign':
-        if (!v.admin) return deny();
         return NextResponse.json(await assignFromLog(b.id, b.ownerEmail, v));
       default: return NextResponse.json({ error: 'Unknown action.' }, { status: 400 });
     }

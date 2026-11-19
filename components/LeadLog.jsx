@@ -73,12 +73,12 @@ function Row({ l, reps, isAdmin, onChanged }) {
         )}
       </td>
       <td>
-        {isAdmin ? (
+        {(isAdmin || l.owner_email) ? (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <input type="email" list="ll-reps" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Unassigned" aria-label="Assign to" style={{ width: 160 }} />
-            <button type="button" className="btn" style={{ fontSize: 12 }} disabled={owner === (l.owner_email || '')} onClick={assign}>{owner ? 'Assign' : 'Unassign'}</button>
+            <button type="button" className="btn" style={{ fontSize: 12 }} disabled={owner === (l.owner_email || '') || (!isAdmin && !owner)} onClick={assign}>{owner ? 'Assign' : 'Unassign'}</button>
           </div>
-        ) : (l.owner_email || <span className="hint">—</span>)}
+        ) : <span className="hint">—</span>}
       </td>
       <td>
         {status}
@@ -147,8 +147,8 @@ export default function LeadLog({ initial, isAdmin }) {
           </Field>
           <Field id="ll-wanted" name="Model, size or budget"><input id="ll-wanted" value={f.wanted} onChange={set('wanted')} placeholder="e.g. LG 36in French door, under $1,200" autoComplete="off" /></Field>
           <Field id="ll-notes" name="Notes"><textarea id="ll-notes" rows={2} value={f.notes} onChange={set('notes')} placeholder="Anything worth remembering: what they said, when to call back" /></Field>
-          {isAdmin && (
-            <Field id="ll-assign" name="Assign to (blank = unassigned)">
+          {(
+            <Field id="ll-assign" name={isAdmin ? 'Assign to (blank = unassigned)' : 'Assign to (blank = me)'}>
               <input id="ll-assign" type="email" list="ll-reps" value={f.assignTo} onChange={set('assignTo')} autoComplete="off" />
             </Field>
           )}
