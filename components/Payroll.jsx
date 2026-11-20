@@ -64,7 +64,7 @@ export default function Payroll({ d, setD, extra = {} }) {
                   <td style={{ textAlign: 'right' }}>{cad(p.paid)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 800, color: p.balance > 0 ? 'var(--danger)' : p.balance < 0 ? 'var(--c4)' : 'var(--c1)' }}>
                     {p.balance > 0 ? `owed ${cad(p.balance)}` : p.balance < 0 ? `overpaid ${cad(-p.balance)}` : 'settled'}</td>
-                  <td style={{ textAlign: 'right' }}>{p.thisWeek > 0 ? cad(p.thisWeek) : '—'}</td>
+                  <td style={{ textAlign: 'right' }}>{p.thisWeek > 0 ? cad(p.thisWeek) : '—'}{p.thisWeekOpen > 0 && <div className="hint" style={{ margin: 0, fontSize: 11.5 }}>+ still clocked in</div>}</td>
                   <td style={{ textAlign: 'right' }}><button className="dash-filter" onClick={() => setOpen(open === p.person ? null : p.person)}>{open === p.person ? 'Hide' : 'Details'}</button></td>
                 </tr>
                 {open === p.person && p.lines.map((l) => (
@@ -79,6 +79,14 @@ export default function Payroll({ d, setD, extra = {} }) {
                   </tr>))}
               </Fragment>
             ))}
+            <tr>
+              <td><b>Total</b></td>
+              <td style={{ textAlign: 'right', fontWeight: 700 }}>{cad(people.reduce((t, p) => t + p.owed, 0))}</td>
+              <td style={{ textAlign: 'right', fontWeight: 700 }}>{cad(people.reduce((t, p) => t + p.paid, 0))}</td>
+              <td style={{ textAlign: 'right', fontWeight: 800 }}>{cad(people.reduce((t, p) => t + p.balance, 0))}</td>
+              <td style={{ textAlign: 'right', fontWeight: 700 }}>{cad(people.reduce((t, p) => t + (p.thisWeek || 0), 0))}</td>
+              <td />
+            </tr>
           </tbody></table></div>
       )}
 
