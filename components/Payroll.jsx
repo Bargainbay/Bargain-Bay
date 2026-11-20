@@ -1,5 +1,6 @@
 'use client';
 import { Fragment, useState } from 'react';
+import { isPayrollHidden } from '../lib/payroll-hidden';
 
 // Per person: what they are owed for work, what has been paid (cash from the till or a bank transfer), and the
 // balance. "Owed" is typed from the payroll figure for a period; a payment is what actually left.
@@ -9,7 +10,7 @@ const span = (l) => (l.periodStart ? `${l.periodStart} to ${l.periodEnd}` : '');
 // `extra` is merged into every request (the Payroll page passes { view: 'payroll', weekStart }); with none, the answer is the
 // bankroll data the Financial page holds.
 export default function Payroll({ d, setD, extra = {} }) {
-  const people = d.pay?.people || [];
+  const people = (d.pay?.people || []).filter((p) => !isPayrollHidden(p.person));
   const names = d.pay?.names || [];
   const [owed, setOwed] = useState({ person: '', periodStart: '', periodEnd: '', amount: '', note: '' });
   const [paid, setPaid] = useState({ person: '', amount: '', date: d.date, how: 'cash', periodStart: '', periodEnd: '', note: '', expenseId: '' });

@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Payroll from './Payroll';
+import { isPayrollHidden } from '../lib/payroll-hidden';
 
 // The top of the Payroll page: for each person, the hours they have clocked, what they have earned, what has been paid
 // and what we still owe. Nothing to press: the clock posts to what is owed by itself. Below it sit the payments, the
@@ -12,7 +13,7 @@ export default function PayrollHub({ initial, today }) {
   const [state, setState] = useState(initial); // { hours, pay }
   const hoursBy = new Map(state.hours.map((h) => [keyOf(h.name), h]));
   const payBy = new Map(state.pay.people.map((p) => [keyOf(p.person), p]));
-  const names = [...new Set([...state.hours.map((h) => keyOf(h.name)), ...state.pay.people.map((p) => keyOf(p.person))])];
+  const names = [...new Set([...state.hours.map((h) => keyOf(h.name)), ...state.pay.people.map((p) => keyOf(p.person))])].filter((k) => !isPayrollHidden(k));
   const rows = names.map((k) => {
     const h = hoursBy.get(k), p = payBy.get(k);
     return { name: h?.name || p?.person, hours: h?.hours || 0, owed: p?.owed || 0, paid: p?.paid || 0, balance: p?.balance || 0, thisWeek: p?.thisWeek || 0, h };
