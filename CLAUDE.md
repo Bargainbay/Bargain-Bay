@@ -5609,6 +5609,18 @@ migration `0081_meta_leads_seen` (**run Run schema migration after deploy**), `t
 - **It is the Manager's chore, not just a cron it watches (2026-11-19).** Every pull that brings leads in is logged as `pull_meta_leads` in `manager_actions` (shows under "What the Manager did", read back on the next call). A failing pull's issue carries `fix: 'pull_meta_leads'`, so the unattended pass retries it. By voice: the `pull_meta_leads` tool (Sales Manager and General Manager; internal, no confirm needed). `test/manager.test.mjs` pins the Manager's tool list, so a new tool must be added there on purpose.
 - Not built: Bargain Bay's Page id and a BB lead form (its Meta ad account is disabled for payment), lead-ad webhooks (this polls), auto-assigning pulled leads to a rep.
 
+## The Manager's growth view and morning brief (added 2026-11-20)
+`lib/manager-growth.js` (sales queue, lost demand, listing quality, pricing watch; pure scorers + read-only readers), `lib/manager-brief.js`,
+`/admin/manager/brief` + `/api/admin/manager-brief` (ADMIN; on the Reports hub and linked from the Manager page), `test/manager-growth.test.mjs`.
+Built because the Manager's unattended work was housekeeping only; nothing looked at how SALES were going.
+- **READ-ONLY, and a test greps the file for writes, email, text, payment and photo-setting calls.** It ranks and reports; staff act. It never contacts a customer.
+- **Sales queue:** Bargain Bay's open leads (not RS, not imported, not bought) plus abandoned carts with a unit still for sale, scored by heat, value, how long nobody has called, and a overdue next step. The score is a heuristic (`scoreLead` / `scoreCart`), not a measurement: change the weights deliberately.
+- **Lost demand** reads `lost_reason = 'no_stock'` leads (the lead log) and sets each wanted category against what is live now (`matchesWanted`). It is only as good as reps marking leads; the page says so when empty.
+- **Listing quality** only REPORTS (no price, above retail, no model, vague category, thin title, no condition, no cost). Fix at the tracker row: the sync overwrites site edits. Not auto-fixed on purpose: guessing a category or title is how a wrong listing goes live.
+- **Pricing watch** is advice (stale 90+ days with margin, priced under cost + 10%, above retail). Changing a price still goes through Clearance / the tracker with the usual floors. `staleStockHits` moved here from `manager-business.js`.
+- **Four new scan issues** (`biz-sales-queue`, `biz-lost-demand`, `biz-listing-quality` via `GROWTH_CHECKS`, spread into `BUSINESS_CHECKS`) so the call and the unattended pass can mention them. The voice `morning_brief` tool now includes a trimmed `growth` section (no new tool, so the tool-list tests are unchanged).
+- **Not built:** the Manager does not raise tasks from the queue (abandoned carts already raise theirs), no scheduled email of the brief, and no automatic listing fixes.
+
 ## The Team board — chat and posts for the whole crew (added 2026-11-17)
 `/team` (every crew member; nav tab "Team" with an unread badge, "💬 Team" on the driver app and a link on `/clock`),
 `lib/team-board.js`, `lib/team-board-rules.js` (no imports), `components/TeamChat.jsx` (not `TeamBoard.jsx`, which is the Sales Hub owner view), `/api/team`, `/api/ops/team`,
