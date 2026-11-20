@@ -6,7 +6,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { suite, test, assert, equal } from './_harness.mjs';
 import {
-  callerFor, toolsFor, tierOf, isGated, isOwnerOnly, overApproval, OWNER_APPROVAL_OVER, TOOL_TIER, DEPTS,
+  callerFor, callers, toolsFor, tierOf, isGated, isOwnerOnly, overApproval, OWNER_APPROVAL_OVER, TOOL_TIER, DEPTS,
   stalePricing, ageDays, matchPayment, sameName, dayReport, TRACKER_FREE_FIELDS
 } from '../lib/manager-policy.js';
 import { GM_ONLY } from '../lib/manager-policy.js';
@@ -18,13 +18,17 @@ import { EXPECTED } from '../lib/health.js';
 import { __useTestDatabase } from '../lib/db.js';
 import { migrate } from '../lib/migrate.js';
 
+// The real numbers are NOT in the source (public repo): tests use reserved fictional 555-01xx numbers.
+process.env.MANAGER_CALLERS = 'Owner:4165550100,Ravi:4165550101';
+
 suite('manager team: who may ring in');
 test('only the owner and Ravi are recognised, however the number is written', () => {
-  equal(callerFor('+16476433035')?.name, 'Owner');
-  equal(callerFor('(647) 643-3035')?.name, 'Owner');
-  equal(callerFor('647-244-9765')?.name, 'Ravi');
-  equal(callerFor('+1 647 244 9765')?.name, 'Ravi');
+  equal(callerFor('+14165550100')?.name, 'Owner');
+  equal(callerFor('(416) 555-0100')?.name, 'Owner');
+  equal(callerFor('416-555-0101')?.name, 'Ravi');
+  equal(callerFor('+1 416 555 0101')?.name, 'Ravi');
   equal(callerFor('+16475550123'), null);
+  equal(callerFor('+1 (647) 555-0123'), null);
   equal(callerFor(''), null); equal(callerFor(null), null); equal(callerFor('9765'), null);
 });
 
@@ -36,6 +40,23 @@ test('the General Manager has every tool; each department has a subset that incl
   equal(toolsFor('sales', all).map((t) => t.name), ['set_list_price', 'end_call']);
   equal(toolsFor('nonsense', all).length, 3);   // an unknown department is the GM, never a silent blank
   for (const d of ['delivery', 'sales']) assert(DEPTS[d].tools.includes('end_call') && DEPTS[d].tools.includes('switch_department'));
+});
+test('with MANAGER_CALLERS unset the line refuses EVERYBODY (fails closed), and junk entries are ignored', () => {
+  const keep = process.env.MANAGER_CALLERS;
+  try {
+    delete process.env.MANAGER_CALLERS;
+    equal(callerFor('+14165550100'), null);
+    equal(callers().length, 0);
+    process.env.MANAGER_CALLERS = 'nonumber, :4165550100, Bad:123, Good:(416) 555-0102';
+    equal(callers().length, 1); equal(callerFor('4165550102')?.name, 'Good');
+  } finally { process.env.MANAGER_CALLERS = keep; }
+});
+test('the source holds no real caller numbers', async () => {
+  const fs = await import('node:fs');
+  for (const f of ['lib/manager-policy.js', 'lib/manager-call.js']) {
+    const src = fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+    assert(!/\(?647\)?[\s.-]?(?!555)\d{3}[\s.-]?\d{4}/.test(src), `${f} holds a 647 number`);
+  }
 });
 test('refunds, discounts and voids are owner-only; prices, payments and tracker prices are gated; dispatch is free', () => {
   for (const n of ['refund_invoice', 'apply_discount', 'void_invoice']) { assert(isOwnerOnly(n) && isGated(n), n); }
@@ -128,7 +149,7 @@ async function withDb(fn) {
   try { await fn(client); } finally { __useTestDatabase(null); }
 }
 const call = (client, { caller = 'Owner', dept = 'gm', trigger = 'manual' } = {}) =>
-  client.query(`INSERT INTO manager_calls (to_number, trigger, issues, caller, dept) VALUES ('+16476433035', $1, '{"list":[],"hidden":0}'::jsonb, $2, $3) RETURNING id`, [trigger, caller, dept]).then((r) => r.rows[0].id);
+  client.query(`INSERT INTO manager_calls (to_number, trigger, issues, caller, dept) VALUES ('+14165550100', $1, '{"list":[],"hidden":0}'::jsonb, $2, $3) RETURNING id`, [trigger, caller, dept]).then((r) => r.rows[0].id);
 
 suite('manager team: money waits for a later yes');
 test('a price change only PROPOSES on its first turn, and the model cannot confirm itself', async () => {
@@ -198,11 +219,11 @@ test('an unknown number is refused with no row written; the owner is recognised 
   await withDb(async (client) => {
     equal(await startInboundCall({ from: '+16475550123' }), null);
     equal((await client.query('SELECT count(*)::int AS n FROM manager_calls')).rows[0].n, 0);
-    const c = await startInboundCall({ from: '(647) 244-9765', callSid: 'CA1', dept: 'delivery' });
+    const c = await startInboundCall({ from: '(416) 555-0101', callSid: 'CA1', dept: 'delivery' });
     equal(c.caller, 'Ravi'); equal(c.dept, 'delivery');
     const g = await greeting(c.id);
     assert(/Hi Ravi/.test(g) && /Delivery Manager here/.test(g) && /What do you need\?/.test(g), g);
-    equal((await startInboundCall({ from: '+16476433035', dept: 'bogus' })).dept, 'gm');
+    equal((await startInboundCall({ from: '+14165550100', dept: 'bogus' })).dept, 'gm');
   });
 });
 
