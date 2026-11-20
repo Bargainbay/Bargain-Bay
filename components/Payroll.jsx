@@ -54,7 +54,7 @@ export default function Payroll({ d, setD, extra = {} }) {
 
       {people.length === 0 ? <p className="hint" style={{ margin: 0 }}>Nobody yet. Add what someone is owed for a pay period, then record each payment.</p> : (
         <div className="table-wrap"><table className="admin">
-          <thead><tr><th>Person</th><th style={{ textAlign: 'right' }}>Owed</th><th style={{ textAlign: 'right' }}>Paid</th><th style={{ textAlign: 'right' }}>Balance</th><th /></tr></thead>
+          <thead><tr><th>Person</th><th style={{ textAlign: 'right' }}>Owed</th><th style={{ textAlign: 'right' }}>Paid</th><th style={{ textAlign: 'right' }}>Balance (to last week)</th><th style={{ textAlign: 'right' }}>This week so far</th><th /></tr></thead>
           <tbody>
             {people.map((p) => (
               <Fragment key={p.person}>
@@ -64,11 +64,12 @@ export default function Payroll({ d, setD, extra = {} }) {
                   <td style={{ textAlign: 'right' }}>{cad(p.paid)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 800, color: p.balance > 0 ? 'var(--danger)' : p.balance < 0 ? 'var(--c4)' : 'var(--c1)' }}>
                     {p.balance > 0 ? `owed ${cad(p.balance)}` : p.balance < 0 ? `overpaid ${cad(-p.balance)}` : 'settled'}</td>
+                  <td style={{ textAlign: 'right' }}>{p.thisWeek > 0 ? cad(p.thisWeek) : '—'}</td>
                   <td style={{ textAlign: 'right' }}><button className="dash-filter" onClick={() => setOpen(open === p.person ? null : p.person)}>{open === p.person ? 'Hide' : 'Details'}</button></td>
                 </tr>
                 {open === p.person && p.lines.map((l) => (
                   <tr key={`${p.person}${l.id}`}>
-                    <td colSpan={5} style={{ fontSize: 13.5 }}>
+                    <td colSpan={6} style={{ fontSize: 13.5 }}>
                       {l.kind === 'owed'
                         ? <>Owed <b>{cad(l.amount)}</b> for {span(l) || 'a period'}</>
                         : <>Paid <b>{cad(l.amount)}</b> on {l.paidOn} · {l.how === 'cash' ? 'cash from the till' : l.waitingForBank ? 'bank transfer (waiting for the bank to show it)' : 'bank transfer'}{span(l) ? ` · for ${span(l)}` : ''}</>}
