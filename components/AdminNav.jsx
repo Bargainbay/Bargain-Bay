@@ -77,6 +77,7 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     // Looked at every evening, so it gets its own tab rather than hiding in the hub.
     // The cost list that feeds it is one click from that page.
     { key: 'daily-pnl', label: 'Daily P&L', href: '/admin/daily-pnl' },
+    { key: 'cash-split', label: 'Where the money goes', href: '/admin/cash-split' },
     { key: 'reports', label: 'Reports', href: '/admin/reports' },
     // The agent village is its own section: a game-style view of every job and
     // assistant, not a report. Admin only.

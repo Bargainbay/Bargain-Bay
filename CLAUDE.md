@@ -5703,3 +5703,15 @@ exactly three things: `GET` the hours report, `POST {action:'shift_create'}` and
 `audit_log` row by `hours-agent` and the shift is stamped "edited by AI manager". Key lives in `~/.claude/secrets/hours-agent.key` on the owner's
 Mac, never in the repo. Rotate: new value in Vercel + redeploy. Staff-clock (`staff_shifts`) edits are NOT covered; only driver shifts.
 - **REFURBISHED units are NOT in the Black Friday sale (owner, 2026-11-18).** `inSale` in `lib/bf-hero.js` excludes them from the cards, from `topOffPct` (the headline can never be a refurbished unit's discount) and from the hero's "units marked down" count. They stay on `/clearance` and `/refurbished` like any other day.
+
+## Where the money goes — the running split of the bankroll (added 2026-11-20)
+`/admin/cash-split` (ADMIN; nav tab "Where the money goes", Reports hub, `lib/cash-split.js`, `lib/cash-split-math.js` (no imports), `test/cash-split.test.mjs`).
+Owner's ask: after past cash erosion, a running total of how much of what we take in must go back into product, how much is set aside for labour
+(for the day it was worked) and how much is profit. Built on `dailyPnl()` (which gained `productCost` = cost of units sold) so it agrees with the Daily P&L.
+- **Four piles that add back to the sales to the cent**: product (cost of units sold), labour (staff wages + driver pay + driver hours), running costs
+  (overhead, truck, fuel, other delivery costs), profit. A negative profit is shown as "eating into the bankroll", never hidden.
+- **Stock still to put back = product sold less supplier-invoice subtotals in the same period** (`purchase_invoices`, null if unreadable). Only counts
+  invoices that were recorded; POs received with no invoice yet are not in it.
+- **Bankroll shown for comparison; only the stock still owed is taken off it.** Wages paid and bills paid are not tracked against these days, so labour and
+  running costs are shown as accrued, not netted.
+- Sales are on the invoice date (same SALE basis); units with no cost on file count as zero product, so product reads low until costs are entered.
