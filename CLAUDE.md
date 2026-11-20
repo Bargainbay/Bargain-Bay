@@ -2381,8 +2381,7 @@ discrepancy or thing to work on, takes instructions by voice and fixes what it s
   speaks, a Claude tool loop decides what to say. `twilioSignatureOk`, `sayTwiml` and `callBaseUrl` are IMPORTED from
   `lib/import-call.js`: one definition of "really from Twilio". The webhook has the same two locks (Twilio signature + an HMAC
   token for the call id) and must keep both.
-- **It rings ONE number: the owner's, (647) 643-3035** (`managerTarget`: env `MANAGER_CALL_TO`, setting `manager_call_to`, else
-  that default). Never a number from a request or a browser. `outbound('voice')` refuses outside production.
+- **It rings ONE number: the owner's** (`managerTarget`: env `MANAGER_CALL_TO`, else setting `manager_call_to`; **no default in the source since 2026-11-20, because this repository is public** - unset rings nobody and the scan raises a high issue in production). Never a number from a request or a browser. `outbound('voice')` refuses outside production.
 - **The scan is the single list** (phone, page and email agree). Checks: scheduled jobs/config (the same `evaluateHealth` as the
   daily email), models with no stock photo, /shop and /feed up and /feed vs the database, inventory sync age, prices at zero or
   above retail, stock gaps, loose dispatch stops, unconfirmed door cash, pending reseller applications, the owner's notes.
@@ -5515,7 +5514,7 @@ backups, sync) with no view of sales, deliveries or money, which is why it sound
   managers a subset (`DEPTS` in the policy file), and `switch_department` changes hat mid-call. A department's work rolls up into the GM's
   end-of-day report. Every action carries `detail.dept`.
 - **Inbound calls (owner or Ravi only).** Point a Twilio number's "A call comes in" webhook at `/api/manager/inbound` (`?dept=delivery|sales`
-  optional). Twilio signature AND caller ID on the allow-list (`CALLERS`: (647) 643-3035 owner, (647) 244-9765 Ravi); anyone else hears
+  optional). Twilio signature AND caller ID on the allow-list (`callers()` in `lib/manager-policy.js`, read from env `MANAGER_CALLERS` = `Owner:<10 digits>,Ravi:<10 digits>`; **numbers are NOT in the source** (public repo, caller ID is spoofable) and unset refuses everybody); anyone else hears
   "private line" before any row is written. **Ravi has the same authority as the owner on a call** (owner named him); his name is on the call and
   in the notifications. Caller ID can be spoofed, so money still needs the read-back and a later-turn yes.
 - **Tiers (`TOOL_TIER`).** `act`: done now, emailed after (assign drivers, windows, run order, non-price tracker cells, follow-ups, payments it can verify).
@@ -5608,6 +5607,18 @@ migration `0081_meta_leads_seen` (**run Run schema migration after deploy**), `t
 - Workshop-board leads are hidden from Dispatch, the chase cron and the voice agent until they pay (`workshop.metaLead` inside `isUnpaidApplication`), take no seat, and cannot use a pay link.
 - **It is the Manager's chore, not just a cron it watches (2026-11-19).** Every pull that brings leads in is logged as `pull_meta_leads` in `manager_actions` (shows under "What the Manager did", read back on the next call). A failing pull's issue carries `fix: 'pull_meta_leads'`, so the unattended pass retries it. By voice: the `pull_meta_leads` tool (Sales Manager and General Manager; internal, no confirm needed). `test/manager.test.mjs` pins the Manager's tool list, so a new tool must be added there on purpose.
 - Not built: Bargain Bay's Page id and a BB lead form (its Meta ad account is disabled for payment), lead-ad webhooks (this polls), auto-assigning pulled leads to a rep.
+
+## The Manager's growth view and morning brief (added 2026-11-20)
+`lib/manager-growth.js` (sales queue, lost demand, listing quality, pricing watch; pure scorers + read-only readers), `lib/manager-brief.js`,
+`/admin/manager/brief` + `/api/admin/manager-brief` (ADMIN; on the Reports hub and linked from the Manager page), `test/manager-growth.test.mjs`.
+Built because the Manager's unattended work was housekeeping only; nothing looked at how SALES were going.
+- **READ-ONLY, and a test greps the file for writes, email, text, payment and photo-setting calls.** It ranks and reports; staff act. It never contacts a customer.
+- **Sales queue:** Bargain Bay's open leads (not RS, not imported, not bought) plus abandoned carts with a unit still for sale, scored by heat, value, how long nobody has called, and a overdue next step. The score is a heuristic (`scoreLead` / `scoreCart`), not a measurement: change the weights deliberately.
+- **Lost demand** reads `lost_reason = 'no_stock'` leads (the lead log) and sets each wanted category against what is live now (`matchesWanted`). It is only as good as reps marking leads; the page says so when empty.
+- **Listing quality** only REPORTS (no price, above retail, no model, vague category, thin title, no condition, no cost). Fix at the tracker row: the sync overwrites site edits. Not auto-fixed on purpose: guessing a category or title is how a wrong listing goes live.
+- **Pricing watch** is advice (stale 90+ days with margin, priced under cost + 10%, above retail). Changing a price still goes through Clearance / the tracker with the usual floors. `staleStockHits` moved here from `manager-business.js`.
+- **Four new scan issues** (`biz-sales-queue`, `biz-lost-demand`, `biz-listing-quality` via `GROWTH_CHECKS`, spread into `BUSINESS_CHECKS`) so the call and the unattended pass can mention them. The voice `morning_brief` tool now includes a trimmed `growth` section (no new tool, so the tool-list tests are unchanged).
+- **Not built:** the Manager does not raise tasks from the queue (abandoned carts already raise theirs), no scheduled email of the brief, and no automatic listing fixes.
 
 ## The Team board — chat and posts for the whole crew (added 2026-11-17)
 `/team` (every crew member; nav tab "Team" with an unread badge, "💬 Team" on the driver app and a link on `/clock`),
