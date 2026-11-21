@@ -18,7 +18,8 @@ import OpsSection from '../../../components/OpsSection';
 import FinFoldBar from '../../../components/FinFoldBar';
 import ExpenseRules from '../../../components/ExpenseRules';
 import RuleSuggestions from '../../../components/RuleSuggestions';
-import { Kpi, HBars, TrendChart } from '../../../components/charts';
+import FinancialKpis from '../../../components/FinancialKpis';
+import { HBars, TrendChart } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Financial — Bargain Bay' };
@@ -74,14 +75,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
       </div>
       <DashboardFilters periods={DASH_PERIODS} active={period} />
 
-      <div className="dash-kpis">
-        <Kpi label="Revenue" value={money(k.revenue)} />
-        <Kpi label="Gross profit" value={money(k.grossProfit)} sub={`${k.marginPct.toFixed(1)}% margin · COGS ${money(k.cogs)}`} />
-        <Kpi label="Labor" value={money(k.labor || 0)} sub="crew pay this period (payroll)" />
-        <Kpi label="Operating costs" value={money(k.opex)} sub={`${money(k.expenses)} ops + ${money(k.labor || 0)} labor + ${money(k.adSpend)} ads`} />
-        <Kpi label="Net profit" value={money(k.netProfit)} sub="gross − labor − expenses − ads" />
-        <Kpi label="Inventory capital" value={money(k.inventoryCost)} sub="COGS in stock" />
-      </div>
+      <FinancialKpis d={d} periodLabel={periodLabel(period)} />
 
       <OpsSection scope="fin" id="trend" title="Gross profit trend" defaultOpen>
       <div className="panel" style={{ marginTop: 18 }}>
