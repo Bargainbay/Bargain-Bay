@@ -65,7 +65,7 @@ export default function Payroll({ d, setD, extra = {} }) {
                   <td style={{ textAlign: 'right' }}>{cad(p.paid)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 800, color: p.balance > 0 ? 'var(--danger)' : p.balance < 0 ? 'var(--c4)' : 'var(--c1)' }}>
                     {p.balance > 0 ? `owed ${cad(p.balance)}` : p.balance < 0 ? `overpaid ${cad(-p.balance)}` : 'settled'}</td>
-                  <td style={{ textAlign: 'right' }}>{p.thisWeek > 0 ? cad(p.thisWeek) : '—'}{p.thisWeekOpen > 0 && <div className="hint" style={{ margin: 0, fontSize: 11.5 }}>+ still clocked in</div>}</td>
+                  <td style={{ textAlign: 'right' }}>{p.thisWeek > 0 ? cad(p.thisWeek) : (p.thisWeekPaid > 0 ? '$0.00' : '—')}{p.thisWeekPaid > 0 && <div className="hint" style={{ margin: 0, fontSize: 11.5 }}>{cad(p.thisWeekPaid)} already paid</div>}{p.thisWeekOpen > 0 && <div className="hint" style={{ margin: 0, fontSize: 11.5 }}>+ still clocked in</div>}</td>
                   <td style={{ textAlign: 'right' }}><button className="dash-filter" onClick={() => setOpen(open === p.person ? null : p.person)}>{open === p.person ? 'Hide' : 'Details'}</button></td>
                 </tr>
                 {open === p.person && p.lines.map((l) => (
