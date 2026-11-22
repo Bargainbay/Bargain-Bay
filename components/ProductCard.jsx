@@ -21,7 +21,9 @@ export default function ProductCard({ unit, count = 1 }) {
   return (
     <div className={'card' + (unit.onClearance ? ' card-clearance' : '')}>
       {unit.onClearance
-        ? <span className="clearance-badge">Clearance</span>
+        ? (/black friday/i.test(unit.clearanceNote || '')
+          ? <span className="clearance-badge bf-badge">Black Friday Deal</span>
+          : <span className="clearance-badge">Clearance</span>)
         : off > 0 && <span className="off-badge">{off}% off</span>}
       {grouped && <span className="count-badge">{count} available</span>}
       <a href={href} className="thumb">

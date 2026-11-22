@@ -66,6 +66,7 @@ function forPanel(x, sold) {
     compareAt: x.compareAt || 0,
     clientPrice: x.clientPrice,
     onClearance: !!x.onClearance,
+    bf: /black friday/i.test(x.clearanceNote || ''),
     isMemberPrice: !!x.isMemberPrice,
     image: x.image,
     // The gallery lives in the buy panel, so the photos have to travel with the
