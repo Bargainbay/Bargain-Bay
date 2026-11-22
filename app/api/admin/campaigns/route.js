@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { getSession, isAdmin, validEmail, normalizeEmail } from '../../../../lib/auth';
 import { emailConfigured } from '../../../../lib/email';
 import { smsConfigured, smsMarketingConfigured } from '../../../../lib/sms';
-import { audience, audienceCounts, consentCounts, sendEmailCampaign, sendSmsCampaign } from '../../../../lib/campaigns';
+import { audience, audienceCounts, consentCounts, sendEmailCampaign, sendSmsCampaign, campaignRecipients } from '../../../../lib/campaigns';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const maxDuration = 300; // a few hundred emails, paced under Resend's rate limit
 
 async function admin() {
   const s = await getSession();
@@ -20,6 +21,7 @@ export async function GET(req) {
   const sp = new URL(req.url).searchParams;
   const seg = sp.get('segment');
   const segment = SEGMENTS.includes(seg) ? seg : 'buyers';
+  if (sp.get('key')) return NextResponse.json({ recipients: await campaignRecipients(sp.get('key')) });
   const channel = sp.get('channel') === 'sms' ? 'sms' : 'email';
   const counts = await audienceCounts(segment);
   // How many of that segment we may LAWFULLY message, and why the rest we may
@@ -67,7 +69,7 @@ export async function POST(req) {
   // ---- full campaign ----
   const recipients = await audience(segment);
   const result = channel === 'email'
-    ? await sendEmailCampaign({ recipients, subject, message, html, segment })
+    ? await sendEmailCampaign({ recipients, subject, message, html, segment, skip: Array.isArray(body.skip) ? body.skip : [], campaignKey: String(body.campaignKey || '') })
     : await sendSmsCampaign({ recipients, message });
   return NextResponse.json({ ok: true, result });
 }
