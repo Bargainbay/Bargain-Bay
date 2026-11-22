@@ -239,6 +239,7 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
 .card-model { font-size: 12px; color: var(--muted); font-family: ui-monospace, monospace; }
 .price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
 .price { font-size: 18px; font-weight: 600; color: var(--taupe-dark); }
+.save-tag { font-size: 12px; font-weight: 700; color: #1e7b3c; white-space: nowrap; }
 .compare { font-size: 13px; color: var(--muted); text-decoration: line-through; }
 .off-badge {
   position: absolute; top: 10px; right: 10px; background: var(--taupe); color: #fff;

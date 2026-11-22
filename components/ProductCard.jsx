@@ -38,6 +38,7 @@ export default function ProductCard({ unit, count = 1 }) {
           {grouped && <span className="from-label">from</span>}
           <span className={'price' + (unit.onClearance ? ' price-clearance' : '') + (unit.isMemberPrice ? ' price-member' : '')}>{money(unit.price)}</span>
           {!grouped && unit.compareAt > unit.price && <span className="compare">{money(unit.compareAt)}</span>}
+          {!grouped && unit.compareAt > unit.price && <span className="save-tag">{off >= 40 ? `${off}% off` : `Save ${money(Math.round(unit.compareAt - unit.price)).replace(/\.00$/, '')}`}</span>}
         </div>
         {unit.isMemberPrice && <div className="member-tag">Member price</div>}
         <div style={{ marginTop: 'auto', paddingTop: 8 }}>
