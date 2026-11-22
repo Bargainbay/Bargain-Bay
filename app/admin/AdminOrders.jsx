@@ -45,10 +45,11 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
   const [byStatus, setByStatus] = useState(initialByStatus || {});
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [q, setQ] = useState('');
   // The window the rows on screen actually came from — NOT the boxes, which the
   // user may have typed in and not applied yet. Load more has to page through
   // the same window that produced the rows above it.
-  const [window_, setWindow] = useState({ from: '', to: '' });
+  const [window_, setWindow] = useState({ from: '', to: '', q: '' });
   const [loading, setLoading] = useState('');
   const [savingId, setSavingId] = useState(null);
   const [error, setError] = useState('');
@@ -124,12 +125,13 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
 
   // One trip to /api/admin/orders. `append` is what separates "load 200 more"
   // (keep what's on screen) from applying a filter (replace it).
-  async function fetchPage({ from: f, to: t, offset, append }) {
+  async function fetchPage({ from: f, to: t, q: qq, offset, append }) {
     setLoading(append ? 'more' : 'filter'); setError('');
     try {
       const qs = new URLSearchParams({ limit: String(pageSize), offset: String(offset) });
       if (f) qs.set('from', f);
       if (t) qs.set('to', t);
+      if (qq) qs.set('q', qq);
       const res = await fetch(`/api/admin/orders?${qs}`);
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Could not load orders'); return; }
@@ -143,7 +145,7 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
       });
       if (data.total != null) setTotal(data.total);
       if (data.byStatus) setByStatus(data.byStatus);
-      setWindow({ from: f || '', to: t || '' });
+      setWindow({ from: f || '', to: t || '', q: qq || '' });
     } catch {
       setError('Network error');
     } finally {
@@ -151,7 +153,7 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
     }
   }
 
-  const filtered = Boolean(window_.from || window_.to);
+  const filtered = Boolean(window_.from || window_.to || window_.q);
 
   return (
     <div>
@@ -175,6 +177,13 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
         </div>
       )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 10 }}>
+        <label style={{ fontSize: 12, color: 'var(--muted)', flex: '1 1 240px', maxWidth: 360 }}>
+          Search<br />
+          <input type="search" value={q} placeholder="Name, email, phone, BB- number, address, SKU, item…"
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') fetchPage({ from, to, q, offset: 0, append: false }); }}
+            style={{ width: '100%', padding: '4px 7px', fontSize: 13 }} />
+        </label>
         <label style={{ fontSize: 12, color: 'var(--muted)' }}>
           From<br />
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: 'auto', padding: '4px 7px', fontSize: 13 }} />
@@ -184,19 +193,19 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ width: 'auto', padding: '4px 7px', fontSize: 13 }} />
         </label>
         <button className="btn" style={{ padding: '5px 11px', fontSize: 12.5 }} disabled={Boolean(loading)}
-          onClick={() => fetchPage({ from, to, offset: 0, append: false })}>
+          onClick={() => fetchPage({ from, to, q, offset: 0, append: false })}>
           {loading === 'filter' ? 'Loading…' : 'Apply'}
         </button>
-        {(filtered || from || to) && (
+        {(filtered || from || to || q) && (
           <button className="btn" style={{ padding: '5px 11px', fontSize: 12.5 }} disabled={Boolean(loading)}
-            onClick={() => { setFrom(''); setTo(''); fetchPage({ from: '', to: '', offset: 0, append: false }); }}>
+            onClick={() => { setFrom(''); setTo(''); setQ(''); fetchPage({ from: '', to: '', q: '', offset: 0, append: false }); }}>
             Clear
           </button>
         )}
         <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
           {orders.length < total
-            ? <>Showing the <b>{orders.length}</b> most recent of <b>{total}</b>{filtered ? ' in this range' : ''} — older ones are below the cut.</>
-            : <>Showing all <b>{total}</b>{filtered ? ' in this range' : ''}.</>}
+            ? <>Showing the <b>{orders.length}</b> most recent of <b>{total}</b>{filtered ? ' matching' : ''} — older ones are below the cut.</>
+            : <>Showing all <b>{total}</b>{filtered ? ' matching' : ''}.</>}
         </span>
       </div>
       <p className="hint" style={{ marginBottom: 14 }}>
@@ -394,7 +403,7 @@ export default function AdminOrders({ initialOrders, total: initialTotal = null,
       {orders.length < total && (
         <div style={{ marginTop: 12, textAlign: 'center' }}>
           <button className="btn" disabled={Boolean(loading)}
-            onClick={() => fetchPage({ from: window_.from, to: window_.to, offset: orders.length, append: true })}>
+            onClick={() => fetchPage({ from: window_.from, to: window_.to, q: window_.q, offset: orders.length, append: true })}>
             {loading === 'more' ? 'Loading…' : `Load ${Math.min(pageSize, total - orders.length)} more`}
           </button>
           <div className="hint" style={{ marginTop: 6 }}>

@@ -31,7 +31,8 @@ export async function GET(req) {
     limit: sp.get('limit'),
     offset: sp.get('offset'),
     from: sp.get('from'),
-    to: sp.get('to')
+    to: sp.get('to'),
+    q: sp.get('q')
   };
 
   try {
