@@ -827,6 +827,10 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
    used on a warehouse touchscreen with no trackpad, where a horizontal scroll
    area nobody can see the edge of is a column nobody knows exists. */
 .disp-strip { position: relative; display: flex; align-items: stretch; gap: 4px; }
+/* The page is capped at 1140px (~4 columns). Break out to the full window so every driver is on screen at once (desktop only). */
+@media (min-width: 701px) {
+  .disp-strip { width: calc(100vw - 32px); margin-left: calc(50% - 50vw + 16px); }
+}
 .disp-cols {
   display: flex; gap: 14px; align-items: flex-start;
   overflow-x: auto; padding-bottom: 10px; flex: 1 1 auto;
@@ -857,7 +861,8 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .disp-addnum { display: flex; gap: 4px; align-items: center; }
 .disp-addnum input { width: 104px; padding: 6px 8px; font-size: 13px; }
 .disp-col {
-  flex: 0 0 300px; min-width: 0;
+  /* Columns share the width equally so every driver fits in one view; below 210px the strip scrolls sideways as before. */
+  flex: 1 1 0; min-width: 210px;
   background: var(--card); border: 1px solid var(--line);
   border-radius: 12px; padding: 12px;
 }
