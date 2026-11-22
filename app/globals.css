@@ -866,6 +866,9 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
   background: var(--card); border: 1px solid var(--line);
   border-radius: 12px; padding: 12px;
 }
+/* Drivers with no stops that day: a narrow column of names, not a full one each. */
+.disp-col.disp-col-idle { flex: 0 0 120px; min-width: 0; opacity: .8; }
+.disp-idle-list { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .disp-col-head {
   display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
   margin: 0 0 10px; font-size: 15px; color: var(--charcoal);
