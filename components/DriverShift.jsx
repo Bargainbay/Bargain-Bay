@@ -47,6 +47,12 @@ export default function DriverShift({ onChanged }) {
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    const refused = (e) => { setOk(''); setForm(null); setErr(e.detail?.message || 'That didn’t save.'); load(); };
+    window.addEventListener('rs-shift-refused', refused);
+    return () => window.removeEventListener('rs-shift-refused', refused);
+  }, []);
+
   async function answer(a) {
     setQuestion(null);
     try {
