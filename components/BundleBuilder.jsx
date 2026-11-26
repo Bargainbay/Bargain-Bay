@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import SmsOptIn from './SmsOptIn';
 
 const fmt = (n) => '$' + (Number(n) || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -10,6 +11,7 @@ export default function BundleBuilder({ units = [], user = null }) {
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState('');
   const [note, setNote] = useState('');
+  const [smsOptIn, setSmsOptIn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [done, setDone] = useState(null);
@@ -39,7 +41,7 @@ export default function BundleBuilder({ units = [], user = null }) {
       const res = await fetch('/api/quote-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone, note, skus: picked })
+        body: JSON.stringify({ name, email, phone, note, skus: picked, smsOptIn })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Could not submit your request.'); return; }
@@ -123,6 +125,7 @@ export default function BundleBuilder({ units = [], user = null }) {
           <label>Phone (optional)</label>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 555-5555" />
         </div>
+        <SmsOptIn checked={smsOptIn} onChange={setSmsOptIn} />
         <div className="field">
           <label>Anything else? (optional)</label>
           <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Delivery area, timing, an item you didn't see in stock…" />

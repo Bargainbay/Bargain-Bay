@@ -1,3 +1,4 @@
+import SmsSubscribe from '../../components/SmsSubscribe';
 import { getAvailable } from '../../lib/inventory';
 import { getSession } from '../../lib/auth';
 import { decorate } from '../../lib/pricing';
@@ -51,6 +52,8 @@ export default async function DealsPage() {
           </p>
         </div>
       </section>
+
+      <SmsSubscribe where="deals page" />
 
       {snap.giveaway && (
         <a href="/giveaway" className="deal-giveaway" aria-label="Enter the giveaway">

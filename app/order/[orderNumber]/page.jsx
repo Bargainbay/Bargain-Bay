@@ -1,3 +1,4 @@
+import SmsSubscribe from '../../../components/SmsSubscribe';
 import { notFound } from 'next/navigation';
 import { hasDb } from '../../../lib/db';
 import { getOrderByNumber } from '../../../lib/orders';
@@ -233,6 +234,8 @@ export default async function OrderPage({ params, searchParams }) {
           </p>
         )}
       </div>
+
+      <SmsSubscribe where="order page" defaultPhone={order.phone || ''} />
 
       <p className="hint">Questions about this order? Email <a href={`mailto:${SALES_EMAIL}`} style={{ textDecoration: 'underline' }}>{SALES_EMAIL}</a> with your order number.</p>
     </div>

@@ -1,3 +1,4 @@
+import SmsSubscribe from '../../components/SmsSubscribe';
 import { redirect } from 'next/navigation';
 import { getSession } from '../../lib/auth';
 import { hasDb, query } from '../../lib/db';
@@ -76,6 +77,8 @@ export default async function AccountPage({ searchParams }) {
           <p style={{ fontSize: 14.5, margin: 0 }}>Your clients, their orders and your commission. <a href="/partner" style={{ textDecoration: 'underline', fontWeight: 700 }}>Open the partner portal →</a></p>
         </div>
       )}
+
+      <SmsSubscribe where="account page" defaultPhone={profile.phone || ''} />
 
       {!(seat && seat.role === 'affiliate') && <div className="panel">
         <h2>Wholesale / Reseller access</h2>

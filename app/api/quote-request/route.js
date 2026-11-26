@@ -1,3 +1,5 @@
+import { subscribeToTexts } from '../../../lib/sms-subscribe';
+import { clientIp } from '../../../lib/antifraud';
 import { NextResponse } from 'next/server';
 import { normalizeEmail, validEmail } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
@@ -24,6 +26,10 @@ export async function POST(req) {
 
   try {
     const r = await createQuoteRequest({ name: body.name, email, phone: body.phone, skus, note: body.note });
+    if (body.smsOptIn === true && body.phone) {
+      await subscribeToTexts({ phone: body.phone, name: body.name, source: 'quote_request', ip: clientIp(req), where: 'the quote request form' })
+        .catch((e) => console.error('sms consent record failed', e.message));
+    }
     const rows = r.items
       .map((it) => `<tr><td style="padding:4px 0;border-bottom:1px solid #eee">${esc(it.description)}</td><td style="padding:4px 0;border-bottom:1px solid #eee;text-align:right">${money(it.amount)}</td></tr>`)
       .join('');

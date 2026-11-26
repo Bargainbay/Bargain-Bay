@@ -9,6 +9,7 @@ import { shipmentCount, notPickable } from '../../lib/marketplace-rules';
 import { loadGoogleMaps, placesReady, mapsKey } from '../../lib/maps';
 import HoneypotField from '../../components/HoneypotField';
 import MarketingOptIn, { CONSENT_TEXT } from '../../components/MarketingOptIn';
+import SmsOptIn from '../../components/SmsOptIn';
 import { initiateCheckout, purchase, newEventId } from '../../lib/fpixel';
 
 export default function CheckoutClient({ catalog, session, prefill, addonOverrides = {} }) {
@@ -29,7 +30,8 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
     // Honeypot — stays '' for every real customer and rides along in the POST
     // body via the {...form} spread in submit().
     website: '',
-    marketingOptIn: false
+    marketingOptIn: false,
+    smsOptIn: false
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -309,6 +311,11 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
                 id="co-marketing"
                 checked={form.marketingOptIn}
                 onChange={(v) => setForm((f) => ({ ...f, marketingOptIn: v }))}
+              />
+              <SmsOptIn
+                id="co-sms"
+                checked={form.smsOptIn}
+                onChange={(v) => setForm((f) => ({ ...f, smsOptIn: v }))}
               />
               {!session && (
                 <div className="field" style={{ background: '#f4f7fc', borderRadius: 10, padding: '12px 14px' }}>

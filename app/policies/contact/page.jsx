@@ -1,3 +1,5 @@
+import SmsSubscribe from '../../../components/SmsSubscribe';
+
 export const metadata = { title: 'Contact Us — Bargain Bay' };
 
 export default function ContactPage() {
@@ -27,6 +29,8 @@ export default function ContactPage() {
       <blockquote>
         Pickup is <b>by appointment</b> at the Pickering warehouse — please don&apos;t visit without a confirmed time.
       </blockquote>
+
+      <SmsSubscribe where="contact page" />
 
       <h2>Track an order</h2>
       <p>
