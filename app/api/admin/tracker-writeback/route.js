@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin } from '../../../../lib/auth';
 import { loadGrades } from '../../../../lib/grade-pricing';
-import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, applyVendorUpliftToTracker, applyVendorListRuleToTracker, applyGradePricingToTracker, typedPriceReport, appendTrackerUnits, highestSkuNumber, sheetsConfigured } from '../../../../lib/sheets';
+import { writeSoldRows, writeUnsoldRows, setTrackerCost, setTrackerInvoice, correctTrackerUnit, applyVendorUpliftToTracker, applyVendorListRuleToTracker, applyGradePricingToTracker, applyLikeNewRuleToTracker, typedPriceReport, appendTrackerUnits, highestSkuNumber, sheetsConfigured } from '../../../../lib/sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -48,6 +48,9 @@ export async function POST(req) {
   // { gradePricing: { dryRun?: true (default), revert? } }: put the GA/GB New Scratch & Dent bump into the
   // Suggested Sale Price formula and fill the Grades tab from RS Ops (lib/grade-pricing.js).
   const gradeRule = b.gradePricing && typeof b.gradePricing === 'object' ? b.gradePricing : null;
+  // { likeNewRule: { dryRun?: true (default), revert? } }: add the Like New tier to the Settings tab and
+  // make Like New rows read a flat share of retail in the Suggested Sale Price formula.
+  const likeRule = b.likeNewRule && typeof b.likeNewRule === 'object' ? b.likeNewRule : null;
   const typedPrices = b.typedPrices === true;
   const listRule = b.vendorListRule && typeof b.vendorListRule === 'object' ? b.vendorListRule : null;
   const vendorUplift = b.vendorUplift && typeof b.vendorUplift === 'object' ? b.vendorUplift : null;
@@ -95,6 +98,9 @@ export async function POST(req) {
     const listRes = listRule
       ? await applyVendorListRuleToTracker({ dryRun: listRule.dryRun !== false, revert: !!listRule.revert, fixTyped: !!listRule.fixTyped, allRows: !!listRule.allRows, vendorKey: String(listRule.vendor || 'abi').toLowerCase() })
       : null;
+    const likeRes = likeRule
+      ? await applyLikeNewRuleToTracker({ dryRun: likeRule.dryRun !== false, revert: !!likeRule.revert })
+      : null;
     let gradeRes = null;
     if (gradeRule) {
       const { grades, error } = await loadGrades();
@@ -103,7 +109,7 @@ export async function POST(req) {
       gradeRes.gradesKnown = Object.keys(grades).length;
     }
     return NextResponse.json({
-      ok: true, gradePricing: gradeRes, added: addRes, vendorListRule: listRes, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
+      ok: true, likeNewRule: likeRes, gradePricing: gradeRes, added: addRes, vendorListRule: listRes, soldWritten: soldRes.written, unsoldWritten: unsoldRes.written,
       unsoldMissing: unsoldRes.missing, costsUpdated: costRes, invoices: invoiceRes, corrections: correctionRes, vendorUplift: upliftRes, typedPrices: typedRes
     });
   } catch (e) {

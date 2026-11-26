@@ -253,6 +253,7 @@ label { font-size: 13px; font-weight: 500; color: var(--ink); display: block; ma
 .pill.cond-new-in-box, .pill.cond-new-open-box { background: var(--tint); color: var(--charcoal); }
 .pill.cond-scratch-dent { background: var(--warnbg); color: var(--warn); }
 .pill.cond-refurbished { background: #EAE4DD; color: var(--taupe-dark); }
+.pill.cond-like-new { background: #E1ECF7; color: #1d4f80; }
 .pill.cond-used { background: #ECEAE6; color: var(--muted); }
 .pill.sold { background: var(--dangerbg); color: var(--danger); }
 
@@ -641,6 +642,16 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 }
 .clearance-hero h1 { margin: 6px 0 8px; color: #fff; }
 .clearance-hero p { font-size: 14.5px; max-width: 640px; opacity: .95; }
+
+/* Like New — same shapes, in blue. */
+.nav-likenew { color: #1d4f80 !important; font-weight: 700; }
+.likenew-banner { background: linear-gradient(100deg, #1d4f80 0%, #143757 100%); box-shadow: 0 8px 26px rgba(29,79,128,.26); }
+.likenew-hero {
+  margin: 8px 0 4px; padding: 26px 24px; border-radius: 14px;
+  background: linear-gradient(100deg, #1d4f80 0%, #143757 100%); color: #fff;
+}
+.likenew-hero h1 { margin: 6px 0 8px; color: #fff; }
+.likenew-hero p { font-size: 14.5px; max-width: 640px; opacity: .95; }
 
 /* Refurbished — same shapes as clearance, in green so the two read as different things. */
 .nav-refurb, .cats-refurb { color: #1f6b43 !important; font-weight: 700; }

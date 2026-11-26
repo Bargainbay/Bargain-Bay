@@ -16,7 +16,7 @@ const PRICE_BANDS = [
 // 'Scratch & Dent' and 'Used' are retired but stay listed while live products
 // still carry them — dropping an option hides real stock from the filter.
 const CONDITION_OPTIONS = [
-  'New in Box', 'New Open Box', 'New Scratch & Dent', 'Refurbished',
+  'New in Box', 'New Open Box', 'New Scratch & Dent', 'Like New', 'Refurbished',
   'Scratch & Dent', 'Used', 'Tested & Working'
 ];
 

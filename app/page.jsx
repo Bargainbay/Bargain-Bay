@@ -51,6 +51,7 @@ export default async function Home() {
   const newest = newestModels(units, 12);
   const clearance = units.filter((u) => u.onClearance);
   const refurb = units.filter((u) => u.condition === 'Refurbished');
+  const likeNew = units.filter((u) => u.condition === 'Like New');
   const tileImages = Object.fromEntries(COLLECTIONS.map((c) => [c.slug, tileImage(c.slug, units)]));
   const topClearanceOff = clearance.reduce(
     (m, u) => Math.max(m, u.compareAt > u.price ? Math.round((1 - u.price / u.compareAt) * 100) : 0), 0
@@ -59,7 +60,7 @@ export default async function Home() {
   return (
     <div>
       {promo && promo.scene === 'blackfriday' ? (
-        <BlackFridayHero promo={promo} units={units} markedDown={clearance.filter((u) => u.condition !== 'Refurbished').length} />
+        <BlackFridayHero promo={promo} units={units} markedDown={clearance.filter((u) => u.condition !== 'Refurbished' && u.condition !== 'Like New').length} />
       ) : promo ? (
         <section className={'hero hero-promo' + (promo.video ? ' hero-has-video' : '') + (promo.scene ? ` hero-scene-${promo.scene}` : '')} style={promo.bg ? { '--hero-bg': `url(${promo.bg})` } : undefined}>
           {promo.video && <HeroVideo src={promo.video} />}
@@ -123,6 +124,17 @@ export default async function Home() {
       )}
 
       <SmsSubscribe where="home page" />
+
+      {likeNew.length > 0 && (
+        <a href="/like-new" className="clearance-banner likenew-banner" aria-label="Shop Like New">
+          <div className="clearance-banner-txt">
+            <span className="clearance-kicker">Like New</span>
+            <strong>{likeNew.length} Like New unit{likeNew.length === 1 ? '' : 's'}, certified tested</strong>
+            <span className="clearance-banner-sub">May show small signs of use · one-year warranty</span>
+          </div>
+          <span className="clearance-banner-cta">Shop Like New →</span>
+        </a>
+      )}
 
       {refurb.length > 0 && (
         <a href="/refurbished" className="clearance-banner refurb-banner" aria-label="Shop refurbished">

@@ -23,6 +23,7 @@ const CONDITION_MAP = {
   'New Open Box': 'new',
   'New Scratch & Dent': 'new',
   'Scratch & Dent': 'new',
+  'Like New': 'refurbished', // pre-owned: never advertised as new
   'Refurbished': 'refurbished',
   'Used': 'used',
   'Tested & Working': 'used',

@@ -23,6 +23,7 @@ function gCondition(condition) {
     'New Open Box': 'new',
     'New Scratch & Dent': 'new',
     'Scratch & Dent': 'new',
+    'Like New': 'refurbished',
     'Refurbished': 'refurbished',
     'Used': 'used',
     'Tested & Working': 'used',

@@ -101,6 +101,16 @@ row, the footer and the home page (banner, only when there is stock), and in the
 sitemap. Green (`.refurb-*` in globals.css) so it reads as a different thing from
 the red Clearance.
 
+### Like New (added 2026-11-26)
+A fifth condition for our own stock: pre-owned, **certified tested**, may show small signs of use. First used for the
+refurbished units of lot S-ORD116266. **Flat 60% of retail above and below $1,000** (`LIKE_NEW_PCT`, enforced in
+`lib/csv.js`), **one-year warranty** (owner; NOT Refurbished's 3 months). Own page `/like-new`, blue pill, in the shop
+filter; feeds call it `refurbished`; left out of the Black Friday sale like Refurbished. **Sellers cannot use it**
+(`LISTING_CONDITIONS`). Tracker: a "Like New" tier on Settings row 10 and an OUTERMOST wrapper on the Suggested Sale
+Price formula (`lib/like-new-formula.js`, `POST /api/admin/tracker-writeback { likeNewRule: { dryRun, revert } }`); the
+grade and vendor formula actions peel it before they work. RS Ops writes the label for that lot's "Refurb" units and
+offers "Like New" as a QA grade.
+
 ### The product tile is square; the photo is not
 `.thumb` (app/globals.css) is `aspect-ratio: 1/1` **plus `min-height: 0`**, and
 its image is **absolutely positioned**. All three are load-bearing and the reason

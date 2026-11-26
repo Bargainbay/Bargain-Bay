@@ -37,6 +37,7 @@ export default function Header({ promo = null }) {
             <a href="/deals" className="nav-clearance">Deals</a>
             <a href="/bundles" className="nav-clearance">Packages</a>
             <a href="/clearance" className="nav-clearance">Clearance</a>
+            <a href="/like-new" className="nav-likenew">Like New</a>
             <a href="/refurbished" className="nav-refurb">Refurbished</a>
             <a href="/premium" className="nav-premium">Premium Brands</a>
             <a href="/vesta">Vesta</a>

@@ -16,6 +16,7 @@ export const dynamic = 'force-dynamic';
 
 const CONDITION_SCHEMA = {
   'New in Box': 'https://schema.org/NewCondition',
+  'Like New': 'https://schema.org/RefurbishedCondition',
   'Refurbished': 'https://schema.org/RefurbishedCondition'
 };
 
