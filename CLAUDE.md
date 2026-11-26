@@ -5147,6 +5147,19 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
 - **"Patterns worth a rule" reads vendor + bank description only, never the note** ("TD Canada Trust · account", identical on every row, made "trust" a
   pattern); bank and account words are also in `DESCRIPTOR_NOISE`.
 
+## The owner view on the Financial dashboard (added 2026-11-25)
+`lib/finance-insights.js` (server), `lib/finance-insights-math.js` (no imports; the forecast re-runs in the browser),
+`components/{FinInsights,CashForecast,FinanceTargets}.jsx`, `POST /api/admin/finance-targets` (admin), `test/finance-insights.test.mjs`.
+Ten folds under the cards: true net profit, 13-week cash forecast, net worth, 12-month trend, targets, break-even and
+runway, stock aging, returns by supplier/brand/category/lot, cash cycle, ad return.
+- **Wages are the Labor line** (`isWageCategory`): they were always inside operating costs, so net profit did not change
+  when they moved. Do NOT add clock-in wages on top of the ledger's wage payments; that counts them twice.
+- Forecast, break-even and runway run on the LAST 28 DAYS of real money (never reaching before the first bank-feed line).
+  Old supplier/consignment balances are NOT scheduled unless a weekly pay-down is typed in.
+- Stock figures come from the TRACKER (untested and in-repair included), not `products`.
+- A block that cannot be read shows "not loaded", never zero. Net worth is saved monthly (setting `net_worth_history`)
+  only when every line is known, by the page and the nightly pass.
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
 

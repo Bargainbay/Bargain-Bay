@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin, canKeepBooks } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
@@ -19,6 +20,7 @@ import FinFoldBar from '../../../components/FinFoldBar';
 import ExpenseRules from '../../../components/ExpenseRules';
 import RuleSuggestions from '../../../components/RuleSuggestions';
 import FinancialKpis from '../../../components/FinancialKpis';
+import FinInsights from '../../../components/FinInsights';
 import { HBars, TrendChart } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
@@ -76,6 +78,10 @@ export default async function FinancialDashboardPage({ searchParams }) {
       <DashboardFilters periods={DASH_PERIODS} active={period} />
 
       <FinancialKpis d={d} periodLabel={periodLabel(period)} />
+
+      <Suspense key={period} fallback={<div className="panel" style={{ marginTop: 18 }}>Loading the owner view…</div>}>
+        <FinInsights period={period} periodLabel={periodLabel(period)} bankroll={bankroll} admin={admin} />
+      </Suspense>
 
       <OpsSection scope="fin" id="trend" title="Gross profit trend" defaultOpen>
       <div className="panel" style={{ marginTop: 18 }}>

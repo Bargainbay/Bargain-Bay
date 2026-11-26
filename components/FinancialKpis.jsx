@@ -42,8 +42,8 @@ export default function FinancialKpis({ d, periodLabel }) {
   const cards = [
     { key: 'revenue', label: 'Revenue', value: money(k.revenue) },
     { key: 'gross', label: 'Gross profit', value: money(k.grossProfit), sub: `${k.marginPct.toFixed(1)}% margin · COGS ${money(k.cogs)}` },
-    { key: 'labor', label: 'Labor', value: money(k.labor || 0), sub: 'crew pay this period (payroll)' },
-    { key: 'opex', label: 'Operating costs', value: money(k.opex), sub: `${money(k.expenses)} ops + ${money(k.labor || 0)} labor + ${money(k.adSpend)} ads` },
+    { key: 'labor', label: 'Labor', value: money(k.labor || 0), sub: 'wages paid this period' },
+    { key: 'opex', label: 'Operating costs', value: money(k.opex), sub: `${money(k.expenses)} running + ${money(k.labor || 0)} wages + ${money(k.adSpend)} ads` },
     { key: 'net', label: 'Net profit', value: money(k.netProfit), sub: 'gross − labor − expenses − ads' },
     { key: 'inv', label: 'Inventory capital', value: money(k.inventoryCost), sub: 'COGS in stock' }
   ];
@@ -67,9 +67,16 @@ export default function FinancialKpis({ d, periodLabel }) {
         { h: 'Profit', right: true, f: (r) => money(r.price - num(r.cost)) }]} />
     </>);
   } else if (open === 'labor') {
+    const wageRows = (det.expenseRows || []).filter((r) => r.isWage);
     body = (<>
-      <p className="hint" style={{ marginTop: 0 }}>Labor here is only what the old payroll log holds (tested / cleaned / repaired pieces, logged hours, per-order delivery pay). <strong>Clock-in hours (/clock and the driver app) and dispatch per-stop pay are not in this number</strong>, so $0 does not mean nobody was paid. The full picture is on <a href="/admin/hours" style={{ textDecoration: 'underline' }}>Hours</a> and <a href="/admin/payroll" style={{ textDecoration: 'underline' }}>Payroll</a>.</p>
-      <Line label="Labor counted on this page" value={money(k.labor || 0)} strong />
+      <p className="hint" style={{ marginTop: 0 }}>Wages that actually left the bank or the till in {periodLabel}. Pay earned but not yet paid is not here: see <a href="/admin/payroll" style={{ textDecoration: 'underline' }}>Payroll</a>.</p>
+      <Line label="Wage payments recorded" value={money(k.wagesPaid || 0)} />
+      {k.pieceLabor > 0 && <Line label="Piece-rate labour log" value={money(k.pieceLabor)} />}
+      <Line label="Labor" value={money(k.labor || 0)} strong />
+      <h3 style={{ margin: '14px 0 6px' }}>Each payment</h3>
+      <Table rows={wageRows} cols={[
+        { h: 'Date', f: (r) => r.day }, { h: 'Paid to', f: (r) => r.vendor }, { h: 'Note', f: (r) => r.note },
+        { h: 'Source', f: (r) => r.source }, { h: 'Amount', right: true, f: (r) => money(r.amount) }]} />
     </>);
   } else if (open === 'opex') {
     body = (<>
@@ -86,7 +93,7 @@ export default function FinancialKpis({ d, periodLabel }) {
       <h3 style={{ margin: '14px 0 6px' }}>By category</h3>
       <Table rows={d.expensesByCategory} cols={[{ h: 'Category', f: (r) => r.category }, { h: 'Amount', right: true, f: (r) => money(r.amount) }]} />
       <h3 style={{ margin: '14px 0 6px' }}>Every expense, biggest first (left-out rows marked)</h3>
-      <Table rows={det.expenseRows} cols={[
+      <Table rows={(det.expenseRows || []).filter((r) => !r.isWage)} cols={[
         { h: 'Date', f: (r) => r.day }, { h: 'Category', f: (r) => r.category + (r.leftOut ? ' (left out)' : '') }, { h: 'Vendor', f: (r) => r.vendor },
         { h: 'Note', f: (r) => r.note }, { h: 'Source', f: (r) => r.source }, { h: 'Amount', right: true, f: (r) => money(r.amount) }]} />
       {det.adRows.length > 0 && (<>
