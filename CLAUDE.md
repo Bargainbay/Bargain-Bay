@@ -5715,3 +5715,8 @@ Owner's ask: after past cash erosion, a running total of how much of what we tak
 - **Bankroll shown for comparison; only the stock still owed is taken off it.** Wages paid and bills paid are not tracked against these days, so labour and
   running costs are shown as accrued, not netted.
 - Sales are on the invoice date (same SALE basis); units with no cost on file count as zero product, so product reads low until costs are entered.
+
+## Shift editing
+- **Fix times keeps an untouched box's exact seconds** (`keepRecorded`, both editors), a staff Out at or before the In means
+  past midnight, and payroll judges a driver/staff overlap on the same quarter hours it pays; a shift it will not pay for
+  overlapping is named on the Payroll page. A staff shift over 14h is still unpaid even after an office edit.

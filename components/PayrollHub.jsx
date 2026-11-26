@@ -38,6 +38,7 @@ export default function PayrollHub({ initial, today }) {
                     {r.thisWeek > 0 && <div className="hint" style={{ margin: 0, fontSize: 12.5 }}>+ {cad(r.thisWeek)} earned this week, owed from Monday</div>}
                     {r.h?.open > 0 && <div className="hint" style={{ margin: 0, color: 'var(--danger)', fontSize: 12.5 }}>still clocked in: their latest hours are added once they clock out</div>}
                     {r.h?.tooLong > 0 && <div className="hint" style={{ margin: 0, color: 'var(--danger)', fontSize: 12.5 }}>{r.h.tooLong} shift{r.h.tooLong === 1 ? '' : 's'} too long to count (a forgotten clock-out?): fix below</div>}
+                    {r.h?.overlap > 0 && <div className="hint" style={{ margin: 0, color: 'var(--danger)', fontSize: 12.5 }}>{r.h.overlap} driving shift{r.h.overlap === 1 ? ' is' : 's are'} not paid: it overlaps their warehouse shift. Fix times below</div>}
                     {r.h?.noRate > 0 && <div className="hint" style={{ margin: 0, color: 'var(--danger)', fontSize: 12.5 }}>{r.h.noRate} shift{r.h.noRate === 1 ? '' : 's'} with no hourly rate</div>}
                   </td>
                   <td style={{ textAlign: 'right' }}>{r.hours.toFixed(2)}</td>
