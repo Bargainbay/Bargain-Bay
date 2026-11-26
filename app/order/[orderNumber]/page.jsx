@@ -6,7 +6,6 @@ import { getSession } from '../../../lib/auth';
 import { linkToken, verifyLinkToken } from '../../../lib/links';
 import { publicSku, money, STATUS_LABELS, PICKUP_ADDRESS, SALES_EMAIL, ETRANSFER_EMAIL } from '../../../lib/constants';
 import { availableSlots, pickupLabel } from '../../../lib/pickup';
-import PixelPurchase from '../../../components/PixelPurchase';
 import PickupBooker from '../../../components/PickupBooker';
 import OrderLiveRefresh from '../../../components/OrderLiveRefresh';
 
@@ -94,14 +93,6 @@ export default async function OrderPage({ params, searchParams }) {
       </div>
       <OrderLiveRefresh orderNumber={order.order_number} token={linkToken('order', order.order_number)} status={order.status} />
 
-      {justPaid && !cancelled && (
-        <PixelPurchase
-          orderNumber={order.order_number}
-          ids={order.items.map((i) => i.sku)}
-          value={Number(order.total)}
-          email={order.email}
-        />
-      )}
       {justPaid && !cancelled && (
         <div className="notice-box">Payment received — thank you! We&apos;ll email you to schedule {order.delivery_method === 'delivery' ? 'delivery' : 'pickup'}.</div>
       )}

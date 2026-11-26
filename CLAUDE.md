@@ -215,7 +215,13 @@ Photograph -> Take photo (repeatable) / Choose from phone -> Save -> it leaves t
 ## Meta / Facebook ads integration (added 2026-06-16)
 - `components/MetaPixel.jsx` — base pixel + PageView on route change, rendered in `app/layout.jsx`. Renders nothing if `NEXT_PUBLIC_FB_PIXEL_ID` is unset.
 - `lib/fpixel.js` — event helpers (ViewContent, AddToCart, InitiateCheckout, Purchase).
-- `components/PixelView.jsx` — ViewContent on product pages. `components/PixelPurchase.jsx` — Purchase (browser + CAPI, shared eventId for dedup) on the confirmed order page.
+- `components/PixelView.jsx` — ViewContent on product pages.
+- **Purchase counts PAID website orders only (2026-11-25).** Never from the browser. Checkout writes a
+  `meta_purchases` row (migration 0083, also created at runtime) holding the pixel cookies;
+  `/api/cron/meta-purchases` (every 10 min, `lib/meta-purchases.js`) sends it through the Conversions API once the order
+  is paid (past `pending_payment`, invoice not owing; pay-in-person also needs a recorded payment or delivery),
+  once per order, event time = order time. Staff invoices, walk-ins and earlier orders are never sent. A cancelled or
+  unpaid order never counts; a refund after sending is not retracted. `/api/meta-capi` refuses `Purchase`.
 - `app/api/meta-capi/route.js` — server-side Conversions API (hashes email/phone). Soft-fails if unconfigured; never blocks a page.
 - `app/feed/route.js` — **Meta product feed (CSV) at `/feed`**. Reuses catalog + clearance + reservations + images. Columns: `id,title,description,availability,condition,price,sale_price,link,image_link,brand,product_type,google_product_category`. Clearance/discounts show as `sale_price` vs retail `price`. Placeholder-image units are skipped; sold/reserved → `out of stock`.
 - **THE RULE:** feed `id` == pixel `content_ids` == CAPI `contentIds` == the unit SKU. If they ever drift, dynamic/Advantage+ catalog ads break.
