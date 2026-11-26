@@ -137,6 +137,7 @@ export default async function PnlPage({ searchParams }) {
         earned. Have your accountant check it before it goes anywhere official.
         {c.supplierPayments > 0 && <> Payments to suppliers ({money(c.supplierPayments)} in this period) are not listed as costs: that stock is already counted in cost of goods sold when it sells.</>}
         {c.ownerDraws > 0 && <> Owner draws ({money(c.ownerDraws)} in this period) are not listed as costs: that is profit taken out.</>}
+        {c.movedOnly > 0 && <> Also not costs ({money(c.movedOnly)}): refunds already taken off sales, receipt paybacks and money passed on for someone else.</>}
       </p>
     </div>
   );

@@ -1,10 +1,10 @@
 // A payment to a supplier is counted once: when it is connected to what we owe.
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
-import { isSupplierPayment } from '../lib/supplier-payments.js';
+import { isSupplierPayment, isMoneyOnly, NOT_COST_CATEGORIES } from '../lib/supplier-payments.js';
 import { journal } from '../lib/ledger.js';
 import { profitAndLoss } from '../lib/pnl.js';
-import { hstRemittance } from '../lib/analytics.js';
+import { hstRemittance, financialDashboard } from '../lib/analytics.js';
 import { ensureFinanceSchema, setPurchaseInvoicePaid } from '../lib/finance.js';
 import { torontoToday } from '../lib/constants.js';
 
@@ -60,6 +60,23 @@ test('owner draws are not a cost on the statement, and the amount is said', asyn
     const c = (await profitAndLoss('month')).current;
     equal(c.expenses, 50); equal(c.ownerDraws, 700);
     assert(!c.byCategory.some((x) => /owner draw/i.test(x.category)));
+  } finally { done(); }
+});
+test('refunds already off sales, receipt paybacks and passed-on money are not costs anywhere', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    const today = await seed(client);
+    for (const c of NOT_COST_CATEGORIES) {
+      assert(isMoneyOnly(c), c);
+      await client.query(`INSERT INTO expenses (incurred_on, category, vendor, amount, tax, source) VALUES ($1,$2,'V',100,13,'plaid')`, [today, c]);
+    }
+    assert(!isMoneyOnly('Refund'), 'a plain refund nobody entered on an invoice still counts');
+    equal((await profitAndLoss('month')).current.expenses, 50);
+    equal((await profitAndLoss('month')).current.movedOnly, 300);
+    equal((await financialDashboard('month')).kpis.expenses, 50);
+    equal((await hstRemittance('month')).current.credits.expenses, 6.5);
+    const j = await journal('2000-01-01', tomorrow(today));
+    equal(bankOut(j), 56.5); equal(net(j, '6000'), 50);
   } finally { done(); }
 });
 test('the HST credit comes from the invoice only', async () => {
