@@ -4,6 +4,9 @@ import {
   inventoryGapsReport, linkSaleLine, runStockReconcile,
   listFillRequests, approveFillRequests, rejectFillRequests
 } from '../../../../lib/stock-reconcile';
+import { setWaitingCosts } from '../../../../lib/unit-cost';
+import { audit } from '../../../../lib/audit';
+import { money } from '../../../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,7 +23,7 @@ export async function GET() {
   const s = await staff();
   if (!s) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   try {
-    const report = await inventoryGapsReport();
+    const report = await inventoryGapsReport({ withCost: isAdmin(s) });
     // Fill requests carry what each unit COST — admin only, stripped here rather
     // than hidden in the browser.
     const fillRequests = isAdmin(s) ? await listFillRequests().catch(() => []) : null;
@@ -36,6 +39,8 @@ export async function GET() {
 // { action: 'check_rsops' }        — run the RS Ops → tracker pass now (no email)
 // { action: 'approve_fills', ids }  — ADMIN: write the invoice's cost onto booked-in units
 // { action: 'reject_fills', ids, note } — ADMIN: not the same appliance; add the line as new
+// { action: 'set_costs', costs: [{ sku, cost }] } — ADMIN: pre-tax cost typed against
+//                                   waiting units; goes to the tracker, the site and their sales
 export async function POST(req) {
   const s = await staff();
   if (!s) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
@@ -48,6 +53,17 @@ export async function POST(req) {
       const r = body.action === 'approve_fills'
         ? await approveFillRequests(ids, { by: s.email })
         : await rejectFillRequests(ids, { by: s.email, note: body.note });
+      return NextResponse.json({ ok: true, ...r });
+    }
+    if (body.action === 'set_costs') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can enter costs.' }, { status: 403 });
+      const r = await setWaitingCosts(body.costs);
+      for (const u of r.saved) {
+        await audit(s, {
+          action: 'unit.cost', entity: 'unit', entityId: u.sku,
+          summary: `Cost set to ${money(u.cost)} (was ${u.was == null ? 'blank' : money(u.was)}) on Stock gaps`, detail: u
+        });
+      }
       return NextResponse.json({ ok: true, ...r });
     }
     if (body.action === 'link') return NextResponse.json({ ok: true, ...(await linkSaleLine(body.itemId, Array.isArray(body.skus) ? body.skus : body.sku, { alreadyLinked: body.alreadyLinked })) });

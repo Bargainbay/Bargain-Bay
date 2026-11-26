@@ -765,6 +765,14 @@ still in cleaning or repair — most of them — could only be typed.
   unlinked or awaiting approval, or the RS Ops call failed. "Check RS Ops now" on Stock gaps runs the
   same pass without the email.
 
+### A cost typed on Stock gaps (added 2026-11-25)
+`lib/unit-cost.js`, `test/unit-cost.test.mjs`. ADMIN only: each unit under "Waiting for a purchase invoice" has a cost box
+(pre-tax; `set_costs` on `/api/admin/inventory-gaps`, logged in `audit_log`). It writes the tracker's Cost of Product cell, then
+`propagateUnitCost` copies the new Total Cost to `products`, `salvage_units` (re-spread over parts if parted out) and sale lines.
+A line is changed only where its cost is blank, 0 or the unit's previous total; a different typed cost is left and named. The row
+STAYS NEEDS INVOICE, so the later invoice still matches; approving that fill carries its cost through the same function.
+Staff never receive the cost (`inventoryGapsReport({ withCost })`).
+
 ## Finding the unit, and not adding it twice (added 2026-09-22)
 Written after INV-1236: six appliances, one picked from stock, five typed through
 "Not from our stock?" with the reason **"Already delivered"** — and after a

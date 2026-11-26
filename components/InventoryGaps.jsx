@@ -31,6 +31,8 @@ export default function InventoryGaps() {
   const [armed, setArmed] = useState('');
   // itemId → the SKUs ticked for that line, in the order they were ticked.
   const [picked, setPicked] = useState({});
+  // sku → the cost typed in its box and not yet saved.
+  const [costs, setCosts] = useState({});
 
   async function load() {
     setErr('');
@@ -99,6 +101,29 @@ export default function InventoryGaps() {
     load();
   }
 
+  // Boxes holding a figure that differs from what is saved. An emptied box saves nothing.
+  const savedCost = new Map((data?.waiting || []).flatMap((l) => l.units).map((u) => [u.sku, u.cost]));
+  const typed = (skus) => skus.filter((sku) => {
+    const v = String(costs[sku] ?? '').trim();
+    return v !== '' && !(savedCost.get(sku) != null && Number(v) === savedCost.get(sku));
+  });
+
+  async function saveCosts(skus) {
+    const list = typed(skus).map((sku) => ({ sku, cost: costs[sku] }));
+    if (!list.length || busy) return;
+    const d = await post({ action: 'set_costs', costs: list }, 'costs');
+    if (!d) return;
+    const lines = d.invoiceLines + d.orderLines;
+    setMsg([
+      d.saved.length && `Saved ${d.saved.length} cost${d.saved.length === 1 ? '' : 's'} to the tracker and the system${lines ? `, including ${d.invoiceLines} invoice line${d.invoiceLines === 1 ? '' : 's'} and ${d.orderLines} order line${d.orderLines === 1 ? '' : 's'}` : ''}.`,
+      d.kept?.length && `Left alone, because a different cost is typed on the sale: ${d.kept.map((k) => `${k.invoice} (${k.sku}, ${money(k.cost)})`).join('; ')}.`,
+      d.refused?.length && `Not saved: ${d.refused.map((r) => `${r.sku} (${r.reason})`).join('; ')}.`
+    ].filter(Boolean).join(' '));
+    const done = new Set(d.saved.map((u) => u.sku));
+    await load();
+    setCosts((c) => Object.fromEntries(Object.entries(c).filter(([sku]) => !done.has(sku))));
+  }
+
   // Requests grouped by the invoice they came from — an admin reads one delivery at a time.
   const fillGroups = (() => {
     const m = new Map();
@@ -120,6 +145,9 @@ export default function InventoryGaps() {
   }
 
   const th = { textAlign: 'left', padding: '6px 8px', whiteSpace: 'nowrap' };
+  const waitingUnits = (data?.waiting || []).flatMap((l) => l.units);
+  const toSave = typed(waitingUnits.map((u) => u.sku));
+  const withCostCount = waitingUnits.filter((u) => u.cost != null).length;
   const unlinked = (data?.unlinked || []).filter((l) => !l.linkedSku);
   const underLinked = (data?.unlinked || []).filter((l) => l.linkedSku);
 
@@ -272,9 +300,22 @@ export default function InventoryGaps() {
           {data.waiting.length === 0 ? <p className="hint">Nothing — every unit on the tracker has its invoice.</p> : (
             <>
               <p className="hint" style={{ marginTop: 0 }}>
-                These are on the tracker with <b>no cost</b>. Upload each lot&apos;s purchase invoice (Operations → purchase invoice)
+                These are on the tracker with <b>no purchase invoice</b>. Upload each lot&apos;s invoice (Operations → purchase invoice)
                 — its matching lines come to an admin for approval here, instead of adding the appliances again.
+                {data.canApprove && <> You can also type what a unit cost, <b>before HST</b>: it goes to the tracker, the reports and
+                  any sale of that unit. The unit stays listed until its invoice is in.</>}
               </p>
+              {data.canApprove && (
+                <div style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--card, #fff)', padding: '6px 0', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <button className={'btn' + (toSave.length ? ' accent' : '')} disabled={!!busy || !toSave.length} onClick={() => saveCosts(toSave)}>
+                    {busy === 'costs' ? 'Saving…' : `Save ${toSave.length || ''} cost${toSave.length === 1 ? '' : 's'}`}
+                  </button>
+                  <span className="hint" style={{ margin: 0 }}>{withCostCount} of {waitingUnits.length} have a cost</span>
+                  {/* Repeated here: the page's own messages are far above a long list. */}
+                  {err && <span style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</span>}
+                  {msg && <span role="status" style={{ fontSize: 13 }}>{msg}</span>}
+                </div>
+              )}
               <div className="table-wrap"><table className="admin">
                 <thead><tr><th style={th}>Lot</th><th style={th}>Waiting since</th><th style={th}>Units</th></tr></thead>
                 <tbody>
@@ -284,7 +325,21 @@ export default function InventoryGaps() {
                       <td style={{ verticalAlign: 'top', whiteSpace: 'nowrap' }}>{l.oldest || '—'}</td>
                       <td style={{ fontSize: 13 }}>
                         {l.units.map((u) => (
-                          <div key={u.sku}><span style={{ fontFamily: 'monospace' }}>{u.sku}</span> · {[u.make, u.model].filter(Boolean).join(' ')} · <span style={{ color: u.sold ? 'var(--danger)' : 'var(--muted)' }}>{u.status || 'no status'}</span></div>
+                          <div key={u.sku} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: data.canApprove ? '3px 0' : 0 }}>
+                            <span><span style={{ fontFamily: 'monospace' }}>{u.sku}</span> · {[u.make, u.model].filter(Boolean).join(' ')} · <span style={{ color: u.sold ? 'var(--danger)' : 'var(--muted)' }}>{u.status || 'no status'}</span></span>
+                            {data.canApprove && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+                                <span style={{ color: 'var(--muted)' }}>$</span>
+                                <input type="text" inputMode="decimal" aria-label={`Cost before HST for ${u.sku}`} placeholder="cost"
+                                  value={costs[u.sku] ?? (u.cost != null ? u.cost.toFixed(2) : '')} disabled={busy === 'costs'}
+                                  onChange={(e) => { const v = e.target.value; setCosts((c) => ({ ...c, [u.sku]: v })); }}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') saveCosts([u.sku]); }}
+                                  style={{ width: 90, textAlign: 'right', padding: '4px 6px' }} />
+                                <button className="btn" style={{ fontSize: 12.5, width: 64, visibility: typed([u.sku]).length ? 'visible' : 'hidden' }}
+                                  disabled={!!busy} onClick={() => saveCosts([u.sku])}>Save</button>
+                              </span>
+                            )}
+                          </div>
                         ))}
                       </td>
                     </tr>
