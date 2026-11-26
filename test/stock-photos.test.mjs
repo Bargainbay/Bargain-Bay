@@ -140,6 +140,41 @@ test('a washer-and-dryer listing is not a picture of the dryer', async () => {
   });
 });
 
+// Costco's headline never carries the model number; its own item line does
+// (GTW500BMZWS sat photo-less because of this, 2026-11-25).
+async function viaSearch(model, html, pageUrl = 'https://www.costco.ca/p/-/ge-washer/1') {
+  const real = globalThis.fetch;
+  const key = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'test';
+  globalThis.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes('api.anthropic.com')) return new Response(JSON.stringify({ content: [{ type: 'web_search_tool_result', content: [{ url: pageUrl }] }] }), { status: 200 });
+    if (u === pageUrl) return new Response(html, { status: 200 });
+    if (u.startsWith('https://gdx-assets.costco.com/')) return new Response(new Uint8Array(9000), { status: 200, headers: { 'content-type': 'image/jpeg' } });
+    if (u.includes('/search/suggest.json')) return new Response('{}', { status: 200 });
+    return new Response('', { status: 410 });
+  };
+  try { return await findStockPhoto(model, 'GE'); }
+  finally { globalThis.fetch = real; if (key === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = key; }
+}
+const OG = '<meta property="og:image" content="https://gdx-assets.costco.com/a/as/1__1.avif?width=350"/><h1>GE 5.0 cu ft. Washer</h1>';
+
+test("a Costco page whose item line names the model is accepted, as a JPEG", async () => {
+  const hit = await viaSearch('GTW500BMZWS', `${OG}<div>Item 3999999 | Model GTW500BMZWS</div>`);
+  equal(hit?.url, 'https://gdx-assets.costco.com/a/as/1__1.jpg?width=1024&height=1024&fit=contain');
+});
+
+test('a page that only mentions the model, or sells it in a bundle, is refused', async () => {
+  equal(await viaSearch('GTW500BMZWS', `${OG}<div>Item 1 | Model GTW550BMRWS</div><p>Related: Model GTW500BMZWS</p>`), null);
+  equal(await viaSearch('GTW500BMZWS', `${OG}<div>Item 1 | Model GTW500BMZWS | GTD45EBMZWS</div>`), null);
+  equal(await viaSearch('GTW500BMZWS', `${OG}<div>Item 1 | Model GTW500BMZWS</div>`, 'https://shop.example/p/1'), null);
+});
+
+test("a product page that declares the model in its own product data is accepted", async () => {
+  const ld = '<script type="application/ld+json">{"@type":"Product","mpn":"GTW500BMZWS"}</script>';
+  assert(await viaSearch('GTW500BMZWS', `${OG}${ld}`, 'https://shop.example/p/1'));
+});
+
 test('models past the per-run cap are not reported as failures', async () => {
   await withFakeWeb({}, async () => {
     const r = await autoFixStockPhotos(Array.from({ length: 10 }, (_, i) => ({ model: `ZZZ${i}000`, skus: ['A'] })));
