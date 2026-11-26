@@ -12,6 +12,8 @@ import { query } from '../../../../lib/db';
 import { audit } from '../../../../lib/audit';
 import { recentActions } from '../../../../lib/manager-actions';
 import { clearFlagged } from '../../../../lib/manager-payments';
+import { getChaser, saveChaser, runLeadChase } from '../../../../lib/lead-chaser';
+import { sendDayReport } from '../../../../lib/manager-report';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -23,9 +25,9 @@ const denied = () => NextResponse.json({ error: 'Not authorized' }, { status: 40
 export async function GET() {
   if (!(await admin())) return denied();
   try {
-    const [scan, calls, notes, snoozes, to, actions] = await Promise.all([scanIssues(), recentCalls(10), openNotes(), loadSnoozes(), managerTarget(), recentActions(30)]);
+    const [scan, calls, notes, snoozes, to, actions, chaser] = await Promise.all([scanIssues(), recentCalls(10), openNotes(), loadSnoozes(), managerTarget(), recentActions(30), getChaser()]);
     const last4 = (to || '').slice(-4);
-    return NextResponse.json({ ...scan, calls, notes, snoozes, actions, configured: callConfigured(), ringsLast4: last4 });
+    return NextResponse.json({ ...scan, calls, notes, snoozes, actions, chaser, configured: callConfigured(), ringsLast4: last4 });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not scan.' }, { status: 500 });
   }
@@ -83,6 +85,18 @@ export async function POST(req) {
         const r = await clearFlagged({ by: s.email });
         await audit(s, { action: 'manager.clear_payments', entity: 'manager_payments', summary: `Cleared flagged e-transfers: ${r.paired} found on the ledger, ${r.cleared} cleared as already matched`, detail: r });
         return NextResponse.json({ ok: true, ...r });
+      }
+      case 'save_chaser': {
+        const chaser = await saveChaser({ rep: body.rep });
+        await audit(s, { action: 'manager.lead_chaser', entity: 'settings', entityId: 'lead_chaser', summary: chaser.rep ? `Uncalled leads are now texted to ${chaser.rep}` : 'Uncalled leads go to the owner again', detail: chaser });
+        return NextResponse.json({ ok: true, chaser });
+      }
+      // Previews: nothing is sent or written.
+      case 'preview_chase':
+        return NextResponse.json({ ok: true, chase: await runLeadChase({ dry: true }) });
+      case 'preview_report': {
+        const r = await sendDayReport({ dry: true, ...(/^\d{4}-\d{2}-\d{2}$/.test(body.date || '') ? { date: body.date } : {}) });
+        return NextResponse.json({ ok: true, rep: r.rep, open: r.open, html: r.html });
       }
       case 'backup_now': {
         const r = await backupNow();

@@ -5670,6 +5670,18 @@ migration `0081_meta_leads_seen` (**run Run schema migration after deploy**), `t
 - **It is the Manager's chore, not just a cron it watches (2026-11-19).** Every pull that brings leads in is logged as `pull_meta_leads` in `manager_actions` (shows under "What the Manager did", read back on the next call). A failing pull's issue carries `fix: 'pull_meta_leads'`, so the unattended pass retries it. By voice: the `pull_meta_leads` tool (Sales Manager and General Manager; internal, no confirm needed). `test/manager.test.mjs` pins the Manager's tool list, so a new tool must be added there on purpose.
 - Not built: Bargain Bay's Page id and a BB lead form (its Meta ad account is disabled for payment), lead-ad webhooks (this polls), auto-assigning pulled leads to a rep.
 
+## Uncalled leads are the rep's, and the rep's day is in the owner's report (added 2026-11-25)
+`lib/lead-chaser.js`, `lib/rep-day.js`, `test/lead-chaser.test.mjs`; rs-solutions `GET /api/ops/activity?date=` (`src/lib/dayActivity.ts`).
+
+- **Who is chased is a setting** (`lead_chaser.rep`, Voice Manager page -> Uncalled Facebook leads). Never hard-code it: this repo is public.
+- The meta-leads cron texts that rep (operations number, via `sendStaffText`, kind `lead_chase`; EMAIL if no mobile is on file) only while CLOCKED IN, 10:00-19:00 Toronto,
+  3h apart, 3 a day at most. An unreadable text log sends nothing.
+- With a rep set, `biz-meta-leads-uncalled` reaches the owner ONLY if the last reminder failed to send.
+- The 8pm report opens with the rep's day: calls (portal `call` activities + workshop Board spoke/tried notes), entries in both systems, hours.
+- **RS Solutions admin has one shared password**: an entry counts for the rep only when it carries their typed name. Unnamed ones
+  (sign-ups, payments, older card moves) are counted separately and credited to nobody. An unreadable source is said, never shown as zero.
+- A workshop lead with a "tried" note no longer counts as "nobody has called".
+
 ## The Team board — chat and posts for the whole crew (added 2026-11-17)
 `/team` (every crew member; nav tab "Team" with an unread badge, "💬 Team" on the driver app and a link on `/clock`),
 `lib/team-board.js`, `lib/team-board-rules.js` (no imports), `components/TeamChat.jsx` (not `TeamBoard.jsx`, which is the Sales Hub owner view), `/api/team`, `/api/ops/team`,

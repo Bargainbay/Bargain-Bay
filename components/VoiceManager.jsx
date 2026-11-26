@@ -107,6 +107,13 @@ export default function VoiceManager() {
         ))}
       </>)}
 
+      <h2>Uncalled Facebook leads</h2>
+      <p className="hint">{data.chaser?.rep
+        ? `${data.chaser.rep} is reminded while clocked in, by text or by email if there is no mobile on file (${data.chaser.startHour}:00 to ${data.chaser.endHour}:00, at most ${data.chaser.perDay} a day), and your end-of-day report shows their calls and entries.`
+        : 'Nobody is set to chase these, so they come to you.'}</p>
+      <p><input key={data.chaser?.rep || ''} type="email" defaultValue={data.chaser?.rep || ''} id="lead-chaser" placeholder="Sales rep's email" style={{ width: '60%' }} />{' '}
+        <button className="btn" disabled={busy} onClick={async () => { if (await post({ action: 'save_chaser', rep: document.getElementById('lead-chaser').value })) load(); }}>Save</button></p>
+
       <h2>Notes for the manager</h2>
       {data.notes.map((n) => (
         <div key={n.id} style={{ padding: '4px 0' }}>{n.body}{' '}
