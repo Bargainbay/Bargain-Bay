@@ -51,6 +51,12 @@ export default function VoiceManager() {
     if (r) setMsg(`${r.done} marked done, ${r.cancelled} cancelled, ${r.skipped.length} left for you${r.failed.length ? `, ${r.failed.length} failed` : ''}.`);
     load();
   }
+  async function clearPayments() {
+    if (!confirm('Clear these e-transfers as already matched? No invoice or payment changes.')) return;
+    const r = await post({ action: 'clear_payment_flags' });
+    if (r) setMsg(`${r.paired + r.cleared} e-transfers cleared.${r.stillOwing.length ? ` Check these, an invoice still shows owing: ${r.stillOwing.map((x) => `${x.invoice} (${x.from}, $${x.amount.toFixed(2)})`).join('; ')}.` : ''}`);
+    load();
+  }
   async function runBackup() {
     setMsg('Running the backup, this can take up to a minute…');
     const r = await post({ action: 'backup_now' });
@@ -84,6 +90,7 @@ export default function VoiceManager() {
             {i.detail && i.detail !== i.title && <div className="hint" style={{ whiteSpace: 'pre-line', marginTop: 4 }}>{i.detail}</div>}
             <div style={{ marginTop: 6 }}>
               {i.key === 'dispatch-loose-ends' && <button className="btn primary" disabled={busy} onClick={closeStale}>Close them</button>}{' '}
+              {i.key === 'biz-payments-review' && <button className="btn primary" disabled={busy} onClick={clearPayments}>Already matched, clear them</button>}{' '}
               {i.key.startsWith('health-backup-offsite') && <button className="btn primary" disabled={busy} onClick={runBackup}>Run backup now</button>}{' '}
               {i.link && <a className="btn" href={i.link}>Open</a>}{' '}
               <button className="btn" disabled={busy} onClick={async () => { await post({ action: 'snooze', key: i.key, days: 3 }); load(); }}>Snooze 3 days</button>

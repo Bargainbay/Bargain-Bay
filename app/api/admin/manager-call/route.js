@@ -11,6 +11,7 @@ import { setSetting } from '../../../../lib/settings';
 import { query } from '../../../../lib/db';
 import { audit } from '../../../../lib/audit';
 import { recentActions } from '../../../../lib/manager-actions';
+import { clearFlagged } from '../../../../lib/manager-payments';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -76,6 +77,11 @@ export async function POST(req) {
       case 'close_stale': {
         const r = await closeStaleStops({ mode: body.mode === 'cancel_all' ? 'cancel_all' : 'auto' });
         await audit(s, { action: 'manager.close_stale', entity: 'jobs', summary: `Closed old stops: ${r.done} done, ${r.cancelled} cancelled, ${r.skipped.length} left alone`, detail: r });
+        return NextResponse.json({ ok: true, ...r });
+      }
+      case 'clear_payment_flags': {
+        const r = await clearFlagged({ by: s.email });
+        await audit(s, { action: 'manager.clear_payments', entity: 'manager_payments', summary: `Cleared flagged e-transfers: ${r.paired} found on the ledger, ${r.cleared} cleared as already matched`, detail: r });
         return NextResponse.json({ ok: true, ...r });
       }
       case 'backup_now': {
