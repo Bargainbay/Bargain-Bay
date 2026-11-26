@@ -19,6 +19,7 @@ export default function RepClock() {
     const r = await post(action);
     setBusy(false);
     if (!r.ok) setErr(r.error || 'That did not work.');
+    else if (r.pay && ['not-on-team-list', 'failed'].includes(r.pay.status)) setErr(`Shop clock is set, but your PAY hours were not recorded: ${r.pay.note}`);
     await load();
   }
   if (open === undefined) return null;
@@ -27,7 +28,7 @@ export default function RepClock() {
       <div>
         <b>{open ? `At the shop since ${time(open.started_at)}` : 'Not clocked in at the shop'}</b>
         <div className="hint" style={{ fontSize: 12.5 }}>
-          {open ? 'Today counts as an In-house Day.' : 'Clock in when you start the day at the shop. Any other working day is a Mobile Day.'}
+          {open ? 'Today counts as an In-house Day, and your pay hours are running.' : 'Clock in when you start the day at the shop. Any other working day is a Mobile Day. This also starts your pay clock.'}
         </div>
         {err && <div role="alert" style={{ color: 'var(--red, #c33)', fontSize: 13 }}>{err}</div>}
       </div>

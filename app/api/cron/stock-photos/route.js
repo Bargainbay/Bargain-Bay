@@ -22,7 +22,9 @@ async function run(req) {
     const missing = (await modelPhotoRows()).filter((r) => r.source === 'missing');
     if (!missing.length) return NextResponse.json({ ok: true, missing: 0 });
     const r = await handlePhotoGaps(missing);
-    return NextResponse.json({ ok: !r.error, missing: missing.length, set: r.fixed.length, stillMissing: r.remaining.length, told: r.told, error: r.error });
+    // A failed pass must not count as a success: the health check is what says
+    // the finder has stopped (the Manager no longer lists what it has not tried).
+    return NextResponse.json({ ok: !r.error, missing: missing.length, set: r.fixed.length, stillMissing: r.remaining.length, told: r.told, error: r.error }, { status: r.error ? 500 : 200 });
   } catch (e) {
     console.error('stock photo pass failed', e?.message || e);
     return NextResponse.json({ ok: false, error: e?.message || 'failed' }, { status: 500 });

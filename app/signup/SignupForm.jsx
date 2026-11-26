@@ -2,13 +2,14 @@
 import { useState } from 'react';
 import HoneypotField from '../../components/HoneypotField';
 import MarketingOptIn, { CONSENT_TEXT } from '../../components/MarketingOptIn';
+import SmsOptIn from '../../components/SmsOptIn';
 import { useSearchParams } from 'next/navigation';
 import OAuthButtons from '../../components/OAuthButtons';
 
 export default function SignupForm({ providers = [] }) {
   const params = useSearchParams();
   const next = params.get('next') || '/account';
-  const [form, setForm] = useState({ email: params.get('email') || '', name: '', phone: '', password: '', website: '', marketingOptIn: false });
+  const [form, setForm] = useState({ email: params.get('email') || '', name: '', phone: '', password: '', website: '', marketingOptIn: false, smsOptIn: false });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -62,6 +63,10 @@ export default function SignupForm({ providers = [] }) {
           <MarketingOptIn
             checked={form.marketingOptIn}
             onChange={(v) => setForm((f) => ({ ...f, marketingOptIn: v }))}
+          />
+          <SmsOptIn
+            checked={form.smsOptIn}
+            onChange={(v) => setForm((f) => ({ ...f, smsOptIn: v }))}
           />
           <button className="btn primary block" style={{ marginTop: 14 }} disabled={busy}>{busy ? 'Creating…' : 'Create account'}</button>
         </form>

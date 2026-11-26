@@ -193,3 +193,85 @@ test('ONE ACCOUNT ON BOTH CLOCKS IS ONE PERSON, UNDER THE EMPLOYEE\'S NAME', asy
     assert(!owed.includes('nicholas carter'), 'the old line under the driver name is voided');
   } finally { db.done(); }
 });
+
+test('FIXING AN OUT TIME KEEPS THE UNTOUCHED IN, SO THE DRIVE BEFORE IT IS STILL PAID; A REAL OVERLAP IS NAMED', async () => {
+  const db = await withTestDb();
+  try {
+    const { ensureShiftSchema, setShiftTimes } = await import('../lib/shifts.js');
+    const { fixStaffShift } = await import('../lib/team-clock.js');
+    await ensureShiftSchema();
+    const uid = (await query(`INSERT INTO users (email, name, password_hash, hourly_rate) VALUES ('nick@x.ca','Nick','x',18) RETURNING id`)).rows[0].id;
+    const eid = await emp('Nick', 18, 'nick@x.ca');
+    const at = (v) => `('${v}'::timestamp AT TIME ZONE 'America/Toronto')`;
+    const drive = (await query(`INSERT INTO driver_shifts (user_id, driving, started_at, ended_at)
+      VALUES ($1, true, ${at('2026-11-05 11:20:10')}, ${at('2026-11-05 16:03:30')}) RETURNING id`, [uid])).rows[0].id;
+    const sid = (await query(`INSERT INTO staff_shifts (employee_id, started_at, ended_at, rate)
+      VALUES ($1, ${at('2026-11-05 16:03:40')}, ${at('2026-11-06 11:25:15')}, 18) RETURNING id`, [eid])).rows[0].id;
+    const before = (await query('SELECT * FROM staff_shifts WHERE id = $1', [sid])).rows[0];
+
+    const same = await fixStaffShift(sid, { date: '2026-11-05', start: '16:03', end: '11:25' }, 'a');
+    equal(+new Date(same.started_at), +new Date(before.started_at), 'untouched In keeps its seconds');
+    equal(+new Date(same.ended_at), +new Date(before.ended_at), 'untouched overnight Out stays on the next day');
+
+    const fixed = await fixStaffShift(sid, { date: '2026-11-05', start: '16:03', end: '23:25' }, 'a');
+    equal(+new Date(fixed.started_at), +new Date(before.started_at));
+    let n = (await payrollWeek('2026-11-02')).people.find((p) => p.name === 'Nick');
+    equal(n.hours, 12.25); equal(n.overlap, 0);
+
+    const d0 = (await query('SELECT * FROM driver_shifts WHERE id = $1', [drive])).rows[0];
+    await setShiftTimes(drive, { startTime: '11:20', endTime: '16:03' }, 'a');
+    const d1 = (await query('SELECT * FROM driver_shifts WHERE id = $1', [drive])).rows[0];
+    equal(+new Date(d1.started_at), +new Date(d0.started_at)); equal(+new Date(d1.ended_at), +new Date(d0.ended_at));
+
+    // Seconds alone are not an overlap.
+    await query(`UPDATE staff_shifts SET started_at = ${at('2026-11-05 16:03:00')} WHERE id = $1`, [sid]);
+    n = (await payrollWeek('2026-11-02')).people.find((p) => p.name === 'Nick');
+    equal(n.hours, 12.25); equal(n.overlap, 0);
+
+    await fixStaffShift(sid, { date: '2026-11-05', start: '15:00', end: '23:25' }, 'a');
+    n = (await payrollWeek('2026-11-02')).people.find((p) => p.name === 'Nick');
+    equal(n.overlap, 1); equal(n.hours, 8.5);
+
+    // Past midnight rolls to the next day; a typo that would make a 23 hour shift is refused.
+    const night = await fixStaffShift(sid, { date: '2026-11-05', start: '18:00', end: '01:00' }, 'a');
+    equal((new Date(night.ended_at) - new Date(night.started_at)) / 3600000, 7);
+    let msg = ''; try { await fixStaffShift(sid, { date: '2026-11-05', start: '18:00', end: '17:00' }, 'a'); } catch (e) { msg = e.message; }
+    assert(/check the times/.test(msg), msg);
+  } finally { db.done(); }
+});
+
+test('A WAREHOUSE SHIFT OVER 14 HOURS IS PAID ONCE THE OFFICE FIXES IT, NOT BECAUSE THE CLOCK ENDED IT OR A RATE CHANGED', async () => {
+  const db = await withTestDb();
+  try {
+    const { fixStaffShift, clockOut, saveEmployee, addStaffShift } = await import('../lib/team-clock.js');
+    const eid = await emp('Long', 18);
+    const sid = (await query(`INSERT INTO staff_shifts (employee_id, started_at, rate)
+      VALUES ($1, now() - interval '15 hours', 18) RETURNING id`, [eid])).rows[0].id;
+    const row = async () => (await query(`SELECT (started_at AT TIME ZONE 'America/Toronto')::date::text AS day, edited_by,
+        to_char(started_at AT TIME ZONE 'America/Toronto', 'HH24:MI') AS s,
+        to_char(ended_at AT TIME ZONE 'America/Toronto', 'HH24:MI') AS e FROM staff_shifts WHERE id = $1`, [sid])).rows[0];
+    const mine = async (day, name = 'Long') => (await payrollWeek(day)).people.find((p) => p.name === name);
+
+    // A start fixed while still clocked in, then the clock ends it: nobody has checked the finish.
+    await fixStaffShift(sid, { start: (await row()).s }, 'office@x.ca');
+    await clockOut({ id: eid, name: 'Long' });
+    await saveEmployee({ email: 'long@x.ca', hourlyRate: 20, backfillFrom: '2020-01-01' }, 'office@x.ca');
+    const r = await row();
+    equal(r.edited_by, null);
+    let p = await mine(r.day);
+    equal(p.tooLong, 1); equal(p.hours, 0);
+
+    // Saved in Fix times: confirmed, so paid.
+    await fixStaffShift(sid, { date: r.day, start: r.s, end: r.e }, 'office@x.ca');
+    p = await mine(r.day);
+    equal(p.tooLong, 0); equal(p.shifts, 1); assert(p.hours >= 14.75 && p.hours <= 15.25, p.hours);
+
+    // The same for one the office types in whole; one nobody touched stays out.
+    const two = await emp('Typed', 20);
+    await addStaffShift(two, { date: '2026-10-20', start: '07:00', end: '22:00' }, 'office@x.ca');
+    await shift(two, '2026-10-21', '07:00', '22:00', 20);
+    p = await mine('2026-10-20', 'Typed');
+    equal(p.hours, 15); equal(p.earned, 300); equal(p.tooLong, 1);
+  } finally { db.done(); }
+});
+

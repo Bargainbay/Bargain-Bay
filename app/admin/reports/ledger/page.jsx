@@ -114,6 +114,7 @@ export default async function LedgerPage() {
           Owed to suppliers
           {owing.length > 0 && <span className="pill" style={{ marginLeft: 8, fontSize: 11 }}>{owing.length}</span>}
         </h2>
+        <p className="hint">A payment to a supplier is counted once, when you press <b>Mark paid</b> here. A bank line filed as &quot;Supplier Payment&quot; is not counted by itself, so the books show that money as still in the bank until the invoice or unit is marked.</p>
         <PayablesList initial={owing} canEdit={admin} />
       </div>
 

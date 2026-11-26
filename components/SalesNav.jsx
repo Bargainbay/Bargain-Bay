@@ -1,5 +1,6 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
+import PendingBadge from './PendingBadge';
 
 // The Sales Hub's frame: the Bargain Bay | RS Solutions | All toggle and the tabs.
 //
@@ -18,6 +19,7 @@ const TABS = [
   ['/admin/invoices', 'Invoices'],
   ['/sales/performance', 'Performance'],
   ['/sales/resources', 'Resources'],
+  ['/team', 'Team'],
   ['/sales/agreement', 'My agreement']
 ];
 const SIDES = [['all', 'All'], ['bb', 'Bargain Bay'], ['rs', 'RS Solutions']];
@@ -59,6 +61,7 @@ export default function SalesNav({ side = 'all', name = '', admin = false }) {
               style={{ padding: '8px 14px', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none',
                 background: on ? accent : 'var(--panel-alt, #f3f3f3)', color: on ? '#fff' : 'var(--charcoal, #222)' }}>
               {label}
+              {href === '/team' && <PendingBadge url="/api/team?summary=1" field="total" />}
             </a>
           );
         })}

@@ -1,9 +1,13 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getSession, isAdmin, canKeepBooks } from '../../../lib/auth';
 import { hasDb } from '../../../lib/db';
 import { money } from '../../../lib/constants';
 import { financialDashboard, DASH_PERIODS } from '../../../lib/analytics';
-import { listExpenses, listRecurringExpenses, listUnreviewedExpenses, listExpenseRules, suggestExpenseRules, getLedgerStart, EXPENSE_CATEGORIES } from '../../../lib/finance';
+import { listExpenses, listRecurringExpenses, listUnreviewedExpenses, listExpenseRules, suggestExpenseRules, getLedgerStart, unpaidPurchaseInvoices, EXPENSE_CATEGORIES } from '../../../lib/finance';
+import { consignmentOwed } from '../../../lib/consignment';
+import PayablesList from '../../../components/PayablesList';
+import ConsignmentOwed from '../../../components/ConsignmentOwed';
 import { qboStatus } from '../../../lib/qbo';
 import { plaidStatus } from '../../../lib/plaid';
 import DashboardShell from '../../../components/DashboardShell';
@@ -18,7 +22,9 @@ import OpsSection from '../../../components/OpsSection';
 import FinFoldBar from '../../../components/FinFoldBar';
 import ExpenseRules from '../../../components/ExpenseRules';
 import RuleSuggestions from '../../../components/RuleSuggestions';
-import { Kpi, HBars, TrendChart } from '../../../components/charts';
+import FinancialKpis from '../../../components/FinancialKpis';
+import FinInsights from '../../../components/FinInsights';
+import { HBars, TrendChart } from '../../../components/charts';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Financial — Bargain Bay' };
@@ -61,6 +67,13 @@ export default async function FinancialDashboardPage({ searchParams }) {
 
   const k = d.kpis;
   const ag = d.aging;
+  // What we still owe for stock: supplier invoices, and consigned units that have sold. The same lists, and the
+  // same "Mark paid" buttons, as the ledger page.
+  const [owing, consOwed] = await Promise.all([
+    unpaidPurchaseInvoices().catch(() => []),
+    consignmentOwed().catch(() => [])
+  ]);
+  const total = (list, key) => money(list.reduce((a, r) => a + Number(r[key] || 0), 0));
   return (
     <DashboardShell active="financial">
       <FinFoldBar />
@@ -74,14 +87,25 @@ export default async function FinancialDashboardPage({ searchParams }) {
       </div>
       <DashboardFilters periods={DASH_PERIODS} active={period} />
 
-      <div className="dash-kpis">
-        <Kpi label="Revenue" value={money(k.revenue)} />
-        <Kpi label="Gross profit" value={money(k.grossProfit)} sub={`${k.marginPct.toFixed(1)}% margin · COGS ${money(k.cogs)}`} />
-        <Kpi label="Labor" value={money(k.labor || 0)} sub="crew pay this period (payroll)" />
-        <Kpi label="Operating costs" value={money(k.opex)} sub={`${money(k.expenses)} ops + ${money(k.labor || 0)} labor + ${money(k.adSpend)} ads`} />
-        <Kpi label="Net profit" value={money(k.netProfit)} sub="gross − labor − expenses − ads" />
-        <Kpi label="Inventory capital" value={money(k.inventoryCost)} sub="COGS in stock" />
-      </div>
+      <FinancialKpis d={d} periodLabel={periodLabel(period)} />
+
+      <OpsSection scope="fin" id="owe-suppliers" title={`Open supplier invoices · ${total(owing, 'total')}`} count={owing.length || null} defaultOpen>
+        <div className="panel" style={{ marginTop: 18, maxHeight: 520, overflow: 'auto' }}>
+          <p className="hint" style={{ marginTop: 0 }}>Set the day the money left, then press <b>Mark paid</b>. This connects a payment already made to what we owe, and is the only place it is counted; it sends no money. There is no undo button, so check the row first.</p>
+          <PayablesList initial={owing} canEdit={admin} />
+        </div>
+      </OpsSection>
+
+      <OpsSection scope="fin" id="owe-consignment" title={`Consignment units to pay · ${total(consOwed, 'cost')}`} count={consOwed.length || null} defaultOpen>
+        <div className="panel" style={{ marginTop: 18, maxHeight: 520, overflow: 'auto' }}>
+          <p className="hint" style={{ marginTop: 0 }}>Units a vendor left with us that have sold. Set the day, and the amount if you paid something other than the figure shown, then press <b>Mark paid</b>. <b>Not consigned</b> removes a unit that was ours all along.</p>
+          <ConsignmentOwed initial={consOwed} canEdit={admin} />
+        </div>
+      </OpsSection>
+
+      <Suspense key={period} fallback={<div className="panel" style={{ marginTop: 18 }}>Loading the owner view…</div>}>
+        <FinInsights period={period} periodLabel={periodLabel(period)} bankroll={bankroll} admin={admin} />
+      </Suspense>
 
       <OpsSection scope="fin" id="trend" title="Gross profit trend" defaultOpen>
       <div className="panel" style={{ marginTop: 18 }}>

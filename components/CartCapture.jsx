@@ -1,11 +1,13 @@
 'use client';
 import { useEffect } from 'react';
 import { getCart, onCartChange } from '../lib/cart';
+import { watchCheckoutFields } from '../lib/checkout-watch';
 
 // Tells the server who is holding which cart, ONLY once they are identifiable:
-// signed in (the server reads the session) or an email/phone typed on /checkout,
-// captured on blur — before they submit, because the ones we want to reach are
-// the ones who never do. Renders nothing and can never block the page.
+// signed in (the server reads the session) or an email/phone in the boxes on
+// /checkout, typed or autofilled — before they submit, because the ones we want
+// to reach are the ones who never do (lib/checkout-watch). Renders nothing and
+// can never block the page.
 const TOKEN_KEY = 'bb_cart_token';
 
 function token() {
@@ -25,42 +27,25 @@ export default function CartCapture() {
     if (!tok) return undefined;
     let timer = null;
     let lastSent = '';
-    const ident = { email: '', phone: '', name: '' };
-    let optIn = null;   // null = never ticked; true/false = the box as the shopper left it
+    let fields = { email: '', phone: '', name: '' };
 
     const send = () => {
+      clearTimeout(timer);
       const skus = getCart();
-      const body = JSON.stringify({ token: tok, skus, ...ident, ...(optIn === null ? {} : { marketingOptIn: optIn }) });
+      const body = JSON.stringify({ token: tok, skus, ...fields });
       if (body === lastSent) return;
       lastSent = body;
       fetch('/api/cart-capture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
     };
     const soon = () => { clearTimeout(timer); timer = setTimeout(send, 1500); };
 
-    const onBlur = (e) => {
-      const el = e.target;
-      if (!el || !el.id) return;
-      if (el.id === 'co-email') ident.email = el.value.trim();
-      else if (el.id === 'co-phone') ident.phone = el.value.trim();
-      else if (el.id === 'co-name') ident.name = el.value.trim();
-      else return;
-      soon();
-    };
-    // The unticked marketing box beside the email field. Reported the moment it
-    // changes, so a shopper who ticks it and then leaves is still on record as
-    // having said yes. Unticking after ticking withdraws.
-    const onChange = (e) => {
-      if (e.target?.id !== 'co-marketing') return;
-      optIn = !!e.target.checked;
-      const el = document.getElementById('co-email');
-      if (el && el.value) ident.email = el.value.trim();
-      soon();
-    };
-    document.addEventListener('change', onChange);
-    document.addEventListener('focusout', onBlur);
+    const stop = watchCheckoutFields(document, window, (next, now) => {
+      fields = next;
+      if (now) send(); else soon();
+    });
     const off = onCartChange(soon);
     soon();   // signed-in shoppers are identified server-side, so report once on load
-    return () => { document.removeEventListener('focusout', onBlur); document.removeEventListener('change', onChange); off(); clearTimeout(timer); };
+    return () => { stop(); off(); clearTimeout(timer); };
   }, []);
   return null;
 }

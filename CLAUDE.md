@@ -174,7 +174,15 @@ remain. **The fix is one key per model in `data/images.json`.** AJ Madison and
 its CDN bot-block scripted lookups (403 even from a browser session) — fetch
 those by hand in a normal browser, don't hammer it.
 
-**Sales owns stock photos, and the Manager does it WITHOUT being asked (2026-11-19, owner).** Every sync runs `handlePhotoGaps` (`lib/catalog-sync.js`): `lib/stock-photo-finder.js` looks each photo-less model up on AJ Madison, then Frigidaire Canada's product-support page, and sets the photo (`setModelPhoto`) only if the page answers 200 AND names the model AND the image loads — never a guess; no match = nothing set. It emails `SALES_EMAIL` one note: what it set (to glance at) and what it could not find (a person adds those on Admin → Photos). Unfound models are retried at most daily (setting `stock_photo_autotried`) and mailed once (`stock_photo_alerted`). Max 8 per sync; production only (staging shares the DB). It also runs HOURLY on its own (`/api/cron/stock-photos`, minute 20, in `EXPECTED`) over the `products` table, so a new lot never waits for the nightly sync to get its pictures; that pass lists/delists nothing and never touches the tracker. The RS Manager's sales tools: `fix_stock_photos` (no confirmation), `stock_photo_gaps`, `set_stock_photo` (confirmed write, for the ones the finder misses). Sources, in order: AJ Madison, Frigidaire Canada, then ANY brand via (3) the open `/search/suggest.json` of seven Canadian Shopify appliance stores (`SHOPIFY_STORES` in the finder; the product TITLE must name the model) and (4) a web search whose result PAGES we fetch and check ourselves (page title/h1 names the model, og:image loads and is not a logo; the model only nominates pages, never an image URL; needs `ANTHROPIC_API_KEY`, untested end-to-end before shipping). Tested 2026-11-19 on the 27 non-Frigidaire models already on the site that AJ Madison lacks: sources 1-3 resolve 15; the rest (Shark, Samsung, GE, some Whirlpool/LG/Maytag) fall to the web search or a person. Manufacturer and big-retailer sites (Whirlpool, LG, Best Buy, Home Depot) block servers, so they are not direct sources.
+**Sales owns stock photos, and the Manager does it WITHOUT being asked (2026-11-19, owner).** Every sync runs `handlePhotoGaps` (`lib/catalog-sync.js`): `lib/stock-photo-finder.js` looks each photo-less model up on AJ Madison, then Frigidaire Canada's product-support page, and sets the photo (`setModelPhoto`) only if the page answers 200 AND names the model AND the image loads — never a guess; no match = nothing set. It emails `SALES_EMAIL` one note: what it set (to glance at) and what it could not find (a person adds those on Admin → Photos). Unfound models are retried at most daily (setting `stock_photo_autotried_v3`) and mailed once (`stock_photo_alerted`). **(2026-11-25)** A source that REFUSED to answer (403/429/5xx/timeout) is retried hourly and only mailed after 3 goes, and the email says what each source said. A cdn.shopify.com picture whose check is refused (not 404) keeps the link from the store's own catalogue. A model with no digits ("Laundry Centre") is never searched; bundle listings ("X & Y") are skipped; models past the per-run cap are not counted as failures. Max 8 per sync; production only (staging shares the DB). It also runs HOURLY on its own (`/api/cron/stock-photos`, minute 20, in `EXPECTED`) over the `products` table, so a new lot never waits for the nightly sync to get its pictures; that pass lists/delists nothing and never touches the tracker. The RS Manager's sales tools: `fix_stock_photos` (no confirmation), `stock_photo_gaps`, `set_stock_photo` (confirmed write, for the ones the finder misses). Sources, in order: AJ Madison, Frigidaire Canada, then ANY brand via (3) the open `/search/suggest.json` of seven Canadian Shopify appliance stores (`SHOPIFY_STORES` in the finder; the product TITLE must name the model) and (4) a web search whose result PAGES we fetch and check ourselves (page title/h1 names the model, og:image loads and is not a logo; the model only nominates pages, never an image URL; needs `ANTHROPIC_API_KEY`, untested end-to-end before shipping). Tested 2026-11-19 on the 27 non-Frigidaire models already on the site that AJ Madison lacks: sources 1-3 resolve 15; the rest (Shark, Samsung, GE, some Whirlpool/LG/Maytag) fall to the web search or a person. Manufacturer and big-retailer sites (Whirlpool, LG, Best Buy, Home Depot) block servers, so they are not direct sources.
+
+**The Manager fixes photo gaps; it only reports what it could not (2026-11-25).**
+`lib/stock-photo-finder.js` runs hourly and after every sync. `checkPhotos` raises a
+model only once the finder has given up on it, with what it tried. A web-search page
+counts when its headline names the model, its own product data declares it, or
+Costco's "Item N | Model X" line does (Costco headlines carry no model). A failed
+pass returns 500 so the health check sees a dead finder. Bump `PHOTO_TRIED_KEY`
+when the finder learns a source, so given-up models are retried.
 
 **Managed at `/admin/photos` (Photos tab, staff; added 2026-10-05).** Stock photo per
 MODEL via `lib/model-photos.js` / table `model_photos` (migration 0011) — a row
@@ -215,7 +223,13 @@ Photograph -> Take photo (repeatable) / Choose from phone -> Save -> it leaves t
 ## Meta / Facebook ads integration (added 2026-06-16)
 - `components/MetaPixel.jsx` — base pixel + PageView on route change, rendered in `app/layout.jsx`. Renders nothing if `NEXT_PUBLIC_FB_PIXEL_ID` is unset.
 - `lib/fpixel.js` — event helpers (ViewContent, AddToCart, InitiateCheckout, Purchase).
-- `components/PixelView.jsx` — ViewContent on product pages. `components/PixelPurchase.jsx` — Purchase (browser + CAPI, shared eventId for dedup) on the confirmed order page.
+- `components/PixelView.jsx` — ViewContent on product pages.
+- **Purchase counts PAID website orders only (2026-11-25).** Never from the browser. Checkout writes a
+  `meta_purchases` row (migration 0083, also created at runtime) holding the pixel cookies;
+  `/api/cron/meta-purchases` (every 10 min, `lib/meta-purchases.js`) sends it through the Conversions API once the order
+  is paid (past `pending_payment`, invoice not owing; pay-in-person also needs a recorded payment or delivery),
+  once per order, event time = order time. Staff invoices, walk-ins and earlier orders are never sent. A cancelled or
+  unpaid order never counts; a refund after sending is not retracted. `/api/meta-capi` refuses `Purchase`.
 - `app/api/meta-capi/route.js` — server-side Conversions API (hashes email/phone). Soft-fails if unconfigured; never blocks a page.
 - `app/feed/route.js` — **Meta product feed (CSV) at `/feed`**. Reuses catalog + clearance + reservations + images. Columns: `id,title,description,availability,condition,price,sale_price,link,image_link,brand,product_type,google_product_category`. Clearance/discounts show as `sale_price` vs retail `price`. Placeholder-image units are skipped; sold/reserved → `out of stock`.
 - **THE RULE:** feed `id` == pixel `content_ids` == CAPI `contentIds` == the unit SKU. If they ever drift, dynamic/Advantage+ catalog ads break.
@@ -764,6 +778,23 @@ still in cleaning or repair — most of them — could only be typed.
 - **The daily email** goes to `SERVICE_EMAIL` only when something is waiting,
   unlinked or awaiting approval, or the RS Ops call failed. "Check RS Ops now" on Stock gaps runs the
   same pass without the email.
+
+### A cost typed on Stock gaps (added 2026-11-25)
+`lib/unit-cost.js`, `test/unit-cost.test.mjs`. ADMIN only: each unit under "Waiting for a purchase invoice" has a cost box
+(pre-tax; `set_costs` on `/api/admin/inventory-gaps`, logged in `audit_log`). It writes the tracker's Cost of Product cell, then
+`propagateUnitCost` copies the new Total Cost to `products`, `salvage_units` (re-spread over parts if parted out) and sale lines.
+A line is changed only where its cost is blank, 0 or the unit's previous total; a different typed cost is left and named. The row
+STAYS NEEDS INVOICE, so the later invoice still matches; approving that fill carries its cost through the same function.
+**The list (and the daily email and manager count) is only units with NO cost** (owner, 2026-11-25): NEEDS INVOICE and Cost of
+Product blank or 0. A saved cost drops the unit off it.
+
+### Sold and never in stock: the express add (added 2026-11-25)
+`addSoldUnits` (lib/stock-reconcile.js), `add_sold` on `/api/admin/inventory-gaps`, ADMIN. Each "Sold without a stock unit" row takes a
+cost (WHOLE line, pre-tax) plus optional model and unit count; Enter or **Save all** puts the unit on the tracker (`BI-L<line id>-<n>`,
+lot `BI-SOLD`, NEEDS INVOICE; Sold and dated to the SALE when the invoice is paid), links the line (`linkSaleLine`) and saves the cost on the
+invoice and order lines in the same transaction. Make and category are read off the line. A model we hold unsold is refused until saved a
+second time. A save that fails after the tracker write finishes the same SKU next time. Keep the lot free of invoice-like codes or a later
+purchase invoice will not match the row. **Not for vendor drop-offs** (nothing records the money owed).
 
 ## Finding the unit, and not adding it twice (added 2026-09-22)
 Written after INV-1236: six appliances, one picked from stock, five typed through
@@ -4377,9 +4408,11 @@ Microsoft app must be "any org + personal accounts".
 (mounted in `SiteChrome`), `components/AbandonedCarts.jsx` on the Sales dashboard under My Day,
 `POST /api/cart-capture`, `GET /api/admin/abandoned-carts` (staff).
 
-- **Stored only once identifiable**: signed in (session, never the body) or an email/phone typed
-  on `/checkout`, captured on blur via `#co-email`/`#co-phone` ids. Anonymous carts are never kept.
-  Keep those input ids or capture silently stops.
+- **Stored only once identifiable**: signed in (session, never the body) or an email/phone in the
+  `/checkout` boxes, typed or autofilled, read via `#co-name`/`#co-email`/`#co-phone` ids
+  (`lib/checkout-watch.js`, 2026-11-25: every box is read on change/blur/input and when the page is
+  hidden or left; half-typed values are skipped). Anonymous carts are never kept. Keep those input
+  ids or capture silently stops.
 - **NO automated email or text, ever, from this.** A typed checkout email is not marketing
   consent. Staff phone or personally email. Wanting automation means going through `filterAudience`.
 - **"Bought" is derived at read time** (an order for the same email/phone after the cart began),
@@ -5146,6 +5179,34 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
 - **"Patterns worth a rule" reads vendor + bank description only, never the note** ("TD Canada Trust · account", identical on every row, made "trust" a
   pattern); bank and account words are also in `DESCRIPTOR_NOISE`.
 
+## The owner view on the Financial dashboard (added 2026-11-25)
+`lib/finance-insights.js` (server), `lib/finance-insights-math.js` (no imports; the forecast re-runs in the browser),
+`components/{FinInsights,CashForecast,FinanceTargets}.jsx`, `POST /api/admin/finance-targets` (admin), `test/finance-insights.test.mjs`.
+Above it, **Open supplier invoices** and **Consignment units to pay** reuse the ledger page's `PayablesList` / `ConsignmentOwed`
+(Mark paid is admin only, `/api/admin/ledger`).
+Ten folds under the cards: true net profit, 13-week cash forecast, net worth, 12-month trend, targets, break-even and
+runway, stock aging, returns by supplier/brand/category/lot, cash cycle, ad return.
+- **Wages are the Labor line** (`isWageCategory`): they were always inside operating costs, so net profit did not change
+  when they moved. Do NOT add clock-in wages on top of the ledger's wage payments; that counts them twice.
+- Forecast, break-even and runway run on the LAST 28 DAYS of real money (never reaching before the first bank-feed line).
+  Old supplier/consignment balances are NOT scheduled unless a weekly pay-down is typed in.
+  Money out includes UNSORTED e-transfers (`bank_activity`): they are never an expense until sorted, so profit and
+  break-even exclude them and say so, but the forecast spends them.
+- Stock figures come from the TRACKER (untested and in-repair included), not `products`.
+- A block that cannot be read shows "not loaded", never zero. Net worth is saved monthly (setting `net_worth_history`)
+  only when every line is known, by the page and the nightly pass.
+
+## A supplier payment is counted ONCE (owner, 2026-11-25)
+`lib/supplier-payments.js`, `test/supplier-payments.test.mjs`. **The books never count a supplier payment twice, and
+money is matched only where a person connects an e-transfer to what we owe ("Mark paid").** A bank line filed as
+"Supplier Payment ..." is a label: it is NOT an expense (ledger, P&L statement, weekly brief, dashboard), NOT journalled,
+and its HST is NOT an input tax credit (that comes from the supplier invoice). The ledger records the money when the
+invoice or consigned unit is marked paid. Do not add name/amount guessing that nets bank lines against invoices.
+**Owner draws are not a cost on the P&L statement or weekly brief** (`isOwnerDraw`, owner 2026-11-25); the Financial
+dashboard still SHOWS them under net profit.
+Consequence: until marked, the books' bank figure still includes that money; direct stock purchases with no invoice
+claim no HST until the invoice is uploaded.
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
 
@@ -5620,6 +5681,18 @@ Built because the Manager's unattended work was housekeeping only; nothing looke
 - **Four new scan issues** (`biz-sales-queue`, `biz-lost-demand`, `biz-listing-quality` via `GROWTH_CHECKS`, spread into `BUSINESS_CHECKS`) so the call and the unattended pass can mention them. The voice `morning_brief` tool now includes a trimmed `growth` section (no new tool, so the tool-list tests are unchanged).
 - **Not built:** the Manager does not raise tasks from the queue (abandoned carts already raise theirs), no scheduled email of the brief, and no automatic listing fixes.
 
+## Uncalled leads are the rep's, and the rep's day is in the owner's report (added 2026-11-25)
+`lib/lead-chaser.js`, `lib/rep-day.js`, `test/lead-chaser.test.mjs`; rs-solutions `GET /api/ops/activity?date=` (`src/lib/dayActivity.ts`).
+
+- **Who is chased is a setting** (`lead_chaser.rep`, Voice Manager page -> Uncalled Facebook leads). Never hard-code it: this repo is public.
+- The meta-leads cron texts that rep (operations number, via `sendStaffText`, kind `lead_chase`; EMAIL if no mobile is on file) only while CLOCKED IN, 10:00-19:00 Toronto,
+  3h apart, 3 a day at most. An unreadable text log sends nothing.
+- With a rep set, `biz-meta-leads-uncalled` reaches the owner ONLY if the last reminder failed to send.
+- The 8pm report opens with the rep's day: calls (portal `call` activities + workshop Board spoke/tried notes), entries in both systems, hours.
+- **RS Solutions admin has one shared password**: an entry counts for the rep only when it carries their typed name. Unnamed ones
+  (sign-ups, payments, older card moves) are counted separately and credited to nobody. An unreadable source is said, never shown as zero.
+- A workshop lead with a "tried" note no longer counts as "nobody has called".
+
 ## The Team board — chat and posts for the whole crew (added 2026-11-17)
 `/team` (every crew member; nav tab "Team" with an unread badge, "💬 Team" on the driver app and a link on `/clock`),
 `lib/team-board.js`, `lib/team-board-rules.js` (no imports), `components/TeamChat.jsx` (not `TeamBoard.jsx`, which is the Sales Hub owner view), `/api/team`, `/api/ops/team`,
@@ -5714,3 +5787,34 @@ exactly three things: `GET` the hours report, `POST {action:'shift_create'}` and
 `audit_log` row by `hours-agent` and the shift is stamped "edited by AI manager". Key lives in `~/.claude/secrets/hours-agent.key` on the owner's
 Mac, never in the repo. Rotate: new value in Vercel + redeploy. Staff-clock (`staff_shifts`) edits are NOT covered; only driver shifts.
 - **REFURBISHED units are NOT in the Black Friday sale (owner, 2026-11-18).** `inSale` in `lib/bf-hero.js` excludes them from the cards, from `topOffPct` (the headline can never be a refurbished unit's discount) and from the hero's "units marked down" count. They stay on `/clearance` and `/refurbished` like any other day.
+
+## Where the money goes — the running split of the bankroll (added 2026-11-20)
+`/admin/cash-split` (ADMIN; nav tab "Where the money goes", Reports hub, `lib/cash-split.js`, `lib/cash-split-math.js` (no imports), `test/cash-split.test.mjs`).
+Owner's ask: after past cash erosion, a running total of how much of what we take in must go back into product, how much is set aside for labour
+(for the day it was worked) and how much is profit. Built on `dailyPnl()` (which gained `productCost` = cost of units sold) so it agrees with the Daily P&L.
+- **Four piles that add back to the sales to the cent**: product (cost of units sold), labour (staff wages + driver pay + driver hours), running costs
+  (overhead, truck, fuel, other delivery costs), profit. A negative profit is shown as "eating into the bankroll", never hidden.
+- **Stock still to put back = product sold less supplier-invoice subtotals in the same period** (`purchase_invoices`, null if unreadable). Only counts
+  invoices that were recorded; POs received with no invoice yet are not in it.
+- **Bankroll shown for comparison; only the stock still owed is taken off it.** Wages paid and bills paid are not tracked against these days, so labour and
+  running costs are shown as accrued, not netted.
+- Sales are on the invoice date (same SALE basis); units with no cost on file count as zero product, so product reads low until costs are entered.
+
+## Shift editing
+- **Fix times keeps an untouched box's exact seconds** (`keepRecorded`, both editors), a staff Out at or before the In means
+  past midnight, and payroll judges a driver/staff overlap on the same quarter hours it pays; a shift it will not pay for
+  overlapping is named on the Payroll page.
+- **A shift over 14h is paid (up to 20h) once the office has fixed or typed its times** (owner, 2026-11-25): `edited_at`
+  on a driver shift, `edited_by` on a staff one. `clockOut` clears a staff shift's `edited_by` and a rate backfill no longer
+  sets it, so the mark means somebody checked the times. Saving Fix times unchanged confirms a real long day.
+
+## The daily call list, and the daily Black Friday email (added 2026-11-25)
+- **Call list** (`lib/lead-daily.js`, `/api/cron/daily-leads` 11:30 UTC, panel on `/sales/team`, setting `lead_daily`): each rep
+  listed is topped up to N new leads a day (owner: 20), due that day, dealt in turn, warm then property managers / contractors /
+  builders first, closest to Pickering first. Never a partner's lead, an owned one, or one without a phone. Emails Service@ when
+  fewer than two days remain. Rep emails live in the setting, never in code.
+- **A sales associate ON that list** may open `/sales/leads` for their own leads only (`leadViewer`, "My leads" tab): no import,
+  no convert, no other Hub page, no cost.
+- **Black Friday email** (`lib/bf-daily.js`, `/api/cron/bf-email` 15:00 UTC, panel on `/admin/campaigns`, setting `bf_daily`):
+  OFF until switched on, Nov 26 to the chosen last day (default Nov 30). Plain text, live stock, goes through
+  `sendEmailCampaign` (consent gate and unsubscribe unchanged). Once per day. Gmail still chooses the tab.

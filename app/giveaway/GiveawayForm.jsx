@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import HoneypotField, { HONEYPOT_FIELD } from '../../components/HoneypotField';
+import SmsOptIn from '../../components/SmsOptIn';
 import { GIVEAWAY_EMAIL_TEXT } from '../../lib/deals-config';
 
 // Entering takes a Bargain Bay account, our deals-and-flyers email, and this form,
@@ -8,7 +9,7 @@ import { GIVEAWAY_EMAIL_TEXT } from '../../lib/deals-config';
 // entering. Someone already signed in skips the email and password; someone with an
 // account who is signed out is sent to log in rather than typing it in.
 export default function GiveawayForm() {
-  const [f, setF] = useState({ name: '', email: '', password: '', phone: '', postal: '', eligible: false, subscribe: false, [HONEYPOT_FIELD]: '' });
+  const [f, setF] = useState({ name: '', email: '', password: '', phone: '', postal: '', eligible: false, subscribe: false, smsOptIn: false, [HONEYPOT_FIELD]: '' });
   const [me, setMe] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -75,6 +76,7 @@ export default function GiveawayForm() {
         </>
       )}
       <label>Phone (optional)<input type="tel" value={f.phone} onChange={set('phone')} autoComplete="tel" /></label>
+      <SmsOptIn id="give-sms" checked={f.smsOptIn} onChange={(v) => setF((s) => ({ ...s, smsOptIn: v }))} />
       <label>Ontario postal code<input value={f.postal} onChange={set('postal')} required autoComplete="postal-code" placeholder="L1W 3T9" maxLength={7} /></label>
       <label className="check-line">
         <input type="checkbox" checked={f.subscribe} onChange={tick('subscribe')} required />

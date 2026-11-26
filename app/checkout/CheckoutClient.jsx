@@ -9,7 +9,8 @@ import { shipmentCount, notPickable } from '../../lib/marketplace-rules';
 import { loadGoogleMaps, placesReady, mapsKey } from '../../lib/maps';
 import HoneypotField from '../../components/HoneypotField';
 import MarketingOptIn, { CONSENT_TEXT } from '../../components/MarketingOptIn';
-import { initiateCheckout, purchase, newEventId } from '../../lib/fpixel';
+import SmsOptIn from '../../components/SmsOptIn';
+import { initiateCheckout, newEventId } from '../../lib/fpixel';
 
 export default function CheckoutClient({ catalog, session, prefill, addonOverrides = {} }) {
   const [skus, setSkus] = useState(null);
@@ -29,7 +30,8 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
     // Honeypot — stays '' for every real customer and rides along in the POST
     // body via the {...form} spread in submit().
     website: '',
-    marketingOptIn: false
+    marketingOptIn: false,
+    smsOptIn: false
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -257,21 +259,6 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
         setApplied(null);
         setError(`${data.couponError} Your order was placed at full price — check the summary before you send payment.`);
       }
-      // Card payments are off, so an order is placed with no payment step and
-      // the order page's `status=success` Purchase never fires — Meta saw zero
-      // purchases. Count the placed order here, ONLY when there is no card
-      // redirect (a Stripe order is counted by the order page once it is paid,
-      // and counting it here too would double it). Same localStorage key as
-      // PixelPurchase so one order can never be counted by both.
-      if (!data.url && data.orderNumber) {
-        try {
-          const key = 'bb_purchase_' + data.orderNumber;
-          if (!localStorage.getItem(key)) {
-            localStorage.setItem(key, '1');
-            purchase({ ids: items.map((u) => u.id), value: total }, newEventId());
-          }
-        } catch {}
-      }
       clearCart();
       window.location.href = data.url || data.orderUrl;
     } catch {
@@ -309,6 +296,11 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
                 id="co-marketing"
                 checked={form.marketingOptIn}
                 onChange={(v) => setForm((f) => ({ ...f, marketingOptIn: v }))}
+              />
+              <SmsOptIn
+                id="co-sms"
+                checked={form.smsOptIn}
+                onChange={(v) => setForm((f) => ({ ...f, smsOptIn: v }))}
               />
               {!session && (
                 <div className="field" style={{ background: '#f4f7fc', borderRadius: 10, padding: '12px 14px' }}>

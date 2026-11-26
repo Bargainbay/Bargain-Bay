@@ -3,6 +3,7 @@ import { query, hasDb } from '../../../lib/db';
 import { enterGiveaway, entryParam, checkEntryInput } from '../../../lib/giveaway';
 import { GIVEAWAY, GIVEAWAY_EMAIL_TEXT, giveawayOpen, dayLabel } from '../../../lib/deals-config';
 import { grantConsent } from '../../../lib/consent';
+import { subscribeToTexts } from '../../../lib/sms-subscribe';
 import { sendEmail, esc } from '../../../lib/email';
 import {
   getSession, hashPassword, createSessionToken, sessionCookieOptions,
@@ -93,6 +94,11 @@ export async function POST(req) {
     // the same sentence the form shows, never whatever the browser claims.
     await grantConsent({ channel: 'email', email, source: 'giveaway', ip, evidence: GIVEAWAY_EMAIL_TEXT });
 
+    // Optional, separate from the required email box: never a condition of entry.
+    if (body.smsOptIn === true && body.phone) {
+      await subscribeToTexts({ phone: body.phone, name: input.name, source: 'giveaway', ip, where: 'the giveaway form' })
+        .catch((e) => console.error('sms consent record failed', e.message));
+    }
     const r = await enterGiveaway(GIVEAWAY.id, { ...input, marketing: true }, { ip, userAgent: userAgent(req) });
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
 

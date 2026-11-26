@@ -21,7 +21,9 @@ export default function ProductCard({ unit, count = 1 }) {
   return (
     <div className={'card' + (unit.onClearance ? ' card-clearance' : '')}>
       {unit.onClearance
-        ? <span className="clearance-badge">Clearance</span>
+        ? (/black friday/i.test(unit.clearanceNote || '')
+          ? <span className="clearance-badge bf-badge">Black Friday Deal</span>
+          : <span className="clearance-badge">Clearance</span>)
         : off > 0 && <span className="off-badge">{off}% off</span>}
       {grouped && <span className="count-badge">{count} available</span>}
       <a href={href} className="thumb">
@@ -36,6 +38,7 @@ export default function ProductCard({ unit, count = 1 }) {
           {grouped && <span className="from-label">from</span>}
           <span className={'price' + (unit.onClearance ? ' price-clearance' : '') + (unit.isMemberPrice ? ' price-member' : '')}>{money(unit.price)}</span>
           {!grouped && unit.compareAt > unit.price && <span className="compare">{money(unit.compareAt)}</span>}
+          {!grouped && unit.compareAt > unit.price && <span className="save-tag">{off >= 40 ? `${off}% off` : `Save ${money(Math.round(unit.compareAt - unit.price)).replace(/\.00$/, '')}`}</span>}
         </div>
         {unit.isMemberPrice && <div className="member-tag">Member price</div>}
         <div style={{ marginTop: 'auto', paddingTop: 8 }}>

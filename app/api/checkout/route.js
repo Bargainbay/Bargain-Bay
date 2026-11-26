@@ -25,6 +25,8 @@ import { validateCoupon, bestAutoCoupon, typedCodeUnits, redeemCouponWithClient,
 import { upsertCustomer } from '../../../lib/customers';
 import { attachPartnerForOrder } from '../../../lib/referral-partners';
 import { grantConsent } from '../../../lib/consent';
+import { recordWebOrderForMeta } from '../../../lib/meta-purchases';
+import { subscribeToTexts } from '../../../lib/sms-subscribe';
 import {
   clientIp, userAgent, honeypotTripped, isDisposableEmail, isBlocked,
   checkOrderRate, unpaidUnitsHeld, ensureAbuseSchema, MAX_UNPAID_UNITS
@@ -410,6 +412,17 @@ export async function POST(req) {
       evidence: String(body.marketingOptInText || '').slice(0, 500) || 'Ticked the marketing box at checkout'
     }).catch((e) => console.error('consent record failed', e.message));
   }
+
+  // The separate, unticked text-message box. Same rule: never costs a sale. The customer is saved above.
+  if (body.smsOptIn === true) {
+    await subscribeToTexts({ phone, name, source: 'checkout', ip, where: 'the checkout page', ensureCustomer: false })
+      .catch((e) => console.error('sms consent record failed', e.message));
+  }
+
+  // Meta hears about this sale only once it is paid (lib/meta-purchases). Keep the
+  // shopper's pixel cookies now. Awaited (Vercel freeze), never costs the sale.
+  await recordWebOrderForMeta(order.id, req)
+    .catch((e) => console.error('meta purchase record failed', e.message));
 
   // Give the web sale an INV- number and a row in the invoice ledger, so every
   // sale carries the same paperwork whether it came from the storefront or from

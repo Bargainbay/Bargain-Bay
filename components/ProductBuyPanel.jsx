@@ -45,7 +45,7 @@ export default function ProductBuyPanel({ units, initialId }) {
       <ProductGallery
         images={slides}
         alt={name}
-        badge={sel.onClearance ? <span className="clearance-badge product-clearance-badge">Clearance</span> : null}
+        badge={sel.onClearance ? (sel.bf ? <span className="clearance-badge bf-badge product-clearance-badge">Black Friday Deal</span> : <span className="clearance-badge product-clearance-badge">Clearance</span>) : null}
       />
       <div>
         <ConditionPill condition={sel.condition} />

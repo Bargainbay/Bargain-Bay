@@ -155,6 +155,10 @@ test('the scan finds missing photos and bad prices, and a check that throws beco
       await client.query(`INSERT INTO products (sku, make, model, category, title, price, compare_at, active)
         VALUES ('T-1','Acme','NOPHOTO-1','Washer','Acme NOPHOTO-1', 0, 500, true),
                ('T-2','Acme','NOPHOTO-1','Washer','Acme NOPHOTO-1', 900, 500, true)`);
+      // Not looked for yet: that is the finder's job, not the owner's.
+      assert(!(await scanIssues()).issues.some((i) => i.key === 'photos-missing'), 'raised before the finder tried');
+      await client.query(`INSERT INTO settings (key, value) VALUES ('stock_photo_autotried_v4', $1)`,
+        [JSON.stringify({ 'NOPHOTO-1': { at: Date.now(), n: 1, retry: false, why: 'Tried: AJ Madison: does not carry it.' } })]);
       const { issues } = await scanIssues();
       const keys = issues.map((i) => i.key);
       assert(keys.includes('photos-missing'), keys.join());
@@ -163,6 +167,7 @@ test('the scan finds missing photos and bad prices, and a check that throws beco
       equal(issues[0].severity, 'high');          // ranked: urgent first
       const photos = issues.find((i) => i.key === 'photos-missing');
       assert(photos.title.includes('1 model') && photos.title.includes('2 units'));
+      assert(photos.detail.includes('does not carry it'), photos.detail);
       // A broken check is reported, never silently dropped.
       await client.query('DROP TABLE users CASCADE');
       const after = await scanIssues();

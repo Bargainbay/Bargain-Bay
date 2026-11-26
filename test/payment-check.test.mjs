@@ -3,7 +3,7 @@
 // needs a SECOND e-transfer. Real lib code, real Postgres (PGlite); the bank mailbox is a test seam.
 import { PGlite } from '@electric-sql/pglite';
 import { suite, test, assert, equal } from './_harness.mjs';
-import { withPaymentCheck, vetEtransfer, unbackedEtransfers, __useTestBankEmails, PaymentCheckError } from '../lib/manager-payments.js';
+import { withPaymentCheck, vetEtransfer, unbackedEtransfers, __useTestBankEmails, PaymentCheckError, scanPayments, clearFlagged, etransferBacking } from '../lib/manager-payments.js';
 import { recordInvoicePayment, markInvoicePaid, voidInvoicePayment } from '../lib/invoices.js';
 import { __useTestDatabase } from '../lib/db.js';
 import { migrate } from '../lib/migrate.js';
@@ -180,5 +180,37 @@ test('vetEtransfer never throws for an unknown invoice', async () => {
   await withDb(async () => {
     const v = await vetEtransfer(999999, { amount: 10 });
     equal(v.ok, true);
+  });
+});
+
+suite('payment check: a flagged e-transfer stops being reported once it is dealt with');
+const flag = (client, msg, cents, name, daysAgo = 0) => client.query(
+  `INSERT INTO manager_payments (msg_id, sender, amount_cents, received_at, status) VALUES ($1,$2,$3, now() - ($4::int * interval '1 day'),'flag_unmatched')`, [msg, name, cents, daysAgo]);
+const openFlags = async (client) => Number((await client.query(`SELECT count(*)::int AS n FROM manager_payments WHERE resolved_at IS NULL AND status LIKE 'flag%'`)).rows[0].n);
+
+test('a flag raised before staff entered the payment closes on the next scan, even once its email has aged out', async () => {
+  await withDb(async (client) => {
+    __useTestBankEmails([]);
+    const id = await invoice(client, 'INV-C20', 'Pat Lee', 300);
+    await recordInvoicePayment(id, { amount: 300, method: 'etransfer', paidDate: today(), silent: true });
+    await scanPayments({ dry: true });
+    await flag(client, 'old', 30000, 'Pat Lee');
+    await scanPayments();
+    equal(await openFlags(client), 0);
+  });
+});
+test('clearing on the owner\'s word closes every flag, changes no money, and keeps each email used up', async () => {
+  await withDb(async (client) => {
+    __useTestBankEmails([em('x', 41000, 'Sam Wu')]);
+    await scanPayments({ dry: true });
+    const id = await invoice(client, 'INV-C21', 'Sam Wu', 410);
+    await flag(client, 'x', 41000, 'Sam Wu');
+    await flag(client, 'y', 9900, 'Nobody', 20);
+    const r = await clearFlagged({ by: 'owner@example.com' });
+    equal(r.cleared, 2);
+    equal(r.stillOwing.length, 1); equal(r.stillOwing[0].invoice, 'INV-C21');
+    equal(await openFlags(client), 0);
+    equal(await count(client, id), 0);
+    equal((await etransferBacking(410)).ok, false);
   });
 });

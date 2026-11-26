@@ -1,3 +1,4 @@
+import SmsSubscribe from '../components/SmsSubscribe';
 import { getAvailable } from '../lib/inventory';
 import { newestModels } from '../lib/group-units';
 import { getSession } from '../lib/auth';
@@ -120,6 +121,8 @@ export default async function Home() {
           <span className="clearance-banner-cta">Shop clearance →</span>
         </a>
       )}
+
+      <SmsSubscribe where="home page" />
 
       {refurb.length > 0 && (
         <a href="/refurbished" className="clearance-banner refurb-banner" aria-label="Shop refurbished">

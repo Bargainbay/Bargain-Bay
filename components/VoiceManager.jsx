@@ -51,6 +51,12 @@ export default function VoiceManager() {
     if (r) setMsg(`${r.done} marked done, ${r.cancelled} cancelled, ${r.skipped.length} left for you${r.failed.length ? `, ${r.failed.length} failed` : ''}.`);
     load();
   }
+  async function clearPayments() {
+    if (!confirm('Clear these e-transfers as already matched? No invoice or payment changes.')) return;
+    const r = await post({ action: 'clear_payment_flags' });
+    if (r) setMsg(`${r.paired + r.cleared} e-transfers cleared.${r.stillOwing.length ? ` Check these, an invoice still shows owing: ${r.stillOwing.map((x) => `${x.invoice} (${x.from}, $${x.amount.toFixed(2)})`).join('; ')}.` : ''}`);
+    load();
+  }
   async function runBackup() {
     setMsg('Running the backup, this can take up to a minute…');
     const r = await post({ action: 'backup_now' });
@@ -85,6 +91,7 @@ export default function VoiceManager() {
             {i.detail && i.detail !== i.title && <div className="hint" style={{ whiteSpace: 'pre-line', marginTop: 4 }}>{i.detail}</div>}
             <div style={{ marginTop: 6 }}>
               {i.key === 'dispatch-loose-ends' && <button className="btn primary" disabled={busy} onClick={closeStale}>Close them</button>}{' '}
+              {i.key === 'biz-payments-review' && <button className="btn primary" disabled={busy} onClick={clearPayments}>Already matched, clear them</button>}{' '}
               {i.key.startsWith('health-backup-offsite') && <button className="btn primary" disabled={busy} onClick={runBackup}>Run backup now</button>}{' '}
               {i.link && <a className="btn" href={i.link}>Open</a>}{' '}
               <button className="btn" disabled={busy} onClick={async () => { await post({ action: 'snooze', key: i.key, days: 3 }); load(); }}>Snooze 3 days</button>
@@ -100,6 +107,13 @@ export default function VoiceManager() {
             <button className="btn" disabled={busy} onClick={async () => { await post({ action: 'unsnooze', key: i.key }); load(); }}>Bring back</button></div>
         ))}
       </>)}
+
+      <h2>Uncalled Facebook leads</h2>
+      <p className="hint">{data.chaser?.rep
+        ? `${data.chaser.rep} is reminded while clocked in, by text or by email if there is no mobile on file (${data.chaser.startHour}:00 to ${data.chaser.endHour}:00, at most ${data.chaser.perDay} a day), and your end-of-day report shows their calls and entries.`
+        : 'Nobody is set to chase these, so they come to you.'}</p>
+      <p><input key={data.chaser?.rep || ''} type="email" defaultValue={data.chaser?.rep || ''} id="lead-chaser" placeholder="Sales rep's email" style={{ width: '60%' }} />{' '}
+        <button className="btn" disabled={busy} onClick={async () => { if (await post({ action: 'save_chaser', rep: document.getElementById('lead-chaser').value })) load(); }}>Save</button></p>
 
       <h2>Notes for the manager</h2>
       {data.notes.map((n) => (

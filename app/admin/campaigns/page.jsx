@@ -4,6 +4,7 @@ import { emailConfigured } from '../../../lib/email';
 import { smsConfigured } from '../../../lib/sms';
 import AdminNav from '../../../components/AdminNav';
 import CampaignComposer from '../../../components/CampaignComposer';
+import BfDailyPanel from '../../../components/BfDailyPanel';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Campaigns — Bargain Bay' };
@@ -22,6 +23,7 @@ export default async function CampaignsPage() {
     <div>
       <AdminNav active="campaigns" />
       <h1 style={{ color: 'var(--charcoal)', margin: '4px 0 16px' }}>Campaigns</h1>
+      <BfDailyPanel />
       <div className="panel">
         <p className="hint" style={{ marginTop: 0 }}>
           Send an email or text blast to a customer segment. Always send yourself a <b>test</b> first.

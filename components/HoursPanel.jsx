@@ -57,6 +57,12 @@ export default function HoursPanel() {
   useEffect(() => { if (range !== 'custom') load(range); }, [range, load]);
   useEffect(() => { loadLive(); const t = setInterval(loadLive, 60000); return () => clearInterval(t); }, [loadLive]);
 
+  useEffect(() => {
+    const again = () => { load(range); loadLive(); };
+    window.addEventListener('rs-hours-changed', again);
+    return () => window.removeEventListener('rs-hours-changed', again);
+  }, [range, load, loadLive]);
+
   async function saveFix() {
     if (!fix) return;
     setSaving(true); setErr('');

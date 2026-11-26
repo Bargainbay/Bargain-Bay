@@ -1520,7 +1520,7 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
           </section>
         )}
 
-        {board.drivers.map((d) => {
+        {board.drivers.filter((d) => byDriver(d.id).length > 0).map((d) => {
           const stops = byDriver(d.id);
           const own = ownedBy(d.id);
           const riding = stops.length - own.length;
@@ -1553,6 +1553,17 @@ export default function DispatchBoard({ initial, canManageClients, canConfirmMon
             </BoardColumn>
           );
         })}
+        {/* Drivers with nothing on this day: one slim column of names rather than a full empty column each. */}
+        {board.drivers.some((d) => byDriver(d.id).length === 0) && (
+          <section className="disp-col disp-col-idle">
+            <h3 className="disp-col-head">No stops</h3>
+            <div className="disp-idle-list">
+              {board.drivers.filter((d) => byDriver(d.id).length === 0).map((d) => (
+                <span key={d.id} className="pill">{d.name}</span>
+              ))}
+            </div>
+          </section>
+        )}
         </div>
         {stripOver && (
           <button type="button" className="disp-page right" disabled={stripAt.end}

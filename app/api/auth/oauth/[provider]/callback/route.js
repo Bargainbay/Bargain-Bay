@@ -36,7 +36,10 @@ export async function GET(req, { params }) {
       ).catch(() => {});
     }
     const token = await createSessionToken(r.user);
-    const res = NextResponse.redirect(new URL(safeNext(saved.next), req.url));
+    // A brand-new account was never asked for a phone number, so offer deal texts once, skippable.
+    // The number is typed on that page and POSTed: it never travels in a URL.
+    const dest = safeNext(saved.next);
+    const res = NextResponse.redirect(new URL(r.created ? `/texts?welcome=1&next=${encodeURIComponent(dest)}` : dest, req.url));
     res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     res.cookies.delete(STATE_COOKIE);
     return res;

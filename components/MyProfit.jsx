@@ -28,15 +28,19 @@ export default function MyProfit({ initial }) {
       <div className="panel" style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Whole company · sales and gross profit</h2>
-          <span className="hint" style={{ margin: 0 }}>Every sale, whoever closed it · before HST · weeks run Monday to Sunday · per-rep figures are in Rep commission below</span>
+          <span className="hint" style={{ margin: 0 }}>Every sale, whoever closed it · gross profit is before HST · weeks run Monday to Sunday · per-rep figures are in Rep commission below</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14, marginTop: 12 }}>
           {[['Today', co.today], ['This week', co.week], ['This month', co.month]].map(([label, p]) => (
             <div key={label} style={{ border: '1px solid var(--line-soft)', borderRadius: 8, padding: '10px 12px' }}>
               <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>{label}</div>
               <div style={{ marginTop: 6 }}>
-                <div className="hint" style={{ margin: 0 }}>Total sales</div>
+                <div className="hint" style={{ margin: 0 }}>Total sales before tax</div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--charcoal)' }}>{$(p.revenue)}</div>
+              </div>
+              <div style={{ marginTop: 6 }}>
+                <div className="hint" style={{ margin: 0 }}>Total sales with tax</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--charcoal)' }}>{$(p.revenueWithTax)}</div>
               </div>
               <div style={{ marginTop: 6 }}>
                 <div className="hint" style={{ margin: 0 }}>Gross profit</div>

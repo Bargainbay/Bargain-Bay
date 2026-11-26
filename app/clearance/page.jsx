@@ -1,3 +1,4 @@
+import SmsSubscribe from '../../components/SmsSubscribe';
 import { getAvailable } from '../../lib/inventory';
 import { getSession } from '../../lib/auth';
 import { decorate } from '../../lib/pricing';
@@ -32,6 +33,8 @@ export default async function ClearancePage() {
           </p>
         </div>
       </section>
+
+      <SmsSubscribe where="clearance page" />
 
       {units.length === 0 ? (
         <div className="panel" style={{ marginTop: 18, fontSize: 15, color: 'var(--muted)' }}>

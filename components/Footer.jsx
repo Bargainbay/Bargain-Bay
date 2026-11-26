@@ -1,9 +1,11 @@
 import { SALES_EMAIL, PICKUP_ADDRESS } from '../lib/constants';
+import SmsSubscribe from './SmsSubscribe';
 
 export default function Footer() {
   return (
     <footer className="site-footer">
       <div className="wrap">
+        <SmsSubscribe where="footer" variant="footer" />
         <div className="cols">
           <div>
             <img src="/bargain-bay-logo-on-charcoal.png" alt="Bargain Bay" className="footer-logo" />
@@ -39,6 +41,7 @@ export default function Footer() {
             <a href="/policies/privacy">Privacy Policy</a>
             <a href="/policies/terms">Terms of Service</a>
             <a href="/contact">Contact Us</a>
+            <a href="/texts">Deals by text</a>
           </div>
         </div>
         <div className="legal">

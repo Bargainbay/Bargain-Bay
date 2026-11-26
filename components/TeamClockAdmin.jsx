@@ -32,12 +32,39 @@ export default function TeamClockAdmin({ employees, shifts, from, to, drivers = 
   const [emp, setEmp] = useState({ email: '', name: '', roleLabel: '', hourlyRate: '', company: '', phone: '' });
   const [fix, setFix] = useState(null);
   const [list, setList] = useState('');
-  const [add, setAdd] = useState({ employeeId: '', date: '', start: '', end: '', note: '' });
+  const [add, setAdd] = useState({ who: '', date: '', start: '', end: '', note: '' });
   const [addMsg, setAddMsg] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [rates, setRates] = useState({}); // driver id -> typed rate
+
+  // Drivers who are not also on the employee list: their hours live on the driver clock.
+  const fold = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const driverOnly = drivers.filter((d) => !employees.some((e) =>
+    fold(e.email) === fold(d.email) || (d.name && fold(e.name) === fold(d.name))));
+
+  async function addShift() {
+    setAddMsg(''); setErr('');
+    const [kind, id] = add.who.split(':');
+    if (!id) { setErr('Pick who worked.'); return; }
+    if (!add.date || !add.start || !add.end) { setErr('Give the day, the start time and the finish time.'); return; }
+    const done = () => {
+      setAddMsg('Shift added.');
+      setAdd({ who: add.who, date: '', start: '', end: '', note: '' });
+      window.dispatchEvent(new Event('rs-hours-changed'));
+    };
+    if (kind === 'staff') { await send({ action: 'add_shift', employeeId: id, date: add.date, start: add.start, end: add.end, note: add.note }, done); return; }
+    setBusy(true);
+    try {
+      // Hours only (no van or odometer); Fix times can correct it afterwards.
+      const r = await fetch('/api/admin/dispatch', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'shift_create', driverId: id, date: add.date, startTime: add.start, endTime: add.end, driving: false, note: add.note || 'Added by the office' }) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Failed');
+      done(); router.refresh();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  }
 
   async function send(body, after) {
     setBusy(true); setErr('');
@@ -159,19 +186,22 @@ export default function TeamClockAdmin({ employees, shifts, from, to, drivers = 
         <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Add a missed shift</summary>
         <p className="hint">For when somebody forgot to clock in and out. Times are Toronto time. It is saved at their current hourly rate and marked as added by the office.</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select style={{ ...input, width: 170 }} value={add.employeeId} onChange={(e) => setAdd({ ...add, employeeId: e.target.value })}>
+          <select style={{ ...input, width: 170 }} value={add.who} onChange={(e) => setAdd({ ...add, who: e.target.value })}>
             <option value="">Who worked…</option>
-            {employees.map((e) => <option key={e.id} value={e.id}>{e.name || e.email}</option>)}
+            {employees.length > 0 && <optgroup label="Staff">
+              {employees.map((e) => <option key={`s${e.id}`} value={`staff:${e.id}`}>{e.name || e.email}</option>)}
+            </optgroup>}
+            {driverOnly.length > 0 && <optgroup label="Drivers and assistants">
+              {driverOnly.map((d) => <option key={`d${d.id}`} value={`driver:${d.id}`}>{d.name || d.email}</option>)}
+            </optgroup>}
           </select>
           <input style={input} type="date" max={to} value={add.date} onChange={(e) => setAdd({ ...add, date: e.target.value })} />
           <label>In <input style={input} type="time" value={add.start} onChange={(e) => setAdd({ ...add, start: e.target.value })} /></label>
           <label>Out <input style={input} type="time" value={add.end} onChange={(e) => setAdd({ ...add, end: e.target.value })} /></label>
           <input style={{ ...input, width: 190 }} placeholder="Note (optional)" value={add.note} onChange={(e) => setAdd({ ...add, note: e.target.value })} />
-          <button type="button" className="dash-filter active" disabled={busy} onClick={() => {
-            setAddMsg('');
-            send({ action: 'add_shift', ...add }, () => { setAddMsg('Shift added.'); setAdd({ employeeId: add.employeeId, date: '', start: '', end: '', note: '' }); });
-          }}>Add shift</button>
+          <button type="button" className="dash-filter active" disabled={busy} onClick={addShift}>Add shift</button>
           {addMsg && <span className="hint">{addMsg}</span>}
+          {err && <span role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</span>}
         </div>
       </details>
       <div className="table-wrap"><table className="admin">

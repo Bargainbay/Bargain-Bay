@@ -8,6 +8,7 @@ import { notifyOwner, esc } from '../../../../lib/email';
 import { attachPartnerFromCookie } from '../../../../lib/referral-partners';
 import { upsertCustomer } from '../../../../lib/customers';
 import { grantConsent } from '../../../../lib/consent';
+import { subscribeToTexts } from '../../../../lib/sms-subscribe';
 import {
   clientIp, honeypotTripped, isDisposableEmail, isBlocked,
   checkSignupRate, ensureAbuseSchema
@@ -81,6 +82,11 @@ export async function POST(req) {
         channel: 'email', email, source: 'signup', ip,
         evidence: String(body.marketingOptInText || '').slice(0, 500) || 'Ticked the marketing box at signup'
       }).catch((e) => console.error('consent record failed', e.message));
+    }
+
+    if (body.smsOptIn === true) {
+      await subscribeToTexts({ phone, name, source: 'signup', ip, where: 'the sign-up page', ensureCustomer: false })
+        .catch((e) => console.error('sms consent record failed', e.message));
     }
 
     // Notify the owner (fire-and-forget; never blocks signup).
