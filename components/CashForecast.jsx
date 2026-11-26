@@ -11,7 +11,7 @@ const right = { textAlign: 'right', whiteSpace: 'nowrap' };
 
 export default function CashForecast({ f }) {
   const base = {
-    weeklyIn: f.weeklyIn, weeklyStock: f.weeklyCogs, weeklyWages: f.weeklyWages,
+    weeklyIn: f.weeklyIn, weeklyStock: f.weeklyStock, weeklyWages: f.weeklyWages,
     weeklyRunning: f.weeklyRunning, weeklyDraws: f.weeklyDraws, weeklyPaydown: 0
   };
   const [v, setV] = useState(base);
@@ -23,7 +23,7 @@ export default function CashForecast({ f }) {
   });
   const fields = [
     ['weeklyIn', 'Money in each week', 'customer payments, tax included'],
-    ['weeklyStock', 'Spent on new stock each week', `starts at the cost of what sells; the bank shows ${money(f.weeklySupplierPaid)} to suppliers`],
+    ['weeklyStock', 'Stock and other e-transfers each week', `the bank shows ${money(f.weeklySupplierPaid)} to suppliers plus ${money(f.weeklyUnsorted)} in unsorted e-transfers; what sells costs ${money(f.weeklyCogs)}`],
     ['weeklyWages', 'Wages each week', 'wages actually paid'],
     ['weeklyRunning', 'Running bills each week', 'rent, fuel, truck, ads, parts, fees'],
     ['weeklyDraws', 'Owner draws and loans each week', 'taken out of the business'],

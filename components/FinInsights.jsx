@@ -87,6 +87,9 @@ export default async function FinInsights({ period, periodLabel, bankroll, admin
             { h: 'Line', f: (r) => (r.strong ? <strong>{r.label}</strong> : r.label) },
             { h: 'Amount', r: true, f: (r) => (r.strong ? <strong>{money(r.value)}</strong> : money(r.value)), neg: (r) => r.strong && r.value < 0 }
           ]} />
+          {p.unsorted && p.unsorted.total > 0 && (
+            <p className="hint" style={red}>{money(p.unsorted.total)} left the bank in {p.unsorted.count} e-transfers that are not sorted into anything, so none of it is in these costs. Any of it that was a bill or wages makes net profit lower. Sort them under <a href="/admin/financial#live" style={{ textDecoration: 'underline' }}>Bankroll, Live transactions</a>.</p>
+          )}
           {p.owed && (p.owed.total > 0 || p.owed.thisWeek > 0) && (
             <p className="hint">Not in these figures yet: {money(p.owed.total)} wages owed through last week and {money(p.owed.thisWeek)} earned this week. Once all of it is paid, net profit is that much lower.</p>
           )}
@@ -110,7 +113,7 @@ export default async function FinInsights({ period, periodLabel, bankroll, admin
           ))}
         </div>
         <p style={{ fontSize: 15 }}>Net worth: <strong style={w.net < 0 ? red : null}>{money(w.net)}</strong>{!w.complete && ' (at least one line is not known, so this is not the full picture)'}</p>
-        <p className="hint">Supplier and vendor amounts are what is recorded as unpaid. If some were already paid, mark them paid on the <a href="/admin/reports/ledger" style={{ textDecoration: 'underline' }}>ledger</a> and this goes up.</p>
+        <p className="hint">Supplier and vendor amounts are what is recorded as unpaid. If some were already paid (an e-transfer does not mark an invoice paid), mark them paid on the <a href="/admin/reports/ledger" style={{ textDecoration: 'underline' }}>ledger</a> and this goes up.</p>
         {history.length > 0 && (<>
           <h3 style={{ margin: '14px 0 6px' }}>Month by month</h3>
           <Table rows={[...history].reverse()} cols={[
@@ -156,7 +159,7 @@ export default async function FinInsights({ period, periodLabel, bankroll, admin
             { label: 'Costs per day', value: $(even.costPerDay), sub: `margin on sales ${pct(even.margin)}` },
             { label: 'Runway if sales stopped', value: days(even.runwayDays), sub: 'cash on hand ÷ daily costs', bad: even.runwayDays != null && even.runwayDays < 30 }
           ]} />
-          <p className="hint">Costs and sales are the last {even.days} days (since {day(even.since)}); margin is up to 90 days. Owner draws and stock purchases are not counted as costs.</p>
+          <p className="hint">Costs and sales are the last {even.days} days (since {day(even.since)}); margin is up to 90 days. Owner draws, stock purchases and unsorted e-transfers are not counted as costs, so runway is shorter than shown if some of those are bills.</p>
         </>)}
       </Section>
 

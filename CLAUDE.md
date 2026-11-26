@@ -5156,6 +5156,8 @@ runway, stock aging, returns by supplier/brand/category/lot, cash cycle, ad retu
   when they moved. Do NOT add clock-in wages on top of the ledger's wage payments; that counts them twice.
 - Forecast, break-even and runway run on the LAST 28 DAYS of real money (never reaching before the first bank-feed line).
   Old supplier/consignment balances are NOT scheduled unless a weekly pay-down is typed in.
+  Money out includes UNSORTED e-transfers (`bank_activity`): they are never an expense until sorted, so profit and
+  break-even exclude them and say so, but the forecast spends them.
 - Stock figures come from the TRACKER (untested and in-repair included), not `products`.
 - A block that cannot be read shows "not loaded", never zero. Net worth is saved monthly (setting `net_worth_history`)
   only when every line is known, by the page and the nightly pass.

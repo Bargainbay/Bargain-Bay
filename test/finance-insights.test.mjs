@@ -109,6 +109,16 @@ test('EVERY BLOCK LOADS (only the tracker, absent here, is reported as not known
     assert(d.trend.rows.length === 1 && d.trend.rows[0].net === 280);
   } finally { done(); }
 });
+test('unsorted e-transfers out are in the forecast and flagged against profit, not counted as cost', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    await seed(client);
+    await client.query(`INSERT INTO bank_activity (ext_id, activity_date, amount, pending) VALUES ('t1',$1,-7000,false), ('t2',$1,-9,true), ('t3',$1,50,false)`, [torontoToday()]);
+    const d = await financeInsights({ period: 'month', bankroll: { total: 5000, bankKnown: true, cashKnown: true, pay: { people: [] } } });
+    equal([d.profit.unsorted.total, d.profit.unsorted.count, d.profit.net], [7000, 1, 280]);
+    assert(d.forecast.weeklyStock >= d.forecast.weeklyUnsorted && d.forecast.weeklyUnsorted > 0);
+  } finally { done(); }
+});
 test('net worth is saved once a month, only when every line is known', async () => {
   const { done } = await withTestDb();
   try {
