@@ -318,8 +318,8 @@ export default function InventoryGaps() {
                       <td style={{ verticalAlign: 'top', whiteSpace: 'nowrap' }}>{l.oldest || '—'}</td>
                       <td style={{ fontSize: 13 }}>
                         {l.units.map((u) => (
-                          <div key={u.sku} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: data.canApprove ? '3px 0' : 0 }}>
-                            <span><span style={{ fontFamily: 'monospace' }}>{u.sku}</span> · {[u.make, u.model].filter(Boolean).join(' ')} · <span style={{ color: u.sold ? 'var(--danger)' : 'var(--muted)' }}>{u.status || 'no status'}</span></span>
+                          <div key={u.sku} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: data.canApprove ? '3px 0' : 0 }}>
+                            <span style={{ flex: 1, minWidth: 0 }}><span style={{ fontFamily: 'monospace' }}>{u.sku}</span> · {[u.make, u.model].filter(Boolean).join(' ')} · <span style={{ color: u.sold ? 'var(--danger)' : 'var(--muted)' }}>{u.status || 'no status'}</span></span>
                             {data.canApprove && (
                               <span style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
                                 <span style={{ color: 'var(--muted)' }}>$</span>
