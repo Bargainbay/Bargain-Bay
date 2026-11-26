@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { SMS_CONSENT_TEXT } from '../lib/consent-text';
 import HoneypotField, { HONEYPOT_FIELD } from './HoneypotField';
 
-export default function SmsSubscribe({ where = 'website', defaultPhone = '', variant = 'panel' }) {
+export default function SmsSubscribe({ where = 'website', defaultPhone = '', variant = 'panel', next = '' }) {
   const [phone, setPhone] = useState(defaultPhone || '');
   const [trap, setTrap] = useState('');
   const [busy, setBusy] = useState(false);
@@ -29,7 +29,10 @@ export default function SmsSubscribe({ where = 'website', defaultPhone = '', var
       <strong>Get Bargain Bay deals by text</strong>
       <p className="sms-sub-lead">One of each unit. Text subscribers hear about the markdowns.</p>
       {done ? (
-        <p role="status" className="sms-sub-done">✓ Thanks, you&apos;re signed up. If you replied STOP before, text START to the number we text you from.</p>
+        <>
+          <p role="status" className="sms-sub-done">✓ Thanks, you&apos;re signed up. A confirmation text is on its way to new numbers. If you replied STOP before, text START to the number we text you from.</p>
+          {next && <a className="btn accent" href={next} style={{ display: 'inline-block', marginTop: 12 }}>Continue →</a>}
+        </>
       ) : (
         <form onSubmit={submit}>
           <HoneypotField value={trap} onChange={(e) => setTrap(e.target.value)} />

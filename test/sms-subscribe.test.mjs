@@ -1,7 +1,7 @@
 // The website's only way onto the deal-text list: lib/sms-subscribe.
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
-import { subscribeToTexts, textableNumber } from '../lib/sms-subscribe.js';
+import { subscribeToTexts, textableNumber, WELCOME_TEXT } from '../lib/sms-subscribe.js';
 import { filterAudience, withdrawConsent } from '../lib/consent.js';
 import { marketingAudience } from '../lib/customers.js';
 
@@ -14,6 +14,30 @@ test('only a real 10-digit North American number is textable', () => {
   equal(textableNumber('12345'), null);
   equal(textableNumber('0000000000'), null);
   equal(textableNumber(''), null);
+});
+
+test('the confirmation text is one segment and says how to stop', () => {
+  assert(WELCOME_TEXT.length <= 160, String(WELCOME_TEXT.length));
+  assert(/STOP/.test(WELCOME_TEXT) && /^Bargain Bay/.test(WELCOME_TEXT));
+});
+
+test('a new number is texted once, from the marketing number; a repeat is not', async () => {
+  const keys = ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM', 'TWILIO_MARKETING_FROM', 'VERCEL_ENV'];
+  const before = keys.map((k) => process.env[k]);
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  Object.assign(process.env, { TWILIO_ACCOUNT_SID: 'AC_test', TWILIO_AUTH_TOKEN: 't', TWILIO_FROM: '+15550000001', TWILIO_MARKETING_FROM: '+15550000002', VERCEL_ENV: 'production' });
+  globalThis.fetch = async (url, opts) => { calls.push(String(opts?.body)); return new Response('{"sid":"SM1"}', { status: 201 }); };
+  const { done } = await withTestDb();
+  try {
+    await subscribeToTexts({ phone: '4374888549', where: 'the test' });
+    await subscribeToTexts({ phone: '4374888549', where: 'the test' });
+    equal(calls.length, 1, 'one text');
+    equal(new URLSearchParams(calls[0]).get('From'), '+15550000002', 'marketing number');
+  } finally {
+    done(); globalThis.fetch = realFetch;
+    keys.forEach((k, i) => { if (before[i] === undefined) delete process.env[k]; else process.env[k] = before[i]; });
+  }
 });
 
 test('subscribing records consent once and puts the number in the campaign audience', async () => {

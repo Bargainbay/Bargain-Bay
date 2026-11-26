@@ -414,7 +414,7 @@ export async function POST(req) {
 
   // The separate, unticked text-message box. Same rule: never costs a sale. The customer is saved above.
   if (body.smsOptIn === true) {
-    subscribeToTexts({ phone, name, source: 'checkout', ip, where: 'the checkout page', ensureCustomer: false })
+    await subscribeToTexts({ phone, name, source: 'checkout', ip, where: 'the checkout page', ensureCustomer: false })
       .catch((e) => console.error('sms consent record failed', e.message));
   }
 
