@@ -4,14 +4,14 @@ import { getAvailable } from '../../lib/inventory';
 import { getSession } from '../../lib/auth';
 import { decorate } from '../../lib/pricing';
 import { bfGroups, isBfDeal } from '../../lib/bf-hero';
-import { money } from '../../lib/constants';
+import { money, REFURBISHED_WARRANTY_MONTHS } from '../../lib/constants';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Black Friday Appliance Deals | Bargain Bay',
   description:
-    'Every appliance marked down for Black Friday at Bargain Bay. Tested and working with a one-year warranty. One of each, while they last.',
+    'Every appliance marked down for Black Friday at Bargain Bay. Tested and working, with a warranty. One of each, while they last.',
   alternates: { canonical: '/black-friday' }
 };
 
@@ -28,8 +28,9 @@ export default async function BlackFridayPage() {
           <span className="clearance-kicker">Black Friday</span>
           <h1>Black Friday deals</h1>
           <p>
-            Every appliance on this page is marked down for Black Friday, tested and working, with a
-            <b> one-year warranty</b>. One of each, so when it&apos;s gone, it&apos;s gone.
+            Every appliance on this page is marked down for Black Friday and is tested and working, with a
+            <b> one-year warranty</b> ({REFURBISHED_WARRANTY_MONTHS} months on refurbished units). One of each, so when
+            it&apos;s gone, it&apos;s gone.
           </p>
         </div>
       </section>
