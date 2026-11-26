@@ -5719,4 +5719,7 @@ Owner's ask: after past cash erosion, a running total of how much of what we tak
 ## Shift editing
 - **Fix times keeps an untouched box's exact seconds** (`keepRecorded`, both editors), a staff Out at or before the In means
   past midnight, and payroll judges a driver/staff overlap on the same quarter hours it pays; a shift it will not pay for
-  overlapping is named on the Payroll page. A staff shift over 14h is still unpaid even after an office edit.
+  overlapping is named on the Payroll page.
+- **A shift over 14h is paid (up to 20h) once the office has fixed or typed its times** (owner, 2026-11-25): `edited_at`
+  on a driver shift, `edited_by` on a staff one. `clockOut` clears a staff shift's `edited_by` and a rate backfill no longer
+  sets it, so the mark means somebody checked the times. Saving Fix times unchanged confirms a real long day.

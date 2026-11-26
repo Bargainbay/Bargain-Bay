@@ -239,3 +239,39 @@ test('FIXING AN OUT TIME KEEPS THE UNTOUCHED IN, SO THE DRIVE BEFORE IT IS STILL
     assert(/check the times/.test(msg), msg);
   } finally { db.done(); }
 });
+
+test('A WAREHOUSE SHIFT OVER 14 HOURS IS PAID ONCE THE OFFICE FIXES IT, NOT BECAUSE THE CLOCK ENDED IT OR A RATE CHANGED', async () => {
+  const db = await withTestDb();
+  try {
+    const { fixStaffShift, clockOut, saveEmployee, addStaffShift } = await import('../lib/team-clock.js');
+    const eid = await emp('Long', 18);
+    const sid = (await query(`INSERT INTO staff_shifts (employee_id, started_at, rate)
+      VALUES ($1, now() - interval '15 hours', 18) RETURNING id`, [eid])).rows[0].id;
+    const row = async () => (await query(`SELECT (started_at AT TIME ZONE 'America/Toronto')::date::text AS day, edited_by,
+        to_char(started_at AT TIME ZONE 'America/Toronto', 'HH24:MI') AS s,
+        to_char(ended_at AT TIME ZONE 'America/Toronto', 'HH24:MI') AS e FROM staff_shifts WHERE id = $1`, [sid])).rows[0];
+    const mine = async (day, name = 'Long') => (await payrollWeek(day)).people.find((p) => p.name === name);
+
+    // A start fixed while still clocked in, then the clock ends it: nobody has checked the finish.
+    await fixStaffShift(sid, { start: (await row()).s }, 'office@x.ca');
+    await clockOut({ id: eid, name: 'Long' });
+    await saveEmployee({ email: 'long@x.ca', hourlyRate: 20, backfillFrom: '2020-01-01' }, 'office@x.ca');
+    const r = await row();
+    equal(r.edited_by, null);
+    let p = await mine(r.day);
+    equal(p.tooLong, 1); equal(p.hours, 0);
+
+    // Saved in Fix times: confirmed, so paid.
+    await fixStaffShift(sid, { date: r.day, start: r.s, end: r.e }, 'office@x.ca');
+    p = await mine(r.day);
+    equal(p.tooLong, 0); equal(p.shifts, 1); assert(p.hours >= 14.75 && p.hours <= 15.25, p.hours);
+
+    // The same for one the office types in whole; one nobody touched stays out.
+    const two = await emp('Typed', 20);
+    await addStaffShift(two, { date: '2026-10-20', start: '07:00', end: '22:00' }, 'office@x.ca');
+    await shift(two, '2026-10-21', '07:00', '22:00', 20);
+    p = await mine('2026-10-20', 'Typed');
+    equal(p.hours, 15); equal(p.earned, 300); equal(p.tooLong, 1);
+  } finally { db.done(); }
+});
+
