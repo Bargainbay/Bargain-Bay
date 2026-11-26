@@ -101,10 +101,12 @@ export default async function SalesDashboardPage({ searchParams }) {
       <DashboardFilters periods={DASH_PERIODS} active={period} />
 
       <div className="dash-kpis">
-        <Kpi label={`Revenue booked (ex-HST) · ${periodLabel(period)}`} value={money(k.revenue)} delta={k.revenueDelta}
+        <Kpi label={`Sales before tax · ${periodLabel(period)}`} value={money(k.revenue)} delta={k.revenueDelta}
           sub={k.owing > 0
-            ? `${money(k.collected)} collected · ${money(k.owing)} still owing`
-            : (k.hstCollected ? `all collected · + ${money(k.hstCollected)} HST` : 'pre-tax sales')} />
+            ? `${money(k.collected)} collected · ${money(k.owing)} still owing (before tax)`
+            : 'all collected'} />
+        <Kpi label={`Sales with tax · ${periodLabel(period)}`} value={money(k.revenue + k.hstCollected)}
+          sub={`includes ${money(k.hstCollected)} HST`} />
         {!salesOnly && (
           <Kpi label="Profit" value={money(k.profit)} delta={k.profitDelta}
             sub={k.unitsWithCost

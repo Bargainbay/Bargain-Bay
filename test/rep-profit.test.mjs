@@ -100,6 +100,7 @@ test('THE COMPANY FIGURE COUNTS EVERY SALE, INCLUDING ONES NO REP CLOSED, AND ON
     equal(p.company.today.gp, 700);
     equal(p.company.today.sales, 2);
     equal(p.company.today.revenue, 1500);   // pre-tax sales: 1000 + 500
+    equal(p.company.today.revenueWithTax, 1500);   // no HST on these orders
     equal(p.company.week.gp, 700); equal(p.company.week.revenue, 1500);
     equal(p.company.month.gp, 700); equal(p.company.month.sales, 2);
     // the rep's own figure and the team table still read only what they closed
@@ -120,5 +121,17 @@ test('a consigned unit is costed before tax (cost / 1.13), the same as the Daily
     await client.query(`INSERT INTO consignment_units (sku, vendor, cost) VALUES ($1,'Abi',1130)`, [sku]);
     const p = await repProfit({ name: 'Owner' }, { all: true });
     equal(p.company.today.gp, 500);                       // 1500 - 1130/1.13, not 1500 - 1130
+  } finally { done(); }
+});
+
+test('the company card carries sales both before and with tax', async () => {
+  const { client, done } = await fresh();
+  try {
+    await client.query(`INSERT INTO orders (order_number,email,name,status,total,hst,subtotal,created_at) VALUES ('BB-TAX1','a@b.ca','A','confirmed',1130,130,1000,now())`);
+    const p = await repProfit({ name: 'Owner' }, { all: true });
+    for (const k of ['today', 'week', 'month']) {
+      equal(p.company[k].revenue, 1000);
+      equal(p.company[k].revenueWithTax, 1130);
+    }
   } finally { done(); }
 });
