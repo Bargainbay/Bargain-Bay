@@ -5185,6 +5185,8 @@ money is matched only where a person connects an e-transfer to what we owe ("Mar
 "Supplier Payment ..." is a label: it is NOT an expense (ledger, P&L statement, weekly brief, dashboard), NOT journalled,
 and its HST is NOT an input tax credit (that comes from the supplier invoice). The ledger records the money when the
 invoice or consigned unit is marked paid. Do not add name/amount guessing that nets bank lines against invoices.
+**Owner draws are not a cost on the P&L statement or weekly brief** (`isOwnerDraw`, owner 2026-11-25); the Financial
+dashboard still SHOWS them under net profit.
 Consequence: until marked, the books' bank figure still includes that money; direct stock purchases with no invoice
 claim no HST until the invoice is uploaded.
 

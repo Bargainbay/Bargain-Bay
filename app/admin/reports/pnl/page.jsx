@@ -136,6 +136,7 @@ export default async function PnlPage({ searchParams }) {
         as the Sales dashboard, so the two agree. HST is excluded throughout: it is collected for the CRA, not
         earned. Have your accountant check it before it goes anywhere official.
         {c.supplierPayments > 0 && <> Payments to suppliers ({money(c.supplierPayments)} in this period) are not listed as costs: that stock is already counted in cost of goods sold when it sells.</>}
+        {c.ownerDraws > 0 && <> Owner draws ({money(c.ownerDraws)} in this period) are not listed as costs: that is profit taken out.</>}
       </p>
     </div>
   );

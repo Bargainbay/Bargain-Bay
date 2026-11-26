@@ -52,6 +52,16 @@ test('the profit statement leaves it out and says how much', async () => {
     assert(!c.byCategory.some((x) => isSupplierPayment(x.category)));
   } finally { done(); }
 });
+test('owner draws are not a cost on the statement, and the amount is said', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    const today = await seed(client);
+    await client.query(`INSERT INTO expenses (incurred_on, category, vendor, amount, source) VALUES ($1,'Owner draw - Sai','Sai',700,'plaid')`, [today]);
+    const c = (await profitAndLoss('month')).current;
+    equal(c.expenses, 50); equal(c.ownerDraws, 700);
+    assert(!c.byCategory.some((x) => /owner draw/i.test(x.category)));
+  } finally { done(); }
+});
 test('the HST credit comes from the invoice only', async () => {
   const { client, done } = await withTestDb();
   try {
