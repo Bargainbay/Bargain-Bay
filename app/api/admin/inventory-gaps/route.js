@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff } from '../../../../lib/auth';
 import {
-  inventoryGapsReport, linkSaleLine, runStockReconcile,
+  inventoryGapsReport, linkSaleLine, addSoldUnits, runStockReconcile,
   listFillRequests, approveFillRequests, rejectFillRequests
 } from '../../../../lib/stock-reconcile';
 import { setWaitingCosts } from '../../../../lib/unit-cost';
@@ -27,7 +27,9 @@ export async function GET() {
     // Fill requests carry what each unit COST — admin only, stripped here rather
     // than hidden in the browser.
     const fillRequests = isAdmin(s) ? await listFillRequests().catch(() => []) : null;
-    return NextResponse.json({ ok: true, ...report, fillRequests, canApprove: isAdmin(s) });
+    // What a line cost is admin only too.
+    const unlinked = isAdmin(s) ? report.unlinked : (report.unlinked || []).map(({ cost, ...l }) => l);
+    return NextResponse.json({ ok: true, ...report, unlinked, fillRequests, canApprove: isAdmin(s) });
   } catch (e) {
     return NextResponse.json({ error: e?.message || 'Could not build the report.' }, { status: 500 });
   }
@@ -36,6 +38,9 @@ export async function GET() {
 // { action: 'link', itemId, skus } — tie a typed sale line to the unit(s) it sold;
 //                                   several units split the line (`sku` still works for one);
 //                                   `alreadyLinked` = the SKU a line carries when adding more to it
+// { action: 'add_sold', entries: [{ itemId, cost, units, model, confirmNew }] }
+//                                 — ADMIN: the unit was never in stock: add it with its
+//                                   cost and link the line, in one step
 // { action: 'check_rsops' }        — run the RS Ops → tracker pass now (no email)
 // { action: 'approve_fills', ids }  — ADMIN: write the invoice's cost onto booked-in units
 // { action: 'reject_fills', ids, note } — ADMIN: not the same appliance; add the line as new
@@ -62,6 +67,17 @@ export async function POST(req) {
         await audit(s, {
           action: 'unit.cost', entity: 'unit', entityId: u.sku,
           summary: `Cost set to ${money(u.cost)} (was ${u.was == null ? 'blank' : money(u.was)}) on Stock gaps`, detail: u
+        });
+      }
+      return NextResponse.json({ ok: true, ...r });
+    }
+    if (body.action === 'add_sold') {
+      if (!isAdmin(s)) return NextResponse.json({ error: 'Only an admin can enter costs.' }, { status: 403 });
+      const r = await addSoldUnits(body.entries, { by: s.email });
+      for (const u of r.saved) {
+        await audit(s, {
+          action: 'unit.sold_added', entity: 'invoice', entityId: u.number,
+          summary: `Added ${u.skus.join(', ')} at ${money(u.cost)} cost to ${u.number} on Stock gaps`, detail: u
         });
       }
       return NextResponse.json({ ok: true, ...r });

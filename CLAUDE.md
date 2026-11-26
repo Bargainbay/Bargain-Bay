@@ -788,6 +788,14 @@ STAYS NEEDS INVOICE, so the later invoice still matches; approving that fill car
 **The list (and the daily email and manager count) is only units with NO cost** (owner, 2026-11-25): NEEDS INVOICE and Cost of
 Product blank or 0. A saved cost drops the unit off it.
 
+### Sold and never in stock: the express add (added 2026-11-25)
+`addSoldUnits` (lib/stock-reconcile.js), `add_sold` on `/api/admin/inventory-gaps`, ADMIN. Each "Sold without a stock unit" row takes a
+cost (WHOLE line, pre-tax) plus optional model and unit count; Enter or **Save all** puts the unit on the tracker (`BI-L<line id>-<n>`,
+lot `BI-SOLD`, NEEDS INVOICE; Sold and dated to the SALE when the invoice is paid), links the line (`linkSaleLine`) and saves the cost on the
+invoice and order lines in the same transaction. Make and category are read off the line. A model we hold unsold is refused until saved a
+second time. A save that fails after the tracker write finishes the same SKU next time. Keep the lot free of invoice-like codes or a later
+purchase invoice will not match the row. **Not for vendor drop-offs** (nothing records the money owed).
+
 ## Finding the unit, and not adding it twice (added 2026-09-22)
 Written after INV-1236: six appliances, one picked from stock, five typed through
 "Not from our stock?" with the reason **"Already delivered"** — and after a
