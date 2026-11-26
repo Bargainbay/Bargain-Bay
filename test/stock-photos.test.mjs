@@ -81,3 +81,99 @@ test('a row wins over images.json, and removing it falls back', async () => {
     equal(rows.find((r) => r.model === 'NEWMODEL-1').source, 'missing');
   } finally { done(); }
 });
+
+// ---- the automatic finder ----
+import { findStockPhoto, autoFixStockPhotos, hasModelNumber } from '../lib/stock-photo-finder.js';
+import { handlePhotoGaps } from '../lib/catalog-sync.js';
+
+suite('stock photo finder');
+
+const CDN = 'https://cdn.shopify.com/s/files/1/x/dryer.jpg';
+// A pretend internet: one retailer (`titles`) and a picture server that answers
+// with `picture`. Everything else says it does not carry the model.
+async function withFakeWeb({ titles = [], picture = 200, store = 200 }, fn) {
+  const real = globalThis.fetch;
+  const key = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  const mails = [];
+  globalThis.fetch = async (url, init) => {
+    const u = String(url);
+    if (u.includes('api.resend.com')) { mails.push(JSON.parse(init.body)); return new Response('{"id":"1"}', { status: 200 }); }
+    if (u.includes('/search/suggest.json')) {
+      if (store !== 200) return new Response('', { status: store });
+      const products = u.includes('leons.ca') ? titles.map((title) => ({ title, image: CDN })) : [];
+      return new Response(JSON.stringify({ resources: { results: { products } } }), { status: 200 });
+    }
+    if (u === CDN) return picture === 200
+      ? new Response(new Uint8Array(9000), { status: 200, headers: { 'content-type': 'image/jpeg' } })
+      : new Response('', { status: picture });
+    return new Response('', { status: 410 });
+  };
+  try { return await fn(mails); }
+  finally { globalThis.fetch = real; if (key !== undefined) process.env.ANTHROPIC_API_KEY = key; }
+}
+
+test('words that are not a model number are never searched', async () => {
+  equal(hasModelNumber('Laundry Centre'), false);
+  equal(hasModelNumber('Top Load Washer/Dryer Set'), false);
+  assert(hasModelNumber('MVD420W'));
+  await withFakeWeb({ titles: ['GE Laundry Centre'] }, async () => {
+    equal(await findStockPhoto('Laundry Centre', 'Frigidaire'), null);
+    const r = await autoFixStockPhotos([{ model: 'Laundry Centre', skus: ['A'] }]);
+    equal(r.notFound.length, 1);
+    equal(r.why['Laundry Centre'].transient, false);
+  });
+});
+
+test("a refused Shopify picture check keeps the store's own link; a missing file does not", async () => {
+  await withFakeWeb({ titles: ['Marathon Dryer MVD420W'], picture: 403 }, async () => {
+    equal((await findStockPhoto('MVD420W', 'Marathon'))?.url, CDN);
+  });
+  await withFakeWeb({ titles: ['Marathon Dryer MVD420W'], picture: 404 }, async () => {
+    equal(await findStockPhoto('MVD420W', 'Marathon'), null);
+  });
+});
+
+test('a washer-and-dryer listing is not a picture of the dryer', async () => {
+  await withFakeWeb({ titles: ['Electrolux Washer ELFW7437AW & Electric Dryer ELFE743CAW'] }, async () => {
+    equal(await findStockPhoto('ELFE743CAW', 'Electrolux'), null);
+  });
+});
+
+test('models past the per-run cap are not reported as failures', async () => {
+  await withFakeWeb({}, async () => {
+    const r = await autoFixStockPhotos(Array.from({ length: 10 }, (_, i) => ({ model: `ZZZ${i}000`, skus: ['A'] })));
+    equal(r.notFound.length, 8);
+    equal(r.notTried.length, 2);
+  });
+});
+
+test('a refusal is retried hourly and only mailed, with the reason, after three goes', async () => {
+  const { done } = await withTestDb();
+  const env = { v: process.env.VERCEL_ENV, k: process.env.RESEND_API_KEY };
+  const now = Date.now;
+  process.env.VERCEL_ENV = 'production';
+  process.env.RESEND_API_KEY = 'test-key';
+  try {
+    await withFakeWeb({ store: 429 }, async (mails) => {
+      const gaps = [{ model: 'MVD420W', make: 'Marathon', category: 'Dryer', skus: ['A'] }];
+      let t = now();
+      Date.now = () => t;
+      await handlePhotoGaps(gaps);
+      equal(mails.length, 0);
+      t += 61 * 60 * 1000; await handlePhotoGaps(gaps);
+      equal(mails.length, 0);
+      t += 61 * 60 * 1000; await handlePhotoGaps(gaps);
+      assert(mails.length > 0, 'told after the third refusal');
+      assert(mails[0].html.includes('refused (429)'), 'the email says why');
+      const n = mails.length;
+      t += 25 * 60 * 60 * 1000; await handlePhotoGaps(gaps);
+      equal(mails.length, n);
+    });
+  } finally {
+    Date.now = now;
+    if (env.v === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = env.v;
+    if (env.k === undefined) delete process.env.RESEND_API_KEY; else process.env.RESEND_API_KEY = env.k;
+    done();
+  }
+});
