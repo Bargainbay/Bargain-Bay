@@ -9,7 +9,8 @@ export const maxDuration = 180;
 
 // Every half hour through the day: the first pass from 7am Toronto reviews the
 // business and emails the owner the morning brief; later passes give people their
-// target once they clock in (switched off until he turns it on). `?dry=1` builds
+// target once they clock in and push them every 2-3 hours until 8pm (both are
+// switches on the Manager page). `?dry=1` builds
 // the brief without writing a target or sending anything.
 async function run(req) {
   if (!cronAuthorized(req)) return NextResponse.json({ error: 'Not authorized' }, { status: 401 });

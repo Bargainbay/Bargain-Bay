@@ -5017,7 +5017,7 @@ not shown anywhere until the storefront slice.
 ## The General Manager: the business review (added 2026-11-26)
 `lib/exec-rules.js` (pure judgement), `lib/exec-data.js` + `lib/exec-sql.js` (read-only facts), `lib/exec.js`
 (memory, brief, targets), `/admin/manager` (`components/ManagerCommand.jsx`, `/api/admin/manager-exec`, ADMIN),
-`/api/cron/exec-brief` (every 30 min, 11-23 UTC), migration `0084_manager_assignments` (also created at runtime),
+`/api/cron/exec-brief` (every 30 min, 11:00-01:30 UTC), migrations `0084_manager_assignments` + `0085_manager_pushes` (also created at runtime),
 RS Ops `GET /api/intake/floor` (`lib/floor-report.js` there), `test/exec.test.mjs`.
 - **Owner: the manager must be a manager, not an alert list.** Money by revenue line against the same days last
   month, ranked money moves (each says what its dollar figure IS; estimates say estimate), the refurb bottleneck,
@@ -5026,8 +5026,13 @@ RS Ops `GET /api/intake/floor` (`lib/floor-report.js` there), `test/exec.test.mj
   optional, the brief goes without it and says so).
 - **A source that cannot be read is named in `blind`, never counted as zero**, and nobody is judged or flagged off it.
 - **"Nothing recorded" is never "did nothing"** — keep that wording. Driver-clock days are never flagged.
-- **Texting staff their target is OFF until the owner ticks it** on the page; then once, to their own number, only
-  while clocked in, 7am-6pm. No money, price or customer action exists in any of this.
+- **Texting staff is two switches on the page, both switched on by the owner 2026-11-26.** The target goes once
+  when they clock in (one text however many targets); then a push every 2-3 hours (`PUSH_GAP_MIN`, max
+  `MAX_PUSHES`) with progress and encouragement, stopping once they have been told they hit it. Own number only,
+  only while clocked in, 7am-8pm. An unreadable source sends no count, never "nothing recorded". Driver pushes
+  never ask anyone to hurry. **It is the operations number: a STOP reply also blocks that person's sign-in
+  codes.** No money, price or customer action exists in any of this.
+- **Client delivery work up to 2026-11-25 is billed and paid** (owner, 2026-11-26), set as `billedThrough`.
 - The phone Manager reads the STORED review (`company_scoreboard`, `people_review`, `floor_flow`, `todays_plan`);
   it never rebuilds one mid-call. The issue scan raises bottleneck / unlisted units / people / unbilled work from it.
 - **Not covered:** workshop course revenue (lives in rs-solutions, only its Board calls are read), ad return,

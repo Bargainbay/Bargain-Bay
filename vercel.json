@@ -138,7 +138,7 @@
     },
     {
       "path": "/api/cron/exec-brief",
-      "schedule": "*/30 11-23 * * *"
+      "schedule": "*/30 0,1,11-23 * * *"
     },
     {
       "path": "/api/cron/meta-purchases",

@@ -4,10 +4,10 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import {
-  monthWindows, matchByName, peopleReview, floorFlow, rankPlays, assignTargets, measure, judgeAssignment, streamBoard, verdictLine, assignmentText
+  monthWindows, matchByName, peopleReview, floorFlow, rankPlays, assignTargets, measure, judgeAssignment, streamBoard, verdictLine, assignmentText, pushText, planText, unreadable
 } from '../lib/exec-rules.js';
 import { gatherFacts } from '../lib/exec-data.js';
-import { buildReview, runExecPass, textTargets, saveExecConfig, assignmentsOn, cleanJudgement, briefHtml, reviewForCall, judgeEarlier, setTargets } from '../lib/exec.js';
+import { buildReview, runExecPass, textTargets, saveExecConfig, assignmentsOn, cleanJudgement, briefHtml, reviewForCall, judgeEarlier, setTargets, pushTargets, targetReach } from '../lib/exec.js';
 import { scanIssues } from '../lib/manager-issues.js';
 
 const TODAY = '2026-11-26';
@@ -127,6 +127,18 @@ test('client work with no invoice here is a thing to check until he says how far
   assert(m('2026-10-26')[0].key === 'bill-clients' && m('2026-10-26')[0].title.startsWith('Invoice'));
 });
 
+test('a push says where they stand, never accuses off an unread source, and never hurries a driver', () => {
+  const a = (metric, target, actual) => ({ metric, target, actual });
+  assert(pushText('Ravi K', [a('repaired', 3, 0)]).startsWith('Ravi: 0 of 3 repairs finished, 3 to go. Nothing recorded yet'));
+  assert(pushText('Ravi', [a('repaired', 4, 2)]).includes('Past halfway'));
+  assert(pushText('Ravi', [a('repaired', 3, 3)]).includes('target hit'));
+  const unseen = pushText('Ravi', [a('repaired', 3, null)]);
+  assert(unseen.includes('3 repairs finished is the target') && !/nothing|0 of/i.test(unseen), unseen);
+  assert(pushText('Andre', [a('stops_proof', 4, 1)], 3).includes('Drive safe'));
+  assert(planText('Roushi S', [{ metric: 'calls', target: 20, why: 'list' }, { metric: 'assessed', target: 4, why: 'queue' }]).includes('; plus 4 units tested'));
+  equal([unreadable('calls', ['the RS Solutions workshop Board (x)']), unreadable('cleaned', ['the dispatch board (x)'])], [true, false]);
+});
+
 test('the model cannot put words about a person who does not exist into the brief', () => {
   const j = cleanJudgement({ headline: 'h', decisions: [{ decision: 'd', recommend: 'r', why: 'w' }, { decision: '' }], coaching: [{ name: 'Nobody', say: 'x' }, { name: 'roushi', say: 'y' }] }, ['Roushi']);
   equal(j.decisions.length, 1);
@@ -226,6 +238,39 @@ test('staff are texted only with the switch on, only once clocked in, and only o
     equal((await textTargets({ now: new Date(`${TODAY}T03:00:00Z`), send })).skipped, 'outside texting hours');
   });
 });
+
+test('pushes come every 2-3 hours, only on the clock, and stop once the target is hit', () => withTestDb(async (db) => {
+  const { ensureExecSchema } = await import('../lib/exec.js');
+  await ensureExecSchema();
+  const at = (utc) => new Date(`${TODAY}T${utc}:00Z`);
+  await db.query("INSERT INTO employees (name, email, phone, active) VALUES ('Roushi', 'r@x.ca', '4165550100', true)");
+  const emp = (await db.query("SELECT id FROM employees WHERE email = 'r@x.ca'")).rows[0];
+  await db.query('INSERT INTO staff_shifts (employee_id, started_at) VALUES ($1, $2)', [emp.id, at('14:00').toISOString()]);
+  await db.query(`INSERT INTO manager_assignments (day, person_name, person_email, metric, target, why) VALUES ('${TODAY}','Roushi','r@x.ca','calls',4,'list')`);
+  const bodies = [];
+  const send = async ({ body }) => { bodies.push(body); return { ok: true }; };
+  const progress = (n) => ({ blind: [], stopDays: {}, people: [{ name: 'Roushi', email: 'r@x.ca', days: [TODAY], callsByDay: { [TODAY]: n } }] });
+  await saveExecConfig({ textStaff: true });
+  const env = process.env.VERCEL_ENV; process.env.VERCEL_ENV = 'production';
+  try {
+    equal((await textTargets({ now: at('14:30'), send })).sent, ['Roushi']);
+    equal((await pushTargets({ now: at('18:00'), send, progress: progress(1) })).skipped, 'pushing staff is switched off');
+    await saveExecConfig({ pushStaff: true });
+    equal((await pushTargets({ now: at('16:00'), send, progress: progress(1) })).sent, []);      // too soon
+    equal((await pushTargets({ now: at('17:00'), send, progress: progress(1) })).sent, ['Roushi']);
+    equal((await pushTargets({ now: at('17:30'), send, progress: progress(1) })).sent, []);
+    equal((await pushTargets({ now: at('19:30'), send, progress: progress(5) })).sent, ['Roushi']);
+    equal((await pushTargets({ now: at('22:30'), send, progress: progress(6) })).sent, []);      // already cheered
+    assert(bodies[1].includes('1 of 4 calls logged, 3 to go'), bodies[1]);
+    assert(bodies[2].includes('target hit'), bodies[2]);
+    const [row] = await targetReach(await assignmentsOn(TODAY), { now: at('20:00') });
+    equal([row.hasPhone, row.onClock, row.pushes], [true, true, 2]);
+    // clocked out: nothing more
+    await db.query('UPDATE manager_assignments SET cheered_at = NULL');
+    await db.query('UPDATE staff_shifts SET ended_at = $1', [at('20:30').toISOString()]);
+    equal((await pushTargets({ now: at('23:00'), send, progress: progress(1) })).sent, []);
+  } finally { if (env === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = env; }
+}));
 
 test('the morning brief goes once a day, and a failed send gives the day back', async () => {
   await seeded(async () => {

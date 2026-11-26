@@ -60,6 +60,8 @@ export default function ManagerCommand() {
           if (e.target.checked && !confirm('Each morning, once someone clocks in, the Manager will TEXT them their target for the day. Switch on?')) return;
           post({ action: 'config', textStaff: e.target.checked }, 'config');
         }} /> Text each person their daily target when they clock in</label>
+        <label style={row}><input type="checkbox" style={box} checked={config.pushStaff} disabled={!!busy || !config.textStaff}
+          onChange={(e) => post({ action: 'config', pushStaff: e.target.checked }, 'config')} /> Push them every 2-3 hours while they are clocked in</label>
         <label style={{ ...row, marginTop: 6 }}>Client delivery work is already invoiced up to
           <input type="date" style={{ width: 'auto', margin: 0 }} defaultValue={config.billedThrough} disabled={!!busy}
             onChange={(e) => post({ action: 'config', billedThrough: e.target.value }, 'config', 'Saved. Press Review now to recount.')} /></label>
@@ -98,7 +100,8 @@ export default function ManagerCommand() {
           </div>
 
           <div style={card}><h2 style={h2}>Targets</h2>
-            {targets.length ? <ul style={{ margin: 0, paddingLeft: 18 }}>{targets.map((a) => <li key={a.id}><b>{a.name}</b>: {a.target} {WORDS[a.metric] || a.metric} <span className="hint">({a.why}){a.texted_at ? ', texted' : ''}</span></li>)}</ul> : <p>No targets today.</p>}
+            {targets.length ? <ul style={{ margin: 0, paddingLeft: 18 }}>{targets.map((a) => <li key={a.id}><b>{a.name}</b>: {a.target} {WORDS[a.metric] || a.metric} <span className="hint">({a.why}){a.texted_at ? ', texted' : ''}{a.pushes ? `, pushed ${a.pushes} time${a.pushes === 1 ? '' : 's'}` : ''}{a.onClock ? ', clocked in' : ''}</span>
+              {a.hasPhone === false && <span style={{ color: '#b3261e' }}> no mobile on file, cannot be texted</span>}</li>)}</ul> : <p>No targets today.</p>}
             {s.yesterday?.length > 0 && <><p style={{ margin: '10px 0 2px' }}><b>Yesterday</b></p><ul style={{ margin: 0, paddingLeft: 18 }}>{s.yesterday.map((a) => <li key={a.id}>{a.name}: {a.actual ?? '-'} of {a.target} {WORDS[a.metric] || a.metric}{a.status ? ` - ${RESULT[a.status]}` : ''}</li>)}</ul></>}
           </div>
 
