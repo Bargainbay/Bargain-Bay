@@ -135,6 +135,7 @@ export default async function PnlPage({ searchParams }) {
         Revenue counts on the day the sale was made and expenses on the day they were incurred — the same basis
         as the Sales dashboard, so the two agree. HST is excluded throughout: it is collected for the CRA, not
         earned. Have your accountant check it before it goes anywhere official.
+        {c.supplierPayments > 0 && <> Payments to suppliers ({money(c.supplierPayments)} in this period) are not listed as costs: that stock is already counted in cost of goods sold when it sells.</>}
       </p>
     </div>
   );

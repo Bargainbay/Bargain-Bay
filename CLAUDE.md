@@ -5179,6 +5179,15 @@ runway, stock aging, returns by supplier/brand/category/lot, cash cycle, ad retu
 - A block that cannot be read shows "not loaded", never zero. Net worth is saved monthly (setting `net_worth_history`)
   only when every line is known, by the page and the nightly pass.
 
+## A supplier payment is counted ONCE (owner, 2026-11-25)
+`lib/supplier-payments.js`, `test/supplier-payments.test.mjs`. **The books never count a supplier payment twice, and
+money is matched only where a person connects an e-transfer to what we owe ("Mark paid").** A bank line filed as
+"Supplier Payment ..." is a label: it is NOT an expense (ledger, P&L statement, weekly brief, dashboard), NOT journalled,
+and its HST is NOT an input tax credit (that comes from the supplier invoice). The ledger records the money when the
+invoice or consigned unit is marked paid. Do not add name/amount guessing that nets bank lines against invoices.
+Consequence: until marked, the books' bank figure still includes that money; direct stock purchases with no invoice
+claim no HST until the invoice is uploaded.
+
 ## What is NOT in this repo
 The master tracker sheet/xlsx, Meta/Shopify/Clover/Vercel cloud config, Google Drive image folders, and the broader RS Solutions business docs (policies, brand assets, prospect lists, social calendar, labor tracking) live in the connected "RS Solutions Complete Tracker" folder and external services — not here.
 

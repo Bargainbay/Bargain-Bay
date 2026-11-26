@@ -91,7 +91,7 @@ export default async function FinancialDashboardPage({ searchParams }) {
 
       <OpsSection scope="fin" id="owe-suppliers" title={`Open supplier invoices · ${total(owing, 'total')}`} count={owing.length || null} defaultOpen>
         <div className="panel" style={{ marginTop: 18, maxHeight: 520, overflow: 'auto' }}>
-          <p className="hint" style={{ marginTop: 0 }}>Set the day the money left, then press <b>Mark paid</b>. This records a payment already made; it sends no money. There is no undo button, so check the row first.</p>
+          <p className="hint" style={{ marginTop: 0 }}>Set the day the money left, then press <b>Mark paid</b>. This connects a payment already made to what we owe, and is the only place it is counted; it sends no money. There is no undo button, so check the row first.</p>
           <PayablesList initial={owing} canEdit={admin} />
         </div>
       </OpsSection>
