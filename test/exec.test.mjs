@@ -115,6 +115,18 @@ test('targets come from each person\'s own typical day and today\'s run, and are
   equal(judgeAssignment(t[2], j.actual, j.worked).status, 'off');
 });
 
+test('somebody on the daily call list owes those calls as well as their floor target', () => {
+  const t = assignTargets({ today: TODAY, callList: { enabled: true, perRep: 20, reps: ['r@x.ca'] }, flow: { stages: [{ key: 'cleaning', count: 9 }] },
+    people: [{ name: 'Roushi', email: 'r@x.ca', kinds: ['floor'], floorByDay: { '2026-11-25': { cleaned: 5 } }, callsByDay: {}, sales: { calls: 0 } }] });
+  equal(t.map((a) => [a.metric, a.target]), [['calls', 20], ['cleaned', 6]]);
+});
+
+test('client work with no invoice here is a thing to check until he says how far he has billed', () => {
+  const m = (billedThrough) => rankPlays({ money: { unbilled: { count: 100, total: 19000, billedThrough }, overdue: { count: 1, total: 1100, top: [] } } });
+  assert(m(null).find((p) => p.key === 'bill-clients').title.startsWith('Check billing'));
+  assert(m('2026-10-26')[0].key === 'bill-clients' && m('2026-10-26')[0].title.startsWith('Invoice'));
+});
+
 test('the model cannot put words about a person who does not exist into the brief', () => {
   const j = cleanJudgement({ headline: 'h', decisions: [{ decision: 'd', recommend: 'r', why: 'w' }, { decision: '' }], coaching: [{ name: 'Nobody', say: 'x' }, { name: 'roushi', say: 'y' }] }, ['Roushi']);
   equal(j.decisions.length, 1);

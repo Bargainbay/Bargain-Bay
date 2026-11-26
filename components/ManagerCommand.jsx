@@ -9,6 +9,9 @@ const WORDS = { cleaned: 'units cleaned', assessed: 'units tested', repaired: 'r
 const RESULT = { met: 'Done', short: 'Short', nothing: 'Nothing recorded', off: 'Not in' };
 const card = { background: '#fff', border: '1px solid #e3e0da', borderRadius: 8, padding: 14, marginBottom: 14 };
 const h2 = { margin: '0 0 8px', fontSize: 15 };
+// The shop's global input style is full width, which strands a checkbox above its label.
+const row = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' };
+const box = { width: 'auto', margin: 0 };
 
 export default function ManagerCommand() {
   const [data, setData] = useState(null);
@@ -52,11 +55,14 @@ export default function ManagerCommand() {
       {msg && <p className="hint">{msg}</p>}
 
       <div style={card}>
-        <label style={{ display: 'block' }}><input type="checkbox" checked={config.emailBrief} disabled={!!busy} onChange={(e) => post({ action: 'config', emailBrief: e.target.checked }, 'config')} /> Email me the brief every morning at 7</label>
-        <label style={{ display: 'block' }}><input type="checkbox" checked={config.textStaff} disabled={!!busy} onChange={(e) => {
+        <label style={row}><input type="checkbox" style={box} checked={config.emailBrief} disabled={!!busy} onChange={(e) => post({ action: 'config', emailBrief: e.target.checked }, 'config')} /> Email me the brief every morning at 7</label>
+        <label style={row}><input type="checkbox" style={box} checked={config.textStaff} disabled={!!busy} onChange={(e) => {
           if (e.target.checked && !confirm('Each morning, once someone clocks in, the Manager will TEXT them their target for the day. Switch on?')) return;
           post({ action: 'config', textStaff: e.target.checked }, 'config');
         }} /> Text each person their daily target when they clock in</label>
+        <label style={{ ...row, marginTop: 6 }}>Client delivery work is already invoiced up to
+          <input type="date" style={{ width: 'auto', margin: 0 }} defaultValue={config.billedThrough} disabled={!!busy}
+            onChange={(e) => post({ action: 'config', billedThrough: e.target.value }, 'config', 'Saved. Press Review now to recount.')} /></label>
       </div>
 
       {!s ? <p>No review yet. Press <b>Review now</b>; after that it runs every morning.</p> : (
