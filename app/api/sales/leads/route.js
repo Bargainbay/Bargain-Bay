@@ -9,6 +9,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const maxDuration = 300; // a 300-row import checks every row for duplicates
 
 const deny = () => NextResponse.json({ error: 'Not authorized' }, { status: 403 });
 const fail = (e) => {

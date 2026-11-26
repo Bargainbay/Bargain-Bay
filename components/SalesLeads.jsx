@@ -67,23 +67,41 @@ function ImportLeads({ onDone, side }) {
   const [res, setRes] = useState(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [files, setFiles] = useState([]);          // [{ name, text }]: several files are imported one after another
+  const [progress, setProgress] = useState('');
   async function run(commit) {
-    setBusy(true); setErr('');
-    const r = await post({ action: commit ? 'import-commit' : 'import-preview', text, side });
-    setBusy(false);
-    if (!r.ok) { setErr(r.error || 'Could not read that.'); return; }
-    setRes({ ...r, committed: commit });
+    setBusy(true); setErr(''); setRes(null);
+    const parts = files.length ? files : [{ name: '', text }];
+    const total = { ready: 0, skipped: 0, created: 0, failed: [], preview: [] };
+    for (let i = 0; i < parts.length; i++) {
+      if (parts.length > 1) setProgress(`${commit ? 'Importing' : 'Checking'} file ${i + 1} of ${parts.length}…`);
+      const r = await post({ action: commit ? 'import-commit' : 'import-preview', text: parts[i].text, side });
+      if (!r.ok) { setErr(`${parts[i].name ? `${parts[i].name}: ` : ''}${r.error || 'Could not read that.'}${total.created ? ` ${total.created} were imported before this.` : ''}`); setBusy(false); setProgress(''); if (commit) onDone(); return; }
+      total.ready += r.ready || 0; total.skipped += r.skipped || 0; total.created += r.created || 0;
+      total.failed.push(...(r.failed || [])); total.preview.push(...(r.preview || []));
+    }
+    setBusy(false); setProgress('');
+    setRes({ ...total, committed: commit });
     if (commit) onDone();
+  }
+  async function pick(e) {
+    const list = Array.from(e.target.files || []).sort((a, b) => a.name.localeCompare(b.name));
+    setFiles(await Promise.all(list.map(async (f) => ({ name: f.name, text: await f.text() }))));
+    setRes(null); setErr('');
   }
   return (
     <div className="panel">
       <h2 style={{ marginTop: 0, fontSize: 16 }}>Import leads</h2>
       <p className="hint" style={{ marginTop: 0 }}>Paste rows from a spreadsheet, headings first (Company, Contact, Email, Phone, Segment, Side). Rows with no Side go to the side you are viewing{side === 'bb' || side === 'rs' ? '' : ' (under All: marked Both)'}. Nothing is saved until you press Import.</p>
-      <textarea value={text} onChange={(e) => { setText(e.target.value); setRes(null); }} rows={6} style={{ width: '100%', fontFamily: 'monospace', fontSize: 12.5 }} aria-label="Pasted rows" />
+      <p style={{ margin: '0 0 8px', fontSize: 13.5 }}>
+        <label>Or choose files (.tsv or .csv, up to 300 rows each): <input type="file" multiple accept=".tsv,.csv,.txt" onChange={pick} /></label>
+      </p>
+      <textarea value={text} disabled={files.length > 0} onChange={(e) => { setText(e.target.value); setRes(null); }} rows={6} style={{ width: '100%', fontFamily: 'monospace', fontSize: 12.5 }} aria-label="Pasted rows" />
       {err && <p style={{ color: 'var(--red, #c33)', fontSize: 14 }} role="alert">{err}</p>}
       <div style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
-        <button className="btn" disabled={busy || !text.trim()} onClick={() => run(false)}>Preview</button>
+        <button className="btn" disabled={busy || (!text.trim() && !files.length)} onClick={() => run(false)}>Preview</button>
         {res && !res.committed && res.ready > 0 && <button className="btn" disabled={busy} onClick={() => run(true)}>Import {res.ready}</button>}
+        {progress && <span role="status" style={{ fontSize: 13.5, alignSelf: 'center' }}>{progress}</span>}
       </div>
       {res && !res.committed && (
         <div style={{ fontSize: 13.5 }}>
