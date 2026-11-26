@@ -1833,6 +1833,7 @@ tr.is-warn td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .poster-grid { display: grid; gap: 14px; }
 .poster-grid-feed { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
 .poster-grid-story { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.poster-grid-square { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
 .poster-grid-ad { grid-template-columns: minmax(300px, 640px); }
 .poster-card { margin: 0; background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 10px; }
 .poster-stills { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
