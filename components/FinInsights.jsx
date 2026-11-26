@@ -113,7 +113,7 @@ export default async function FinInsights({ period, periodLabel, bankroll, admin
           ))}
         </div>
         <p style={{ fontSize: 15 }}>Net worth: <strong style={w.net < 0 ? red : null}>{money(w.net)}</strong>{!w.complete && ' (at least one line is not known, so this is not the full picture)'}</p>
-        <p className="hint">Supplier and vendor amounts are what is recorded as unpaid. If some were already paid (an e-transfer does not mark an invoice paid), mark them paid on the <a href="/admin/reports/ledger" style={{ textDecoration: 'underline' }}>ledger</a> and this goes up.</p>
+        <p className="hint">Supplier and vendor amounts are what is recorded as unpaid. If some were already paid (an e-transfer does not mark an invoice paid), mark them paid in <b>Open supplier invoices</b> or <b>Consignment units to pay</b> above and this goes up.</p>
         {history.length > 0 && (<>
           <h3 style={{ margin: '14px 0 6px' }}>Month by month</h3>
           <Table rows={[...history].reverse()} cols={[

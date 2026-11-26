@@ -5158,6 +5158,8 @@ after deploy**), `components/Bankroll.jsx` + `components/Receipts.jsx`, `/api/ad
 ## The owner view on the Financial dashboard (added 2026-11-25)
 `lib/finance-insights.js` (server), `lib/finance-insights-math.js` (no imports; the forecast re-runs in the browser),
 `components/{FinInsights,CashForecast,FinanceTargets}.jsx`, `POST /api/admin/finance-targets` (admin), `test/finance-insights.test.mjs`.
+Above it, **Open supplier invoices** and **Consignment units to pay** reuse the ledger page's `PayablesList` / `ConsignmentOwed`
+(Mark paid is admin only, `/api/admin/ledger`).
 Ten folds under the cards: true net profit, 13-week cash forecast, net worth, 12-month trend, targets, break-even and
 runway, stock aging, returns by supplier/brand/category/lot, cash cycle, ad return.
 - **Wages are the Labor line** (`isWageCategory`): they were always inside operating costs, so net profit did not change
