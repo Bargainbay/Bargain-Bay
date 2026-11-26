@@ -5809,3 +5809,9 @@ Owner's ask: after past cash erosion, a running total of how much of what we tak
 - **Black Friday email** (`lib/bf-daily.js`, `/api/cron/bf-email` 15:00 UTC, panel on `/admin/campaigns`, setting `bf_daily`):
   OFF until switched on, Nov 26 to the chosen last day (default Nov 30). Plain text, live stock, goes through
   `sendEmailCampaign` (consent gate and unsubscribe unchanged). Once per day. Gmail still chooses the tab.
+
+## Payroll: the double-count warning (added 2026-11-25)
+`addPayment` (`lib/pay-ledger.js`) returns `needsConfirm` (route: 409, nothing written) when a bank line is counted as pay
+while the person has a typed bank payment still waiting (10 days either side), or a bank payment is typed within 6 days of
+transfers already counted. Amounts need not match: one week was typed as $725 and also counted as the two transfers that
+made it up. Both screens ask, then resend `confirmDouble: true`. A new caller of `addPayment` must handle `needsConfirm`.

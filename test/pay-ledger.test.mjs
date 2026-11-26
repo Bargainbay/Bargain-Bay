@@ -103,6 +103,37 @@ test('THE LIVE LIST HAS EVERY KIND OF MOVEMENT, AND MARKS BANK LINES ALREADY IN 
   } finally { done(); }
 });
 
+const paidLines = async () => (await query(`SELECT amount FROM pay_ledger WHERE kind = 'paid' AND voided_at IS NULL`)).rows.length;
+
+test('COUNTING A BANK LINE WHILE A TYPED PAYMENT IS WAITING WARNS, WRITES NOTHING, AND CAN BE CONFIRMED', async () => {
+  const { done } = await withTestDb();
+  try {
+    await addPayment({ person: 'Taj', amount: 725, date: TODAYISH, how: 'bank', by: 'a' });
+    await bankLine('plaid:d1', 355, DAY_BEFORE);
+    const line = (await exp('plaid'))[0];
+    const pay = { person: ' taj ', amount: 355, date: DAY_BEFORE, how: 'bank', expenseId: line.id, by: 'a' };
+    const w = await addPayment(pay);
+    assert(w.needsConfirm && /\$725\.00/.test(w.warning), w.warning);
+    equal(await paidLines(), 1);
+    equal((await exp('plaid'))[0].category, 'Other', 'the bank line is untouched');
+    const r = await addPayment({ ...pay, confirmDouble: true });
+    assert(r.id); equal(await paidLines(), 2);
+  } finally { done(); }
+});
+
+test('TYPING A BANK PAYMENT AFTER THE TRANSFERS WERE COUNTED WARNS; LAST WEEK, OTHER PEOPLE AND CASH DO NOT', async () => {
+  const { done } = await withTestDb();
+  try {
+    await bankLine('plaid:d2', 400, DAY_BEFORE);
+    await addPayment({ person: 'Taj', amount: 400, date: DAY_BEFORE, how: 'bank', expenseId: (await exp('plaid'))[0].id, by: 'a' });
+    assert((await addPayment({ person: 'Taj', amount: 725, date: TODAYISH, how: 'bank', by: 'a' })).needsConfirm);
+    equal(await paidLines(), 1);
+    assert((await addPayment({ person: 'Taj', amount: 725, date: day(10), how: 'bank', by: 'a' })).id, 'a week apart is ordinary');
+    assert((await addPayment({ person: 'Ardy', amount: 725, date: TODAYISH, how: 'bank', by: 'a' })).id);
+    assert((await addPayment({ person: 'Taj', amount: 20, date: TODAYISH, how: 'cash', by: 'a' })).id);
+  } finally { done(); }
+});
+
 test('OWED NEEDS A PERSON, A PERIOD AND AN AMOUNT', async () => {
   const { done } = await withTestDb();
   try {

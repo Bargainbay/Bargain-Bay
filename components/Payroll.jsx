@@ -25,6 +25,9 @@ export default function Payroll({ d, setD, extra = {} }) {
     try {
       const res = await fetch('/api/admin/pay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ viewDate: d.date, days: d.days, ...extra, ...body }) });
       const j = await res.json();
+      if (res.status === 409 && j.needsConfirm) {
+        return window.confirm(j.error) ? await call({ ...body, confirmDouble: true }, label) : null;
+      }
       if (!res.ok) throw new Error(j.error || 'That failed.');
       if (j.candidates) return j;
       setD(j); return j;
