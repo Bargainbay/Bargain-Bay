@@ -23,7 +23,7 @@ export async function GET() {
   const s = await staff();
   if (!s) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   try {
-    const report = await inventoryGapsReport({ withCost: isAdmin(s) });
+    const report = await inventoryGapsReport();
     // Fill requests carry what each unit COST — admin only, stripped here rather
     // than hidden in the browser.
     const fillRequests = isAdmin(s) ? await listFillRequests().catch(() => []) : null;

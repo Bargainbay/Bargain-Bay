@@ -777,7 +777,8 @@ still in cleaning or repair — most of them — could only be typed.
 `propagateUnitCost` copies the new Total Cost to `products`, `salvage_units` (re-spread over parts if parted out) and sale lines.
 A line is changed only where its cost is blank, 0 or the unit's previous total; a different typed cost is left and named. The row
 STAYS NEEDS INVOICE, so the later invoice still matches; approving that fill carries its cost through the same function.
-Staff never receive the cost (`inventoryGapsReport({ withCost })`).
+**The list (and the daily email and manager count) is only units with NO cost** (owner, 2026-11-25): NEEDS INVOICE and Cost of
+Product blank or 0. A saved cost drops the unit off it.
 
 ## Finding the unit, and not adding it twice (added 2026-09-22)
 Written after INV-1236: six appliances, one picked from stock, five typed through

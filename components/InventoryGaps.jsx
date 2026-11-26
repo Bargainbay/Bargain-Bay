@@ -5,9 +5,9 @@ import { splitAmount, quantityHint, singleUnitDescription } from '../lib/stock-m
 
 // The two ways stock stops adding up, each with the button that fixes it.
 //
-//   Waiting for a purchase invoice — RS Ops has the appliance, so the tracker has
-//   it too, with no cost. The fix is uploading that lot's invoice on the Intake
-//   tab: its lines fill these rows in.
+//   Units with no cost — RS Ops has the appliance, so the tracker has it too, but
+//   no purchase invoice has priced it. An admin types the cost here, or the lot's
+//   invoice is uploaded on the Intake tab and its lines fill these rows in.
 //
 //   Sold without a stock unit — an invoice line sold an appliance without saying
 //   which one, so it still reads as in stock. The fix is picking the unit that
@@ -101,12 +101,7 @@ export default function InventoryGaps() {
     load();
   }
 
-  // Boxes holding a figure that differs from what is saved. An emptied box saves nothing.
-  const savedCost = new Map((data?.waiting || []).flatMap((l) => l.units).map((u) => [u.sku, u.cost]));
-  const typed = (skus) => skus.filter((sku) => {
-    const v = String(costs[sku] ?? '').trim();
-    return v !== '' && !(savedCost.get(sku) != null && Number(v) === savedCost.get(sku));
-  });
+  const typed = (skus) => skus.filter((sku) => String(costs[sku] ?? '').trim() !== '');
 
   async function saveCosts(skus) {
     const list = typed(skus).map((sku) => ({ sku, cost: costs[sku] }));
@@ -147,7 +142,6 @@ export default function InventoryGaps() {
   const th = { textAlign: 'left', padding: '6px 8px', whiteSpace: 'nowrap' };
   const waitingUnits = (data?.waiting || []).flatMap((l) => l.units);
   const toSave = typed(waitingUnits.map((u) => u.sku));
-  const withCostCount = waitingUnits.filter((u) => u.cost != null).length;
   const unlinked = (data?.unlinked || []).filter((l) => !l.linkedSku);
   const underLinked = (data?.unlinked || []).filter((l) => l.linkedSku);
 
@@ -295,22 +289,21 @@ export default function InventoryGaps() {
           )}
 
           <h2 style={{ fontSize: 17, margin: '20px 0 4px' }}>
-            Waiting for a purchase invoice {data.waitingCount ? `(${data.waitingCount})` : ''}
+            Units with no cost {data.waitingCount ? `(${data.waitingCount})` : ''}
           </h2>
-          {data.waiting.length === 0 ? <p className="hint">Nothing — every unit on the tracker has its invoice.</p> : (
+          {data.waiting.length === 0 ? <p className="hint">Nothing — every unit on the tracker has a cost.</p> : (
             <>
               <p className="hint" style={{ marginTop: 0 }}>
-                These are on the tracker with <b>no purchase invoice</b>. Upload each lot&apos;s invoice (Operations → purchase invoice)
-                — its matching lines come to an admin for approval here, instead of adding the appliances again.
-                {data.canApprove && <> You can also type what a unit cost, <b>before HST</b>: it goes to the tracker, the reports and
-                  any sale of that unit. The unit stays listed until its invoice is in.</>}
+                {data.canApprove && <>Type what each unit cost, <b>before HST</b>, and save: it goes to the tracker, the reports
+                  and any sale of that unit, and the unit leaves this list. </>}
+                You can instead upload the lot&apos;s purchase invoice (Operations → purchase invoice) — its matching lines come to
+                an admin for approval here, instead of adding the appliances again.
               </p>
               {data.canApprove && (
                 <div style={{ position: 'sticky', top: 0, zIndex: 2, background: 'var(--card, #fff)', padding: '6px 0', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <button className={'btn' + (toSave.length ? ' accent' : '')} disabled={!!busy || !toSave.length} onClick={() => saveCosts(toSave)}>
                     {busy === 'costs' ? 'Saving…' : `Save ${toSave.length || ''} cost${toSave.length === 1 ? '' : 's'}`}
                   </button>
-                  <span className="hint" style={{ margin: 0 }}>{withCostCount} of {waitingUnits.length} have a cost</span>
                   {/* Repeated here: the page's own messages are far above a long list. */}
                   {err && <span style={{ color: 'var(--danger)', fontSize: 13 }}>{err}</span>}
                   {msg && <span role="status" style={{ fontSize: 13 }}>{msg}</span>}
@@ -331,7 +324,7 @@ export default function InventoryGaps() {
                               <span style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
                                 <span style={{ color: 'var(--muted)' }}>$</span>
                                 <input type="text" inputMode="decimal" aria-label={`Cost before HST for ${u.sku}`} placeholder="cost"
-                                  value={costs[u.sku] ?? (u.cost != null ? u.cost.toFixed(2) : '')} disabled={busy === 'costs'}
+                                  value={costs[u.sku] ?? ''} disabled={busy === 'costs'}
                                   onChange={(e) => { const v = e.target.value; setCosts((c) => ({ ...c, [u.sku]: v })); }}
                                   onKeyDown={(e) => { if (e.key === 'Enter') saveCosts([u.sku]); }}
                                   style={{ width: 90, textAlign: 'right', padding: '4px 6px' }} />
