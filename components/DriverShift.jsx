@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { queueOrSend, newRef } from '../lib/driver-outbox';
+import { queueOrSend, newRef, flushShift, waitingShift, SHIFT_URL } from '../lib/driver-outbox';
 import { compress } from './photo-pick';
 
 // Clocking on and off, and the fill-up in between.
@@ -17,6 +17,20 @@ const saveFailed = (e, fallback) =>
   `${e?.message || fallback} Try again where you have signal.`;
 const asDuration = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`);
 
+const SAVED = 'Saved on this phone. It sends by itself as soon as it gets through.';
+
+// What a start looks like on screen before the office has answered.
+const asShift = (body, vans, crew) => ({
+  startedAt: new Date(body.at).toISOString(),
+  driving: body.driving,
+  startKm: body.driving ? (body.startKm || null) : null,
+  vehicleId: body.driving ? (body.vehicleId || null) : null,
+  vehicleName: body.driving
+    ? (vans.find((v) => String(v.id) === String(body.vehicleId))?.name || null) : null,
+  ridingWithName: body.driving
+    ? null : (crew.find((m) => String(m.id) === String(body.ridingWith))?.name || null)
+});
+
 export default function DriverShift({ onChanged }) {
   const [shift, setShift] = useState(null);
   const [vehicles, setVehicles] = useState([]);
@@ -26,19 +40,35 @@ export default function DriverShift({ onChanged }) {
   const [form, setForm] = useState(null);      // 'start' | 'end' | 'fuel'
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
+  const [busy, setBusy] = useState(false);
   const [, tick] = useState(0);
 
   async function load() {
+    // Read what the phone still holds BEFORE asking the office: something not
+    // sent yet beats what the office last knew, or the screen flips back to
+    // "Start shift" and the driver is told their tap did nothing.
+    const last = (await waitingShift()).filter((r) => ['start', 'end'].includes(r.body?.action)).pop();
+    let d = null;
+    const giveUp = new AbortController();
+    const late = setTimeout(() => giveUp.abort(), 10000);
     try {
-      const d = await fetch('/api/driver/shift', { cache: 'no-store' }).then((r) => r.json());
-      if (!d.error) {
-        setShift(d.shift || null);
-        setVehicles(d.vehicles || []);
-        setMates(d.mates || []);
-        setQuestion(d.question || null);
-      }
+      const res = await fetch('/api/driver/shift', { cache: 'no-store', signal: giveUp.signal });
+      if (res.status === 403) setErr('This phone is signed out. Sign in again to clock in or out.');
+      const j = await res.json();
+      if (!j.error) d = j;
     } catch { /* offline: whatever is on screen stays */ }
-    finally { setLoaded(true); }
+    finally { clearTimeout(late); }
+    if (d) {
+      setVehicles(d.vehicles || []);
+      setMates(d.mates || []);
+      setQuestion(last ? null : (d.question || null));
+    }
+    if (last) setShift(last.body.action === 'end' ? null : asShift(last.body, d?.vehicles || [], d?.mates || []));
+    else if (d) {
+      setShift(d.shift || null);
+      setOk((m) => (m === SAVED ? '' : m));   // it has landed
+    }
+    setLoaded(true);
   }
   useEffect(() => {
     load();
@@ -71,32 +101,33 @@ export default function DriverShift({ onChanged }) {
   const running = shift?.startedAt
     ? Math.max(0, Math.round((Date.now() - new Date(shift.startedAt)) / 60000)) : 0;
 
+  // Saved on the phone first, then sent straight away. Answers 'sent', 'drop'
+  // or 'waiting'; throws only when neither the phone nor the network took it.
+  async function clock(body) {
+    const ref = newRef();
+    const saved = await queueOrSend({ kind: 'patch', url: SHIFT_URL, ref, body });
+    return saved.queued ? flushShift(ref) : saved.result;
+  }
+
   async function begin({ driving, vehicleId, startKm, ridingWith }) {
-    setErr(''); setOk('');
+    if (busy) return;
+    setErr(''); setOk(''); setBusy(true);
+    const body = { action: 'start', driving, vehicleId, startKm, ridingWith, at: Date.now() };
     try {
-      await queueOrSend({
-        kind: 'patch', url: '/api/driver/shift', ref: newRef(),
-        body: { action: 'start', driving, vehicleId, startKm, ridingWith, at: Date.now() }
-      });
-    } catch (e) { setErr(saveFailed(e, 'That didn’t start.')); return; }
-    // Optimistic: the day has started as far as the driver is concerned.
-    setShift({
-      startedAt: new Date().toISOString(),
-      driving,
-      startKm: driving ? (startKm || null) : null,
-      vehicleId: driving ? (vehicleId || null) : null,
-      vehicleName: driving
-        ? (vehicles.find((v) => String(v.id) === String(vehicleId))?.name || null) : null,
-      ridingWithName: driving
-        ? null : (mates.find((m) => String(m.id) === String(ridingWith))?.name || null)
-    });
-    setForm(null);
-    setOk('Shift started.');
-    onChanged?.();
-    setTimeout(load, 2500);
+      const r = await clock(body);
+      setForm(null);
+      // Refused: the reason arrives with the 'rs-shift-refused' event above.
+      if (r === 'drop') return;
+      setShift(asShift(body, vehicles, mates));
+      setOk(r === 'sent' ? 'Shift started.' : SAVED);
+      onChanged?.();
+      load();
+    } catch (e) { setErr(saveFailed(e, 'That didn’t start.')); }
+    finally { setBusy(false); }
   }
 
   async function finish(endKm) {
+    if (busy) return;
     setErr(''); setOk('');
     // Checked here as well as on the server so the driver is told at the pump,
     // not tomorrow by the office.
@@ -104,17 +135,17 @@ export default function DriverShift({ onChanged }) {
       setErr(`That reads lower than this morning's ${shift.startKm} km — is it the trip meter?`);
       return;
     }
+    setBusy(true);
     try {
-      await queueOrSend({
-        kind: 'patch', url: '/api/driver/shift', ref: newRef(),
-        body: { action: 'end', endKm, at: Date.now() }
-      });
-    } catch (e) { setErr(saveFailed(e, 'That didn’t save.')); return; }
-    setShift(null);
-    setForm(null);
-    setOk('Shift ended. Have a good night.');
-    onChanged?.();
-    setTimeout(load, 2500);
+      const r = await clock({ action: 'end', endKm, at: Date.now() });
+      setForm(null);
+      if (r === 'drop') return;
+      setShift(null);
+      setOk(r === 'sent' ? 'Shift ended. Have a good night.' : SAVED);
+      onChanged?.();
+      load();
+    } catch (e) { setErr(saveFailed(e, 'That didn’t save.')); }
+    finally { setBusy(false); }
   }
 
   async function fuel({ amount, litres, odometer, note, receipt }) {
@@ -160,7 +191,7 @@ export default function DriverShift({ onChanged }) {
 
       {!shift ? (
         form === 'start'
-          ? <StartForm vehicles={vehicles} mates={mates} onCancel={() => setForm(null)} onStart={begin} />
+          ? <StartForm vehicles={vehicles} mates={mates} busy={busy} onCancel={() => setForm(null)} onStart={begin} />
           : (
             <button type="button" className="drv-btn go drv-shift-btn" onClick={() => setForm('start')}>
               ▶ Start shift
@@ -204,7 +235,7 @@ export default function DriverShift({ onChanged }) {
           {form === 'fuel' && (
             <FuelForm shift={shift} onCancel={() => setForm(null)} onSave={fuel} />
           )}
-          {form === 'end' && <EndForm shift={shift} onCancel={() => setForm(null)} onEnd={finish} />}
+          {form === 'end' && <EndForm shift={shift} busy={busy} onCancel={() => setForm(null)} onEnd={finish} />}
         </>
       )}
     </div>
@@ -215,7 +246,7 @@ export default function DriverShift({ onChanged }) {
 // the rest of the form exists at all. A second crew member is on the clock and
 // is not responsible for a van — asking them for an odometer is asking for a
 // number they cannot see, and they will type something.
-function StartForm({ vehicles, mates, onCancel, onStart }) {
+function StartForm({ vehicles, mates, busy, onCancel, onStart }) {
   const [driving, setDriving] = useState(null);
   const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ? String(vehicles[0].id) : '');
   const [km, setKm] = useState('');
@@ -271,14 +302,14 @@ function StartForm({ vehicles, mates, onCancel, onStart }) {
         </>
       )}
       <div className="drv-row">
-        <button type="submit" className="drv-btn go">Start</button>
+        <button type="submit" className="drv-btn go" disabled={busy}>{busy ? 'Starting…' : 'Start'}</button>
         <button type="button" className="drv-btn" onClick={() => setDriving(null)}>Back</button>
       </div>
     </form>
   );
 }
 
-function EndForm({ shift, onCancel, onEnd }) {
+function EndForm({ shift, busy, onCancel, onEnd }) {
   const [km, setKm] = useState('');
   // A passenger has nothing to read. Ending the shift is one tap.
   if (shift.driving === false) {
@@ -288,7 +319,7 @@ function EndForm({ shift, onCancel, onEnd }) {
           You were riding today, so there&apos;s no odometer to put in.
         </p>
         <div className="drv-row">
-          <button type="button" className="drv-btn go" onClick={() => onEnd(null)}>End shift</button>
+          <button type="button" className="drv-btn go" disabled={busy} onClick={() => onEnd(null)}>{busy ? 'Ending…' : 'End shift'}</button>
           <button type="button" className="drv-btn" onClick={onCancel}>Cancel</button>
         </div>
       </div>
@@ -306,7 +337,7 @@ function EndForm({ shift, onCancel, onEnd }) {
           : 'No reading this morning, so there is no distance for today. Put it in anyway for tomorrow.'}
       </p>
       <div className="drv-row">
-        <button type="submit" className="drv-btn go">End shift</button>
+        <button type="submit" className="drv-btn go" disabled={busy}>{busy ? 'Ending…' : 'End shift'}</button>
         <button type="button" className="drv-btn" onClick={onCancel}>Cancel</button>
       </div>
     </form>
