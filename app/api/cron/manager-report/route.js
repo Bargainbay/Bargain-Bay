@@ -5,7 +5,7 @@ import { withHeartbeat } from '../../../../lib/heartbeat';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 180;
 
 // The end-of-day report (owner, 2026-11-17): everything the Manager and its two
 // department managers did today, plus what needs him. 01:00 UTC = 8pm EST / 9pm EDT.
