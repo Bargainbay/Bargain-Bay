@@ -87,3 +87,18 @@ test('the HST credit comes from the invoice only', async () => {
     equal([h.current.credits.stock, h.current.credits.expenses], [130, 6.5]);
   } finally { done(); }
 });
+
+test('the HST panel also gives each month of the year, and they add up to the quarters', async () => {
+  const { client, done } = await withTestDb();
+  try {
+    await seed(client);
+    await client.query(`INSERT INTO orders (order_number,email,name,status,total,hst,subtotal,created_at) VALUES ('BB-M1','a@b.ca','A','confirmed',1130,130,1000,now())`);
+    const h = await hstRemittance('month');
+    const month = Number(torontoToday().slice(5, 7));
+    equal(h.months.length, month);
+    const last = h.months[month - 1];
+    equal([last.inProgress, last.charged, last.sales, last.credits.total, last.net], [true, 130, 1000, 136.5, -6.5]);
+    const sum = (k) => Math.round(h.months.reduce((a, m) => a + m[k], 0) * 100) / 100;
+    for (const k of ['sales', 'charged', 'net']) equal(sum(k), h.yearToDate[k]);
+  } finally { done(); }
+});

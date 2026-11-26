@@ -10,9 +10,57 @@ import { Kpi } from './charts';
 // recorded one, and spending nobody has reviewed looks exactly like spending
 // with no tax on it. So `coverage` is shown as prominently as the total, and
 // when it's poor the net figure is labelled a ceiling rather than an answer.
+const right = { textAlign: 'right' };
+
+// Quarters and months are the same columns over different spans, closed by the same year-to-date line.
+function PeriodTable({ head, year, rows, yearToDate }) {
+  const credit = (v) => (v > 0 ? `−${money(v)}` : '—');
+  const line = (r, strong) => (
+    <>
+      <td style={right}>{money(r.sales)}</td>
+      <td style={right}>{money(r.charged)}</td>
+      <td style={right}>{credit(r.credits.total)}</td>
+      <td style={{ ...right, fontWeight: strong }}>{money(r.net)}</td>
+      <td style={right}>{r.owing > 0 ? money(r.owing) : '—'}</td>
+    </>
+  );
+  return (
+    <div className="table-wrap" style={{ marginTop: 14 }}>
+      <table className="admin">
+        <thead>
+          <tr>
+            <th>{head}</th>
+            <th style={right}>Sales (ex-HST)</th>
+            <th style={right}>HST charged</th>
+            <th style={right}>Credits</th>
+            <th style={right}>Net owed</th>
+            <th style={right}>Still to collect</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td>
+                <b>{r.name}</b>{r.span ? <span style={{ color: 'var(--muted)' }}> {r.span}</span> : null}
+                {/* A part-finished period read as a finished one is how a remittance comes up short. */}
+                {r.inProgress && <span className="pill" style={{ fontSize: 11, marginLeft: 6 }}>in progress</span>}
+              </td>
+              {line(r, 600)}
+            </tr>
+          ))}
+          <tr>
+            <td><b>{year} to date</b></td>
+            {line(yearToDate, 700)}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function TaxOwed({ data }) {
   if (!data) return null;
-  const { current, yearToDate, quarters, coverage, year, periodLabel } = data;
+  const { current, yearToDate, quarters, months, coverage, year, periodLabel } = data;
   const credits = yearToDate.credits;
   // Below this, "what you owe" isn't a claim worth making.
   const thin = coverage.pct < 80 || credits.total <= 0;
@@ -53,45 +101,12 @@ export default function TaxOwed({ data }) {
       )}
 
       {quarters.length > 0 && (
-        <div className="table-wrap" style={{ marginTop: 14 }}>
-          <table className="admin">
-            <thead>
-              <tr>
-                <th>{year} quarter</th>
-                <th style={{ textAlign: 'right' }}>Sales (ex-HST)</th>
-                <th style={{ textAlign: 'right' }}>HST charged</th>
-                <th style={{ textAlign: 'right' }}>Credits</th>
-                <th style={{ textAlign: 'right' }}>Net owed</th>
-                <th style={{ textAlign: 'right' }}>Still to collect</th>
-              </tr>
-            </thead>
-            <tbody>
-              {quarters.map((q) => (
-                <tr key={q.quarter}>
-                  <td>
-                    <b>{q.quarter}</b> <span style={{ color: 'var(--muted)' }}>{q.label}</span>
-                    {/* A part-finished quarter read as a finished one is how a
-                        remittance comes up short. */}
-                    {q.inProgress && <span className="pill" style={{ fontSize: 11, marginLeft: 6 }}>in progress</span>}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>{money(q.sales)}</td>
-                  <td style={{ textAlign: 'right' }}>{money(q.charged)}</td>
-                  <td style={{ textAlign: 'right' }}>{q.credits.total > 0 ? `−${money(q.credits.total)}` : '—'}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{money(q.net)}</td>
-                  <td style={{ textAlign: 'right' }}>{q.owing > 0 ? money(q.owing) : '—'}</td>
-                </tr>
-              ))}
-              <tr>
-                <td><b>{year} to date</b></td>
-                <td style={{ textAlign: 'right' }}>{money(yearToDate.sales)}</td>
-                <td style={{ textAlign: 'right' }}>{money(yearToDate.charged)}</td>
-                <td style={{ textAlign: 'right' }}>{credits.total > 0 ? `−${money(credits.total)}` : '—'}</td>
-                <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(yearToDate.net)}</td>
-                <td style={{ textAlign: 'right' }}>{yearToDate.owing > 0 ? money(yearToDate.owing) : '—'}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <PeriodTable head={`${year} quarter`} year={year} yearToDate={yearToDate}
+          rows={quarters.map((q) => ({ ...q, key: q.quarter, name: q.quarter, span: q.label }))} />
+      )}
+      {months?.length > 0 && (
+        <PeriodTable head={`${year} month`} year={year} yearToDate={yearToDate}
+          rows={months.map((m) => ({ ...m, key: m.month, name: m.label }))} />
       )}
 
       <p className="hint" style={{ marginTop: 12, lineHeight: 1.6 }}>
