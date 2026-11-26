@@ -69,6 +69,9 @@ export default function Bankroll({ initial }) {
     try {
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ viewDate: d.date, date: d.date, days: d.days, ...body }) });
       const r = await res.json();
+      if (res.status === 409 && r.needsConfirm) {
+        return window.confirm(r.error) ? await call({ ...body, confirmDouble: true }, label, url) : null;
+      }
       if (!res.ok) throw new Error(r.error || 'That failed.');
       setD(r);
       if (r.notes && r.notes.length) setErr(r.notes.join(' · '));

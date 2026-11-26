@@ -86,7 +86,7 @@ export default function FinancialKpis({ d, periodLabel }) {
       <Line label="Total operating costs" value={money(k.opex)} strong />
       {notCosts > 0 && (
         <p className="hint" style={{ margin: '12px 0' }}>
-          <strong>{money(notCosts)} left out</strong> because it is not a running cost: stock purchases (already counted as cost of goods when the unit sells) and owner draws / loan repayments.
+          <strong>{money(notCosts)} left out</strong> because it is not a running cost: stock purchases (already counted as cost of goods when the unit sells), owner draws / loan repayments, and money that only moved (refunds already off sales, receipt paybacks, money passed on).
           {' '}{leftOut.map((e) => `${e.category} ${money(e.amount)}`).join(' · ')}
         </p>
       )}

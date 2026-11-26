@@ -33,8 +33,10 @@ export async function POST(req) {
       await audit(session, { action: 'pay.owed', entity: 'pay', entityId: String(id), summary: `Owed to ${b.person}: $${b.amount} for ${b.periodStart} to ${b.periodEnd}` });
     } else if (b.action === 'pay') {
       const r = await addPayment({ person: b.person, amount: b.amount, date: b.date, how: b.how, expenseId: b.expenseId || null,
-        periodStart: b.periodStart, periodEnd: b.periodEnd, note: b.note, by });
-      await audit(session, { action: 'pay.paid', entity: 'pay', entityId: String(r.id), summary: `Paid ${b.person} $${b.amount} (${b.how})` });
+        periodStart: b.periodStart, periodEnd: b.periodEnd, note: b.note, by, confirmDouble: b.confirmDouble === true });
+      // 409 with the warning as `error`: a page loaded before this existed shows it instead of breaking.
+      if (r.needsConfirm) return NextResponse.json({ needsConfirm: true, error: r.warning }, { status: 409 });
+      await audit(session, { action: 'pay.paid', entity: 'pay', entityId: String(r.id), summary: `Paid ${b.person} $${b.amount} (${b.how})${b.confirmDouble === true ? ', confirmed as separate' : ''}` });
     } else if (b.action === 'post_week') {
       const r = await postWeekOwed({ person: b.person, weekStart: b.weekStart, by });
       await audit(session, { action: 'pay.post_week', entity: 'pay', entityId: String(r.id), summary: `Posted ${b.person}, week of ${b.weekStart}: $${r.amount}` });

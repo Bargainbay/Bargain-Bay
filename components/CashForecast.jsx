@@ -25,7 +25,7 @@ export default function CashForecast({ f }) {
     ['weeklyIn', 'Money in each week', 'customer payments, tax included'],
     ['weeklyStock', 'Stock and other e-transfers each week', `the bank shows ${money(f.weeklySupplierPaid)} to suppliers plus ${money(f.weeklyUnsorted)} in unsorted e-transfers; what sells costs ${money(f.weeklyCogs)}`],
     ['weeklyWages', 'Wages each week', 'wages actually paid'],
-    ['weeklyRunning', 'Running bills each week', 'rent, fuel, truck, ads, parts, fees'],
+    ['weeklyRunning', 'Running bills each week', 'rent, fuel, truck, ads, parts, fees, refunds'],
     ['weeklyDraws', 'Owner draws and loans each week', 'taken out of the business'],
     ['weeklyPaydown', 'Paying old balances each week', `${money(f.owedOld)} recorded as owed to suppliers and vendors`]
   ];

@@ -5013,6 +5013,25 @@ not shown anywhere until the storefront slice.
 - Migration numbers 0033 exist twice on disk (vendor messages here; `workshop_applications` from another session). The
   runner keys on the filename so both apply; pick the next free number.
 
+## The General Manager: the business review (added 2026-11-26)
+`lib/exec-rules.js` (pure judgement), `lib/exec-data.js` + `lib/exec-sql.js` (read-only facts), `lib/exec.js`
+(memory, brief, targets), `/admin/manager` (`components/ManagerCommand.jsx`, `/api/admin/manager-exec`, ADMIN),
+`/api/cron/exec-brief` (every 30 min, 11-23 UTC), migration `0084_manager_assignments` (also created at runtime),
+RS Ops `GET /api/intake/floor` (`lib/floor-report.js` there), `test/exec.test.mjs`.
+- **Owner: the manager must be a manager, not an alert list.** Money by revenue line against the same days last
+  month, ranked money moves (each says what its dollar figure IS; estimates say estimate), the refurb bottleneck,
+  finished units not on the website, each person's paid hours against recorded output, one checkable target per
+  person per day judged next morning, and a written judgement (`MANAGER_BRAIN_MODEL`, default claude-opus-5-5;
+  optional, the brief goes without it and says so).
+- **A source that cannot be read is named in `blind`, never counted as zero**, and nobody is judged or flagged off it.
+- **"Nothing recorded" is never "did nothing"** — keep that wording. Driver-clock days are never flagged.
+- **Texting staff their target is OFF until the owner ticks it** on the page; then once, to their own number, only
+  while clocked in, 7am-6pm. No money, price or customer action exists in any of this.
+- The phone Manager reads the STORED review (`company_scoreboard`, `people_review`, `floor_flow`, `todays_plan`);
+  it never rebuilds one mid-call. The issue scan raises bottleneck / unlisted units / people / unbilled work from it.
+- **Not covered:** workshop course revenue (lives in rs-solutions, only its Board calls are read), ad return,
+  marketing, and any work no system records.
+
 ## Parts bought for a unit, and what a unit COSTS (added 2026-10-13)
 `lib/part-costs.js`, `lib/tracker-cost.js`, migration 0030 (`unit_part_costs`),
 `/admin/part-costs` (ADMIN; linked from the Reports hub and the Parts page),
@@ -5202,6 +5221,8 @@ money is matched only where a person connects an e-transfer to what we owe ("Mar
 "Supplier Payment ..." is a label: it is NOT an expense (ledger, P&L statement, weekly brief, dashboard), NOT journalled,
 and its HST is NOT an input tax credit (that comes from the supplier invoice). The ledger records the money when the
 invoice or consigned unit is marked paid. Do not add name/amount guessing that nets bank lines against invoices.
+**Three more categories are money moving, not costs** (`NOT_COST_CATEGORIES`, same treatment): `Refund (already off sales)`,
+`Receipt payback`, `Passed on (not ours)`. The plain `Refund` category still counts as a cost.
 **Owner draws are not a cost on the P&L statement or weekly brief** (`isOwnerDraw`, owner 2026-11-25); the Financial
 dashboard still SHOWS them under net profit.
 Consequence: until marked, the books' bank figure still includes that money; direct stock purchases with no invoice
@@ -5818,3 +5839,9 @@ Owner's ask: after past cash erosion, a running total of how much of what we tak
 - **Black Friday email** (`lib/bf-daily.js`, `/api/cron/bf-email` 15:00 UTC, panel on `/admin/campaigns`, setting `bf_daily`):
   OFF until switched on, Nov 26 to the chosen last day (default Nov 30). Plain text, live stock, goes through
   `sendEmailCampaign` (consent gate and unsubscribe unchanged). Once per day. Gmail still chooses the tab.
+
+## Payroll: the double-count warning (added 2026-11-25)
+`addPayment` (`lib/pay-ledger.js`) returns `needsConfirm` (route: 409, nothing written) when a bank line is counted as pay
+while the person has a typed bank payment still waiting (10 days either side), or a bank payment is typed within 6 days of
+transfers already counted. Amounts need not match: one week was typed as $725 and also counted as the two transfers that
+made it up. Both screens ask, then resend `confirmDouble: true`. A new caller of `addPayment` must handle `needsConfirm`.

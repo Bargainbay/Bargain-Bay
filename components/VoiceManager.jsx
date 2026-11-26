@@ -68,7 +68,7 @@ export default function VoiceManager() {
 
   return (
     <div className="panel">
-      <h1 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Voice Manager</h1>
+      <h2 style={{ marginTop: 0, color: 'var(--charcoal)' }}>Calls, alerts and log</h2>
       <p className="hint">
         Scans the website, the stock, the scheduled jobs and dispatch. It rings you (number ending {data.ringsLast4}) when something is
         worth a call, between 8am and 8pm Toronto time, and fixes the safe things you tell it to. Anything that moves money stays with you.
