@@ -5746,3 +5746,14 @@ Owner's ask: after past cash erosion, a running total of how much of what we tak
 - **A shift over 14h is paid (up to 20h) once the office has fixed or typed its times** (owner, 2026-11-25): `edited_at`
   on a driver shift, `edited_by` on a staff one. `clockOut` clears a staff shift's `edited_by` and a rate backfill no longer
   sets it, so the mark means somebody checked the times. Saving Fix times unchanged confirms a real long day.
+
+## The daily call list, and the daily Black Friday email (added 2026-11-25)
+- **Call list** (`lib/lead-daily.js`, `/api/cron/daily-leads` 11:30 UTC, panel on `/sales/team`, setting `lead_daily`): each rep
+  listed is topped up to N new leads a day (owner: 20), due that day, dealt in turn, warm then property managers / contractors /
+  builders first, closest to Pickering first. Never a partner's lead, an owned one, or one without a phone. Emails Service@ when
+  fewer than two days remain. Rep emails live in the setting, never in code.
+- **A sales associate ON that list** may open `/sales/leads` for their own leads only (`leadViewer`, "My leads" tab): no import,
+  no convert, no other Hub page, no cost.
+- **Black Friday email** (`lib/bf-daily.js`, `/api/cron/bf-email` 15:00 UTC, panel on `/admin/campaigns`, setting `bf_daily`):
+  OFF until switched on, Nov 26 to the chosen last day (default Nov 30). Plain text, live stock, goes through
+  `sendEmailCampaign` (consent gate and unsubscribe unchanged). Once per day. Gmail still chooses the tab.

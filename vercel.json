@@ -129,6 +129,14 @@
       "schedule": "10,40 * * * *"
     },
     {
+      "path": "/api/cron/daily-leads",
+      "schedule": "30 11 * * *"
+    },
+    {
+      "path": "/api/cron/bf-email",
+      "schedule": "0 15 * * *"
+    },
+    {
       "path": "/api/cron/meta-leads",
       "schedule": "*/15 * * * *"
     }

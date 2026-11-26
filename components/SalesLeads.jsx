@@ -96,7 +96,7 @@ function ImportLeads({ onDone, side }) {
   );
 }
 
-function LeadDetail({ id, isAdmin, onChanged, onClose }) {
+function LeadDetail({ id, isAdmin, leadsOnly, onChanged, onClose }) {
   const [lead, setLead] = useState(null);
   const [kind, setKind] = useState('call');
   const [outcome, setOutcome] = useState('');
@@ -134,7 +134,7 @@ function LeadDetail({ id, isAdmin, onChanged, onClose }) {
           </div>
         </div>
         <span style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-          {!lead.customer_id && <button className="btn" onClick={async () => {
+          {!lead.customer_id && !leadsOnly && <button className="btn" onClick={async () => {
             const r = await post({ action: 'convert', id });
             if (!r.ok) { setErr(r.error || 'Could not convert.'); return; }
             setNote(r.existing ? (r.ownsIt ? 'Linked to an existing customer of yours.' : 'This is already a customer, so it was linked but not credited to you. The owner can assign it.') : 'Converted: this is now your account.');
@@ -197,7 +197,7 @@ function LeadDetail({ id, isAdmin, onChanged, onClose }) {
   );
 }
 
-export default function SalesLeads({ initial, isAdmin, openId, side = 'all', owner }) {
+export default function SalesLeads({ initial, isAdmin, openId, side = 'all', owner, leadsOnly = false }) {
   const [leads, setLeads] = useState(initial);
   const [open, setOpen] = useState(openId);
   const [mode, setMode] = useState(null); // 'new' | 'import'
@@ -209,12 +209,12 @@ export default function SalesLeads({ initial, isAdmin, openId, side = 'all', own
     <div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
         <button className="btn" onClick={() => setMode(mode === 'new' ? null : 'new')}>+ New lead</button>
-        <button className="btn" onClick={() => setMode(mode === 'import' ? null : 'import')}>Import</button>
+        {!leadsOnly && <button className="btn" onClick={() => setMode(mode === 'import' ? null : 'import')}>Import</button>}
         <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && reload()} placeholder="Search company, name, phone, email" aria-label="Search leads" style={{ flex: '1 1 240px' }} />
       </div>
       {mode === 'new' && <NewLead side={side} isAdmin={isAdmin} onDone={(id) => { setMode(null); setOpen(id); reload(); }} />}
       {mode === 'import' && <ImportLeads side={side} onDone={reload} />}
-      {open && <LeadDetail id={open} isAdmin={isAdmin} onChanged={reload} onClose={() => setOpen(null)} />}
+      {open && <LeadDetail id={open} isAdmin={isAdmin} leadsOnly={leadsOnly} onChanged={reload} onClose={() => setOpen(null)} />}
 
       <div className="panel" style={{ overflowX: 'auto' }}>
         <table className="admin" style={{ minWidth: 640 }}>

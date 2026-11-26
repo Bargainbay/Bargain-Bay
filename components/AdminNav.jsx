@@ -30,6 +30,8 @@ export default function AdminNav({ active, salesOnly = false, booksOnly = false,
     { key: 'photos', label: 'Photos', href: '/admin/photos', sales: true },
     // Ready-to-post Facebook Marketplace listings (title, caption, photos) for every unit on sale.
     { key: 'fb-listings', label: 'Facebook', href: '/admin/fb-listings', sales: true },
+    // The daily call list. Opens for a rep, an admin, or a sales associate who is on the list.
+    { key: 'my-leads', label: 'My leads', href: '/sales/leads', sales: true },
     // Warm leads sent by partners' lead generators: claim one, work it. Sales and reps (it is the customer's sale).
     { key: 'partner-leads', label: 'Partner leads', href: '/admin/partner-leads', sales: true },
     // Every inbound lead written down the day it arrives (phone, Facebook, partners, lead teams), and what became of each:

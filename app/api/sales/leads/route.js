@@ -1,7 +1,7 @@
 // The Sales Hub's lead API. A rep or an admin; identity comes from the session,
 // never the body, and every read and write is scoped to the viewer inside lib/leads.js.
 import { NextResponse } from 'next/server';
-import { requireHub } from '../../../../lib/sales-access';
+import { requireLeadViewer } from '../../../../lib/sales-access';
 import {
   listLeads, getLead, createLead, logLeadActivity, setLeadStage, assignLead, acceptLead,
   homeSummary, slaBreaches, importLeads, convertLead, LeadError
@@ -20,7 +20,7 @@ const fail = (e) => {
 };
 
 export async function GET(req) {
-  const viewer = await requireHub();
+  const viewer = await requireLeadViewer();
   if (!viewer) return deny();
   const url = new URL(req.url);
   try {
@@ -45,9 +45,12 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
-  const viewer = await requireHub();
+  const viewer = await requireLeadViewer();
   if (!viewer) return deny();
   const body = await req.json().catch(() => ({}));
+  // A sales associate on the daily list works their leads; converting (which sets commission
+  // ownership) and bulk import stay with a rep or an admin.
+  if (viewer.leadsOnly && !['create', 'log', 'stage', 'accept'].includes(body.action)) return deny();
   try {
     switch (body.action) {
       case 'create':
