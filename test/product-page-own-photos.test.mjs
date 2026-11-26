@@ -20,3 +20,16 @@ test('getById returns the photos saved against that unit', async () => {
     equal((u.photos || []).map((p) => p.url), ['/api/photo/SS-Caledon-Lot-001-1', '/api/photo/SS-Caledon-Lot-001-2']);
   } finally { t.done(); }
 });
+
+// 2026-11-25: a unit marked Sold on the tracker, with no order behind it, still offered
+// "Add to cart" on its own page. The page needs to know the unit is no longer active.
+test('getById says when a unit is no longer active', async () => {
+  const t = await withTestDb();
+  try {
+    await t.client.query(`INSERT INTO products (sku, make, model, category, title, condition, price, active)
+      VALUES ('GONE-1', 'LG', 'M1', 'Dryer', 'LG Dryer', 'Refurbished', 399, false),
+             ('HERE-1', 'LG', 'M1', 'Dryer', 'LG Dryer', 'Refurbished', 399, true)`);
+    equal((await getById('GONE-1')).active, false);
+    equal((await getById('HERE-1')).active, true);
+  } finally { t.done(); }
+});

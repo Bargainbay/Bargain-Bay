@@ -84,7 +84,9 @@ export default async function Product({ params }) {
   if (!base) return notFound();
   const session = await getSession();
   const u = await decorateOne(base, session);
-  const sold = await isUnavailable(u.id);
+  // An inactive unit has left the shop (sold off the tracker, or pulled) even when no
+  // order or hold names it, so its page must not offer it. Checkout already refuses it.
+  const sold = base.active === false || (await isUnavailable(u.id));
   const siblings = await decorate(await getSiblings(u.make, u.model, u.id, 8, { marketplace: true }), session);
 
   // Every available unit of this model, cheapest first; the URL's unit is the
