@@ -503,6 +503,7 @@ table.admin select { padding: 6px 8px; font-size: 13px; width: auto; }
 .sms-sub-footer strong { color: #fff; }
 .sms-sub-footer .sms-sub-lead, .sms-sub-footer .sms-sub-fine { color: #C9C2BA; }
 .sms-sub-footer .sms-sub-row { max-width: 520px; }
+.sms-sub-footer .sms-sub-row .btn { background: #ffd24a; border-color: #ffd24a; color: #111; }
 .sms-sub-footer .sms-sub-done { color: #8fe0a8; }
 .sms-sub-footer .sms-sub-err { color: #ffb4ab; }
 @media print { .sms-sub { display: none; } }
