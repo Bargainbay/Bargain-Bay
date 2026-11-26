@@ -35,6 +35,12 @@ export default async function BlackFridayPage() {
         </div>
       </section>
 
+      <p style={{ margin: '14px 0 0' }}>
+        <a href="/marketing/black-friday/flyer/bargain-bay-black-friday-flyer.pdf" style={{ textDecoration: 'underline', fontWeight: 600 }}>
+          View the Black Friday flyer (PDF)
+        </a>
+      </p>
+
       {units.length === 0 ? (
         <div className="panel" style={{ marginTop: 18, fontSize: 15, color: 'var(--muted)' }}>
           No Black Friday deals are available right now. See <a href="/clearance" style={{ textDecoration: 'underline' }}>clearance</a>

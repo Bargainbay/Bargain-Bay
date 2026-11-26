@@ -1,7 +1,7 @@
 import { CAMPAIGNS } from '../lib/marketing-assets';
 
 // Frame shape per format id; anything unlisted is a 9:16 story.
-const RATIOS = { feed: '4 / 5', square: '1 / 1' };
+const RATIOS = { flyer: '4 / 5', feed: '4 / 5', square: '1 / 1' };
 
 // Every poster we have made, still and animated, with downloads. A server
 // component with no state: the videos load nothing until someone presses play
@@ -46,6 +46,7 @@ export default function MarketingPosters() {
             <div key={f.id} style={{ marginBottom: 22 }}>
               <h4 className="poster-h">{f.title} <span>{f.size}</span></h4>
               <p className="hint" style={{ margin: '0 0 8px' }}>{f.note}</p>
+              {f.pdf && <p style={{ margin: '0 0 8px' }}><span className="poster-dl"><a href={f.pdf} download>Print flyer (PDF)</a></span></p>}
               <div className={'poster-grid poster-grid-' + f.id}>
                 {f.posters.map((p) => <Poster key={p.id} p={p} ratio={RATIOS[f.id] || '9 / 16'} />)}
               </div>
