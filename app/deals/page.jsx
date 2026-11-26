@@ -3,6 +3,7 @@ import { getAvailable } from '../../lib/inventory';
 import { getSession } from '../../lib/auth';
 import { decorate } from '../../lib/pricing';
 import { groupByModel } from '../../lib/group-units';
+import { bfGroups } from '../../lib/bf-hero';
 import { dealsSnapshot } from '../../lib/deals';
 import { describeCoupon, dayLabel, GIVEAWAY } from '../../lib/deals-config';
 import { openToOffers } from '../../lib/member-offers';
@@ -67,7 +68,9 @@ export default async function DealsPage() {
       )}
 
       {snap.active.map((d) => {
-        const list = d.id === 'halloween' ? clearance : pick(d.skus);
+        const list = d.id === 'halloween' ? clearance
+          : d.id === 'blackfriday' ? bfGroups(units).flatMap((g) => g.units)
+            : pick(d.skus);
         const ends = d.coupon?.endsAt || d.to;
         return (
           <section key={d.id} className="deal-block" id={d.id}>

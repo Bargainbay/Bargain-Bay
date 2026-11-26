@@ -8,6 +8,7 @@ import {
   DEALS, DROPS, GIVEAWAY, GIVEAWAYS, isRunning, isUpcoming, dropFor, giveawayOpen,
   describeCoupon, bannerFor, heroFor, torontoParts, ticketsOf, BONUS, MAX_TICKETS, GIVEAWAY_EMAIL_TEXT
 } from '../lib/deals-config.js';
+import { bfGroups } from '../lib/bf-hero.js';
 import {
   entryKey, postalPrefix, checkEntryInput, normalizeInstagram, pickWeighted, entryParam, entryIdFromParam,
   entryStatus, setInstagram, registerVideo, reviewVideo, videoPrefix, entriesCsv
@@ -414,4 +415,16 @@ test('the CSV quotes awkward cells and cannot carry a spreadsheet formula', () =
   assert(lines[1].includes(`"'=HYPERLINK(""x"")"`), 'a leading = is neutralised and quotes are doubled');
   assert(lines[1].includes('"said ""hi"", twice"'));
   assert(lines[1].includes(',zed,'), 'the handle is written without an @, which a spreadsheet would treat as a formula marker');
+});
+
+suite('Black Friday page: only the bannered units');
+test('bfGroups keeps Black Friday markdowns only, biggest saving first', () => {
+  const u = (id, price, note, on = true) => ({ id, make: 'M', model: id, price, compareAt: 1000, onClearance: on, clearanceNote: note });
+  const g = bfGroups([u('A', 900, 'Black Friday'), u('B', 400, 'Black Friday'), u('C', 100, 'Clearance'), u('D', 100, 'Black Friday', false)]);
+  equal(g.map((x) => x.rep.id).join(','), 'B,A');
+});
+test('the Black Friday buttons land on the Black Friday page', () => {
+  const d = DEALS.find((x) => x.id === 'blackfriday');
+  equal(d.hero.cta.href, '/black-friday');
+  equal(d.banner.href, '/black-friday');
 });
