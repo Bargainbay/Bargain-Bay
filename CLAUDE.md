@@ -4401,9 +4401,11 @@ Microsoft app must be "any org + personal accounts".
 (mounted in `SiteChrome`), `components/AbandonedCarts.jsx` on the Sales dashboard under My Day,
 `POST /api/cart-capture`, `GET /api/admin/abandoned-carts` (staff).
 
-- **Stored only once identifiable**: signed in (session, never the body) or an email/phone typed
-  on `/checkout`, captured on blur via `#co-email`/`#co-phone` ids. Anonymous carts are never kept.
-  Keep those input ids or capture silently stops.
+- **Stored only once identifiable**: signed in (session, never the body) or an email/phone in the
+  `/checkout` boxes, typed or autofilled, read via `#co-name`/`#co-email`/`#co-phone` ids
+  (`lib/checkout-watch.js`, 2026-11-25: every box is read on change/blur/input and when the page is
+  hidden or left; half-typed values are skipped). Anonymous carts are never kept. Keep those input
+  ids or capture silently stops.
 - **NO automated email or text, ever, from this.** A typed checkout email is not marketing
   consent. Staff phone or personally email. Wanting automation means going through `filterAudience`.
 - **"Bought" is derived at read time** (an order for the same email/phone after the cart began),
