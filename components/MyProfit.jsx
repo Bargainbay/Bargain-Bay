@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import SalesDetail from './SalesDetail';
 
-const $ = (v) => `$${Number(v || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const $ = (v) => `${v < 0 ? '−' : ''}$${Math.abs(Number(v || 0)).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const $0 = (v) => `$${Math.round(Number(v || 0)).toLocaleString('en-CA')}`;
 
 export default function MyProfit({ initial }) {

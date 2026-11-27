@@ -143,7 +143,7 @@ export default function DayMoney() {
                   <td style={right}>{$(r.revenue)}<div style={small}>{$(r.revenueWithTax)} with tax</div></td>
                   <td style={right}>{$(r.grossProfit)}</td>
                   <td style={right}>{$(r.deliveryIn)}</td>
-                  <td style={right}>{minus(r.wages + r.truck + r.bills)}<div style={small}>wages {$(r.wages)}</div><div style={small}>truck {$(r.truck)} · bills {$(r.bills)}</div></td>
+                  <td style={right}>{minus(r.wages + r.truck + r.bills)}<div style={small}>wages {$(r.wages)}</div><div style={small}>truck {$(r.truck)}</div><div style={small}>bills {$(r.bills)}</div></td>
                   <td style={right}>{r.spent == null ? '—' : minus(r.spent)}{r.unsorted > 0 && <div style={small}>{$(r.unsorted)} not sorted</div>}</td>
                 </tr>
                 {open === r.day && (
