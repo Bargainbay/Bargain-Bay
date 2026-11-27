@@ -12,6 +12,7 @@ import { portalAccess } from '../../../lib/client-portal-session';
 import ClientPortalLogin from '../../../components/ClientPortalLogin';
 import SignOutButton from '../../../components/ClientPortalSignOut';
 import { listClientInvoices } from '../../../lib/client-portal';
+import { buildSchedule, windowText } from '../../../lib/client-schedule';
 import { linkToken } from '../../../lib/links';
 import { money } from '../../../lib/constants';
 
@@ -64,6 +65,7 @@ export default async function ClientPortal({ params, searchParams }) {
   const jobs = all;
   const invoices = demo ? DEMO_INVOICES : await listClientInvoices(id);
   const owing = invoices.reduce((a, i) => a + i.owing, 0);
+  const schedule = buildSchedule(ahead);
   const sum = summarize(jobs);
   const t = encodeURIComponent(sp?.t || 'demo');
   const filtered = !!(filters.from || filters.to || filters.status || filters.q);
@@ -102,6 +104,40 @@ export default async function ClientPortal({ params, searchParams }) {
         <div className="cp-tile"><b>{sum.withPod}</b><span>With signed POD</span></div>
         <div className="cp-tile"><b>{fmtMinutes(sum.avgMinutes) || '—'}</b><span>Avg. time on site</span></div>
       </div>
+
+      {schedule.length > 0 && (
+        <section className="cp-panel" id="schedule">
+          <h2>Delivery schedule &amp; routes</h2>
+          <p className="cp-sub" style={{ marginTop: 0 }}>Scheduled arrival windows and the order each truck will run them. Times may shift on the day; we will tell you if they do.</p>
+          {schedule.map((d) => (
+            <div key={d.date} style={{ marginTop: 14 }}>
+              <h3 style={{ margin: '0 0 6px' }}>{torontoDate(`${d.date}T12:00:00`)}</h3>
+              {d.routes.map((r) => (
+                <div key={r.key} style={{ marginBottom: 12 }}>
+                  <div className="cp-sub" style={{ marginBottom: 4 }}>
+                    <b>{r.label}</b>{r.driverName ? ` · ${r.driverName}${r.driver2Name ? ` + ${r.driver2Name}` : ''}` : ''} · {r.stops.length} stop{r.stops.length === 1 ? '' : 's'}
+                    {r.mapsUrl && <> · <a href={r.mapsUrl} target="_blank" rel="noreferrer" className="cp-noprint">Open route in Google Maps</a></>}
+                  </div>
+                  <table className="cp-stack">
+                    <thead><tr><th>Stop</th><th>Arrival window</th><th>Customer</th><th>Address</th><th>Items</th></tr></thead>
+                    <tbody>
+                      {r.stops.map((j, n) => (
+                        <tr key={j.id}>
+                          <td data-label="Stop"><b>{r.assigned ? n + 1 : '—'}</b></td>
+                          <td data-label="Arrival window"><b>{windowText(j)}</b></td>
+                          <td data-label="Customer"><Link href={`/client/${id}/job/${j.id}?t=${t}`}>{j.customerName || 'Customer'}</Link></td>
+                          <td data-label="Address">{j.address || '—'}</td>
+                          <td data-label="Items">{j.items.map((i) => `${i.qty > 1 ? `${i.qty}× ` : ''}${i.description}`).join(' · ') || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          ))}
+        </section>
+      )}
 
       <section className="cp-panel" id="invoices">
         <h2>Invoices</h2>
