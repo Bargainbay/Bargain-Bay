@@ -622,7 +622,16 @@ function JobCard({ job, drivers, busy, onAssign, onStatus, onUndoStart, onCancel
             </div>
           )
         : job.items?.length > 0 && (
-            <div className="disp-items">{job.items.map((i) => i.description).join(' · ')}</div>
+            <div className="disp-items">
+              {job.items.map((i) => `${i.loadedAt && !['done', 'failed'].includes(job.status) ? '✓ ' : ''}${i.description}`).join(' · ')}
+              {/* What the crew has ticked onto the van, once they have started. */}
+              {!['done', 'failed', 'cancelled'].includes(job.status) && job.items.some((i) => i.loadedAt) && (
+                <div style={{ fontWeight: 700 }}>
+                  📦 {job.items.filter((i) => i.loadedAt).length} of {job.items.length} loaded
+                  {` · ${[...new Set(job.items.map((i) => i.loadedBy).filter(Boolean))].join(', ')}`}
+                </div>
+              )}
+            </div>
           )}
       {job.partsNeeded && <div className="disp-fail">Waiting on: {job.partsNeeded}</div>}
       {/* The clock stays on the card for everyone — a stop that has been running

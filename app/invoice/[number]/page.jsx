@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { hasDb } from '../../../lib/db';
 import { getInvoiceByNumber } from '../../../lib/invoices';
+import { withModels } from '../../../lib/line-models';
+import { modelNote } from '../../../lib/stock-match';
 import { getSession, isAdmin } from '../../../lib/auth';
 import { verifyLinkToken } from '../../../lib/links';
 import { query } from '../../../lib/db';
@@ -102,7 +104,7 @@ export default async function InvoicePage({ params, searchParams }) {
       />
     );
   }
-
+  const items = await withModels(invoice.items);
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
@@ -174,14 +176,16 @@ export default async function InvoicePage({ params, searchParams }) {
 
       <div className="panel">
         <h2>Items</h2>
-        {invoice.items.map((it) => {
+        {items.map((it) => {
           const w = warrantyLabel(it.warranty_months);
+          const model = modelNote(it.description, it.model);
           const lineRefunded = !!it.refunded_at && (partialRefund || refunded);
           return (
             <div className="summary-row" key={it.id} style={{ alignItems: 'flex-start', opacity: lineRefunded ? 0.6 : 1 }}>
               <span style={{ textDecoration: lineRefunded ? 'line-through' : 'none' }}>
                 {it.description}{it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({publicSku(it.sku)})</span> : null}
                 {lineRefunded && <span className="pill sold" style={{ fontSize: 11, marginLeft: 6 }}>Refunded</span>}
+                {model && <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>Model: {model}</span>}
                 {it.final_sale && !lineRefunded && <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: 'var(--danger, #b3261e)' }}>{FINAL_SALE_LABEL}</span>}
                 {w && !lineRefunded && <span style={{ display: 'block', fontSize: 12.5, color: 'var(--green, #0f6e56)' }}>✓ {w}</span>}
                 {it.kind === 'trade_in' && (

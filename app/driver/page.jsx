@@ -60,7 +60,7 @@ export default async function DriverPage({ searchParams }) {
   }
 
   touchDriverSeen(session.userId).catch(() => {});
-  const initial = await driverJobs(session.userId)
+  const initial = await driverJobs(session.userId, { details: true })
     .catch(() => ({ date: null, today: null, viewingToday: true, stops: [], tomorrow: [], earlier: [] }));
 
   return (

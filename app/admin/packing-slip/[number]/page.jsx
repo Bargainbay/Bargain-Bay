@@ -5,6 +5,7 @@ import { dispatchAccess } from '../../../../lib/dispatch-access';
 import { isDriver } from '../../../../lib/drivers';
 import { getPackingSlip } from '../../../../lib/invoices';
 import { currentLocations } from '../../../../lib/locations';
+import { modelNote } from '../../../../lib/stock-match';
 import {
   BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, PICKUP_ADDRESS, DISPATCH_EMAIL, isUnitLine, isHaulAwayLine, isInstallLine, isDoorRemovalLine } from '../../../../lib/constants';
 import PackingSlipActions from '../../../../components/PackingSlipActions';
@@ -117,7 +118,8 @@ export default async function PackingSlipPage({ params }) {
           </thead>
           <tbody>
             {units.map((it, i) => {
-              const sub = [it.sku, it.condition].filter(Boolean).join(' · ');
+              const m = modelNote(it.description, it.model);
+              const sub = [m && `Model ${m}`, it.sku, it.condition].filter(Boolean).join(' · ');
               return (
                 <tr className="ps-row" key={it.id}>
                   <td style={{ color: '#999', textAlign: 'center' }}>{i + 1}</td>

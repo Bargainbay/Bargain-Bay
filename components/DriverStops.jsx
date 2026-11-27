@@ -10,6 +10,7 @@ import DriverPhotos from './DriverPhotos';
 import DriverShift from './DriverShift';
 import ReviewQr from './ReviewQr';
 import OrderNotes from './OrderNotes';
+import { LoadItem, LoadSheet, PhotoViewer, loadCount } from './DriverLoad';
 
 // The driver's day. Designed for one hand, in a van, in the sun: big targets,
 // one obvious next action per stop, and no screen that needs reading.
@@ -77,6 +78,11 @@ export default function DriverStops({ initial, driverName }) {
   const [adding, setAdding] = useState(null);         // a finished stop getting more photos
   const [err, setErr] = useState('');
   const timer = useRef(null);
+  const [loading, setLoading] = useState(null);       // 'today' | 'tomorrow': the checklist is open
+  const [viewing, setViewing] = useState(null);       // the item whose pictures are open
+  // Counts the driver's own changes, so a list that was asked for BEFORE a tick
+  // cannot arrive afterwards and untick it on screen.
+  const changes = useRef(0);
   const [reviewFor, setReviewFor] = useState(null);   // the stop we're asking on
   const [reviewUrl, setReviewUrl] = useState(initial.reviewUrl || '');
   const [geo, setGeo] = useState({ state: 'off' });
@@ -85,6 +91,7 @@ export default function DriverStops({ initial, driverName }) {
   // the truth until it has drained.
   const refresh = useCallback(async () => {
     try {
+      const before = changes.current;
       const q = await queueState();
       setQueued(q.total);
       setStuck(q.stuck);
@@ -96,6 +103,7 @@ export default function DriverStops({ initial, driverName }) {
       const res = await fetch(`/api/driver/jobs?date=${encodeURIComponent(date)}`, { cache: 'no-store' });
       if (!res.ok) return;
       const d = await res.json();
+      if (changes.current !== before) return;
       if (Array.isArray(d.stops)) setStops(d.stops);
       if (Array.isArray(d.tomorrow)) setTomorrow(d.tomorrow);
       if (Array.isArray(d.earlier)) setEarlier(d.earlier);
@@ -185,6 +193,7 @@ export default function DriverStops({ initial, driverName }) {
     // all on a card from the other.
     const before = stops.find((s) => s.id === stop.id) || earlier.find((s) => s.id === stop.id);
     const apply = (xs) => xs.map((s) => (s.id === stop.id ? { ...s, ...patch } : s));
+    changes.current += 1;
     setStops(apply);
     setEarlier(apply);
     try {
@@ -193,6 +202,32 @@ export default function DriverStops({ initial, driverName }) {
       const undo = (xs) => xs.map((s) => (s.id === stop.id ? before : s));
       if (before) { setStops(undo); setEarlier(undo); }
       setErr(`${e?.message || 'That didn’t save.'} Try again where you have signal.`);
+      return;
+    }
+    push();
+  }
+
+  // Ticking an item onto the van (or taking the tick back). Painted at once and
+  // queued like everything else; the stop can be in any of the three lists.
+  async function toggleLoaded(stop, item) {
+    setErr('');
+    const loaded = !item.loadedAt;
+    const at = new Date().toISOString();
+    const paint = (patch) => {
+      const apply = (xs) => xs.map((s) => (s.id !== stop.id ? s
+        : { ...s, items: s.items.map((i) => (i.id === item.id ? { ...i, ...patch } : i)) }));
+      changes.current += 1;
+      setStops(apply);
+      setEarlier(apply);
+      setTomorrow(apply);
+    };
+    paint({ loadedAt: loaded ? at : null, loadedBy: loaded ? driverName || null : null });
+    try {
+      await queueOrSend({ kind: 'patch', jobId: stop.id, ref: newRef(),
+        body: { jobId: stop.id, action: 'load', itemId: item.id, loaded, at } });
+    } catch (e) {
+      paint({ loadedAt: item.loadedAt || null, loadedBy: item.loadedBy || null });
+      setErr(`${e?.message || 'That tick didn’t save.'} Try again where you have signal.`);
       return;
     }
     push();
@@ -268,6 +303,9 @@ export default function DriverStops({ initial, driverName }) {
   const owed = left.reduce(
     (sum, s) => sum + (Number(s.balanceDue) || 0) + (cashAtTheDoor(s)?.amount || 0), 0
   );
+
+  const toLoad = loadCount(left);
+  const loadTomorrow = loadCount(tomorrow);
 
   return (
     <div className="drv">
@@ -350,6 +388,13 @@ export default function DriverStops({ initial, driverName }) {
           gets paid for. */}
       {viewingToday && <DriverShift onChanged={push} />}
 
+      {toLoad.total > 0 && (
+        <button type="button" className={'drv-btn drv-load-open' + (toLoad.loaded < toLoad.total ? ' go' : '')}
+          onClick={() => setLoading('today')}>
+          📦 Load checklist · {toLoad.loaded === toLoad.total ? `all ${toLoad.total} loaded ✓` : `${toLoad.loaded} of ${toLoad.total} loaded`}
+        </button>
+      )}
+
       {stops.length === 0 && (
         <div className="drv-card"><p className="hint" style={{ margin: 0 }}>
           {viewingToday
@@ -359,7 +404,7 @@ export default function DriverStops({ initial, driverName }) {
       )}
 
       {left.map((s, i) => (
-        <StopCard key={s.id} stop={s} n={i + 1}
+        <StopCard key={s.id} stop={s} n={i + 1} onView={setViewing}
           onStart={() => start(s)} onUndo={() => undoStart(s)} onArrive={() => arrive(s)}
           onFinish={() => setFinishing(s)} onFail={() => couldNot(s)} />
       ))}
@@ -368,7 +413,7 @@ export default function DriverStops({ initial, driverName }) {
         <>
           <h2 className="drv-sub">Finished</h2>
           {closed.map((s) => (
-            <StopCard key={s.id} stop={s} done me={driverName}
+            <StopCard key={s.id} stop={s} done me={driverName} onView={setViewing}
               onAddPhotos={() => setAdding(s)}
               onReview={reviewUrl && s.status === 'done' ? () => setReviewFor(s) : null} />
           ))}
@@ -408,7 +453,7 @@ export default function DriverStops({ initial, driverName }) {
                 they&apos;ll put it in.
               </p>
               {earlier.map((s, i) => (
-                <StopCard key={s.id} stop={s} n={i + 1}
+                <StopCard key={s.id} stop={s} n={i + 1} onView={setViewing}
                   onStart={() => start(s)} onUndo={() => undoStart(s)} onArrive={() => arrive(s)}
                   onFinish={() => setFinishing(s)} onFail={() => couldNot(s)} />
               ))}
@@ -428,11 +473,25 @@ export default function DriverStops({ initial, driverName }) {
               <p className="hint" style={{ margin: '0 0 8px' }}>
                 For planning tonight. You can&apos;t start these until tomorrow.
               </p>
-              {tomorrow.map((s, i) => <StopCard key={s.id} stop={s} n={i + 1} preview />)}
+              {loadTomorrow.total > 0 && (
+                <button type="button" className="drv-btn drv-load-open" onClick={() => setLoading('tomorrow')}>
+                  📦 Tomorrow&apos;s load checklist · {loadTomorrow.loaded} of {loadTomorrow.total} loaded
+                </button>
+              )}
+              {tomorrow.map((s, i) => <StopCard key={s.id} stop={s} n={i + 1} preview onView={setViewing} />)}
             </>
           )}
         </>
       )}
+
+      {loading && (
+        <LoadSheet
+          title={loading === 'tomorrow' ? 'Tomorrow’s load' : 'Load checklist'}
+          stops={loading === 'tomorrow' ? tomorrow : left}
+          onToggle={toggleLoaded} onView={setViewing} onClose={() => setLoading(null)}
+        />
+      )}
+      {viewing && <PhotoViewer item={viewing} onClose={() => setViewing(null)} />}
 
       {finishing && (
         <DriverFinish
@@ -453,7 +512,7 @@ export default function DriverStops({ initial, driverName }) {
   );
 }
 
-function StopCard({ stop, n, done, preview, me, onStart, onUndo, onArrive, onFinish, onFail, onAddPhotos, onReview }) {
+function StopCard({ stop, n, done, preview, me, onView, onStart, onUndo, onArrive, onFinish, onFail, onAddPhotos, onReview }) {
   const [notesOpen, setNotesOpen] = useState(false);
   const addr = fullAddress(stop);
   const isService = stop.type === 'service_call';
@@ -545,11 +604,13 @@ function StopCard({ stop, n, done, preview, me, onStart, onUndo, onArrive, onFin
 
       {stop.shipmentType && <div className="drv-glove">{SHIPMENT[stop.shipmentType] || stop.shipmentType}</div>}
 
-      <div className="drv-what">
-        {isService
-          ? [stop.appliance, stop.issue].filter(Boolean).join(' — ') || 'Service call'
-          : (stop.items?.length ? stop.items.map((i) => i.description).join(' · ') : '—')}
-      </div>
+      {!isService && stop.items?.length ? (
+        stop.items.map((it) => <LoadItem key={it.id} item={it} onView={onView} />)
+      ) : (
+        <div className="drv-what">
+          {isService ? [stop.appliance, stop.issue].filter(Boolean).join(' — ') || 'Service call' : '—'}
+        </div>
+      )}
       {stop.services?.length > 0 && (
         <div className="drv-svc">{stop.services.map((k) => SERVICE_LABEL[k] || k).join(' · ')}</div>
       )}

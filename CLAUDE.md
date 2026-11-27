@@ -4401,6 +4401,25 @@ page of cards: one click to the hub, one to the report.
   added to a route and not to that file is reachable only by URL, which is the
   exact failure this section exists to stop.
 
+## Model numbers on invoices, and the driver's load checklist (added 2026-11-27)
+- **Invoices show `Model: X` under an appliance line** (hosted page, PDF, invoice / paid / re-sent emails, packing slip).
+  `lib/line-models.js` looks it up AT RENDER TIME from the line's SKU (products, then the tracker), so old invoices
+  get it too; nothing is stored and the description is never rewritten (other code matches on it). `modelNote`
+  (lib/stock-match.js) hides it when the description already says it or the value is not a model ("Laundry Centre").
+  A line with no SKU shows only what was typed. RS Solutions client invoices (delivery jobs) are unchanged.
+- **Driver app -> "Load checklist"** (`components/DriverLoad.jsx`): every item on today's open stops (and tomorrow's),
+  with picture, kind of appliance, model, serial, SKU, warehouse spot, and a tick. Ticks are `job_items.loaded_at /
+  loaded_by / loaded_for` (migration 0087, also in `ensureJobSchema`), sent through the offline outbox
+  (`PATCH /api/driver/jobs` action `load`). **A tick counts only while the stop is on the day it was made for.** Shared
+  by both drivers; the dispatch card shows "N of M loaded". Ticking is optional: nothing refuses a finish without it.
+- **Pictures** (`lib/load-list.js`, only when `driverJobs(..., { details: true })`): our own unit photos, then RS Ops'
+  (`GET /api/intake/unit-photos` there, key-protected; sale photos, else intake ones), then the stock picture of the
+  model. Each is captioned "This exact unit" or "Stock picture"; keep that. A typed line gets a model and stock picture
+  from a model number in its text.
+- **`updateJob` no longer rewrites items the form sends back unchanged** — doing so stripped every SKU on any edit.
+- Not covered: appliances added to an invoice AFTER its stop was created still do not reach the stop's items (only
+  service tags re-sync).
+
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
 2. Don't mark `NEXT_PUBLIC_*` vars "Sensitive" — pointless; their value ships in the public browser bundle by design.

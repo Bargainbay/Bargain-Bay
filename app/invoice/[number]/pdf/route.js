@@ -7,6 +7,8 @@ import { brandFor } from '../../../../lib/brands';
 import { jobsForInvoice, takeJobFor } from '../../../../lib/client-portal';
 import { linkToken } from '../../../../lib/links';
 import { warrantyLabel, PICKUP_ADDRESS, returnTermsFor, ETRANSFER_EMAIL, isQuickSaleEmail } from '../../../../lib/constants';
+import { withModels } from '../../../../lib/line-models';
+import { modelNote } from '../../../../lib/stock-match';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -177,6 +179,8 @@ function render(invoice, B) {
       if (it.sku) desc += ` (${it.sku})`;
       doc.font('Helvetica').fontSize(10).fillColor(refunded ? grey : ink)
         .text(desc + (refunded ? '  [REFUNDED]' : ''), L, rowY, { width: amtX - L - 10, strike: refunded });
+      const model = modelNote(it.description, it.model);
+      if (model) doc.fontSize(9).fillColor(grey).text(`Model: ${model}`, L, doc.y, { width: amtX - L - 10 });
       const w = warrantyLabel(it.warranty_months);
       if (w && !refunded) doc.fontSize(9).fillColor('#0f6e56').text(w, L, doc.y, { width: amtX - L - 10 });
       if (it.final_sale && !refunded) doc.font('Helvetica-Bold').fontSize(9).fillColor('#b3261e').text('FINAL SALE - no returns, refunds or exchanges', L, doc.y, { width: amtX - L - 10 });
@@ -267,7 +271,7 @@ export async function GET(req, { params }) {
     });
     pdf = await renderRs(invoice, B, rows);
   } else {
-    pdf = await render(invoice, B);
+    pdf = await render({ ...invoice, items: await withModels(invoice.items) }, B);
   }
   return new Response(pdf, {
     headers: {

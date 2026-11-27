@@ -5,7 +5,7 @@ import { hasDb, query } from '../../../../lib/db';
 import { isDriver, touchDriverSeen } from '../../../../lib/drivers';
 import {
   driverJobs, jobBelongsToDriver, podAlreadyRecorded, photoBatchRecorded, jobPhotoCount,
-  jobPhotosWithRef, saveJobSignature, addJobPhoto, markOrderDeliveredForJob
+  jobPhotosWithRef, saveJobSignature, addJobPhoto, markOrderDeliveredForJob, setItemLoaded
 } from '../../../../lib/driver-jobs';
 import {
   setJobStatus, undoOnTheWay, completeJob, markReviewAsked
@@ -47,7 +47,7 @@ export async function GET(req) {
     // BEFORE the driver is standing at a door with one bar of signal.
     const reviewUrl = await getSetting('google_review_url', '').catch(() => '');
     return NextResponse.json({
-      ...(await driverJobs(s.userId, { date })),
+      ...(await driverJobs(s.userId, { date, details: true })),
       driver: { name: s.name || '' },
       reviewUrl: typeof reviewUrl === 'string' ? reviewUrl : ''
     });
@@ -78,6 +78,13 @@ export async function PATCH(req) {
         jobId, kind: body.kind === 'extra' ? 'extra' : 'note', body: body.body, by: who(s), role: 'driver'
       });
       return NextResponse.json({ ok: true, note });
+    }
+    // One item ticked onto (or off) the van.
+    if (body.action === 'load') {
+      const itemId = Number(body.itemId);
+      if (!itemId) return NextResponse.json({ error: 'Which item?' }, { status: 400 });
+      const r = await setItemLoaded(jobId, itemId, body.loaded === true, { by: s.name || s.email, at: body.at });
+      return NextResponse.json({ ok: true, ...r });
     }
     if (body.action === 'undo_start') {
       const job = await undoOnTheWay(jobId, who(s));
