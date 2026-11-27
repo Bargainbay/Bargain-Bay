@@ -2112,35 +2112,65 @@ a.pq-btn { text-decoration: none; }
 .bfh-count-cell small { display: block; margin-top: 4px; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #a79e91; }
 .bfh-count-fallback { color: #d9d2c8; font-size: 15px; }
 
-.bfh-deals-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
-.bfh-deals-head b { font: 600 13px/1 var(--font-head); letter-spacing: .16em; text-transform: uppercase; color: #fff; }
-.bfh-deals-head span { font-size: 12px; color: #8f867a; }
-.bfh-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.bfh-card { position: relative; display: flex; flex-direction: column; background: #fff; color: #2a2825; border-radius: 12px; overflow: hidden; text-decoration: none; box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .15s ease, box-shadow .15s ease; }
-.bfh-card:hover { transform: translateY(-3px); box-shadow: 0 16px 38px rgba(0,0,0,.5); }
-.bfh-ribbon { position: absolute; z-index: 2; top: 10px; left: 0; background: #c81e1e; color: #fff; font: 700 13px/1 var(--font-head); letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px 7px 10px; border-radius: 0 6px 6px 0; }
-/* min-height: 0 + an absolutely positioned image are load-bearing: .bfh-photo is a flex item, so without them the photo's own
-   height beats aspect-ratio and the card grows to the source file (the same trap as .thumb above). */
-.bfh-photo { position: relative; display: block; min-height: 0; aspect-ratio: 1 / 1; background: #fff; }
-.bfh-photo img { position: absolute; inset: 0; width: 100%; height: 100%; padding: 8px; box-sizing: border-box; object-fit: contain; display: block; }
-.bfh-card-body { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px 13px; border-top: 1px solid #eee7de; }
-.bfh-card-body small { color: #837a71; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
-.bfh-card-body b { font-size: 13px; line-height: 1.25; font-weight: 600; min-height: 2.5em; }
-.bfh-price { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; margin-top: 2px; }
-.bfh-price em { font-style: normal; font-size: 11px; color: #837a71; text-transform: uppercase; }
-.bfh-price strong { font: 700 24px/1 var(--font-head); color: #b91c1c; }
-.bfh-price s { color: #9a9086; font-size: 13px; }
-.bfh-avail { font-size: 11px; font-weight: 600; color: #0f6e56; }
-
 .bfh-proof { position: relative; list-style: none; margin: 22px 0 0; padding: 14px 20px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 14px; border-top: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.35); font-size: 13px; color: #cfc7bb; }
 .bfh-proof b { color: #f3cd6b; }
 
+.bfh-clock { margin-top: 0; }
+.bfh-bar { position: relative; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; padding: 26px 20px 16px; }
+.bfh-h1 { margin: 12px 0 0; font: 700 clamp(40px, 9vw, 76px)/.95 var(--font-head); text-transform: uppercase; letter-spacing: .01em; color: #fff; }
+.bfh-h1 .bfh-gold { background: linear-gradient(180deg, #ffe08a, #e9b949 55%, #b8862b); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.bfh-h1-off { display: block; margin-top: 8px; font: 500 clamp(18px, 3.4vw, 28px)/1.1 var(--font-head); letter-spacing: .04em; color: #d9d2c8; }
+.bfh-h1-off b { color: #ff5a4f; font-weight: 700; }
+.bfh-code-pad { position: relative; margin: 10px 20px 0; }
+.bfh-ribbon { position: absolute; z-index: 2; top: 14px; left: 0; background: #c81e1e; color: #fff; font: 700 15px/1 var(--font-head); letter-spacing: .08em; text-transform: uppercase; padding: 9px 16px 9px 12px; border-radius: 0 6px 6px 0; }
+.bfs-empty { position: relative; padding: 10px 20px 24px; display: grid; gap: 14px; justify-items: start; color: #d9d2c8; }
+
+/* The slideshow. Every slide is in the DOM (so it is crawlable) and the track slides sideways. */
+.bfs { position: relative; overflow: hidden; margin: 0 14px; border-radius: 12px; background: #15130f; border: 1px solid #2b2620; }
+.bfs-track { display: flex; transition: transform .6s cubic-bezier(.2,.7,.2,1); }
+.bfs-slide { flex: 0 0 100%; min-width: 0; display: grid; grid-template-columns: 1fr; }
+/* min-height: 0 + an absolutely positioned image: the photo is a grid item, so without them its own height would override the ratio. */
+.bfs-photo { position: relative; display: block; min-height: 0; aspect-ratio: 1 / 1; max-height: 420px; width: 100%; background: #fff; overflow: hidden; }
+.bfs-photo img { position: absolute; inset: 0; width: 100%; height: 100%; padding: 14px; box-sizing: border-box; object-fit: contain; display: block; }
+.bfs-copy { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 20px 22px 54px; }
+.bfs-lot { font: 600 12px/1 var(--font-head); letter-spacing: .18em; text-transform: uppercase; color: #f3cd6b; }
+.bfs-make { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: #a79e91; }
+.bfs-title { margin: 0; font: 600 clamp(22px, 4.4vw, 34px)/1.15 var(--font-head); color: #fff; }
+.bfs-off { margin-top: 6px; font: 700 clamp(26px, 5vw, 40px)/1 var(--font-head); text-transform: uppercase; letter-spacing: .03em; color: #ff5a4f; }
+.bfs-price { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.bfs-price em { font-style: normal; font-size: 13px; color: #a79e91; text-transform: uppercase; }
+.bfs-price strong { font: 700 clamp(40px, 8vw, 64px)/1 var(--font-head); color: #fff; font-variant-numeric: tabular-nums; }
+.bfs-price s { font-size: 20px; color: #8f867a; }
+.bfs-save { font-size: 15px; color: #f3cd6b; font-weight: 600; }
+.bfs-left { font-size: 13px; font-weight: 600; color: #7fd6b2; }
+.bfs-copy .bfh-btn { margin-top: 10px; }
+.bfs-sub { margin: 0; max-width: 420px; color: #b9b0a3; font-size: 15px; line-height: 1.5; }
+.bfs-soldline { margin: 6px 0 0; font: 700 clamp(30px, 6vw, 48px)/1 var(--font-head); text-transform: uppercase; color: #e24b4a; letter-spacing: .03em; }
+.is-sold .bfs-photo img { filter: grayscale(1) brightness(.6); }
+.is-sold .bfs-photo .bfh-ribbon { background: #4a423a; }
+.is-sold .bfs-title, .is-sold .bfs-make { color: #8f867a; }
+.bfs-stamp { position: absolute; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-14deg); border: 5px solid #e24b4a; color: #e24b4a; background: rgba(15,12,10,.6);
+  font: 700 clamp(34px, 9vw, 64px)/1 var(--font-head); letter-spacing: .08em; text-transform: uppercase; padding: 8px 22px; border-radius: 8px; white-space: nowrap; pointer-events: none; }
+.bfs-arrow { position: absolute; z-index: 4; top: calc(min(100vw - 30px, 420px) / 2 - 22px); width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(12,12,14,.7); color: #fff; font-size: 28px; line-height: 1; cursor: pointer; }
+.bfs-arrow:hover { background: rgba(12,12,14,.95); }
+.bfs-prev { left: 8px; } .bfs-next { right: 8px; }
+.bfs-foot { position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 18px; background: linear-gradient(0deg, rgba(12,12,14,.9), transparent); }
+.bfs-dots { display: flex; gap: 8px; }
+.bfs-dot { width: 12px; height: 12px; padding: 0; border-radius: 50%; border: 0; background: rgba(255,255,255,.35); cursor: pointer; }
+.bfs-dot.on { background: #f3cd6b; transform: scale(1.25); }
+.bfs-dot.sold { background: #e24b4a; opacity: .75; }
+.bfs-tally { font-size: 13px; color: #cfc7bb; }
+.bfs-tally b { color: #ff7a70; }
+
 @media (min-width: 900px) {
-  .bfh-photo { aspect-ratio: 16 / 11; }
-  .bfh-card-body { padding: 8px 12px 11px; }
-  .bfh-card-body b { min-height: 0; }
-  .bfh-title { font-size: clamp(72px, 9vw, 118px); }
-  .bfh-inner { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 36px; padding: 40px 40px 14px; align-items: center; }
+  .bfh-bar { padding: 30px 40px 18px; }
+  .bfh-code-pad { margin: 10px 40px 0; }
+  .bfs { margin: 0 40px; }
+  .bfs-slide { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+  .bfs-photo { aspect-ratio: auto; max-height: none; min-height: 440px; }
+  .bfs-copy { justify-content: center; padding: 30px 44px 54px; gap: 10px; }
+  .bfs-arrow { top: 45%; }
+  .bfs-foot { left: 50%; padding: 12px 44px; background: none; }
   .bfh-proof { grid-template-columns: repeat(4, auto); justify-content: space-between; padding: 16px 40px; }
 }
-@media (prefers-reduced-motion: reduce) { .bfh-card { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .bfs-track { transition: none; } }
