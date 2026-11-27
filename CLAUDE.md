@@ -4417,8 +4417,13 @@ page of cards: one click to the hub, one to the report.
   model. Each is captioned "This exact unit" or "Stock picture"; keep that. A typed line gets a model and stock picture
   from a model number in its text.
 - **`updateJob` no longer rewrites items the form sends back unchanged** — doing so stripped every SKU on any edit.
-- Not covered: appliances added to an invoice AFTER its stop was created still do not reach the stop's items (only
-  service tags re-sync).
+- **A later change to the sale moves the stop's items** (`lib/stop-sync.js`): callers read `stopCargo(orderId)` before
+  changing the order and call `syncStopItems(orderId, before)` after (invoice edit, refund, void/delete, order edit,
+  order cancel/reopen, Stock gaps linking). **It applies the difference only**, so hand-typed stop items, split stops
+  and ticks survive. Only delivery stops not done/cancelled (not return pickups). A unit removed after it was ticked
+  loaded, or a cancelled sale, puts a bracketed instruction at the front of the stop notes. **A new path that changes
+  `order_items` must call it.** Not covered: changes made before 2026-11-27, and a unit added after every stop on the
+  order is finished (book a new stop).
 
 ## LANDMINES (learned the hard way)
 1. **`NEXT_PUBLIC_*` vars are inlined at BUILD time.** Adding/changing one requires a FRESH build — a "Redeploy" of an existing/older deployment will NOT pick it up, and Vercel sometimes promotes an out-of-order older build. Fix: push a trivial commit to force a new build that becomes Production. (This exact trap cost us an hour with the pixel.)
