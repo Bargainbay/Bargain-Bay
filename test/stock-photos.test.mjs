@@ -2,7 +2,7 @@
 // by /feed, so it can't be advertised. Nothing used to say so: the sync reported
 // success and the gap was found by looking at the shop (28 models, 2026-10-05).
 import { suite, test, assert, equal } from './_harness.mjs';
-import { modelsWithoutStockPhoto } from '../lib/images.js';
+import { modelsWithoutStockPhoto, imageFor } from '../lib/images.js';
 import { syncSummary } from '../lib/sync-report.js';
 import images from '../data/images.json' with { type: 'json' };
 
@@ -29,6 +29,13 @@ test('an explicit image override counts as having a photo', () => {
 test('a unit with no model is still reported, per unit', () => {
   const r = modelsWithoutStockPhoto([{ id: 'C-1' }, { id: 'C-2', model: '' }]);
   equal(r.length, 2);
+});
+
+test('a word-only model is matched by make and model, never across brands', () => {
+  const unit = { id: 'D-1', model: 'Laundry Centre', category: 'Laundry Centre' };
+  equal(imageFor({ ...unit, make: 'Whirlpool' }), '/model-photos/YWET4027HW2.jpg');
+  assert(imageFor({ ...unit, make: 'GE' }).endsWith('.svg'));
+  equal(modelsWithoutStockPhoto([{ ...unit, make: 'Whirlpool' }]).length, 0);
 });
 
 test('the sync summary warns when models lack a photo, and is quiet otherwise', () => {
