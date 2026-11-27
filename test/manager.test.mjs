@@ -52,7 +52,7 @@ test('the opening line counts from the scan and leads with the worst', () => {
   assert(openingLine([]).includes('Nothing needs you'));
 });
 test('phone numbers become E.164, junk becomes null', () => {
-  equal(toE164('(647) 643-3035'), '+16476433035'); equal(toE164('1-647-643-3035'), '+16476433035'); equal(toE164('12345'), null);
+  equal(toE164('(416) 555-0100'), '+14165550100'); equal(toE164('1-416-555-0100'), '+14165550100'); equal(toE164('12345'), null);
 });
 test('the scheduled run is expected by the health email, with room for the overnight gap', () => {
   assert(EXPECTED['manager-call'] >= 16 * 3600_000);
@@ -60,8 +60,13 @@ test('the scheduled run is expected by the health email, with room for the overn
 
 suite('manager call');
 test('it rings the owner\'s number, and a call token is not transferable', async () => {
-  const saved = process.env.MANAGER_CALL_TO; delete process.env.MANAGER_CALL_TO;
-  try { equal(await managerTarget(), '+16476433035'); } finally { if (saved) process.env.MANAGER_CALL_TO = saved; }
+  const saved = process.env.MANAGER_CALL_TO;
+  try {
+    delete process.env.MANAGER_CALL_TO;
+    equal(await managerTarget(), null, 'no number in the source: unset rings nobody');
+    process.env.MANAGER_CALL_TO = '(416) 555-0100';
+    equal(await managerTarget(), '+14165550100');
+  } finally { if (saved) process.env.MANAGER_CALL_TO = saved; else delete process.env.MANAGER_CALL_TO; }
   assert(callTokenOk(5, callToken(5))); assert(!callTokenOk(6, callToken(5))); assert(!callTokenOk(5, ''));
 });
 test('it will not ring from a non-production deployment, or without Twilio', async () => {
@@ -69,10 +74,14 @@ test('it will not ring from a non-production deployment, or without Twilio', asy
   try {
     delete process.env.TWILIO_ACCOUNT_SID;
     equal((await startManagerCall({ scan: { issues: [], hidden: [] } })).ok, false);
-    Object.assign(process.env, { TWILIO_ACCOUNT_SID: 'x', TWILIO_AUTH_TOKEN: 'y', TWILIO_FROM: '+1', ANTHROPIC_API_KEY: 'k', VERCEL_ENV: 'preview' });
+    Object.assign(process.env, { TWILIO_ACCOUNT_SID: 'x', TWILIO_AUTH_TOKEN: 'y', TWILIO_FROM: '+1', ANTHROPIC_API_KEY: 'k', VERCEL_ENV: 'preview', MANAGER_CALL_TO: '4165550100' });
+    // (a number must exist for the preview gate to be what refuses: the source no longer carries a default)
     delete process.env.ALLOW_REAL_OUTBOUND;
     const r = await startManagerCall({ scan: { issues: [], hidden: [] } });
     equal(r.ok, false); assert(/preview/.test(r.reason));
+    delete process.env.MANAGER_CALL_TO;
+    const none = await startManagerCall({ scan: { issues: [], hidden: [] } });
+    equal(none.ok, false); assert(/MANAGER_CALL_TO/.test(none.reason), 'no number configured is named, not silent');
   } finally { for (const k of Object.keys(process.env)) if (!(k in keep)) delete process.env[k]; Object.assign(process.env, keep); }
 });
 
@@ -83,7 +92,7 @@ async function withDb(fn) {
   __useTestDatabase(client);
   try { await fn(client); } finally { __useTestDatabase(null); }   // a leaked test DB makes later suites think a database exists
 }
-const seed = (client, list) => client.query(`INSERT INTO manager_calls (to_number, issues) VALUES ('+16476433035', $1::jsonb) RETURNING id`, [JSON.stringify({ list, hidden: 0 })]).then((r) => r.rows[0].id);
+const seed = (client, list) => client.query(`INSERT INTO manager_calls (to_number, issues) VALUES ('+14165550100', $1::jsonb) RETURNING id`, [JSON.stringify({ list, hidden: 0 })]).then((r) => r.rows[0].id);
 
 test('a write only PROPOSES on its first turn and runs on the next turn\'s identical yes', async () => {
   await withDb(async (client) => {

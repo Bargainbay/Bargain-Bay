@@ -72,6 +72,7 @@ export default function VoiceManager() {
       <p className="hint">
         Scans the website, the stock, the scheduled jobs and dispatch. It rings you (number ending {data.ringsLast4}) when something is
         worth a call, between 8am and 8pm Toronto time, and fixes the safe things you tell it to. Anything that moves money stays with you.
+        {' '}<a href="/admin/manager/brief">Open the morning brief</a> (who to ring, what we missed, weak listings, pricing).
       </p>
       {!data.configured && <div className="error-box">Calling is not set up: Twilio and the Anthropic key are missing on this deployment.</div>}
       {err && <div className="error-box">{err}</div>}
