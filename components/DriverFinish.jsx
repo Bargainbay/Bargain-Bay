@@ -63,6 +63,12 @@ export default function DriverFinish({ stop, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const isService = stop.type === 'service_call';
+  // A pickup is the customer handing us their goods, so the signature is the
+  // proof we took them. It is REQUIRED unless nobody was there, and then the
+  // driver has to say why (stored on the form, so the office can see it).
+  const isPickup = stop.type === 'pickup';
+  const [noSigReason, setNoSigReason] = useState('');
+  const [noSig, setNoSig] = useState(false);
   // A signature, eight photos and the damage answers exist nowhere but this
   // form until Done is pressed. Nothing gets to reload the page underneath it.
   useEffect(() => { holdReload(); return releaseReload; }, []);
@@ -139,6 +145,14 @@ export default function DriverFinish({ stop, onClose, onDone }) {
         return;
       }
     }
+    if (isPickup) {
+      if (noSig) {
+        if (!noSigReason.trim()) { setErr('Say why there is no signature (nobody home, refused…).'); return; }
+      } else {
+        if (!signed.current) { setErr('Get the customer to sign — a pickup needs their signature.'); return; }
+        if (!signedBy.trim()) { setErr('Print the name of the person who signed.'); return; }
+      }
+    }
     if (collect && !(Number(amount) > 0)) { setErr('How much did you take?'); return; }
     if (hasTradeIn && !tradeIn) { setErr('Did you load their old unit? Tap Yes or No.'); return; }
     if (hasTradeIn && tradeIn === 'no' && !tradeInNote.trim()) {
@@ -147,7 +161,7 @@ export default function DriverFinish({ stop, onClose, onDone }) {
     }
     setBusy(true);
     try {
-      const sig = signed.current
+      const sig = signed.current && !(isPickup && noSig)
         ? await new Promise((r) => canvas.current.toBlob(r, 'image/png'))
         : null;
 
@@ -192,6 +206,7 @@ export default function DriverFinish({ stop, onClose, onDone }) {
             propertyDamageFree: propertyOk,
             explanation: explain,
             printName: signedBy,
+            noSignatureReason: isPickup && noSig ? noSigReason.trim() : '',
             items: lines
           })
         }
@@ -315,7 +330,7 @@ export default function DriverFinish({ stop, onClose, onDone }) {
 
         {!isService && (
           <div className="drv-pod">
-            <div className="drv-pod-head">Proof of delivery</div>
+            <div className="drv-pod-head">{isPickup ? 'Proof of pickup' : 'Proof of delivery'}</div>
 
             {/* Big Yes/No, not checkboxes: this is answered standing in a
                 doorway with a phone in one hand. */}
@@ -351,7 +366,7 @@ export default function DriverFinish({ stop, onClose, onDone }) {
 
             {lines.length > 0 && (
               <div className="drv-field">
-                <label>What was delivered</label>
+                <label>{isPickup ? 'What was picked up' : 'What was delivered'}</label>
                 {lines.map((l, i) => (
                   <div className={'drv-pod-item' + (l.delivered ? '' : ' is-off')} key={i}>
                     <label className="drv-pod-tick">
@@ -368,7 +383,9 @@ export default function DriverFinish({ stop, onClose, onDone }) {
                   </div>
                 ))}
                 <div className="hint" style={{ marginTop: 4 }}>
-                  Untick anything that didn&apos;t go in — it stays open as its own stop for the office to reschedule, and the order isn&apos;t marked delivered. It prints on the form the customer signs.
+                  {isPickup
+                    ? 'Untick anything that was NOT picked up. It prints on the form the customer signs.'
+                    : 'Untick anything that didn’t go in — it stays open as its own stop for the office to reschedule, and the order isn’t marked delivered. It prints on the form the customer signs.'}
                 </div>
               </div>
             )}
@@ -407,10 +424,23 @@ export default function DriverFinish({ stop, onClose, onDone }) {
         </div>
 
         <div className="drv-field">
-          <label>Customer signature</label>
+          <label>Customer signature{isPickup ? ' (required)' : ''}</label>
           <canvas ref={canvas} className="drv-sig" />
           <button type="button" className="drv-btn small" onClick={clearSig}>Clear</button>
-          <div className="hint" style={{ marginTop: 4 }}>Leave blank if nobody was there to sign.</div>
+          {isPickup ? (
+            <>
+              <label className="drv-check" style={{ marginTop: 8 }}>
+                <input type="checkbox" checked={noSig} onChange={(e) => setNoSig(e.target.checked)} />
+                Nobody could sign
+              </label>
+              {noSig && (
+                <input value={noSigReason} onChange={(e) => setNoSigReason(e.target.value)} maxLength={300}
+                  placeholder="Why? (nobody home, refused to sign…)" style={{ marginTop: 6 }} />
+              )}
+            </>
+          ) : (
+            <div className="hint" style={{ marginTop: 4 }}>Leave blank if nobody was there to sign.</div>
+          )}
         </div>
 
         <div className="drv-field">
