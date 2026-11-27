@@ -42,6 +42,8 @@ export default async function ClientJob({ params, searchParams }) {
   const podItems = Array.isArray(f.items) ? f.items : [];
   const label = `${j.orderNumber || j.jobNumber}-${(j.customerName || '').split(' ')[0] || 'stop'}`;
   const closed = ['done', 'failed'].includes(j.status);
+  const pickup = j.type === 'pickup';
+  const podName = pickup ? 'proof of pickup' : 'proof of delivery';
 
   return (
     <div className="cp">
@@ -58,14 +60,14 @@ export default async function ClientJob({ params, searchParams }) {
       {demo && <div className="notice-box cp-noprint"><b>Preview with sample data.</b> Nothing here is a real customer.</div>}
       <Link className="cp-back cp-noprint" href={`/client/${id}?t=${t}`}>← All deliveries for {client.name}</Link>
 
-      <h1>{j.customerName || 'Delivery'}</h1>
+      <h1>{j.customerName || (pickup ? 'Pickup' : 'Delivery')}</h1>
       <div className="cp-sub">{j.typeLabel} · {j.jobNumber}{j.orderNumber ? ` · Order ${j.orderNumber}` : ''} · {client.name}</div>
 
       <div className="cp-panel" style={{ marginTop: 14 }}>
         <div className="cp-grid">
           <div><div className="cp-k">Status</div><div className="cp-v">{j.statusLabel}{j.failReason ? ` — ${j.failReason}` : ''}</div></div>
           <div><div className="cp-k">Date</div><div className="cp-v">{j.date ? torontoDate(`${j.date}T12:00:00`) : '—'}{j.windowStart ? ` · window ${j.windowStart}${j.windowEnd ? `–${j.windowEnd}` : ''}` : ''}</div></div>
-          <div><div className="cp-k">Delivered to</div><div className="cp-v">{j.address || '—'}</div></div>
+          <div><div className="cp-k">{pickup ? 'Picked up from' : 'Delivered to'}</div><div className="cp-v">{j.address || '—'}</div></div>
           {j.pickup && <div><div className="cp-k">Collected from</div><div className="cp-v">{j.pickup}</div></div>}
           {j.phone && <div><div className="cp-k">Customer phone</div><div className="cp-v">{formatPhone(j.phone)}</div></div>}
           <div><div className="cp-k">Crew</div><div className="cp-v">{[j.driverName, j.driver2Name].filter(Boolean).join(' + ') || '—'}</div></div>
@@ -90,11 +92,11 @@ export default async function ClientJob({ params, searchParams }) {
         <div className="cp-panel">
           <h2>Items</h2>
           <div className="cp-scroll"><table>
-            <thead><tr><th>Item</th><th>SKU / Model</th><th style={{ width: 70 }}>Qty</th>{closed && <th style={{ width: 90 }}>Delivered</th>}</tr></thead>
+            <thead><tr><th>Item</th><th>SKU / Model</th><th style={{ width: 70 }}>Qty</th>{closed && <th style={{ width: 90 }}>{pickup ? 'Picked up' : 'Delivered'}</th>}</tr></thead>
             <tbody>
               {j.items.map((it, i) => (
                 <tr key={i}><td>{it.description}</td><td>{it.sku || '—'}</td><td>{it.qty}</td>
-                  {closed && <td>{it.delivered == null ? '—' : it.delivered ? '✓ Yes' : '✗ Not delivered'}</td>}</tr>
+                  {closed && <td>{it.delivered == null ? '—' : it.delivered ? '✓ Yes' : pickup ? '✗ Not picked up' : '✗ Not delivered'}</td>}</tr>
               ))}
             </tbody>
           </table></div>
@@ -102,9 +104,9 @@ export default async function ClientJob({ params, searchParams }) {
       )}
 
       <div className="cp-panel">
-        <h2>Proof of delivery</h2>
+        <h2>{pickup ? 'Proof of pickup' : 'Proof of delivery'}</h2>
         {!j.hasPod ? (
-          <p className="cp-sub" style={{ margin: 0 }}>{closed ? 'No signed form was captured for this stop.' : 'The signed proof of delivery appears here as soon as the crew finishes the stop.'}</p>
+          <p className="cp-sub" style={{ margin: 0 }}>{closed ? 'No signed form was captured for this stop.' : `The signed ${podName} appears here as soon as the crew finishes the stop.`}</p>
         ) : (
           <>
             <div className="cp-grid">
@@ -113,10 +115,11 @@ export default async function ClientJob({ params, searchParams }) {
               <div><div className="cp-k">Signed by</div><div className="cp-v">{f.printName || j.signedBy || '—'}</div></div>
               <div><div className="cp-k">Signed at</div><div className="cp-v">{stamp(j.completedAt) || '—'}</div></div>
             </div>
+            {pickup && !j.hasSignature && f.noSignatureReason && <p style={{ marginTop: 12 }}><b>Not signed:</b> {f.noSignatureReason}</p>}
             {f.explanation && <p style={{ marginTop: 12 }}><b>Customer / driver explanation:</b> {f.explanation}</p>}
             {podItems.length > 0 && (
               <div className="cp-scroll"><table style={{ marginTop: 10 }}>
-                <thead><tr><th>Item</th><th>Serial number</th><th style={{ width: 90 }}>Delivered</th><th>Notes</th></tr></thead>
+                <thead><tr><th>Item</th><th>Serial number</th><th style={{ width: 90 }}>{pickup ? 'Picked up' : 'Delivered'}</th><th>Notes</th></tr></thead>
                 <tbody>
                   {podItems.map((it, i) => (
                     <tr key={i}>

@@ -182,6 +182,16 @@ export async function POST(req) {
     }
   }
 
+  // A pickup is proof we took the customer's goods: it needs their signature, or
+  // the driver's stated reason there is none. Refused BEFORE anything is stored.
+  if (j[0].type === 'pickup' && !(signature && typeof signature === 'object' && signature.size)) {
+    let reason = '';
+    try { reason = String(JSON.parse(String(form.get('podForm') || '{}')).noSignatureReason || '').trim(); } catch { /* none */ }
+    if (!reason) {
+      return NextResponse.json({ error: 'A pickup needs the customer’s signature, or a reason there is none.' }, { status: 400 });
+    }
+  }
+
   try {
     const base = `pod/jobs/${j[0].job_number}`;
     if (signature && typeof signature === 'object' && signature.size) {

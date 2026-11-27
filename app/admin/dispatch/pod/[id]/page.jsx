@@ -43,7 +43,7 @@ export default async function PodPage({ params }) {
   if (!hasDb()) return <div style={{ padding: 24 }}>Database not configured.</div>;
 
   const { rows } = await query(
-    `SELECT j.id, j.job_number, j.customer_name, j.address, j.city, j.postal, j.phone,
+    `SELECT j.id, j.job_number, j.type, j.customer_name, j.address, j.city, j.postal, j.phone,
             j.job_date, j.completed_at, j.signed_by, j.signature_path, j.pod_form, j.notes,
             o.order_number,
             COALESCE(u.name, u.email) AS driver_name,
@@ -61,6 +61,7 @@ export default async function PodPage({ params }) {
   const items = Array.isArray(f.items) ? f.items : [];
   const photos = Array.isArray(j.photo_ids) ? j.photo_ids : [];
   const when = j.completed_at || j.job_date;
+  const pickup = j.type === 'pickup';
 
   return (
     <div className="pod">
@@ -101,23 +102,30 @@ export default async function PodPage({ params }) {
         </span>
       </div>
 
-      <h1>Proof of Delivery form</h1>
+      <h1>{pickup ? 'Proof of Pickup form' : 'Proof of Delivery form'}</h1>
 
       <div className="meta">
         Customer Name: <b>{j.customer_name || '—'}</b> &nbsp; Order: <b>{j.order_number || j.job_number}</b>
         &nbsp; Date: <b>{torontoDate(when) || '—'}</b>
         <br />
         {[j.address, j.city, j.postal].filter(Boolean).join(', ')}
-        {j.driver_name ? <> &nbsp;·&nbsp; Delivered by: <b>{j.driver_name}</b></> : null}
+        {j.driver_name ? <> &nbsp;·&nbsp; {pickup ? 'Picked up by' : 'Delivered by'}: <b>{j.driver_name}</b></> : null}
       </div>
 
-      <p>
+      {pickup ? (
+        <p>
+          I confirm that {BUSINESS_LEGAL} collected the item(s) listed below from me on the date shown, that
+          the list is complete and accurate, and that I am the owner of the item(s) or am authorized to release
+          them. Any damage to the item(s) or to my property is recorded below.
+        </p>
+      ) : (<p>
         At {BUSINESS_LEGAL} we take pride in our delivery services. We would like to ensure that you are
         fully content with our services prior to us leaving your premises. Your satisfaction is very
         important to us and we thank you for your business.
-      </p>
+      </p>)}
 
-      <h2>Merchandise / Property Inspection</h2>
+      <h2>{pickup ? 'Item / Property Condition' : 'Merchandise / Property Inspection'}</h2>
+      {!pickup && (
       <p>
         I acknowledge that I have inspected my purchase and the area through which it was delivered. I agree
         that my products and property are free from any visible damage or free from any new damages to the
@@ -125,6 +133,7 @@ export default async function PodPage({ params }) {
         {' '}{BUSINESS_LEGAL}, and the store whom I purchased the items from will not be held responsible for
         any claims for products or property damages after my inspection has been completed.
       </p>
+      )}
 
       <div className="ask">
         Product is damage free: <b>{TICK(f.productDamageFree === 'yes')} Yes</b> &nbsp;&nbsp;
@@ -142,7 +151,7 @@ export default async function PodPage({ params }) {
           <tr>
             <th style={{ width: '44%' }}>Item</th>
             <th>Serial number</th>
-            <th style={{ width: 80 }}>Delivered</th>
+            <th style={{ width: 80 }}>{pickup ? 'Picked up' : 'Delivered'}</th>
             <th>Notes</th>
           </tr>
         </thead>
@@ -158,6 +167,11 @@ export default async function PodPage({ params }) {
         </tbody>
       </table>
 
+      {pickup && !j.signature_path && f.noSignatureReason ? (
+        <p><b>NOT SIGNED:</b> {f.noSignatureReason}</p>
+      ) : null}
+
+      {!pickup && (
       <p>
         {/* The indemnified party is the company that DID the delivery — us — and
             separately "the stores I/We purchased the items from", which covers
@@ -173,6 +187,7 @@ export default async function PodPage({ params }) {
         merchandise or a duly authorized representative of the purchaser and I am authorized to sign on the
         purchaser&apos;s behalf.
       </p>
+      )}
 
       <div className="sign">
         <div className="sigbox">
