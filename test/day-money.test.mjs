@@ -2,6 +2,8 @@
 import { suite, test, assert, equal } from './_harness.mjs';
 import { withTestDb } from './db.mjs';
 import { dayMoney, withNet } from '../lib/day-money.js';
+import { ensureFinanceSchema } from '../lib/finance.js';
+import { ensureBankActivitySchema } from '../lib/bank-activity.js';
 import { dailyPnl } from '../lib/daily-pnl.js';
 import { ordersOnDay, repProfit } from '../lib/analytics.js';
 import { moneyDay, addUp } from '../lib/day-money-math.js';
@@ -41,6 +43,21 @@ test('each day agrees with the daily P&L, a drop-off unit is set aside tax inclu
     equal((await dailyPnl({ from: today, to: today })).rows[0].net, d.net);
     equal(m.rows[0].net, -10, 'a day with no sales still costs its bills');
     const orders = await ordersOnDay(today);
+    // The actual side: what was really paid, less money that only moved.
+    await ensureFinanceSchema(); await ensureBankActivitySchema();
+    await client.query(`INSERT INTO expenses (incurred_on,category,vendor,amount,tax,source,ext_id) VALUES
+      ($1,'Wages','Pat',100,0,'plaid','plaid:1'), ($1,'Fuel','Esso',40,5.2,'plaid','plaid:2'),
+      ($1,'Supplier Payment - Abi','Abi',999,NULL,'plaid','plaid:3'), ($1,'Owner draw - Sai','Sai',500,NULL,'plaid','plaid:4'),
+      ($1,'Receipt payback','Ravi',40,NULL,'plaid','plaid:5')`, [today]);
+    await client.query(`INSERT INTO bank_activity (ext_id, activity_date, amount, pending) VALUES ('plaid:9',$1,-75,false), ('plaid:10',$1,-20,true), ('plaid:11',$1,300,false)`, [today]);
+    const a = await dayMoney({});
+    const at = a.rows[a.rows.length - 1];
+    equal(at.spent, 145.2, 'wages and fuel with its tax; stock, draws and paybacks are not costs');
+    equal(at.unsorted, 75); equal(at.actualNet, 204.8); equal(at.net, 340, 'the proposed figure does not move');
+    equal(a.rows[0].actualNet, null, 'before the bank is on record there is no actual figure');
+    equal(a.totals.actualNet, null);
+    equal((await dayMoney({ from: today, to: today })).totals.actualNet, 204.8);
+    equal((await withNet(await repProfit({ name: 'Owner' }, { all: true }))).company.today.actualNet, 204.8);
     equal(orders.length, 1); equal(orders[0].lines.length, 2); equal(orders[0].gp, 350);
     equal((await ordersOnDay('nonsense')).length, 0);
     const p = await withNet(await repProfit({ name: 'Owner' }, { all: true }));

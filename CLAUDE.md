@@ -4649,6 +4649,12 @@ profit and "keep aside for product" (`withNet`, soft-fails to hiding them).
   on the Daily P&L until everyone has clocked out.
 - **Keep aside for product = product cost + the tax inside consigned units' costs** (`vendorTax` on each dailyPnl
   row). Profit counts a drop-off unit at cost / 1.13 (owner, 2026-11-10), but the vendor is paid the full figure.
+- **TWO net profits (owner, 2026-11-27).** *Proposed* = our own numbers (clock-ins, dispatch costs, cost list), as above.
+  *Actual* = the same gross profit and delivery income less every running-cost payment in `expenses` (bank, cash, own
+  pocket; amount + tax; recurring templates excluded), dated the day it was paid, filtered by `notOperatingCost` (the
+  P&L's rule: stock, owner draws, loan repayment, receipt payback, passed on are not costs). Money out still unsorted in
+  `bank_activity` is NOT counted and is shown beside it. Null (not zero) before the bank feed begins. Opening a day also
+  lists its payments (`spendLines`).
 - Net profit does not take off rep commission, and is only as complete as the cost list, fuel entries and clock-ins;
   the panel says so (`notes`). Sales logins get none of it.
 

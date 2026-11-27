@@ -50,9 +50,16 @@ export default function MyProfit({ initial }) {
               {p.net != null && (
                 <>
                   <div style={{ marginTop: 6 }}>
-                    <div className="hint" style={{ margin: 0 }}>Net profit (after wages, truck and bills)</div>
+                    <div className="hint" style={{ margin: 0 }}>Proposed net profit (our numbers)</div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: p.net < 0 ? 'var(--danger)' : 'var(--ok)' }}>{$(p.net)}</div>
                   </div>
+                  {p.actualNet != null && (
+                    <div style={{ marginTop: 6 }}>
+                      <div className="hint" style={{ margin: 0 }}>Actual net profit (bank spending)</div>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: p.actualNet < 0 ? 'var(--danger)' : 'var(--ok)' }}>{$(p.actualNet)}</div>
+                      <div className="hint" style={{ margin: 0 }}>{$(p.spent)} actually spent{p.unsorted > 0 && <> · <a href="/admin/bankroll" style={{ textDecoration: 'underline' }}>{$(p.unsorted)} not sorted yet</a></>}</div>
+                    </div>
+                  )}
                   <div style={{ marginTop: 6 }}>
                     <div className="hint" style={{ margin: 0 }}>Keep aside for product</div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--charcoal)' }}>{$(p.restock)}</div>

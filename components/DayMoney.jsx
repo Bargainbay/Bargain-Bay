@@ -1,7 +1,8 @@
 'use client';
 // Every day's money in one table: what was sold, what has to go back into
-// product, and what was left after wages, truck and bills. Click a day to see
-// its sales. Admin only.
+// product, and what was left, two ways: PROPOSED from our own numbers (clock-ins,
+// truck, cost list) and ACTUAL from what was really paid. Click a day to see its
+// sales and payments. Admin only.
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import SalesDetail from './SalesDetail';
 import { addMonths, monthName } from '../lib/rep-periods';
@@ -13,7 +14,26 @@ const right = { textAlign: 'right', whiteSpace: 'nowrap' };
 const dayName = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-CA', { timeZone: 'UTC', weekday: 'long', month: 'short', day: 'numeric' });
 const shift = (iso, d) => { const t = new Date(`${iso}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); };
 const head = { textAlign: 'right' }; // headings may wrap; figures never do
-const netColour = (v) => (v < 0 ? 'var(--danger)' : 'var(--ok)');
+const netColour = (v) => (v == null ? 'var(--muted)' : v < 0 ? 'var(--danger)' : 'var(--ok)');
+const known = (v) => (v == null ? '—' : $(v));
+const small = { fontSize: 12, color: 'var(--muted)', fontWeight: 400 };
+
+function Payments({ spend }) {
+  if (!spend) return <p className="hint">The payments for this day could not be read.</p>;
+  if (!spend.length) return <p className="hint">No payments recorded that day.</p>;
+  return (
+    <div style={{ marginTop: 12 }}>
+      <h3 style={{ margin: '0 0 8px', fontSize: 14, color: 'var(--charcoal)' }}>Payments that day</h3>
+      <div className="table-wrap"><table className="admin" style={{ minWidth: 0 }}>
+        <thead><tr><th>Paid to</th><th>Category</th><th style={right}>Amount</th><th>In actual net profit?</th></tr></thead>
+        <tbody>{spend.map((l, i) => (
+          <tr key={i}><td>{l.vendor || '—'}{l.source !== 'plaid' && <span style={{ ...small, marginLeft: 8 }}>{l.source === 'personal' ? 'own pocket' : l.source}</span>}</td>
+            <td>{l.category}</td><td style={right}>{$(l.paid)}</td><td style={l.counted ? undefined : small}>{l.counted ? 'Yes' : 'No, money moving'}</td></tr>
+        ))}</tbody>
+      </table></div>
+    </div>
+  );
+}
 
 export default function DayMoney() {
   const [range, setRange] = useState('14'); // '14', or a month 'YYYY-MM'
@@ -52,7 +72,7 @@ export default function DayMoney() {
     const ctl = new AbortController();
     fetch(`/api/admin/day-money?day=${open}`, { cache: 'no-store', signal: ctl.signal })
       .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Could not load'); return j; })
-      .then((j) => setSales((s) => ({ ...s, [j.day]: { orders: j.orders } })))
+      .then((j) => setSales((s) => ({ ...s, [j.day]: { orders: j.orders, spend: j.spend } })))
       .catch((e) => { if (e.name !== 'AbortError') setSales((s) => ({ ...s, [open]: { error: e.message } })); });
     return () => ctl.abort();
   }, [open, data]);
@@ -71,8 +91,8 @@ export default function DayMoney() {
   return (
     <div className="panel" style={{ marginBottom: 14 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Day by day · net profit and what to keep aside</h2>
-        <span className="hint" style={{ margin: 0 }}>Before HST · click a day to see its sales</span>
+        <h2 style={{ margin: 0, color: 'var(--charcoal)' }}>Day by day · net profit, two ways, and what to keep aside</h2>
+        <span className="hint" style={{ margin: 0 }}>Sales before HST · click a day to see its sales and payments</span>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
         <button type="button" className={'dash-filter' + (range === '14' ? ' active' : '')} onClick={() => setRange('14')}>Last 14 days</button>
@@ -87,10 +107,10 @@ export default function DayMoney() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
         {[
-          ['Net profit', $(t.net), 'after product, wages, truck and bills', netColour(t.net)],
+          ['Proposed net profit', $(t.net), `our numbers: ${$(t.wages + t.truck + t.bills)} wages, truck and bills`, netColour(t.net)],
+          ['Actual net profit', known(t.actualNet), t.actualNet == null ? 'no bank record for all these days' : `bank spending: ${$(t.spent)} actually spent`, netColour(t.actualNet)],
           ['Keep aside for product', $(t.restock), t.vendorTax > 0 ? `includes ${$(t.vendorTax)} tax paid to drop-off vendors` : 'what the units sold cost'],
-          ['Gross profit', $(t.grossProfit), 'appliances less their cost'],
-          ['Wages, truck and bills', $(t.wages + t.truck + t.bills), `${$(t.wages)} wages · ${$(t.truck)} truck · ${$(t.bills)} bills`]
+          ['Gross profit', $(t.grossProfit), `appliances less their cost · plus ${$(t.deliveryIn)} delivery and services`]
         ].map(([label, value, hint, colour]) => (
           <div key={label} style={{ border: '1px solid var(--line-soft)', borderRadius: 8, padding: '10px 12px' }}>
             <div style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>{label} · {title}</div>
@@ -103,8 +123,8 @@ export default function DayMoney() {
       <div className="table-wrap" style={{ marginTop: 12 }}>
         <table className="admin" style={{ minWidth: 960 }}>
           <thead><tr>
-            <th>Day</th><th style={head}>Net profit</th><th style={head}>Keep aside for product</th><th style={head}>Sales before tax</th><th style={head}>Gross profit</th>
-            <th style={head}>+ Delivery &amp; services</th><th style={head}>− Wages</th><th style={head}>− Truck &amp; fuel</th><th style={head}>− Bills</th>
+            <th>Day</th><th style={head}>Proposed net profit</th><th style={head}>Actual net profit</th><th style={head}>Keep aside for product</th><th style={head}>Sales before tax</th>
+            <th style={head}>Gross profit</th><th style={head}>+ Delivery &amp; services</th><th style={head}>Proposed costs</th><th style={head}>Actually spent</th>
           </tr></thead>
           <tbody>
             {rows.map((r) => (
@@ -118,20 +138,25 @@ export default function DayMoney() {
                     <div style={{ fontSize: 12, color: 'var(--muted)', paddingLeft: 16 }}>{r.sales} sale{r.sales === 1 ? '' : 's'}{when(r.day)}</div>
                   </td>
                   <td style={{ ...right, fontWeight: 700, color: netColour(r.net) }}>{$(r.net)}</td>
+                  <td style={{ ...right, fontWeight: 700, color: netColour(r.actualNet) }}>{known(r.actualNet)}</td>
                   <td style={{ ...right, fontWeight: 700 }}>{$(r.restock)}{r.missingCost > 0 && <div><span className="pill warn" title="A unit sold this day has no cost on file, so this is too low and the profit leaves it out.">cost missing</span></div>}</td>
-                  <td style={right}>{$(r.revenue)}<div style={{ fontSize: 12, color: 'var(--muted)' }}>{$(r.revenueWithTax)} with tax</div></td>
+                  <td style={right}>{$(r.revenue)}<div style={small}>{$(r.revenueWithTax)} with tax</div></td>
                   <td style={right}>{$(r.grossProfit)}</td>
                   <td style={right}>{$(r.deliveryIn)}</td>
-                  <td style={right}>{minus(r.wages)}</td>
-                  <td style={right}>{minus(r.truck)}</td>
-                  <td style={right}>{minus(r.bills)}</td>
+                  <td style={right}>{minus(r.wages + r.truck + r.bills)}<div style={small}>wages {$(r.wages)}</div><div style={small}>truck {$(r.truck)} · bills {$(r.bills)}</div></td>
+                  <td style={right}>{r.spent == null ? '—' : minus(r.spent)}{r.unsorted > 0 && <div style={small}>{$(r.unsorted)} not sorted</div>}</td>
                 </tr>
                 {open === r.day && (
                   <tr><td colSpan={9} style={{ padding: '0 10px 12px' }}>
-                    {!sales[r.day] ? <p className="hint">Loading the sales…</p>
+                    {!sales[r.day] ? <p className="hint">Loading the day…</p>
                       : sales[r.day].error ? <p className="hint" style={{ color: 'var(--danger)' }}>{sales[r.day].error}</p>
-                        : sales[r.day].orders.length === 0 ? <p className="hint">No sales that day.</p>
-                          : <SalesDetail orders={sales[r.day].orders} title={`Sales on ${dayName(r.day)}`} />}
+                        : (
+                          <>
+                            {sales[r.day].orders.length === 0 ? <p className="hint">No sales that day.</p>
+                              : <SalesDetail orders={sales[r.day].orders} title={`Sales on ${dayName(r.day)}`} />}
+                            <Payments spend={sales[r.day].spend} />
+                          </>
+                        )}
                   </td></tr>
                 )}
               </Fragment>
@@ -141,8 +166,10 @@ export default function DayMoney() {
             <tr style={{ fontWeight: 700 }}>
               <td>Total · {t.sales} sales</td>
               <td style={{ ...right, color: netColour(t.net) }}>{$(t.net)}</td>
+              <td style={{ ...right, color: netColour(t.actualNet) }}>{known(t.actualNet)}</td>
               <td style={right}>{$(t.restock)}</td><td style={right}>{$(t.revenue)}</td><td style={right}>{$(t.grossProfit)}</td>
-              <td style={right}>{$(t.deliveryIn)}</td><td style={right}>{minus(t.wages)}</td><td style={right}>{minus(t.truck)}</td><td style={right}>{minus(t.bills)}</td>
+              <td style={right}>{$(t.deliveryIn)}</td><td style={right}>{minus(t.wages + t.truck + t.bills)}</td>
+              <td style={right}>{t.spent == null ? '—' : minus(t.spent)}{t.unsorted > 0 && <div style={small}>{$(t.unsorted)} not sorted</div>}</td>
             </tr>
           </tfoot>
         </table>
