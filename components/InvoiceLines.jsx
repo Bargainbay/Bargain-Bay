@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { isCreditLine, isUnitLine, isHaulAwayLine, INTAKE_CATEGORIES, EXTENDED_WARRANTY_YEARS, extendedWarrantyText, extendedWarrantyYears } from '../lib/constants';
 import { searchStockUnits, OFF_STOCK_REASONS, OFF_STOCK_OTHER } from '../lib/stock-match';
+import { isFinalSale, discountFactor } from '../lib/return-rules';
 import { blankItem, serviceItem, creditItem, subtotalOf, goodsOf, toPayload, fromInvoice, stockLineProblem } from '../lib/invoice-lines';
 
 // The line-item editor shared by the invoice FORM (new) and the invoice EDITOR
@@ -32,7 +33,7 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
   // they quote a number, not after the save is refused.
   const pick = (i, u) => patchItem(i, {
     sku: u.id, description: u.description, q: '', offStock: false, offStockReason: null,
-    minPrice: u.minPrice || 0, consignedTo: u.consignedTo || null,
+    minPrice: u.minPrice || 0, consignedTo: u.consignedTo || null, retail: u.retail || 0,
     // Keep a price the rep already typed; otherwise take the list price when there is one.
     amount: String(items[i]?.amount || '') || (u.price > 0 ? String(u.price) : '')
   });
@@ -47,6 +48,8 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
   });
 
   const goods = goodsOf(items);
+  // Discount lines are typed as positive figures here and stored negative on the way out.
+  const paidShare = discountFactor(items.map((x) => ({ kind: x.kind, amount: x.kind === 'discount' ? -Math.abs(Number(x.amount) || 0) : Number(x.amount) || 0 })));
   // A percentage is snapshotted to dollars the moment it's added: an invoice
   // line is a figure, and re-deriving it later would silently move a total
   // somebody has already quoted out loud.
@@ -118,6 +121,11 @@ export default function InvoiceLines({ items, setItems, showCost = false, servic
             </div>
           );
         })()}
+        {isUnitLine(it.kind) && it.sku && it.retail > 0 && isFinalSale((taxInclusive ? (Number(it.amount) || 0) / 1.13 : Number(it.amount) || 0) * paidShare, it.retail) && (
+          <div className="final-sale-tag" style={{ margin: '-4px 0 6px' }}>
+            Final sale (more than 30% off ${Number(it.retail).toFixed(2)} retail) — tell the customer: no refunds or exchanges.
+          </div>
+        )}
         {isUnitLine(it.kind) && it.sku && (
           <div className="hint" style={{ margin: '-4px 0 8px' }}>
             From stock: <b style={{ fontFamily: 'monospace' }}>{it.sku}</b>

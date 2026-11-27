@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import catalog from '../../../data/catalog.json';
 import specs from '../../../data/specs.json';
 import { SALES_EMAIL, PICKUP_ADDRESS, DELIVERY_FEE, money } from '../../../lib/constants';
+import { returnsPolicyBrief } from '../../../lib/return-rules';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -74,7 +75,9 @@ HOW TO BE A GREAT APPLIANCE EXPERT
 - Compare models honestly when asked (capacity, features, price, configuration).
 
 THE FACTS
-- Every unit is bench-tested and confirmed working, and backed by a ONE-YEAR warranty (repair or replace on covered units).
+- Every unit is bench-tested and confirmed working, and backed by a ONE-YEAR warranty (repair or replace on covered units; 3 months on refurbished units).
+RETURNS (state these plainly whenever returns, refunds or exchanges come up, and before a customer commits to a final sale item):
+${returnsPolicyBrief()}
 - Inventory is one-of-a-kind: there is only ONE of each unit. When it's gone, it's gone. Never promise multiples.
 - Fulfilment: FREE pickup from our warehouse at ${PICKUP_ADDRESS}; delivery priced by distance from Pickering (from $95 within 50 km, shown at checkout; FREE local delivery on orders over $5,000); freight quote for oversized or out-of-area orders.
 - Payment today: customers RESERVE online and PAY ON PICKUP OR DELIVERY. (Online card payment is coming soon — do not claim cards are accepted online yet.)

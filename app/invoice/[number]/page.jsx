@@ -9,7 +9,8 @@ import { linkToken } from '../../../lib/links';
 import RsInvoiceDocument from '../../../components/RsInvoiceDocument';
 import { brandFor } from '../../../lib/brands';
 import { money, SALES_EMAIL, ETRANSFER_EMAIL, warrantyLabel,
-         publicSku, BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, RETURN_POLICY_SUMMARY, DEPOSIT_NOTE, isQuickSaleEmail } from '../../../lib/constants';
+         publicSku, BUSINESS_NAME, BUSINESS_LEGAL, BUSINESS_ADDRESS, HST_NUMBER, PICKUP_ADDRESS, SERVICE_EMAIL, returnTermsFor, isQuickSaleEmail } from '../../../lib/constants';
+import { FINAL_SALE_LABEL } from '../../../lib/return-rules';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Invoice' };
@@ -181,6 +182,7 @@ export default async function InvoicePage({ params, searchParams }) {
               <span style={{ textDecoration: lineRefunded ? 'line-through' : 'none' }}>
                 {it.description}{it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({publicSku(it.sku)})</span> : null}
                 {lineRefunded && <span className="pill sold" style={{ fontSize: 11, marginLeft: 6 }}>Refunded</span>}
+                {it.final_sale && !lineRefunded && <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: 'var(--danger, #b3261e)' }}>{FINAL_SALE_LABEL}</span>}
                 {w && !lineRefunded && <span style={{ display: 'block', fontSize: 12.5, color: 'var(--green, #0f6e56)' }}>✓ {w}</span>}
                 {it.kind === 'trade_in' && (
                   <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>
@@ -211,7 +213,7 @@ export default async function InvoicePage({ params, searchParams }) {
             <div className="summary-row total"><span>Net after refund</span><span>{money(Math.max(0, Number(invoice.total) - refundTotal))}</span></div>
           </>
         )}
-        <p style={{ margin: '10px 0 0', fontSize: 12.5, fontWeight: 600 }}>{DEPOSIT_NOTE}</p>
+        <p style={{ margin: '10px 0 0', fontSize: 12.5, fontWeight: 600 }}>{returnTermsFor(invoice.created_at).note}</p>
         {portalHref && (
           <p style={{ margin: '10px 0 0' }}><a className="btn" href={portalHref}>View each delivery — times, proof of delivery &amp; photos →</a></p>
         )}
@@ -224,7 +226,7 @@ export default async function InvoicePage({ params, searchParams }) {
       <div className="panel">
         <h2 style={{ marginTop: 0 }}>Returns &amp; warranty</h2>
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>
-          {RETURN_POLICY_SUMMARY.map((p, i) => <li key={i} style={{ marginBottom: 5 }}>{p}</li>)}
+          {returnTermsFor(invoice.created_at).summary.map((p, i) => <li key={i} style={{ marginBottom: 5 }}>{p}</li>)}
         </ul>
         <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 0 }}>
           Returns &amp; warranty claims: <a href={`mailto:${SERVICE_EMAIL}`} style={{ textDecoration: 'underline' }}>{SERVICE_EMAIL}</a> (with your invoice number, model, issue &amp; photos).

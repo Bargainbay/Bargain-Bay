@@ -11,6 +11,7 @@ import HoneypotField from '../../components/HoneypotField';
 import MarketingOptIn, { CONSENT_TEXT } from '../../components/MarketingOptIn';
 import SmsOptIn from '../../components/SmsOptIn';
 import { initiateCheckout, newEventId } from '../../lib/fpixel';
+import { isFinalSale, DOA_REPORT_HOURS } from '../../lib/return-rules';
 
 export default function CheckoutClient({ catalog, session, prefill, addonOverrides = {} }) {
   const [skus, setSkus] = useState(null);
@@ -34,6 +35,8 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
     smsOptIn: false
   });
   const [error, setError] = useState('');
+  // Required when the order holds a final sale item: they have to have seen it before they buy.
+  const [finalOk, setFinalOk] = useState(false);
   const [busy, setBusy] = useState(false);
   // Promo code. `applied` is what the server said the code is worth; it is only
   // ever a preview — /api/checkout recomputes the discount from its own prices,
@@ -180,6 +183,9 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
   // better one, exactly as the server will decide.
   const shown = applied && (!auto || applied.discount >= auto.discount) ? applied : auto;
   const discount = shown ? Math.min(shown.discount, subtotal) : 0;
+  // "Sold for" is after the discount, spread over the units, exactly as the invoice judges it.
+  const paidShare = subtotal > 0 ? (subtotal - discount) / subtotal : 1;
+  const isFinal = (u) => isFinalSale(Number(u.price) * paidShare, u.compareAt);
   const freeShip = method === 'delivery' && freeDeliveryApplies(round2(Math.max(0, subtotal - discount)), zone || { zone: 'A' });
   const delivery = method === 'delivery' ? deliveryTotal(items, zoneFee, DELIVERY_FEE, { free: freeShip }).total : 0;
   // Installation / haul-away add-ons: only on a delivery order; the server prices them again.
@@ -388,7 +394,10 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
             <h2 style={{ marginTop: 0, fontSize: 17, color: 'var(--charcoal)' }}>Order summary</h2>
             {items.map((u) => (
               <div className="summary-row" key={u.id}>
-                <span style={{ paddingRight: 10 }}>{u.make} {u.model}</span>
+                <span style={{ paddingRight: 10 }}>
+                  {u.make} {u.model}
+                  {isFinal(u) && <span className="final-sale-tag">Final sale</span>}
+                </span>
                 <span>{money(u.price)}</span>
               </div>
             ))}
@@ -463,6 +472,20 @@ export default function CheckoutClient({ catalog, session, prefill, addonOverrid
                 By placing this order you agree that we give {sellerShips.length === 1 ? 'that seller' : 'those sellers'} your <b>name, delivery address, phone number and email address</b> so
                 they can ship it and contact you about the delivery. They may use them only for this order and may not market to you.{' '}
                 <a href="/marketplace/policies/marketplace-terms" target="_blank" rel="noreferrer">Details</a>
+              </div>
+            )}
+            {items.some(isFinal) ? (
+              <label className="final-sale-box" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer' }}>
+                <input type="checkbox" required checked={finalOk} onChange={(e) => setFinalOk(e.target.checked)} style={{ width: 'auto', marginTop: 3 }} />
+                <span>
+                  I understand items marked <b>Final sale</b> cannot be returned, refunded or exchanged. A unit that is
+                  dead on arrival must be reported within {DOA_REPORT_HOURS} hours for an exchange. All refunds carry a
+                  20% restocking fee. <a href="/policies/returns" target="_blank" rel="noreferrer">Returns policy</a>
+                </span>
+              </label>
+            ) : (
+              <div className="hint" style={{ marginTop: 12 }}>
+                All refunds carry a 20% restocking fee. <a href="/policies/returns" target="_blank" rel="noreferrer">Returns policy</a>
               </div>
             )}
             <button className="btn accent block" style={{ marginTop: 14 }} disabled={busy}>

@@ -14,6 +14,7 @@ import { createQuoteRequest } from '../../../../lib/quotes';
 import { notifyOwner } from '../../../../lib/email';
 import { PICKUP_ADDRESS, BUSINESS_HOURS, SALES_EMAIL, DELIVERY_FEE, money } from '../../../../lib/constants';
 import { hasDb } from '../../../../lib/db';
+import { returnsPolicyBrief } from '../../../../lib/return-rules';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -96,7 +97,8 @@ export async function POST(req) {
           hours: BUSINESS_HOURS,
           pickup: 'Free pickup at the Pickering warehouse, by appointment.',
           delivery: `Priced by distance from Pickering: $95 within 50 km, $140 to 100 km, $225 to 150 km; farther is $2 per km extra. Free local delivery on orders over $5,000.`,
-          warranty: 'Every unit is tested, working, and carries a one-year warranty.',
+          warranty: 'Every unit is tested and working, with a one-year warranty (3 months on refurbished units).',
+          returns: returnsPolicyBrief(),
           email: SALES_EMAIL,
           staffed_now: isStaffedNow()
         });

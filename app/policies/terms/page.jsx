@@ -54,6 +54,8 @@ export default function TermsPage() {
       <p>
         Items are sold in the condition described, and include a <b>one-year functional warranty</b> (3 months for refurbished units). Returns are
         handled per our <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp; Refund Policy</a>.
+        Items sold for more than 30% off retail are <b>final sale</b> (no refunds or exchanges), and every refund
+        is subject to a 20% restocking fee.
         Except as set out in those documents and as required by law, items are sold &quot;as-is&quot; with respect
         to cosmetic condition.
       </p>

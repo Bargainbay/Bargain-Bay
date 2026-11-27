@@ -2144,3 +2144,8 @@ a.pq-btn { text-decoration: none; }
   .bfh-proof { grid-template-columns: repeat(4, auto); justify-content: space-between; padding: 16px 40px; }
 }
 @media (prefers-reduced-motion: reduce) { .bfh-card { transition: none; } }
+
+/* Final sale: more than 30% off retail (lib/return-rules.js). */
+.final-sale-box { margin: 12px 0; padding: 10px 12px; border: 1px solid #e3b1ac; background: #fdf1f0; color: #7a1d17; border-radius: 8px; font-size: 13.5px; line-height: 1.5; }
+.final-sale-box a { color: inherit; text-decoration: underline; }
+.final-sale-tag { display: block; margin-top: 2px; font-size: 12px; font-weight: 700; color: #b3261e; }

@@ -8,6 +8,7 @@ import { publicSku, money, STATUS_LABELS, PICKUP_ADDRESS, SALES_EMAIL, ETRANSFER
 import { availableSlots, pickupLabel } from '../../../lib/pickup';
 import PickupBooker from '../../../components/PickupBooker';
 import OrderLiveRefresh from '../../../components/OrderLiveRefresh';
+import { query } from '../../../lib/db';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Order Status — Bargain Bay' };
@@ -61,6 +62,11 @@ export default async function OrderPage({ params, searchParams }) {
   }
 
   const steps = timelineSteps(order);
+  // Final sale is recorded on the sale's invoice line.
+  const finalSkus = new Set(await query(
+    `SELECT upper(ii.sku) AS sku FROM invoice_items ii JOIN invoices i ON i.id = ii.invoice_id
+      WHERE i.order_id = $1 AND ii.final_sale`, [order.id]
+  ).then((r) => r.rows.map((x) => x.sku)).catch(() => []));
   // An offline order is "Confirmed" the moment it's placed; payment is a separate
   // pending→paid state shown as a badge. So pending_payment lights the Confirmed
   // step, and marking it paid advances the order to Ready (for pickup/delivery).
@@ -178,6 +184,7 @@ export default async function OrderPage({ params, searchParams }) {
               {/* Service, discount and trade-in lines carry no SKU — an empty
                   pair of brackets after every one of them reads as a bug. */}
               {it.sku ? <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({publicSku(it.sku)})</span> : null}
+              {it.sku && finalSkus.has(String(it.sku).toUpperCase()) && <span className="final-sale-tag">Final sale — no refunds or exchanges</span>}
               {it.kind === 'trade_in' && (
                 <span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>
                   We&apos;ll collect this at {order.delivery_method === 'delivery' ? 'delivery' : 'pickup'}.

@@ -4,6 +4,8 @@ import { hasDb } from '../../../../../lib/db';
 import { getInvoiceByNumber, listInvoiceRefunds } from '../../../../../lib/invoices';
 import { money, round2, normalizeLineKind } from '../../../../../lib/constants';
 import { creditFactorOf } from '../../../../../lib/invoice-lines';
+import { refundFacts } from '../../../../../lib/refund-guard';
+import { returnRulesApply } from '../../../../../lib/return-rules';
 import AdminNav from '../../../../../components/AdminNav';
 import RefundControl from '../../../../../components/RefundControl';
 
@@ -52,7 +54,13 @@ export default async function RefundInvoicePage({ params }) {
   // discount or a trade-in. Same helper the refund itself uses, so the figure
   // previewed here is the one that will actually be handed back.
   const creditFactor = creditFactorOf(invoice.items);
+  // Which lines are final sale, judged the same way the refund API will judge them.
+  const facts = await refundFacts(invoice.id).catch(() => null);
+  const finalIds = new Set((facts?.lines || []).filter((l) => l.finalSale).map((l) => l.id));
+  const policy = returnRulesApply(invoice.created_at);
   const view = {
+    policy,
+    isAdmin: isAdmin(session),
     id: invoice.id,
     number: invoice.number,
     status: invoice.status,
@@ -67,7 +75,8 @@ export default async function RefundInvoicePage({ params }) {
       sku: it.sku || null,
       kind: normalizeLineKind(it.kind),
       amount: Number(it.amount) || 0,
-      refunded: !!it.refunded_at
+      refunded: !!it.refunded_at,
+      finalSale: policy && finalIds.has(it.id)
     })),
     creditFactor,
     refunds: await listInvoiceRefunds(invoice.id).catch(() => [])

@@ -1136,6 +1136,28 @@ and the `[number]/edit` screen are staff for the same reason the invoice editor
 is). The order editor carries `cost` through its state to preserve it on save and
 renders it nowhere — check that stays true if that screen ever grows a column.
 
+## Returns policy — final sale, 20% on every refund (2026-11-27, owner)
+`lib/return-rules.js` (no imports) is the one definition; `lib/final-sale.js` stamps sales; `lib/refund-guard.js` enforces;
+migration `0086_final_sale` (also applied at runtime by `ensureInvoiceSchema`); `test/return-rules.test.mjs`.
+
+- **Rules:** sold for MORE than 30% off retail = final sale (no returns, refunds or exchanges); exactly 30% is not. Every refund
+  keeps 20%. DOA within 24h of pickup/delivery = exchange (store credit if none comparable), final sale included. Damage /
+  missing parts / wrong item: 24h; full refund only if WE got it wrong and cannot replace. Warranty is unchanged.
+- **Dated** (`RETURN_RULES_FROM`): earlier sales keep the old terms — `returnTermsFor(createdAt)` prints the old summary on old
+  invoices and the guard ignores them. Do not remove the old text.
+- **"Sold for" is pre-tax, after discount lines / promo codes spread over the appliances.** A trade-in is not a discount.
+  Retail = the product's `compare_at`, else the tracker's Retail. **No retail on record = not flagged**, and so is a typed line
+  with no SKU.
+- **Stamped on `invoice_items.final_sale` / `retail_price` at the sale** (create and edit); an edit re-judges against the
+  recorded retail, never a newer one.
+- **Enforced in `/api/admin/invoices` and Sarah's `refund_invoice`, not in the refund functions** (a seller who cannot fulfil
+  must still be reversible). Staff cannot refund a final sale line, waive the fee, or give back more than 80% as money; an ADMIN
+  can with "Override the returns policy" plus a reason (audit log says POLICY OVERRIDE). Money-only on an invoice with a final
+  sale line: store credit, before delivery only (the cancellation button).
+- Shown on: product page, cart, checkout (required tick box, browser only), order page and email, invoice page/PDF/email, the
+  invoice line editor, Facebook captions, `/policies/returns`, and every agent prompt (`returnsPolicyBrief`).
+- Not covered: the manager's money-only refund (owner-instructed), quotes carry no final-sale note, product cards in grids.
+
 ## Refunds — three shapes, one ledger (added 2026-08-26)
 `/admin/invoices/<INV>/refund` is the whole refund surface (`RefundControl`).
 Every path writes an `invoice_refunds` row, moves `invoices.refund_total`, and
@@ -1172,7 +1194,7 @@ off the LINES, and that is the only thing that stops a fee kept on an earlier
 partial return from being refunded back out on a later one (totals-based maths
 treats the retained fee as refundable and gives 80% of it away).
 
-Refunds are **not** exposed to Sarah with a fee — `refund_invoice` still calls
+(Superseded 2026-11-27: Sarah's `refund_invoice` now keeps the fee by default — see the returns policy above.) Before then she called
 both functions with the default 0%. Keeping a fifth of a customer's money is the
 owner's call, not the phone agent's.
 

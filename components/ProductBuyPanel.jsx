@@ -6,6 +6,7 @@ import ConditionPill from './ConditionPill';
 import AddToCartButton from './AddToCartButton';
 import MakeOffer from './MakeOffer';
 import ProductGallery from './ProductGallery';
+import { isFinalSale, DOA_REPORT_HOURS } from '../lib/return-rules';
 
 // Buy panel for a model that may have several identical in-stock units.
 // `units` is every available unit of the same make+model (cheapest first),
@@ -67,6 +68,13 @@ export default function ProductBuyPanel({ units, initialId }) {
         {off > 0 && <div className="savings">You save {money(sel.compareAt - sel.price)} ({off}% off retail)</div>}
         {sel.isMemberPrice && <div className="member-was">Member price · client price {money(sel.clientPrice)}</div>}
         <div className="hint">+ 13% HST at checkout · prices in CAD</div>
+
+        {isFinalSale(sel.price, sel.compareAt) && (
+          <div className="final-sale-box">
+            <b>Final sale.</b> More than 30% off retail: no returns, refunds or exchanges. Dead on arrival? Report it
+            within {DOA_REPORT_HOURS} hours for an exchange. <a href="/policies/returns">Returns policy</a>
+          </div>
+        )}
 
         <div className="cond-box"><b>{sel.condition}:</b> {sel.explainer}</div>
 

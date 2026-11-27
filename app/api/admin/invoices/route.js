@@ -8,6 +8,7 @@ import { createAndSendInvoice, priceInvoice, listInvoices, listInvoiceAuthors, m
 import { confirmDoorCollection, rejectDoorCollection } from '../../../../lib/door-money';
 import { QUICK_SALE_EMAIL } from '../../../../lib/constants';
 import { consignmentFloorProblem } from '../../../../lib/consignment';
+import { refundGuard } from '../../../../lib/refund-guard';
 
 
 export const dynamic = 'force-dynamic';
@@ -298,11 +299,29 @@ export async function PATCH(req) {
       await audit(await getSession(), { action: 'invoice.store_credit_used', entity: 'invoice', entityId: r.number || invoiceId, summary: `Store credit ${r.creditCode} applied: $${Number(r.creditUsed).toFixed(2)}` });
       return NextResponse.json({ ok: true, invoice: r });
     }
+    // The published returns policy: final sale items are not refunded and every refund keeps the
+    // restocking fee. Only an admin may go outside it, deliberately and with a reason on record.
+    const refundKind = { refund: 'full', refund_items: 'items', refund_amount: 'amount' }[body.action];
+    let override = '';
+    if (refundKind) {
+      const outside = await refundGuard(invoiceId, {
+        kind: refundKind, itemIds: body.itemIds, skus: body.skus,
+        restockingPct: body.restockingPct, amount: body.amount, asCredit: !!body.asCredit
+      });
+      if (outside) {
+        const who = await getSession();
+        if (!isAdmin(who)) return NextResponse.json({ error: `${outside} Only an admin can make an exception.` }, { status: 403 });
+        if (!body.policyOverride || !String(body.reason || '').trim()) {
+          return NextResponse.json({ error: `${outside} To make an exception, tick "Override the returns policy" and give a reason.`, needsOverride: true }, { status: 409 });
+        }
+        override = ' [POLICY OVERRIDE]';
+      }
+    }
     if (body.action === 'refund') {
       const refunded = await refundInvoice(invoiceId, {
         restockingPct: body.restockingPct, reason: body.reason, by: actor, asCredit: body.asCredit === true
       });
-      await audit(await getSession(), { action: 'invoice.refund', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `Full refund${refunded?.storeCredit ? ' to store credit ' + refunded.storeCredit.code : ''}${body.restockingPct ? ` with ${body.restockingPct}% restocking` : ''}${body.reason ? `: ${body.reason}` : ''}` });
+      await audit(await getSession(), { action: 'invoice.refund', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${override ? override.trim() + ' ' : ''}Full refund${refunded?.storeCredit ? ' to store credit ' + refunded.storeCredit.code : ''}${body.restockingPct ? ` with ${body.restockingPct}% restocking` : ''}${body.reason ? `: ${body.reason}` : ''}` });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     // Per-unit refund: refund only the selected line items (invoice_items.id).
@@ -312,7 +331,7 @@ export async function PATCH(req) {
       const refunded = await refundInvoiceItems(invoiceId, {
         itemIds, restockingPct: body.restockingPct, reason: body.reason, by: actor, asCredit: body.asCredit === true
       });
-      await audit(await getSession(), { action: 'invoice.refund_items', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${itemIds.length} line(s) refunded${refunded?.storeCredit ? ' to store credit ' + refunded.storeCredit.code : ''}${body.reason ? `: ${body.reason}` : ''}`, detail: { itemIds } });
+      await audit(await getSession(), { action: 'invoice.refund_items', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${override ? override.trim() + ' ' : ''}${itemIds.length} line(s) refunded${refunded?.storeCredit ? ' to store credit ' + refunded.storeCredit.code : ''}${body.reason ? `: ${body.reason}` : ''}`, detail: { itemIds } });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     // Money-only refund of an arbitrary amount (price adjustment / goodwill /
@@ -321,7 +340,7 @@ export async function PATCH(req) {
       const refunded = await refundInvoiceAmount(invoiceId, {
         amount: body.amount, reason: body.reason, by: actor, asCredit: body.asCredit === true
       });
-      await audit(await getSession(), { action: 'invoice.refund_amount', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${body.amount} refunded${refunded?.storeCredit ? ' to store credit ' + refunded.storeCredit.code : ''}${body.reason ? `: ${body.reason}` : ''}`, detail: { amount: body.amount } });
+      await audit(await getSession(), { action: 'invoice.refund_amount', entity: 'invoice', entityId: refunded?.number || invoiceId, summary: `${override ? override.trim() + ' ' : ''}${body.amount} refunded${refunded?.storeCredit ? ' to store credit ' + refunded.storeCredit.code : ''}${body.reason ? `: ${body.reason}` : ''}`, detail: { amount: body.amount } });
       return NextResponse.json({ ok: true, invoice: refunded });
     }
     const method = String(body.method || '').trim();

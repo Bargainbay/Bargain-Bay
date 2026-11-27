@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { RESTOCKING_FEE_PCT, MAX_RESTOCKING_FEE_PCT, isCreditLine } from '../lib/constants';
+import { FINAL_SALE_OVER_PCT, REFUND_FEE_PCT, DOA_REPORT_HOURS } from '../lib/return-rules';
 
 // The refund console for one invoice. Two ways money goes back, because they are
 // genuinely different events and conflating them is how stock goes wrong:
@@ -12,12 +13,14 @@ import { RESTOCKING_FEE_PCT, MAX_RESTOCKING_FEE_PCT, isCreditLine } from '../lib
 //  * "Refund an amount" — a price adjustment, a goodwill credit, a deposit handed
 //    back. Money only: nothing is relisted, because nothing came back.
 export default function RefundControl({ invoice }) {
-  const { id, number, hasHst, items, refundable, status, refunds = [], creditFactor = 1 } = invoice;
+  const { id, number, hasHst, items, refundable, status, refunds = [], creditFactor = 1, policy = false, isAdmin = false } = invoice;
   const canReturnItems = status === 'paid';
 
   const [tab, setTab] = useState(canReturnItems ? 'items' : 'amount');
   const [picked, setPicked] = useState(() => new Set());
-  const [restock, setRestock] = useState(false);
+  const [restock, setRestock] = useState(policy);
+  // An admin's deliberate exception to the returns policy (our own mistake, a legal obligation).
+  const [override, setOverride] = useState(false);
   const [pct, setPct] = useState(String(RESTOCKING_FEE_PCT));
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -31,7 +34,9 @@ export default function RefundControl({ invoice }) {
 
   // A discount or trade-in credit can't be returned — it's money the customer
   // never paid. Listed for context, never tickable.
-  const refundableItems = items.filter((it) => !it.refunded && !isCreditLine(it.kind));
+  // Under the returns policy a final sale line can't be refunded without an admin's override.
+  const locked = (it) => it.finalSale && !override;
+  const refundableItems = items.filter((it) => !it.refunded && !isCreditLine(it.kind) && !locked(it));
   const toggle = (itemId) => setPicked((s) => {
     const n = new Set(s);
     if (n.has(itemId)) n.delete(itemId); else n.add(itemId);
@@ -42,7 +47,8 @@ export default function RefundControl({ invoice }) {
 
   // Mirrors splitRestocking() in lib/invoices.js — HST follows the money on both
   // halves, because a restocking fee is itself a taxable supply in Ontario.
-  const feePct = restock ? Math.min(MAX_RESTOCKING_FEE_PCT, Math.max(0, Number(pct) || 0)) : 0;
+  const feeLocked = policy && !override;
+  const feePct = restock || feeLocked ? Math.min(MAX_RESTOCKING_FEE_PCT, Math.max(0, Number(pct) || 0)) : 0;
   // Face value of what's ticked, less the share of the invoice's credits that
   // belonged to it — mirrors refundInvoiceItems in lib/invoices.js, so what's
   // previewed here is what the refund actually hands back.
@@ -63,7 +69,7 @@ export default function RefundControl({ invoice }) {
       const res = await fetch('/api/admin/invoices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: id, reason: reason.trim(), asCredit: toCredit, ...body })
+        body: JSON.stringify({ invoiceId: id, reason: reason.trim(), asCredit: toCredit, policyOverride: override, ...body })
       });
       const d = await res.json();
       if (!res.ok) { setErr(d.error || 'Refund failed.'); return; }
@@ -79,6 +85,7 @@ export default function RefundControl({ invoice }) {
     if (!picked.size) { setErr('Tick at least one line to refund.'); return; }
     const feeLine = feeKept ? ` We keep ${fmt(feeKept)} as a ${feePct}% restocking fee.` : '';
     const where = toCredit ? ' as STORE CREDIT (no money leaves the bank)' : '';
+    if (override && !reason.trim()) { setErr('Give a reason for overriding the returns policy.'); return; }
     const msg = allPicked
       ? `Refund ${fmt(itemsRefund)}${where} on ${number} and relist every remaining unit?${feeLine}`
       : `Refund ${picked.size} line(s) of ${number} for ${fmt(itemsRefund)}${where}? The unit(s) are relisted and that money comes off the recorded sale.${feeLine}`;
@@ -88,6 +95,7 @@ export default function RefundControl({ invoice }) {
   function submitAmount() {
     if (!(amt > 0)) { setErr('Enter a refund amount greater than zero.'); return; }
     if (amt > refundable + 0.005) { setErr(`Only ${fmt(refundable)} is still refundable on ${number}.`); return; }
+    if (override && !reason.trim()) { setErr('Give a reason for overriding the returns policy.'); return; }
     post({ action: 'refund_amount', amount: amt },
       `Refund ${fmt(amt)}${toCredit ? ' as STORE CREDIT (no money leaves the bank)' : ''} against ${number}? This returns money only — no unit is relisted.`);
   }
@@ -141,6 +149,19 @@ export default function RefundControl({ invoice }) {
         <input type="checkbox" style={{ width: 'auto' }} checked={toCredit} onChange={(e) => setToCredit(e.target.checked)} />
         <span><b>Give it back as store credit</b> <span style={{ color: 'var(--muted)' }}>(a code the customer can spend later — nothing goes back to their card or bank)</span></span>
       </label>
+      {policy && (
+        <div className="notice-box" style={{ marginBottom: 14, lineHeight: 1.55 }}>
+          <b>Returns policy:</b> more than {FINAL_SALE_OVER_PCT}% off retail is final sale (no refund, no exchange).
+          Every refund keeps a {REFUND_FEE_PCT}% restocking fee. Dead on arrival within {DOA_REPORT_HOURS} hours is exchanged, not refunded.
+          {isAdmin ? (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+              <input type="checkbox" style={{ width: 'auto' }} checked={override}
+                onChange={(e) => { setOverride(e.target.checked); if (!e.target.checked) { setPicked(new Set()); setRestock(true); setPct(String(REFUND_FEE_PCT)); } }} />
+              <span><b>Override the returns policy</b> (admin — a reason is required and recorded)</span>
+            </label>
+          ) : <> Exceptions need an admin.</>}
+        </div>
+      )}
       {err && <div className="error-box">{err}</div>}
 
       {tab === 'items' ? (
@@ -155,15 +176,16 @@ export default function RefundControl({ invoice }) {
               <label key={it.id} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
                 border: '1px solid var(--line)', borderRadius: 8, marginBottom: 6, fontSize: 14,
-                opacity: (it.refunded || isCreditLine(it.kind)) ? 0.55 : 1,
-                cursor: (it.refunded || isCreditLine(it.kind)) ? 'default' : 'pointer'
+                opacity: (it.refunded || isCreditLine(it.kind) || locked(it)) ? 0.55 : 1,
+                cursor: (it.refunded || isCreditLine(it.kind) || locked(it)) ? 'default' : 'pointer'
               }}>
-                <input type="checkbox" style={{ width: 'auto' }} disabled={it.refunded || isCreditLine(it.kind)}
+                <input type="checkbox" style={{ width: 'auto' }} disabled={it.refunded || isCreditLine(it.kind) || locked(it)}
                   checked={picked.has(it.id)} onChange={() => toggle(it.id)} />
                 <span style={{ flex: 1, textDecoration: it.refunded ? 'line-through' : 'none' }}>
                   {it.description}
                   {it.sku && <span style={{ color: 'var(--muted)', fontSize: 12 }}> ({it.sku})</span>}
                   {KIND_PILL[it.kind] && <span className="pill" style={{ fontSize: 11, marginLeft: 6 }}>{KIND_PILL[it.kind]}</span>}
+                  {it.finalSale && <span className="pill sold" style={{ fontSize: 11, marginLeft: 6 }}>Final sale</span>}
                   {it.refunded && <span className="pill sold" style={{ fontSize: 11, marginLeft: 6 }}>Refunded</span>}
                 </span>
                 <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{fmt(it.amount)}</span>
@@ -172,13 +194,13 @@ export default function RefundControl({ invoice }) {
 
             <div style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '10px 12px', marginTop: 12 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
-                <input type="checkbox" style={{ width: 'auto' }} checked={restock}
+                <input type="checkbox" style={{ width: 'auto' }} checked={restock || feeLocked} disabled={feeLocked}
                   onChange={(e) => setRestock(e.target.checked)} />
                 <span>Keep a restocking fee <span style={{ color: 'var(--muted)' }}>(change of mind — the fault is on their side)</span></span>
               </label>
-              {restock && (
+              {(restock || feeLocked) && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                  <input type="number" min="0" max={MAX_RESTOCKING_FEE_PCT} step="1" value={pct}
+                  <input type="number" min={feeLocked ? REFUND_FEE_PCT : 0} max={MAX_RESTOCKING_FEE_PCT} step="1" value={pct}
                     onChange={(e) => setPct(e.target.value)} aria-label="Restocking fee percent"
                     style={{ width: 90, fontSize: 16 }} />
                   <span style={{ fontSize: 14, color: 'var(--muted)' }}>

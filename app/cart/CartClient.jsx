@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { getCart, removeFromCart, onCartChange } from '../../lib/cart';
 import { productPath, money, round2, HST_RATE, DELIVERY_FEE } from '../../lib/constants';
 import ConditionPill from '../../components/ConditionPill';
+import { isFinalSale } from '../../lib/return-rules';
 
 export default function CartClient({ catalog, member }) {
   const [skus, setSkus] = useState(null); // null = not hydrated yet
@@ -61,6 +62,7 @@ export default function CartClient({ catalog, member }) {
                   {u.make} · {u.model} · qty 1 (one available)
                 </div>
                 <ConditionPill condition={u.condition} />
+                {isFinalSale(u.price, u.compareAt) && <span className="final-sale-tag">Final sale — no refunds or exchanges</span>}
                 {gone.includes(u.id) && <span className="pill sold" style={{ marginLeft: 6 }}>No longer available</span>}
               </div>
               <div style={{ textAlign: 'right' }}>

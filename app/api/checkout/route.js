@@ -32,6 +32,7 @@ import {
   checkOrderRate, unpaidUnitsHeld, ensureAbuseSchema, MAX_UNPAID_UNITS
 } from '../../../lib/antifraud';
 import { newVerifyToken, sendOrderVerifyEmail } from '../../../lib/order-verify';
+import { isFinalSale } from '../../../lib/return-rules';
 
 export const dynamic = 'force-dynamic';
 
@@ -514,7 +515,10 @@ export async function POST(req) {
     sendOrderEmails(
       { orderNumber: order.orderNumber, name, email, deliveryMethod, address, city, postal,
         subtotal: orderSubtotal, unitCount: items.length, hst, total, paymentMethod, discount, couponCode: appliedCode, storeCredit: creditToUse },
-      [...items.map((u) => ({ title: u.title || `${u.make} ${u.model}`, price: priceOf(u) })),
+      [...items.map((u) => ({
+        title: u.title || `${u.make} ${u.model}`, price: priceOf(u),
+        finalSale: isFinalSale(priceOf(u) * (subtotal > 0 ? (subtotal - discount) / subtotal : 1), u.compareAt)
+      })),
        ...addonLines.map((l) => ({ title: l.description, price: l.amount }))]
     ).catch((e) => console.error('order emails failed', e.message));
     // Confirm-it's-really-you link. The unit is ALREADY held at this point, so a

@@ -67,7 +67,7 @@ export default function ShippingPage() {
       <h2>Inspect on arrival</h2>
       <p>
         Please inspect your appliance at pickup or on delivery and <b>report any shipping damage or missing
-        parts within 48 hours</b>, with photos (see our <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp;
+        parts within 24 hours</b>, with photos (see our <a href="/policies/returns" style={{ textDecoration: 'underline' }}>Returns &amp;
         Refund Policy</a>). Title and risk of loss pass to you on pickup or on delivery to your address.
       </p>
 
