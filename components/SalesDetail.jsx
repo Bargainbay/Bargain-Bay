@@ -1,5 +1,5 @@
 'use client';
-// Today's sales, in full: who bought, who closed it and where the lead came from,
+// A day's sales, in full: who bought, who closed it and where the lead came from,
 // what is still owed, and every line with its price, cost and profit. Admin only
 // (it is built from costs); the server sends it to nobody else.
 import { Fragment, useState } from 'react';
@@ -17,7 +17,7 @@ function Payment({ o }) {
   return <span style={sub}>{(o.invoiceStatus || o.status || '—').replace(/_/g, ' ')}</span>;
 }
 
-export default function SalesDetail({ orders }) {
+export default function SalesDetail({ orders, title = 'Today’s sales' }) {
   const [items, setItems] = useState(true);
   const total = (f) => orders.reduce((a, o) => a + (Number(o[f]) || 0), 0);
   const cost = total('cost'), revenue = total('revenue'), gp = total('gp');
@@ -25,7 +25,7 @@ export default function SalesDetail({ orders }) {
   return (
     <div style={{ marginTop: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--charcoal)' }}>Today’s sales</h3>
+        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--charcoal)' }}>{title}</h3>
         <button type="button" className="dash-filter" aria-pressed={items} onClick={() => setItems((v) => !v)}>{items ? 'Hide items' : 'Show items'}</button>
       </div>
       <div className="table-wrap" style={{ marginTop: 8 }}>

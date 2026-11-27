@@ -118,7 +118,8 @@ export default async function CashSplitPage({ searchParams }) {
             ))}
           </tbody>
         </table></div>
-        <p className="hint">Product is the cost of the units sold (consigned units at their pre-tax cost, as the Daily P&amp;L counts them). Units sold with no cost on file are counted as nothing, so product is too low until <a href="/admin/cost-fix">their costs are entered</a>.</p>
+        <p className="hint">Product is the cost of the units sold (consigned units at their pre-tax cost, as the Daily P&amp;L counts them). Units sold with no cost on file are counted as nothing, so product is too low until <a href="/admin/cost-fix">their costs are entered</a>.
+          {r.vendorTax > 0 && <> Drop-off vendors are paid with tax included, so putting their units back takes <b>{money(r.vendorTax)}</b> more than the product figure here; the Sales dashboard&apos;s &quot;keep aside&quot; includes it.</>}</p>
       </div>
     </div>
   );

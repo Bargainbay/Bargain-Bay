@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { getSession, isAdmin, isStaff } from '../../../../lib/auth';
 import { repProfit } from '../../../../lib/analytics';
+import { withNet } from '../../../../lib/day-money';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -12,7 +13,7 @@ export async function GET() {
   const s = await getSession();
   if (!(s && isStaff(s))) return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   try {
-    const data = await repProfit({ name: s.name, email: s.email }, { all: isAdmin(s) });
+    const data = await withNet(await repProfit({ name: s.name, email: s.email }, { all: isAdmin(s) }));
     if (!data) return NextResponse.json({ error: 'Database not configured.' }, { status: 503 });
     return NextResponse.json(data);
   } catch (e) {

@@ -4598,6 +4598,19 @@ old "By salesperson" panel on `/admin/dashboard`.
 - Gross profit is computed and sent for an admin only; sales staff get sales, with-tax and count.
 - Today's table: customer, delivery/pickup, lead, payment/owing, before and with tax, cost, profit, margin, every line. A service line is "not counted" in profit.
 
+## Day by day on the Sales dashboard: net profit and restock money (added 2026-11-27)
+`lib/day-money.js`, `lib/day-money-math.js` (pure), `components/DayMoney.jsx`, `GET /api/admin/day-money` (ADMIN;
+`?day=` returns that day's sales via `ordersOnDay`), `test/day-money.test.mjs`. The company cards also carry net
+profit and "keep aside for product" (`withNet`, soft-fails to hiding them).
+
+- **Built on `dailyPnl()`** and split with `cash-split-math`, so net agrees with the Daily P&L and "Where the money
+  goes". The ONE difference: it costs people still clocked in up to now (`asOf`), so today can read lower here than
+  on the Daily P&L until everyone has clocked out.
+- **Keep aside for product = product cost + the tax inside consigned units' costs** (`vendorTax` on each dailyPnl
+  row). Profit counts a drop-off unit at cost / 1.13 (owner, 2026-11-10), but the vendor is paid the full figure.
+- Net profit does not take off rep commission, and is only as complete as the cost list, fuel entries and clock-ins;
+  the panel says so (`notes`). Sales logins get none of it.
+
 ## Affiliates (added 2026-10-26)
 `lib/affiliates.js`, migration `0037_affiliates`, `/affiliate` (public pitch + application +
 the affiliate's own dashboard), `/admin/affiliates` (ADMIN), `/api/affiliate`,

@@ -15,6 +15,8 @@ import MyQuota from '../../../components/MyQuota';
 import MyProfit from '../../../components/MyProfit';
 import TeamProfit from '../../../components/TeamProfit';
 import MonthSales from '../../../components/MonthSales';
+import DayMoney from '../../../components/DayMoney';
+import { withNet } from '../../../lib/day-money';
 import TaxOwed from '../../../components/TaxOwed';
 import LeadSources from '../../../components/LeadSources';
 import { Kpi, Donut, Funnel, TrendChart } from '../../../components/charts';
@@ -63,7 +65,7 @@ export default async function SalesDashboardPage({ searchParams }) {
       repScorecard(period, { name: session.name, email: session.email }).catch((e) => { console.error('repScorecard failed', e.message); return null; }),
       // The rep's own gross profit and commission. The whole-team table rides
       // along for an admin only: it carries everyone's profit.
-      repProfit({ name: session.name, email: session.email }, { all: !salesOnly }).catch((e) => { console.error('repProfit failed', e.message); return null; })
+      repProfit({ name: session.name, email: session.email }, { all: !salesOnly }).then(withNet).catch((e) => { console.error('repProfit failed', e.message); return null; })
     ]);
   } catch (e) {
     console.error('sales dashboard load failed', e.message);
@@ -91,6 +93,7 @@ export default async function SalesDashboardPage({ searchParams }) {
       {/* A rep's own quota comes first: it is the number they are working to. */}
       {(profit?.company || profit?.me) && <MyProfit initial={profit} />}
       {team?.me && <MyQuota data={team} />}
+      {!salesOnly && <DayMoney />}
       <MonthSales />
       {!salesOnly && <TeamProfit data={profit} />}
 

@@ -47,6 +47,18 @@ export default function MyProfit({ initial }) {
                 <div className="hint" style={{ margin: 0 }}>Gross profit</div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--charcoal)' }}>{$(p.gp)}</div>
               </div>
+              {p.net != null && (
+                <>
+                  <div style={{ marginTop: 6 }}>
+                    <div className="hint" style={{ margin: 0 }}>Net profit (after wages, truck and bills)</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: p.net < 0 ? 'var(--danger)' : 'var(--ok)' }}>{$(p.net)}</div>
+                  </div>
+                  <div style={{ marginTop: 6 }}>
+                    <div className="hint" style={{ margin: 0 }}>Keep aside for product</div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--charcoal)' }}>{$(p.restock)}</div>
+                  </div>
+                </>
+              )}
               <div className="hint" style={{ marginTop: 6 }}>{p.sales} sale{p.sales === 1 ? '' : 's'}</div>
             </div>
           ))}
