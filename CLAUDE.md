@@ -4589,6 +4589,15 @@ old "By salesperson" panel on `/admin/dashboard`.
 - **No card for a login that matches no rep** (`resolveViewerRep`), same as the quota card.
 - Commission shown here is what to PAY; nothing pays it automatically.
 
+## Sales by day, and today's sales in detail (added 2026-11-26)
+`monthDays` / `profitRows` / `saleDetails` in `lib/analytics.js`, `lib/month-sales.js` (no imports),
+`components/MonthSales.jsx` (Sales dashboard, under the gross-profit card), `components/SalesDetail.jsx`
+(inside that card, admin), `GET /api/admin/month-days?months=YYYY-MM,...` (staff; max 6), `test/month-sales.test.mjs`.
+- **`profitRows` is the one per-sale query** behind the commission cards, the company card and the chart. Change gross profit there only.
+- A day still to come is NULL, not zero. When a chosen month is still running, the change compares the same days of each month.
+- Gross profit is computed and sent for an admin only; sales staff get sales, with-tax and count.
+- Today's table: customer, delivery/pickup, lead, payment/owing, before and with tax, cost, profit, margin, every line. A service line is "not counted" in profit.
+
 ## Affiliates (added 2026-10-26)
 `lib/affiliates.js`, migration `0037_affiliates`, `/affiliate` (public pitch + application +
 the affiliate's own dashboard), `/admin/affiliates` (ADMIN), `/api/affiliate`,

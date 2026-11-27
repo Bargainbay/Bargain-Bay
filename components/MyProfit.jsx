@@ -4,6 +4,7 @@
 // is the number a rep works to. Starts from what the page loaded and refreshes
 // itself, so a sale closed a minute ago shows without a reload.
 import { useEffect, useState } from 'react';
+import SalesDetail from './SalesDetail';
 
 const $ = (v) => `$${Number(v || 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const $0 = (v) => `$${Math.round(Number(v || 0)).toLocaleString('en-CA')}`;
@@ -50,25 +51,7 @@ export default function MyProfit({ initial }) {
             </div>
           ))}
         </div>
-        {co.today.orders.length > 0 && (
-          <div className="table-wrap" style={{ marginTop: 12 }}>
-            <table className="admin" style={{ minWidth: 0 }}>
-              <thead><tr><th>Sale</th><th>Time</th><th>Closed by</th><th style={{ textAlign: 'right' }}>Gross profit</th></tr></thead>
-              <tbody>
-                {co.today.orders.map((o) => (
-                  <tr key={o.number}>
-                    <td>{o.number}{o.units > 1 ? ` · ${o.units} units` : ''}</td>
-                    <td>{o.at}</td>
-                    <td>{o.rep || <span className="hint">No rep recorded</span>}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      {$(o.gp)}{o.missing > 0 && <span title="A unit on this sale has no cost on file, so its profit is counted as $0 until the cost is entered." className="pill warn" style={{ marginLeft: 6 }}>cost missing</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {co.today.orders.length > 0 && <SalesDetail orders={co.today.orders} />}
         {co.missingCost > 0 && (
           <p className="hint" style={{ marginTop: 8 }}>
             {co.missingCost} unit{co.missingCost === 1 ? '' : 's'} sold this month {co.missingCost === 1 ? 'has' : 'have'} no cost on file, so the profit shown is lower than the real figure.

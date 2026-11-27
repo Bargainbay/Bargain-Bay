@@ -14,6 +14,7 @@ import RepScorecard from '../../../components/RepScorecard';
 import MyQuota from '../../../components/MyQuota';
 import MyProfit from '../../../components/MyProfit';
 import TeamProfit from '../../../components/TeamProfit';
+import MonthSales from '../../../components/MonthSales';
 import TaxOwed from '../../../components/TaxOwed';
 import LeadSources from '../../../components/LeadSources';
 import { Kpi, Donut, Funnel, TrendChart } from '../../../components/charts';
@@ -90,6 +91,7 @@ export default async function SalesDashboardPage({ searchParams }) {
       {/* A rep's own quota comes first: it is the number they are working to. */}
       {(profit?.company || profit?.me) && <MyProfit initial={profit} />}
       {team?.me && <MyQuota data={team} />}
+      <MonthSales />
       {!salesOnly && <TeamProfit data={profit} />}
 
       {/* Before the numbers. A dashboard tells you how the month went; this is
