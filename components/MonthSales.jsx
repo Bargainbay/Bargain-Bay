@@ -26,7 +26,8 @@ const W = 960, H = 320, PAD = { l: 66, r: 12, t: 14, b: 40 };
 function niceTop(v) {
   if (v <= 0) return 1;
   const step = 10 ** Math.floor(Math.log10(v));
-  return [1, 2, 2.5, 5, 10].map((k) => k * step).find((t) => t >= v);
+  // Steps that divide cleanly into the four gridlines, without leaving half the chart empty.
+  return [1, 1.2, 1.6, 2, 2.4, 3.2, 4, 5, 6, 8, 10].map((k) => k * step).find((t) => t >= v);
 }
 
 function Chart({ series, kind, fmt, axisFmt, active, onActive }) {
